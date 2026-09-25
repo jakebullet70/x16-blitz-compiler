@@ -10,7 +10,7 @@ BASLOAD turns readable `.BASL` source into a tokenised `.PRG` that GPC then comp
 **first** step, and almost every mystery in this tree that looks like a compiler bug is a BASLOAD
 failure that did not announce itself.
 
-Its own manual is `testing/MSEDIT/BASLOAD.MD`. **It is wrong in at least one place** (see digits,
+Its own manual is `drive/MSEDIT/BASLOAD.MD`. **It is wrong in at least one place** (see digits,
 below), so prefer this file and the tree's evidence where they disagree.
 
 ---
@@ -156,7 +156,7 @@ the limit — building a string in two assignments costs a line marker and a rea
 ## Line endings
 
 **The tree uses all three, and BASLOAD takes any of them**, so a source-to-source tool must too —
-and must write back what it found. `EDITOR.BASL` and `GPC-BASIC/` are LF, `testing/GPC.BASL` is
+and must write back what it found. `EDITOR.BASL` and `GPC-BASIC/` are LF, `drive/GPC.BASL` is
 CRLF, and the editor itself writes CR.
 
 One probe read (`LINPUT# 2, P$, 10`) tells them apart:
@@ -196,7 +196,7 @@ Emulator: `C:\8bitProgramming\x16emu\x16emu.exe` (r49). The full three-run cycle
 
 | | |
 |---|---|
-| BASLOAD's own manual (partly wrong) | `testing/MSEDIT/BASLOAD.MD` |
+| BASLOAD's own manual (partly wrong) | `drive/MSEDIT/BASLOAD.MD` |
 | the GP.BASIC manual, §5 names and §6 traps | `GPC-BASIC/GP-BASIC.md` |
 | the per-module global register | `GPC-BASIC/GP-BASIC.GLOBALS.md` |
 | accumulated findings | `docs/memory/basload-*.md` |

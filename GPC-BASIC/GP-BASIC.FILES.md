@@ -68,7 +68,7 @@ compiler reads. GPC never sees a label.
 
 **The X16 ships BASLOAD in ROM, and this project does not use that one.** `BASLOAD-GPC.BIN` is the
 same program built from the same upstream source as an ordinary PRG, with a handful of changes in
-`BASLOAD-GPC/src/`. The build drives that one and stages it into `testing/` beside `GPC.BIN`.
+`BASLOAD-GPC/src/`. The build drives that one and stages it into `drive/` beside `GPC.BIN`.
 
 ### Why
 

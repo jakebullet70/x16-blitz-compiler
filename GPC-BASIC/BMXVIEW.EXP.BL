@@ -16,7 +16,7 @@
 ## **  $030C..$030F and SYSing.
 ## **
 ## **  Build:  copy GPB.INC.BL, APPSYS.INC.BL, BMX.INC.BL, STRCASE.INC.BL
-## **          and this file into testing/, then
+## **          and this file into drive/, then
 ## **            python source/gpc/build_basl.py BMXVIEW.EXP.BL BMXVIEW.SRC.PRG
 ## **          and compile BMXVIEW.SRC.PRG with GPC.BIN. Put some .BMX
 ## **          files on the same drive -- samples/BMXVIEWER/SAMPLES has 30.

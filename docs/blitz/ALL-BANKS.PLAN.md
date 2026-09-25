@@ -205,7 +205,7 @@ The asm steps wait for the user's agreement on their shape (the standing asm rul
     before and `LOW FREE` as before. Never build PICKDEMO.
 
     Done 2026-09-14. GPBMODS includes its modules by bare name, so it still builds staged in
-    `testing/`, which is what `modsbuild.py` does. It tokenised to 73,586 bytes and compiled to
+    `drive/`, which is what `modsbuild.py` does. It tokenised to 73,586 bytes and compiled to
     an 11,087-byte PRG with eight overlays: `.004` 7,682, `.005` 7,426, `.006` 4,354, `.007`
     4,866, `.008` 1,794, `.009` 770, `.010` 770, `.011` 3,074. Against the step 12 reference,
     seven overlays have the same size and `.004` is one page smaller. The workspace starts at
@@ -213,20 +213,20 @@ The asm steps wait for the user's agreement on their shape (the standing asm rul
     source, not the compiler: the library copies were crunched after the 10:50 snapshot, and
     the reference compiled from that snapshot by the same compiler still starts at `$3E00`.
     The extension page is byte for byte the reference's. The `.B04` to `.B11` files from the
-    05:13 build are still in `testing/`.
+    05:13 build are still in `drive/`.
 
 ### Phase E: names and docs
 
-14. `.gitignore:260` `testing/*.B[0-9][0-9]` becomes `testing/*.[0-9][0-9][0-9]`. The "nn reaches 63" comments in
+14. `.gitignore:260` `drive/*.B[0-9][0-9]` becomes `drive/*.[0-9][0-9][0-9]`. The "nn reaches 63" comments in
     `source/gpc/modsbuild.py`, `xbasebuild.py` and `samplesbuild.py`. `release.sh:119`.
 
-    Done 2026-09-14. `.gitignore` ignores `testing/*.[0-9][0-9][0-9]` and its comment names the
+    Done 2026-09-14. `.gitignore` ignores `drive/*.[0-9][0-9][0-9]` and its comment names the
     three-digit suffix. The three build scripts already said `.nnn`: their comments changed with
     their overlay loops earlier in the plan. `release.sh:119` says `.nnn`. `release.sh:203` was a
     live bug the step did not list: the GPBMODS glob took `GPBMODS.B` plus digits, so a release
     would have shipped the stale `.B04` to `.B11` and none of the new overlays. It now takes
     `GPBMODS.` plus exactly three digits, which matches `.004` to `.011` and nothing else in
-    `testing/`. The 74 stale `.Bnn` files in `testing/` now show as untracked.
+    `drive/`. The 74 stale `.Bnn` files in `drive/` now show as untracked.
 15. `GPC-BASIC/GP-BASIC.md`:
     - Grep for `.Bnn`, `banks 1 to 63`, `B04` and `in decimal`. The region count, the name and the
       GPBMODS overlay table change.
@@ -248,9 +248,9 @@ The asm steps wait for the user's agreement on their shape (the standing asm rul
 16. Samples:
     - The GPBMODS ABOUT text: grep `OVERLAYS 8` and `.B07` in `samples/GPB-MODS-TESTING/GPBMODS.BASL`.
     - The `XBASE.B04` checks in `xbase-demo.bat` and the comment in `gpbmods-demo.bat`.
-    - The tables in `samples/GPB-MODS-TESTING/readme.md`, plus `testing/readme.md`,
+    - The tables in `samples/GPB-MODS-TESTING/readme.md`, plus `drive/readme.md`,
       `source/gpc/BUILD-HANDOFF.md` and `docs/blitz/EMBEDDED-VS-SHARED.md`.
-    - The staged copies in `testing/` stay as they are.
+    - The staged copies in `drive/` stay as they are.
 
     Done 2026-09-15. `GPBMODS.BASL` says `.nnn` in its two banner comments. The ABOUT / MEMORY
     overlay rows read `.004` to `.011`, the MODULE SIZES headings `.007` and `.004`, and the
@@ -259,11 +259,11 @@ The asm steps wait for the user's agreement on their shape (the standing asm rul
     `XBASE.B04`, which a build no longer writes, so a stale copy passed the check and a missing
     `XBASE.004` did not stop it; the check, its message and the comment now say `XBASE.004`.
     `samples/GPB-MODS-TESTING/readme.md` names the files `GPBMODS.004` to `.011` and the breakdown
-    rows `.004` to `.011`. `testing/readme.md` lists `*.nnn`. `BUILD-HANDOFF.md` gives `.002` to
+    rows `.004` to `.011`. `drive/readme.md` lists `*.nnn`. `BUILD-HANDOFF.md` gives `.002` to
     `.255` and `?RAM`. `EMBEDDED-VS-SHARED.md` says `.nnn` five times. The sizes in the readme and
     the two GPBMODS panels are unchanged: they are one build's snapshot, and the step 13 build moved
     `.004`, `.007`, `.008` and the object, so updating them is a remeasure against
-    `testing/GPBMODS.MAP` and `GPBMODS.SRC.SYM`, not a rename. `GUI-CUA-PLAN.md`,
+    `drive/GPBMODS.MAP` and `GPBMODS.SRC.SYM`, not a rename. `GUI-CUA-PLAN.md`,
     `GUI-PAGE-PLAN.md` and `samples/XBASE/` still say `.Bnn`; they are history or XBASE, and the
     step did not list them.
 17. Notes:

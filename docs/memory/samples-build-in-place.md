@@ -1,6 +1,6 @@
 ---
 name: samples-build-in-place
-description: Samples are tokenised and compiled in their own folder now; never stage sources or modules into testing/
+description: Samples are tokenised and compiled in their own folder now; never stage sources or modules into drive/
 metadata: 
   node_type: memory
   type: feedback
@@ -9,12 +9,12 @@ metadata:
 ---
 
 Samples build in their own folder, with that folder as the emulator drive. Do not copy
-sources or `.INC.BL` modules into `testing/` to build or test them. The master includes its
+sources or `.INC.BL` modules into `drive/` to build or test them. The master includes its
 modules with the folder name, `#INCLUDE "GPC-BASIC/GPB.INC.BL"` (no leading slash), so the copy
 beside the sample is the one read.
 
 **Why:** on 2026-09-13 the user said "stop copying to testing, they are tested in place now".
-The flat copy in `testing/` is how stale modules (an old GUI.INC.BL, a downgraded GPB.INC.BL)
+The flat copy in `drive/` is how stale modules (an old GUI.INC.BL, a downgraded GPB.INC.BL)
 got built without warning.
 
 **How to apply:** `build_basl.py` and `compile_shared.py` take `--drive DIR`. In

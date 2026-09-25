@@ -16,7 +16,7 @@
 #
 #  The full build runs:
 #     make libs                        the libraries + the compiler engine GPC.BIN
-#     make release                     stage the engine + samples into testing/
+#     make release                     stage the engine + samples into drive/
 #     make -C source/runtime gpc-rt    both shared runtimes and their bank code, GPB/GPC/GP1.RT.nnn.BIN
 #     make -C source/gpc release       GPC.PRG + GPC.ERR (tokenised, then compiled)
 #     source/gpc/samplesbuild.py       the five sample programs, each tokenised
@@ -34,8 +34,8 @@
 #  staged tree names every placeholder, and the zip step warns about any it ships.
 #
 #  The zip lands in release/ -- the release drop folder, kept apart from the daily
-#  testing/ build cycle -- named gpc-release-<n>.zip. It is a git-ignored artifact, the
-#  way the old testing/blitz.zip was; release/TMP is git-ignored too, and release/ itself
+#  drive/ build cycle -- named gpc-release-<n>.zip. It is a git-ignored artifact, the
+#  way the old drive/blitz.zip was; release/TMP is git-ignored too, and release/ itself
 #  is tracked so the folder exists in a fresh clone.
 # ***************************************************************************
 set -e
@@ -68,7 +68,7 @@ DO_STAGE=$DO_STAGE DO_ZIP=$DO_ZIP python - <<'PY'
 import os, shutil, struct, sys, zipfile
 
 root    = os.getcwd()
-testing = os.path.join(root, "testing")
+drive = os.path.join(root, "drive")
 TMP     = os.path.join(root, "release", "TMP")
 
 do_stage = os.environ.get("DO_STAGE") == "1"
@@ -76,7 +76,7 @@ do_zip   = os.environ.get("DO_ZIP")   == "1"
 
 # The PRODUCT VERSION lives in ONE place: source/application/buildnum.txt, e.g. "1.0.0". It is
 # what GPC.BIN prints (as V1.0.0) and what names the zip, and it is edited by hand when a
-# release is cut -- nothing bumps it. It used to be VERSION$ in testing/GPC.BASL, which tracked
+# release is cut -- nothing bumps it. It used to be VERSION$ in drive/GPC.BASL, which tracked
 # the front end instead and so never moved when the compiler changed.
 #
 # The zip is named from the WHOLE version (gpc-release-1.0.0.zip), not from its last component.
@@ -128,7 +128,7 @@ from genrtimage import imageName, bankImageName     # noqa: E402
 #  //HELP-TXT/:NAME (GPB.HELP.BASL:218), so the name is not ours to choose here.
 #
 #  GPC.INPUT (the control-file template) is deliberately NOT shipped: GPC.PRG drives the
-#  compile interactively, and the file is per-user state (git-ignored in testing/).
+#  compile interactively, and the file is per-user state (git-ignored in drive/).
 
 # The root. GPC.PRG and GPC.HELP.PRG are both compiled SHARED, so they want
 # GPB.RT.nnn.BIN beside them -- which is this same root, two lines up.
@@ -157,13 +157,13 @@ from genrtimage import imageName, bankImageName     # noqa: E402
 #                   ships with. The program never opens itself by name, so the rename
 #                   is safe, and it still finds HELP-TXT/GPB.HELP.IDX beside it.
 ROOTFILES = [
-    ("testing/GPC.PRG",                     "GPC.PRG"),
-    ("testing/GPC.BIN",                     "GPC.BIN"),
-    ("testing/" + imageName(),              imageName()),
-    ("testing/" + bankImageName(),          bankImageName()),
-    ("testing/" + rt_filename(),            rt_filename()),
-    ("testing/" + rc_filename(),            rc_filename()),
-    ("testing/" + bank_filename(),          bank_filename()),
+    ("drive/GPC.PRG",                     "GPC.PRG"),
+    ("drive/GPC.BIN",                     "GPC.BIN"),
+    ("drive/" + imageName(),              imageName()),
+    ("drive/" + bankImageName(),          bankImageName()),
+    ("drive/" + rt_filename(),            rt_filename()),
+    ("drive/" + rc_filename(),            rc_filename()),
+    ("drive/" + bank_filename(),          bank_filename()),
     ("samples/GPC.ERR/GPC.ERR.PRG",         "GPC.ERR.PRG"),
     ("samples/GPC.ERR/GPC.ERR.OVL",         "GPC.ERR.OVL"),
     ("samples/GPC-HELP/GPB.HELP.PRG",       "GPC.HELP.PRG"),
@@ -171,8 +171,8 @@ ROOTFILES = [
     ("LICENSE",                             "LICENSE"),
 ]
 
-# The GP.BASIC library ships whole, straight from the repo master rather than from testing/ --
-# testing/ holds only the staged copies of whatever was last built there, and they are
+# The GP.BASIC library ships whole, straight from the repo master rather than from drive/ --
+# drive/ holds only the staged copies of whatever was last built there, and they are
 # git-ignored precisely so they cannot be mistaken for the masters.
 #
 # Its two reference docs LIVE in GPC-BASIC/ rather than in a docs folder of their own, so the
@@ -212,7 +212,7 @@ BASLOAD_SRC_ZIP = "GPC-BASLOAD/BASLOAD-SRC.ZIP"
 
 # The BASLOAD source of the two tools. Reference only. SRC/README.TXT says so, and gives
 # the two steps that rebuild either one.
-SRCBASL = [("testing/GPC.BASL",                     "GPC.BASL"),
+SRCBASL = [("drive/GPC.BASL",                     "GPC.BASL"),
            ("samples/GPC.ERR/GPC.ERR.BASL",         "GPC.ERR.BASL")]
 
 # One folder per sample. "fake" names the one file worth stubbing when it is not there --
@@ -221,9 +221,9 @@ SRCBASL = [("testing/GPC.BASL",                     "GPC.BASL"),
 SAMPLES = [
     {
         "dir":   "GPBMODS",
-        "files": [("testing/GPBMODS.PRG",                    "GPBMODS.PRG"),
+        "files": [("drive/GPBMODS.PRG",                    "GPBMODS.PRG"),
                   ("samples/GPB-MODS-TESTING/GPBMODS.BASL",  "GPBMODS.BASL")],
-        "globs": [("testing", lambda n: n.startswith("GPBMODS.") and len(n) == 11 and n[8:].isdigit())],
+        "globs": [("drive", lambda n: n.startswith("GPBMODS.") and len(n) == 11 and n[8:].isdigit())],
         "fake":  "GPBMODS.PRG",
     },
     {
@@ -258,8 +258,8 @@ SAMPLES = [
 # The zip step SKIPS every path under these names -- see DEV_PREFIXES below, which is what
 # actually enforces it, so the rule cannot be lost by being remembered wrongly.
 DEV_ONLY = [
-    ("testing/XT",    "XT"),         # a file
-    ("testing/XFMGR", "XFMGR"),      # a folder, staged whole
+    ("drive/XT",    "XT"),         # a file
+    ("drive/XFMGR", "XFMGR"),      # a folder, staged whole
 ]
 DEV_PREFIXES = ("XT", "XFMGR/")
 

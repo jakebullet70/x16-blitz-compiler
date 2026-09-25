@@ -249,10 +249,10 @@ python source/gpc/int16scan.py --spread PROGRAM       where each module's names 
 
 The programs are GPBMODS, GUIFRMT, XBASE and GPB.HELP.
 
-- **Names and file list** come from `testing/<PROGRAM>.SRC.SYM`, which strips suffixes. The suffixes
+- **Names and file list** come from `drive/<PROGRAM>.SRC.SYM`, which strips suffixes. The suffixes
   come from the sources as they are now, so `--check` and `--names` follow edits without a rebuild.
   A changed `#INCLUDE` list needs a fresh SYM.
-- **Variable space and workspace** are read from `testing/<PROGRAM>.PRG`: the bootstrap's two page
+- **Variable space and workspace** are read from `drive/<PROGRAM>.PRG`: the bootstrap's two page
   numbers and the first `.varspace` operand.
 - **`KNOWN_PAIRS`** holds FILE.DIR.SLOW until FILEDIR is converted.
 - **`--spread`** walks `EDIT_ROOTS`. It skips `HELP-TXT/`, `GPC-HELP.md`, `GPC-HELP.WIN.md` and

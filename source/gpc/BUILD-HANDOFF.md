@@ -34,11 +34,11 @@ There is no host-side compiler. GPC is a native X16 program, so both steps boot 
 bundled emulator in warp and drive the real thing.
 
 **Step 1 — tokenise.** `build_basl.py <NAME.BASL> <NAME.SRC.PRG>` runs BASLOAD-GPC over
-the source in `testing/` and leaves a tokenised PRG. Everything happens in `testing/`;
+the source in `drive/` and leaves a tokenised PRG. Everything happens in `drive/`;
 that folder *is* the emulator's drive.
 
 **Step 2 — compile.** `compile_shared.py [--embedded] <src.prg> <obj.prg> [map]` writes a
-four-line `testing/GPC.INPUT` (source, object, map, mode), boots `GPC.BIN`, and waits.
+four-line `drive/GPC.INPUT` (source, object, map, mode), boots `GPC.BIN`, and waits.
 
 Both send the emulator transcript to a **log file, not to stdout**, so a stage that is
 working prints nothing for minutes. That is why `samplesbuild.py` runs a heartbeat beside
@@ -66,9 +66,9 @@ each stage printing elapsed time and the size of the files being written.
 | File | Where | If missing |
 |---|---|---|
 | `x16emu.exe`, `rom.bin` | `bin/x16emu/` | both scripts die immediately |
-| `GPC.BIN` | `testing/` | the compiler engine — `make -C source/gpc` |
-| `BASLOAD-GPC.BIN`, `BASLOAD-GPC.PRG` | `testing/` | the tokeniser; `build_basl.py` stages it from `BASLOAD-GPC/build/` if that is newer |
-| `GPB.RT.nnn.BIN`, `GPC.RT.nnn.BIN`, `GP1.RT.nnn.BIN` | `testing/` | `make -C source/runtime gpc-rt` |
+| `GPC.BIN` | `drive/` | the compiler engine — `make -C source/gpc` |
+| `BASLOAD-GPC.BIN`, `BASLOAD-GPC.PRG` | `drive/` | the tokeniser; `build_basl.py` stages it from `BASLOAD-GPC/build/` if that is newer |
+| `GPB.RT.nnn.BIN`, `GPC.RT.nnn.BIN`, `GP1.RT.nnn.BIN` | `drive/` | `make -C source/runtime gpc-rt` |
 
 `nnn` is the **runtime** build number from `source/application/rtbuild.txt`. It is pinned
 and does not auto-bump, and moving it strands every SHARED object built against the old one
@@ -87,14 +87,14 @@ folder, then the source, then any extras.
 ## 4. The program table
 
 `samplesbuild.py:36`. One dict per program: `src` (folder, file), `lib` (upstream module
-folder), `extras`, `shared`, `install` (destination, name — `None` leaves it in `testing/`,
+folder), `extras`, `shared`, `install` (destination, name — `None` leaves it in `drive/`,
 which is already the drive its demo bat mounts), `data`.
 
 | Program | Source | Mode | Installs to |
 |---|---|---|---|
-| GPBMODS | `samples/GPB-MODS-TESTING/GPBMODS.BASL` | SHARED | stays in `testing/` |
+| GPBMODS | `samples/GPB-MODS-TESTING/GPBMODS.BASL` | SHARED | stays in `drive/` |
 | GPB.HELP | `samples/GPC-HELP/GPB.HELP.BASL` | SHARED | `samples/GPC-HELP/` + both runtimes |
-| COLORTST | `samples/color-test/COLORTST.BASL` | SHARED | stays in `testing/` |
+| COLORTST | `samples/color-test/COLORTST.BASL` | SHARED | stays in `drive/` |
 | BMXVIEW | `GPC-BASIC/BMXVIEW.EXP.BL` | EMBEDDED | `demo/C.BMXVIEW.PRG` + the BMX images |
 | EDITOR | `samples/edit/EDITOR.BASL` | EMBEDDED | `samples/edit/C.EDITOR.PRG` |
 
@@ -132,7 +132,7 @@ only to the terminal, the session dropped, and ten minutes of build output was l
 the build itself carried on headless:
 
 ```
-python source/gpc/samplesbuild.py 2>&1 | tee testing/SAMPLESBUILD.LOG
+python source/gpc/samplesbuild.py 2>&1 | tee drive/SAMPLESBUILD.LOG
 ```
 
 Fixing the script to open that log itself is the first thing worth doing.
@@ -152,7 +152,7 @@ Two of five. Times and sizes are off the files, not off the lost transcript.
 | **EDITOR** | died | never ran | **failed at tokenise** — defect 2 |
 
 COLORTST is green on an indirect but sound argument: `compile_shared.py` removes
-`testing/GPCCOMP.LOG` **only on the success path**, a tokenise failure returns before the
+`drive/GPCCOMP.LOG` **only on the success path**, a tokenise failure returns before the
 compile is reached so no compile ran after COLORTST's, and the log is gone. Its map is
 present too, which the script checks for explicitly. Warp boots in two to three seconds
 here — the 6 s tokenise says so as plainly as the 3 s compile does.
@@ -188,11 +188,11 @@ already say `.SRC.PRG` and two do not:
 | `samples/edit/EDITOR.BASL` | `@:EDITOR.PRG` | **wrong** |
 
 The two wrong ones left `BMXVIEW.PRG` + `BMXVIEW.SYM` and `EDITOR.PRG` + `EDITOR.SYM` in
-`testing/` and no `.SRC.PRG` at all, so `samplesbuild.py` reported a dead tokenise and
+`drive/` and no `.SRC.PRG` at all, so `samplesbuild.py` reported a dead tokenise and
 skipped the compile.
 
 Worse, `BMXVIEW.PRG` and `EDITOR.PRG` are **the names of the compiled objects**. The
-tokenised source is landing on top of the object. Anything in `testing/` under those two
+tokenised source is landing on top of the object. Anything in `drive/` under those two
 names right now is a tokenise, not a compile — do not trust the 27,316-byte `EDITOR.PRG`.
 
 Two ways out. Editing the `#SAVEAS` in the two sources to `.SRC.PRG` makes all five
@@ -204,7 +204,7 @@ PRG is no older than the source:
 
 ```python
 if os.path.exists(prg) and os.path.getmtime(prg) >= os.path.getmtime(basl):
-    print("  build_basl: skip -- testing/%s is up to date (source no newer)" % prg_name)
+    print("  build_basl: skip -- drive/%s is up to date (source no newer)" % prg_name)
 ```
 
 `samplesbuild.py` deletes the stale outputs before each build precisely to defeat this,
@@ -221,13 +221,13 @@ stage fails, and keep the wrapper's own log (section 5).
 
 ## 7. Diagnosing a failure
 
-1. `testing/GPCCOMP.LOG` is the compiler's transcript — but only until the next compile
+1. `drive/GPCCOMP.LOG` is the compiler's transcript — but only until the next compile
    overwrites it, and it is deleted on success. Copy it aside the moment a stage fails.
 2. A **513-byte object with no map** is a run killed mid-compile, never a real result.
 3. A tiny PRG out of step 1 is a BASLOAD failure, and BASLOAD's failures are silent or
    misdirected. BASLOAD leaves a NUL-terminated message at `$bf00` in bank 0; the driver
-   writes it to `testing/BASLDONE`. The nineteen return codes are in
-   `testing/MSEDIT/BASLOAD.MD`. Reach for the `basload` agent before blaming the compiler.
+   writes it to `drive/BASLDONE`. The nineteen return codes are in
+   `drive/MSEDIT/BASLOAD.MD`. Reach for the `basload` agent before blaming the compiler.
 4. `?OVL` at run time means an overlay was not found beside the program. `?RAM` means the
    program names a bank the machine does not have.
 5. The emulator transcript is long. Keep the last ~20 lines and the numbers — object size,

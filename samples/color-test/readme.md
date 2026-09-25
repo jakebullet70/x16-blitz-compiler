@@ -84,7 +84,7 @@ python source/gpc/build_basl.py COLORTST.BASL COLORTST.SRC.PRG
 python source/gpc/compile_shared.py COLORTST.SRC.PRG COLORTST.PRG
 ```
 
-Both run in `testing/`, which needs `COLORTST.BASL` and the three modules in `GPC-BASIC/` beside it.
+Both run in `drive/`, which needs `COLORTST.BASL` and the three modules in `GPC-BASIC/` beside it.
 Shared, so `GPC.RT.nnn.BIN` must be on the drive at run time. 3,011 bytes of p-code.
 
 `color-demo.bat` in the project root builds nothing and just runs it.

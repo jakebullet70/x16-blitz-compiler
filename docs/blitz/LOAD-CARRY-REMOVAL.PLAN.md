@@ -65,7 +65,7 @@ chained program clears on entry by itself.
 
 Both real chains in the tree pass their parameters through a disk file and would not notice:
 
-- `source/gpc/GPC.BASL:85-105` (and its identical copy `testing/GPC.BASL`) writes
+- `source/gpc/GPC.BASL:85-105` (and its identical copy `drive/GPC.BASL`) writes
   `GPC.INPUT`, then `LOAD "GPC.BIN"`. This is the compiler's own front-end to engine handoff.
 - `samples/cruncher/CRUNCH.BASL:100-115` writes `CRUNCH.INPUT`, then `LOAD "CRUNCH.BIN"`.
 - `OASIS/tmp-test/` chains `T1`..`T9` and `C.T1`..`C.T9` through `CHAIN.DAT`, nine hops
@@ -157,7 +157,7 @@ clears older ones where it installs, but the copies under `work/*/`, `OASIS/tmp-
 `samples/GPC-HELP/` want checking by hand.
 
 Prose that names the old number reads stale afterwards. `help-demo.bat:42` and
-`testing/readme.md:21-23` are the two that are operational rather than illustrative.
+`drive/readme.md:21-23` are the two that are operational rather than illustrative.
 
 ## 6. Prose that names the carry
 
@@ -174,8 +174,8 @@ document that describes a mechanism the runtime no longer has is worse than no d
 | `docs/blitz/GP-BASIC.TIERS.md:508` | lists `loadChainSig` among the storage symbols |
 | `docs/oasis/FULL-SOURCE.PLAN.md:71-76, 195-205` | the mixed-chain argument and the `CLR`-on-entry section |
 | `docs/oasis/MSGPOST.PLAN.md:70-95, 175-200` | the golden RAM collision table and the handoff comparison |
-| `source/gpc/GPC.BASL:100-102` and `testing/GPC.BASL:100-102` | a `REM` claiming the chain works exactly as stock BASIC does and that variables survive |
-| `testing/GPCTEST.BASL:100-102` | the same `REM` |
+| `source/gpc/GPC.BASL:100-102` and `drive/GPC.BASL:100-102` | a `REM` claiming the chain works exactly as stock BASIC does and that variables survive |
+| `drive/GPCTEST.BASL:100-102` | the same `REM` |
 | `samples/cruncher/CRUNCH.BASL:110-112` | "chain-loads exactly as stock BASIC does inside a running program" -- true enough about the mechanism, but check the wording still reads right |
 | `OASIS/tmp-test/gen.py:7` | cites `samples/shared-vars` as the proven form for a compiled `LOAD` |
 | `TODO.md:2968-2990` | the sample entry and the findings block |

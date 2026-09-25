@@ -11,7 +11,7 @@ with buttons, it is the same `GUI.FORM.ADD.LIST` and the same `GUI.LIST.DRAW`.
 
 ## 1. The measurement that shapes everything
 
-Bank 4 is full. Taken from `testing/XBASE.MAP` paired with `testing/XBASE.SRC.SYM`, by
+Bank 4 is full. Taken from `drive/XBASE.MAP` paired with `drive/XBASE.SRC.SYM`, by
 the method in `docs/memory/measure-pcode-per-module.md` -- no experimental build:
 
 | module in bank 4 | bytes |

@@ -202,7 +202,7 @@ Requirements and limits:
 
 - **`GPC.RT.<build>.BIN` must be on the drive** — either alongside the shared objects or in the card's
   root directory, so a card full of program folders needs only one ~11K copy. It is built by the
-  runtime makefile (`make -C source/runtime gpc-rt`) and ships in `testing/`.
+  runtime makefile (`make -C source/runtime gpc-rt`) and ships in `drive/`.
 - Programs mixing shared and self-contained builds are fine; a shared object simply needs the
   resident runtime present when it runs.
 - Shared mode's ceiling is *lower* than the default build's — 22,016 bytes of p-code against
@@ -241,10 +241,10 @@ warm start (runtime already resident, and provably reused rather than reloaded).
 | `source/application` | packages the release |
 | `source/gpc` | the interactive front end `GPC.PRG` — BASLOAD source `GPC.BASL`, written in GP.BASIC, tokenised by `build_basl.py` and then compiled by `compile_shared.py` (no Java/Prog8) |
 | `bin/` | `x16emu/` (test emulator + ROM) and `box16/` (debugger) |
-| `testing/` | the built compiler, the shared runtime `GPC.RT.<build>.BIN`, and sample programs, ready to run (also the scratch `prg-batch/`/`archive/` test inputs) |
+| `drive/` | the built compiler, the shared runtime `GPC.RT.<build>.BIN`, and sample programs, ready to run (also the scratch `prg-batch/`/`archive/` test inputs) |
 | `docs/` | [`BUILDING.md`](docs/BUILDING.md), the build-and-test walkthrough |
 | `samples/` | complete example programs with their sources and documentation |
-| `x16emu.bat` / `box16.bat` | project-root launchers that boot the emulators with `testing/` as the drive |
+| `x16emu.bat` / `box16.bat` | project-root launchers that boot the emulators with `drive/` as the drive |
 
 ## Runtime footprint
 
@@ -294,8 +294,8 @@ That is the one to use. It runs the four steps in the order that keeps them cons
 ```sh
 make libs                       # the bin/*.library files + the engine GPC.BIN
                                 # (this also BUMPS source/application/buildnum.txt)
-make release                    # stage the engine, GPC.INPUT and the samples into testing/
-make -C source/runtime gpc-rt   # the shared runtime, testing/GPC.RT.<build>.BIN
+make release                    # stage the engine, GPC.INPUT and the samples into drive/
+make -C source/runtime gpc-rt   # the shared runtime, drive/GPC.RT.<build>.BIN
 make -C source/gpc release      # GPC.PRG and GPC.ERR: both tokenised, then compiled SHARED
                                 # (this target builds gpc-rt itself, so the line above it is
                                 #  only needed if you want the runtime on its own)

@@ -1,10 +1,10 @@
 # GPC.ERR: from an address to a source line
 
 Handoff document. Phases 1 to 4 are built and verified. Phase 5 is not needed. It rewrites
-`testing/GPC.ERR.BASL` from a two-prompt text helper into a GUI tool that answers with a file name,
+`drive/GPC.ERR.BASL` from a two-prompt text helper into a GUI tool that answers with a file name,
 a source line and the text of the offending statement.
 
-The name does not change. `release.sh` stages `testing/C.GPC.ERR.PRG` as `GPC.ERR.PRG` and that
+The name does not change. `release.sh` stages `drive/C.GPC.ERR.PRG` as `GPC.ERR.PRG` and that
 stays true.
 
 ## 1. The problem it solves
@@ -146,13 +146,13 @@ against a naming convention that was not consistent in this tree. Three spelling
 
 | spelling | written by | example |
 |---|---|---|
-| `M.<source>` | `GPC.BASL`, on the machine | `testing/M.GPC.ERR` |
+| `M.<source>` | `GPC.BASL`, on the machine | `drive/M.GPC.ERR` |
 | `M.<source>.SRC.PRG` | the same, when the source name carries the suffix | `samples/GPC-HELP/M.GPB.HELP.SRC.PRG` |
 | `<name>.MAP` | `source/gpc/samplesbuild.py`, headless | `samples/GPC-HELP/GPB.HELP.MAP` |
 
 Map naming is `<name>.MAP`, section 9. It is what every headless build already writes, it is what
 the samples carry, and it is the only one of the three spellings `FILEPICK` can filter on, because
-`FILEPICK` matches suffixes. `testing/GPC.BASL` builds the name and was the one place that changed.
+`FILEPICK` matches suffixes. `drive/GPC.BASL` builds the name and was the one place that changed.
 `samplesbuild.py` and `modsbuild.py` already wrote `<stem>.MAP`.
 
 A suffix filter cannot reach the `M.` spellings at all. `M.GPC.ERR` has the suffix `ERR` and
@@ -198,7 +198,7 @@ blob should match it statement for statement. `ERR.SRC.SEEK.ASM`'s output matche
 byte for byte on `GPBMODS.SRC.PRG`.
 
 WARNING: the link must not be followed. It holds the address a line had in a program loaded at
-`$0801`, so it wraps on a source over 63 KB. 1,304 of the 4,791 links in `testing/GPBMODS.SRC.PRG`
+`$0801`, so it wraps on a source over 63 KB. 1,304 of the 4,791 links in `drive/GPBMODS.SRC.PRG`
 point backwards. The walk scans to each line's closing zero instead, which is what
 `source/tools/detokenise/detokenise.py` does.
 
@@ -398,7 +398,7 @@ answer with the same lines, files and names as before.
 
 `C.GPC.ERR.PRG` is 10,197 bytes SHARED, against 7,760 before the refactor, so the GUI work cost
 2,437 bytes of p-code. The cap is 22,016 bytes, so 11,819 are left. `C.GPC.ERR.OVL` is 28,433
-bytes, against 24,847. `testing/GPC.ERR.PRG`, the tokenised source, is 62,494 bytes, against
+bytes, against 24,847. `drive/GPC.ERR.PRG`, the tokenised source, is 62,494 bytes, against
 51,155.
 
 ## 5. The compiler side
@@ -510,7 +510,7 @@ Each phase leaves a tool that works.
 `C.GPC.ERR.PRG` is 9,144 bytes SHARED against the 22,016 byte ceiling, so 12,872 bytes are left.
 The library runs from banked regions, so the resident p-code is the shell and the resolvers.
 `C.GPC.ERR.OVL` is 28,433 bytes and holds the six code regions and the two text banks. It has to
-travel with the `.PRG`. `testing/GPC.ERR.PRG`, the tokenised source, is 60,710 bytes. Phase 3 cost
+travel with the `.PRG`. `drive/GPC.ERR.PRG`, the tokenised source, is 60,710 bytes. Phase 3 cost
 1,930 bytes of p-code and 2,306 bytes of overlay, and the GUI refactor of section 4.9 cost 1,384
 bytes of p-code.
 
@@ -551,21 +551,21 @@ answer.
 All eight rows are verified: the BASIC line, the file, the nearest label with its source line, the
 statement text and the names.
 
-The harness is `testing/GPCERRT.BASL`. It holds GPC.ERR's own resolver routines copied unchanged
-with a different caller, compiles SHARED and runs headless. It is a throwaway in `testing/` and is
+The harness is `drive/GPCERRT.BASL`. It holds GPC.ERR's own resolver routines copied unchanged
+with a different caller, compiles SHARED and runs headless. It is a throwaway in `drive/` and is
 not tracked. Its answers matched a host-side reference computed from the same three files.
 
 Two rows need a rule the chain in section 3 does not state. An address that lands on a setup record
 is reported as setup code. An address past the whole map is reported as past the map and answered on
 the last real line. `$4ABC` and `$FFFF` resolve to the same record and differ for that reason.
 
-`testing/SRCTEST.BASL` prints `ERR.SRC.WORDS$` for every window it shows. The names it printed were
+`drive/SRCTEST.BASL` prints `ERR.SRC.WORDS$` for every window it shows. The names it printed were
 checked against a host-side model of the same cut, byte for byte, on seven lines across
 `BMXVIEW.SRC.PRG` and `GPBMODS.SRC.PRG`. `GPBMODS` line 304 renders as
 `C8=GP.INSTR(CC$,C2$,CB%(C4))` and gives `C8 CC$ C2$ CB% C4`, which exercises the `$CE` two-byte
 token path.
 
-`testing/ERRSELF.BASL`, a generated fixed-answer variant of the real program, drove the whole chain
+`drive/ERRSELF.BASL`, a generated fixed-answer variant of the real program, drove the whole chain
 on `GPB.HELP` and printed the right answer for three lines. 1669 gives one name,
 `N6$ = HELP.ROW$, LINE 186`. 968 gives six and sets the flag that retitles the block, because the
 line holds seven names and one had no slot. 1139 gives six and does not set it, because the words
@@ -595,7 +595,7 @@ A second fixture with one library module and a small master is worth making, so 
 
 ## 9. Decisions
 
-1. Map naming is `<name>.MAP`. `testing/GPC.BASL` builds it from the source name, cutting `.PRG` and
+1. Map naming is `<name>.MAP`. `drive/GPC.BASL` builds it from the source name, cutting `.PRG` and
    `.SRC` and adding `.MAP`, so `GPB.HELP.SRC.PRG` gives `GPB.HELP.MAP`. GPC.ERR reads the older
    `M.<name>` shape as well, because the tree is full of maps under that name. GPC.ERR derives the
    symbol file from the map's name: `<base>.SRC.SYM` first, `<base>.SYM` if that is absent.

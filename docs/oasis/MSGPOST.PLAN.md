@@ -194,7 +194,7 @@ entry is not needed. See `FULL-SOURCE.PLAN.md` section 3.
 
 ## 7. Size, and mixed chains
 
-Source-to-object ratio, measured across every `.SRC.PRG`/`.PRG` pair in `samples/` and `testing/`:
+Source-to-object ratio, measured across every `.SRC.PRG`/`.PRG` pair in `samples/` and `drive/`:
 region-free programs land at **0.59-0.77**. The closest in size to MSGPOST is GPB.HELP, 23.5 KB
 tokenised to 14,595, at 0.62.
 
@@ -209,7 +209,7 @@ bootstrap finds the magic at `RTBASE` gone and reloads it.
 
 ## 8. Steps
 
-1. **Repoint the build.** Work directory with `GPC.BIN` and `GPC.IMG.<ver>.BIN` from `testing/`,
+1. **Repoint the build.** Work directory with `GPC.BIN` and `GPC.IMG.<ver>.BIN` from `drive/`,
    and `GPB.INC.BL` from the root `GPC-BASIC/`. Flatten the absolute `/BASIC/INCLUDES/` paths in
    the `#INCLUDE`s. Add `#SAVEAS "@:MSGPOST.SRC.PRG"` and `#SYMFILE "@:MSGPOST.SRC.SYM"` before
    the `#INCLUDE`s. Delete `#AUTONUM 10` (`MSGPOST.BAS:36`) -- it sets the step, not whether

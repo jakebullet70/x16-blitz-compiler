@@ -8,7 +8,7 @@
 # ************************************************************************************************
 # ************************************************************************************************
 #
-#		testing/MD5 is the Commodore BASIC MD5 from Rosetta Code (line 1100's GOTO retargeted --
+#		drive/MD5 is the Commodore BASIC MD5 from Rosetta Code (line 1100's GOTO retargeted --
 #		the published listing jumps to a line that does not exist). It is here because it is a
 #		brutal end-to-end test of the compiler: 32-bit integer arithmetic built out of floats,
 #		hex literals, DEF FN, arrays, string handling, GOSUB depth and file I/O, and a single
@@ -37,11 +37,11 @@
 import os, re, sys, time, hashlib, subprocess
 
 ROOT    = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
-TESTING = os.path.join(ROOT, "testing")
+TESTING = os.path.join(ROOT, "drive")
 EMU     = os.path.join(ROOT, "bin", "x16emu", "x16emu.exe")
 ROM     = os.path.join(ROOT, "bin", "x16emu", "rom.bin")
 
-SOURCE  = "MD5"                     # the BASIC program, tracked in testing/
+SOURCE  = "MD5"                     # the BASIC program, tracked in drive/
 OBJECT  = "C.MD5"                   # what GPC compiles it to (regenerated here)
 MAPFILE = "M.MD5"
 FIXTURE = "MD5FIX.DAT"              # the bytes we hash
@@ -131,14 +131,14 @@ def hash_with(program, logname):
     log = run_emu(["-bas", "MD5DRV.TXT", "-pastewarp"], logname, 240, until=b"JIFFIES")
     found = DIGEST.findall(log)
     if not found:
-        die("%s printed no digest (see testing/%s)" % (program, logname))
+        die("%s printed no digest (see drive/%s)" % (program, logname))
     return found[0].decode()
 
 
 def main():
     for f, what in ((EMU, "emulator"), (ROM, "ROM"),
-                    (os.path.join(TESTING, SOURCE), "testing/" + SOURCE),
-                    (os.path.join(TESTING, "GPC.BIN"), "testing/GPC.BIN")):
+                    (os.path.join(TESTING, SOURCE), "drive/" + SOURCE),
+                    (os.path.join(TESTING, "GPC.BIN"), "drive/GPC.BIN")):
         if not os.path.exists(f):
             die("missing %s: %s" % (what, f))
 

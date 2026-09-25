@@ -12,7 +12,7 @@ live in low RAM, the shell is **10,495 (77%)** and all ten resident modules toge
 2026-09-06 build and is kept for the label-gap method and the GP.ASM correction, not the figures;
 `samples/GPB-MODS-TESTING/readme.md` carries the current ones.
 
-**Measured 2026-09-06** from `testing/GPBMODS.MAP` + `GPBMODS.SRC.SYM`, charging each label the
+**Measured 2026-09-06** from `drive/GPBMODS.MAP` + `GPBMODS.SRC.SYM`, charging each label the
 distance to the next label in OBJECT order. Totals 13,563 against the 13,568 `gpBankStart` read off
 the map's own discontinuity, so the method is sound to five bytes.
 

@@ -6,19 +6,19 @@
 #   once behind a font dump and once behind a "printable runs of 4+ characters" rule
 #   that ate every two-character verdict.
 #
-#   IT WORKS IN ITS OWN DIRECTORY, set by GPCWORK. testing/ is shared -- another
+#   IT WORKS IN ITS OWN DIRECTORY, set by GPCWORK. drive/ is shared -- another
 #   session rewrote GPC.INPUT between this script writing it and the emulator
 #   reading it, twice, and the compile silently built THAT session's program
 #   instead. The run then loaded a stale PRG and crashed with no output, which
 #   reads exactly like a bug in the code under test.
 #
 #   It also tokenises itself rather than calling source/gpc/build_basl.py, which
-#   hardcodes testing/ and is the other session's tool.
+#   hardcodes drive/ and is the other session's tool.
 #
 import os, subprocess, sys, time
 
 ROOT = r"C:\dev\CmdrX16\dos_tools\x16-blitz-compiler"
-T = os.path.join(ROOT, os.environ.get("GPCWORK", "testing"))
+T = os.path.join(ROOT, os.environ.get("GPCWORK", "drive"))
 E = os.path.join(ROOT, "bin", "x16emu")
 PY = sys.executable
 

@@ -170,7 +170,7 @@ copy BANKMGR.INC.BL APPSYS.INC.BL KB.INC.BL
      LINEINPUT.INC.BL GUI.INC.BL GUI2.INC.BL           from GPB-MODS-TESTING/GPC-BASIC/
 copy DBFILE.INC.BL DB.INC.BL DBFORM.INC.BL             from XBASE/GPC-BASIC/
 copy XBASE.BASL XBMENUS.BASL MKFIX.BASL                from XBASE/
-                                                       into testing/
+                                                       into drive/
 
 python source/gpc/build_basl.py MKFIX.BASL MKFIX.PRG
 python source/gpc/build_basl.py XBASE.BASL XBASE.SRC.PRG

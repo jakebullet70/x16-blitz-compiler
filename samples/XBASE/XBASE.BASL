@@ -165,7 +165,7 @@ XB.COMBOEND:
 ## truncating, and what one seek plus one BINPUT# costs.
 ##
 ## Build:  copy GPC-BASIC/*.INC.BL from the root library and from XBASE/GPC-BASIC
-##         into testing/, then
+##         into drive/, then
 ##           python source/gpc/build_basl.py XBASE.BASL XBASE.PRG
 ##         and compile XBASE.PRG with GPC.BIN, SHARED.
 ##

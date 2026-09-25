@@ -374,11 +374,11 @@ re-tokenising.
 carries the runtime, and the engine streams it from `GPC.IMG.<build>.BIN` with
 `GP1.IMG.<build>.BIN` beside it — build-numbered so a stale image is *absent* rather than
 silently wrong. Both are gitignored (`samples/*/GP*.IMG.*.BIN`), so they do not come with a
-clone. Copy the current pair in from `testing/`:
+clone. Copy the current pair in from `drive/`:
 
 ```
-copy testing\GPC.IMG.*.BIN samples\edit\
-copy testing\GP1.IMG.*.BIN samples\edit\
+copy drive\GPC.IMG.*.BIN samples\edit\
+copy drive\GP1.IMG.*.BIN samples\edit\
 ```
 
 The `GPB/GPC/GP1.RT.<build>.BIN` runtimes already here are the *shared* ones and are not

@@ -10,7 +10,7 @@ metadata:
 `BANKA.B05` it was aimed at. Seventeen tracked test sources went on 2026-09-08, in the compile that
 was supposed to be tidying up after itself.
 
-They came back with `git restore testing/` — but only because they were tracked. An untracked
+They came back with `git restore drive/` — but only because they were tracked. An untracked
 `.BASL` would simply have been gone.
 
 **There was no safer spelling while the overlays were `.Bnn`.** `.BASL`, `.BAS` and `.BIN` start

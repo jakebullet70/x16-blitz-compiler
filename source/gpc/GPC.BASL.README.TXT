@@ -5,27 +5,27 @@ SHORT VERSION
 -------------
 The GPC.BASL in THIS folder is not the one you edit.
 
-  MASTER  ->  testing/GPC.BASL       <-- edit + test HERE
+  MASTER  ->  drive/GPC.BASL       <-- edit + test HERE
   MIRROR  ->  source/gpc/GPC.BASL    <-- committed copy; the build OVERWRITES it
 
 Do NOT hand-edit source/gpc/GPC.BASL expecting your changes to survive -- the
-build replaces it with whatever is in testing/GPC.BASL.
+build replaces it with whatever is in drive/GPC.BASL.
 
 
-WHY testing/ IS THE MASTER
+WHY drive/ IS THE MASTER
 --------------------------
 GPC's front end is BASLOAD source now (not Prog8). BASLOAD is an X16 ROM
 utility -- there is no host-side tokeniser for it. We tokenise by running
-BASLOAD inside the bundled emulator, and the emulator's drive IS the testing/
+BASLOAD inside the bundled emulator, and the emulator's drive IS the drive/
 folder. So the file BASLOAD reads -- and the file you interactively edit and
 re-test with
 
     BASLOAD "GPC.BASL"
 
--- is testing/GPC.BASL. That is the working copy.
+-- is drive/GPC.BASL. That is the working copy.
 
 source/gpc/GPC.BASL is a committed mirror so the front-end source is carried
-in the source tree too, and a fresh checkout can seed testing/ from it.
+in the source tree too, and a fresh checkout can seed drive/ from it.
 
 
 THE BUILD
@@ -33,19 +33,19 @@ THE BUILD
     make -C source/gpc            (runs source/gpc/build_basl.py)
 
 build_basl.py:
-  1. tokenises testing/GPC.BASL in place, headless, into testing/GPC.PRG
+  1. tokenises drive/GPC.BASL in place, headless, into drive/GPC.PRG
      (boots x16emu with SDL_VIDEODRIVER=dummy, "types" BASLOAD "GPC.BASL";
       the source's own  #SAVEAS "@:GPC.PRG"  writes the PRG)
-  2. on success, mirrors testing/GPC.BASL back to source/gpc/GPC.BASL
+  2. on success, mirrors drive/GPC.BASL back to source/gpc/GPC.BASL
      (only when they differ, to avoid needless git churn)
-  3. on a fresh checkout with no testing/GPC.BASL, seeds it from this mirror
+  3. on a fresh checkout with no drive/GPC.BASL, seeds it from this mirror
 
 No Java, no prog8c.jar -- just python + the bundled emulator.
 
 
 THE DEV LOOP
 ------------
-  1. edit    testing/GPC.BASL
+  1. edit    drive/GPC.BASL
   2. test    BASLOAD "GPC.BASL"   (in the emulator), then run GPC.PRG
   3. build   make -C source/gpc   (mirrors it here, ready to commit)
 

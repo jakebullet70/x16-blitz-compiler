@@ -20,7 +20,7 @@ import os, re, subprocess, sys, time
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."))
 ROOT = os.path.abspath(os.path.join(ROOT, ".."))
-T = os.path.join(ROOT, "testing")
+T = os.path.join(ROOT, "drive")
 E = os.path.join(ROOT, "bin", "x16emu")
 PY = r"C:\Users\Admin\AppData\Local\Programs\Python\Python313\python.exe"
 

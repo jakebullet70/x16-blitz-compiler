@@ -75,10 +75,10 @@ list runs into. **The last argument is never pushed**: evaluated last, stored fi
 between — so a one-formal verb emits neither opcode. **2 bytes of p-code an argument after the
 first** (`DEFP3` 528 → 532, its one three-formal call site) and **~360 cycles**, or ~80 for an
 argument a nested `GP.FN`'s `.fnsave` would have moved anyway. `GP.SUB` pays it with nothing to
-offset against, which is the honest price. `testing/DEFFNS.BASL` is the test: twelve formals and a
+offset against, which is the honest price. `drive/DEFFNS.BASL` is the test: twelve formals and a
 four-term last argument, called both ways, both giving 11.
 
-Tests are `testing/DEFP1|DEFP1B|DEFP1C|DEFP2.BASL` and five refusals `DEFPV`..`DEFPZ`. `DEFP3` is
+Tests are `drive/DEFP1|DEFP1B|DEFP1C|DEFP2.BASL` and five refusals `DEFPV`..`DEFPZ`. `DEFP3` is
 that whole front door -- **twenty-one verbs in one program**, three of them with formals -- against
 its longhand control `DEFP3C`: **two bytes at each of the twenty-one call sites**, so nothing about
 the cost changes with the number of records, plus the four `.fnpush`/`.fnpop` bytes its one

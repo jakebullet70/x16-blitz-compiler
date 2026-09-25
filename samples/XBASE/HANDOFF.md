@@ -20,8 +20,8 @@ Three things he asked for and has not got:
 
 ### XBase HAS tokenised. The COMPILE is what fails.
 
-`testing/`, from 2026-09-10 22:45, holds `XBASE.SRC.PRG` (8,917 B) and `XBASE.SRC.SYM`
-(28,267 B), so BASLOAD ran. There is no `XBASE.PRG`. The raw `testing/GPCCOMP.LOG` ends:
+`drive/`, from 2026-09-10 22:45, holds `XBASE.SRC.PRG` (8,917 B) and `XBASE.SRC.SYM`
+(28,267 B), so BASLOAD ran. There is no `XBASE.PRG`. The raw `drive/GPCCOMP.LOG` ends:
 
     UNKNOWN LINE NUMBER @ 618
 
@@ -182,7 +182,7 @@ Its build was cancelled deliberately; we will get back to it. State:
   `GP.BANKEDSTR TEXT IN ONE BANK OVER 8K @ 1939`.
 - **`compile_shared.py` misreports that as a 420s timeout.** It only stops on `OK CODE`,
   so a genuine compiler error waits out the full timeout and reads like a hang. The real
-  message is in the raw `testing/GPCCOMP.LOG`. Always read that file.
+  message is in the raw `drive/GPCCOMP.LOG`. Always read that file.
 - The `@ 1939` is a **BASIC line number, not a p-code address**. `_BFTooBig`
   (`source/compiler/source/commands/gpbstrflush.asm:248`) calls `BStrNameSlotLine`
   (`commands/gpbstrpool.asm:423`), which loads the slot's saved line into
@@ -231,7 +231,7 @@ Nothing has been committed or pushed. Modified (non-help): `docs/memory/MEMORY.m
 `samples/GPC-HELP/` files (KEEP). Untracked: the 12 new `samples/XBASE/GPC-BASIC/`
 modules, `source/gpc/modsbuild.py`, `source/gpc/xbasebuild.py`,
 `docs/memory/gui-cua-phase5-state.md`, 2 new `.HLP` files, and 8 scratch files in
-`testing/` that are junk (`BLD.BAS`, `*.PNG`, `*.GIF`, `balls.bas`, `hello.bas`,
+`drive/` that are junk (`BLD.BAS`, `*.PNG`, `*.GIF`, `balls.bas`, `hello.bas`,
 `test.bas`, `tokenise.zip`).
 
 Added 2026-09-11 and still untracked: `.agents/`, `.claude/skills/`, `skills-lock.json` --
@@ -260,7 +260,7 @@ the caveman skills, see section 0. They are NOT gitignored.
 1. **Write the `.bat` emulator launcher.** It is owed, it needs no build, and it is
    independent of everything else here.
 2. Re-run `python source/gpc/xbasebuild.py XBASE` -- **ask him first** -- and settle
-   `UNKNOWN LINE NUMBER @ 618` from the raw `testing/GPCCOMP.LOG`, never the wrapper's
+   `UNKNOWN LINE NUMBER @ 618` from the raw `drive/GPCCOMP.LOG`, never the wrapper's
    verdict. Check the new `.SRC.PRG` size first, for a truncated tokenise.
 3. Get XBase compiling and running as the GUI bench.
 4. Only then, together, define and review phase 6.

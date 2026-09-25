@@ -192,9 +192,9 @@ python source/common-scripts/deferscan.py C.NAME.PRG <the OK CODE number> M.NAME
 
 It walks the p-code by real instruction size and names every deferred statement with its source
 line. Exit 1 means it found something. **Grep the whole tree when retiring a keyword —
-`GPC-BASIC`, `samples` AND `testing`.**
+`GPC-BASIC`, `samples` AND `drive`.**
 
-`testing/*.INC.BL` is gitignored — those are working copies. Refresh them from `GPC-BASIC/` rather
+`drive/*.INC.BL` is gitignored — those are working copies. Refresh them from `GPC-BASIC/` rather
 than editing them; a stale one silently changes what BASLOAD tokenises.
 
 **Nothing builds the examples.** Twelve `.EXP.BL` files and eight `.INC.BL` modules are the

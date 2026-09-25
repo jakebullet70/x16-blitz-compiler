@@ -10,7 +10,7 @@
 ## **
 ## **  Build:  copy GPB.INC.BL, BANKMGR.INC.BL, THEME.INC.BL, APPSYS.INC.BL,
 ## **          MENU.INC.BL, MENU.INC.BANKED.BL, STASH.INC.BL and this file
-## **          into testing/, then
+## **          into drive/, then
 ## **            python source/gpc/build_basl.py MENU.EXP.BL MENU.PRG
 ## **          and compile MENU.PRG SHARED with GPC.BIN.
 ## **

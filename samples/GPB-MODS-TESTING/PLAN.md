@@ -143,12 +143,12 @@ No `#AUTONUM`. It sets the STEP, and only the default 1 survives `STRCASE`.
 
 ## 5. Build and run
 
-The drive is `testing/`, as `color-demo.bat` does, because the object is compiled shared and
+The drive is `drive/`, as `color-demo.bat` does, because the object is compiled shared and
 `GPC.RT.<ver>.BIN` lives there.
 
 ```
-copy samples/GPB-MODS-TESTING/GPBMODS.BASL       -> testing/
-copy samples/GPB-MODS-TESTING/GPC-BASIC/*.INC.BL -> testing/
+copy samples/GPB-MODS-TESTING/GPBMODS.BASL       -> drive/
+copy samples/GPB-MODS-TESTING/GPC-BASIC/*.INC.BL -> drive/
 python source/gpc/build_basl.py     GPBMODS.BASL     GPBMODS.SRC.PRG
 python source/gpc/compile_shared.py GPBMODS.SRC.PRG  GPBMODS.PRG  GPBMODS.MAP
 ```
@@ -349,7 +349,7 @@ Both markers must be the FIRST statement on their line -- that byte is the bound
 be outside every `GP.DO` and `GP.SELECT`, because a `GOTO` written after compilation has no
 `.unwind` in front of it. All three ways to get it wrong are `BLOCK MISMATCH`.
 
-Eleven tests in `testing/BANK*.BASL`, each marked program run against an identical unmarked control:
+Eleven tests in `drive/BANK*.BASL`, each marked program run against an identical unmarked control:
 a region mid-code entered and left by fall-through; a region after `END` holding only subroutines,
 one of which calls back out (the library shape); `GOTO` into, within and out of a region; a `DEF FN`
 body and a `GP.ASM` blob inside one with a second blob after it. Same output every pair, objects six
@@ -391,7 +391,7 @@ afterwards. With the pool written first, `objPtr` -- which is the length `WriteO
 -- cut every pool off the file: a program with an inline blob compiled OK and jumped into nothing at
 the first call. `SaveCodeAndExit` now holds the real end in `objectEnd` across the call.
 
-Thirteen tests, `testing/BANK*.BASL`. `GPC.BIN` 17,269 -> 17,694.
+Thirteen tests, `drive/BANK*.BASL`. `GPC.BIN` 17,269 -> 17,694.
 
 ### Still to do for 3b
 
@@ -455,7 +455,7 @@ was considered and dropped: it is invisible to BASIC and would have closed `BANK
 `BSAVE` and `BVERIFY` write the register directly and would still have leaked -- so it bought one of
 four cases at the price of changing a shipped statement.
 
-Nineteen test sources in `testing/BANK*.BASL`. Thirteen are the pass/fail suite; the rest are the
+Nineteen test sources in `drive/BANK*.BASL`. Thirteen are the pass/fail suite; the rest are the
 one-off proofs named above.
 
 ### What is NOT settled

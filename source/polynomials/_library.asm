@@ -969,7 +969,7 @@ FloatPower:
 ;		A WHOLE exponent is done by repeated multiplication, which is EXACT.
 ;		exp(y*log x) is not: the round trip loses 7-8 bits, so 2^8 came back as
 ;		256.0000026 and 2^32 was 176 too large. Any program using 2^n as a bit mask
-;		or an exact divisor was silently wrong -- the MD5 in testing/ slices a
+;		or an exact divisor was silently wrong -- the MD5 in drive/ slices a
 ;		64-bit length with 2^(8*J) and produced a wrong digest because of it.
 ;
 ;		Test for wholeness on a COPY in S[X+2]: FloatFractionalPart works on the

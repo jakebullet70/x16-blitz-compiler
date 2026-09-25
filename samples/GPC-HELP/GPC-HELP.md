@@ -329,7 +329,7 @@ compiler reads. GPC never sees a label.
 
 **The X16 ships BASLOAD in ROM, and this project does not use that one.** `BASLOAD-GPC.BIN` is the
 same program built from the same upstream source as an ordinary PRG, with a handful of changes in
-`BASLOAD-GPC/src/`. The build drives that one and stages it into `testing/` beside `GPC.BIN`.
+`BASLOAD-GPC/src/`. The build drives that one and stages it into `drive/` beside `GPC.BIN`.
 
 ##### Why
 
@@ -3285,7 +3285,7 @@ the worked example of `GP.BANKED`, `GP.BANKEDSTR` and `BANKMGR` in one place.
 gpbmods-demo.bat
 ```
 
-The drive is `testing/`, not the sample folder. The object is compiled SHARED and loads
+The drive is `drive/`, not the sample folder. The object is compiled SHARED and loads
 `GPB.RT.nnn.BIN` from there.
 
 **No row is a stub.** A chosen row calls the library for real and shows what came back, on the panel

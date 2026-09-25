@@ -18,7 +18,7 @@ case "$1" in
         make release
         echo "== make -C source/gpc release  (GPC.PRG) =="
         make -C source/gpc release
-        echo "== make samples  (mirror samples/ -> testing/samples) =="
+        echo "== make samples  (mirror samples/ -> drive/samples) =="
         make samples
         ;;
     run)
@@ -29,7 +29,7 @@ case "$1" in
         make libs
         echo "== make release =="
         make release
-        echo "== make samples  (mirror samples/ -> testing/samples) =="
+        echo "== make samples  (mirror samples/ -> drive/samples) =="
         make samples
         echo "== launching x16emu with GPC.PRG =="
         cmd //c "USER-RUNS\x16emu.bat" GPC.PRG
@@ -40,7 +40,7 @@ case "$1" in
         make libs
         echo "== make release =="
         make release
-        echo "== make samples  (mirror samples/ -> testing/samples) =="
+        echo "== make samples  (mirror samples/ -> drive/samples) =="
         make samples
         ;;
     *)

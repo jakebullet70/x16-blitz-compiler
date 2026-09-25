@@ -379,7 +379,7 @@ them after pass one.
 Each step ends with its check passing before the next starts.
 
 1. **Reference set.** `chk.py` and `sweep.py` from the two-pass work are not in the repo. Write a
-   script that compiles a fixed list of `testing/` programs and diffs each object against a stored
+   script that compiles a fixed list of `drive/` programs and diffs each object against a stored
    copy.
 2. **Option plumbing** (1.1). Check: the reference set is byte-identical with line 5 empty.
 3. **Pass zero, recording nothing.** Three passes, the early exit, the resets. Nothing is removed.
@@ -408,7 +408,7 @@ A and B must be byte-identical. Run each program built both ways and compare the
 
 ### 5.2 Programs
 
-One `testing/` program a case, or one program with a section a case.
+One `drive/` program a case, or one program with a section a case.
 
 | case | expected |
 |---|---|

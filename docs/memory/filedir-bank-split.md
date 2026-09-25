@@ -69,7 +69,7 @@ shim's doing, not the module's — a `SHIM.GUIBANK` shim deliberately leaves its
 [[gp-banked-call-out-loses-the-bank]]. The blobs preserve the bank they are entered with. Callers
 in low memory do not care; a caller that did would have to re-select.
 
-`testing/FILEDIRT.BASL`'s `D08 BANKAFTEROPEN` and `D09 BANKAFTERNEXT` assert the unbanked contract
+`drive/FILEDIRT.BASL`'s `D08 BANKAFTEROPEN` and `D09 BANKAFTERNEXT` assert the unbanked contract
 and still hold for the `.BODY` labels called directly.
 
 Related: [[pcode-runs-from-a-bank-proven]], [[gp-banked-region-relocation]],

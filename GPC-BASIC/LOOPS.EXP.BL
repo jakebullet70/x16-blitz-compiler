@@ -2,7 +2,7 @@
 ## **
 ## **  LOOPS.EXP.BL -- GP.DO / GP.LOOP / GP.EXITDO
 ## **
-## **  Build:  copy GPC-BASIC/GPB.INC.BL and this file into testing/, then
+## **  Build:  copy GPC-BASIC/GPB.INC.BL and this file into drive/, then
 ## **            python source/gpc/build_basl.py LOOPS.EXP.BL LOOPS.PRG
 ## **          and compile LOOPS.PRG with GPC.BIN.
 ## **

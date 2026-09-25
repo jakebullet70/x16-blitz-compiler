@@ -6,10 +6,10 @@
 #       dcref.py chk  [--gpc FILE] [--only A,B] [--dead]     compile it again and diff
 #
 #   Every program is compiled from a FIXED tokenised input: the .SRC.PRG and .SRC.SYM are
-#   copied out of testing/ once, into work/dcref/inputs/, and never again. Only the compiler
+#   copied out of drive/ once, into work/dcref/inputs/, and never again. Only the compiler
 #   changes between a ref and a chk, so a difference is the compiler's.
 #
-#   Each compile runs in a drive of its own under work/dcref/run/. testing/ is shared with
+#   Each compile runs in a drive of its own under work/dcref/run/. drive/ is shared with
 #   other sessions, and one of them rewriting GPC.INPUT between the write and the read has
 #   already built the wrong program twice.
 #
@@ -20,7 +20,7 @@ import os, shutil, subprocess, sys, time, glob, filecmp
 from concurrent.futures import ThreadPoolExecutor
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
-TESTING = os.path.join(ROOT, "testing")
+TESTING = os.path.join(ROOT, "drive")
 WORK = os.path.join(ROOT, "work", "dcref")
 EMUDIR = os.path.join(ROOT, "bin", "x16emu")
 EMU = os.path.join(EMUDIR, "x16emu.exe")

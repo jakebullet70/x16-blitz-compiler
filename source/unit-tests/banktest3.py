@@ -239,7 +239,7 @@ BIGEMB = [("BNKBIG", 100)]
 shutil.copy2(os.path.join(ROOT, "source", "application", "GPC.BIN"), T)
 for pattern in ("GPC.IMG.*.BIN", "GP1.IMG.*.BIN",
                 "GPB.RT.*.BIN", "GPC.RT.*.BIN", "GP1.RT.*.BIN"):
-    for f in glob.glob(os.path.join(ROOT, "testing", pattern)):
+    for f in glob.glob(os.path.join(ROOT, "drive", pattern)):
         shutil.copy2(f, T)
 
 #   BNKOVL is BNK255 under another name, made fresh each run so the two cannot drift.

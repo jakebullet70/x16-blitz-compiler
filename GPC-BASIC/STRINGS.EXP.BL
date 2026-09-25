@@ -12,7 +12,7 @@
 ## **  STR.REPLACE / STR.SPLICE      BASL, from STRINGS.INC.BL
 ## **
 ## **  Build:  copy GPC-BASIC/GPB.INC.BL, GPC-BASIC/STRINGS.INC.BL,
-## **          GPC-BASIC/STRCASE.INC.BL and this file into testing/, then
+## **          GPC-BASIC/STRCASE.INC.BL and this file into drive/, then
 ## **            python source/gpc/build_basl.py STRINGS.EXP.BL STRINGS.PRG
 ## **          and compile STRINGS.PRG with GPC.BIN.
 ## **

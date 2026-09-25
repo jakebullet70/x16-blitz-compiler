@@ -1,6 +1,6 @@
 ---
 name: retired-keyword-defers-to-runtime
-description: "Retiring a GP keyword leaves every stale caller compiling clean and throwing SYNTAX ERROR at run time — grep the whole tree, testing/ included"
+description: "Retiring a GP keyword leaves every stale caller compiling clean and throwing SYNTAX ERROR at run time — grep the whole tree, drive/ included"
 metadata: 
   node_type: memory
   type: project
@@ -28,15 +28,15 @@ the stash.
 
 **What actually diagnosed it**: building the PREVIOUS compiler in a `git worktree` and running the
 SAME source through it. Clean there, broken here ⇒ the compiler moved under the source, not the
-source under the compiler. `git ls-tree <old> testing/` first — `GPC.BIN` is tracked but
+source under the compiler. `git ls-tree <old> drive/` first — `GPC.BIN` is tracked but
 `GPC.IMG.121.BIN` is not, so the old compiler needs a real `make` in the worktree.
 
 **So: after retiring ANY keyword, grep the whole tree for it — `GPC-BASIC`, `samples`, AND
-`testing`.** Casualties found this way: `GUI.INC.BL` (editor branch only, so the shrink branch never
+`drive`.** Casualties found this way: `GUI.INC.BL` (editor branch only, so the shrink branch never
 saw it — a textually clean merge that was semantically broken) and `SCREEN.EXP.BL` (broken since
-`15d90eb`, unnoticed for days), and `testing/GPC.ERR.BASL` — all three fixed 2026-09-01.
+`15d90eb`, unnoticed for days), and `drive/GPC.ERR.BASL` — all three fixed 2026-09-01.
 
-`testing/*.INC.BL` is **gitignored**, so those are local working copies: refresh them from
+`drive/*.INC.BL` is **gitignored**, so those are local working copies: refresh them from
 `GPC-BASIC/` rather than editing them, and remember a stale one silently changes what BASLOAD
 tokenises. `GPC.ERR` no longer lives there at all: its source and its modules are in
 `samples/GPC.ERR/`, and that folder is the one to grep. See

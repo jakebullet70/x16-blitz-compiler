@@ -10,11 +10,11 @@
 #		The front end is written in BASLOAD source (GPC.BASL). BASLOAD is an X16 ROM utility, so
 #		there is no host tokeniser: build_basl.py boots the bundled emulator, runs BASLOAD on
 #		GPC.BASL, and the source's own  #SAVEAS "@:GPC.SRC.PRG"  writes the tokenised program
-#		into testing/. This replaced the old Prog8/Java build (kept in old-archive/) -- no Java,
+#		into drive/. This replaced the old Prog8/Java build (kept in old-archive/) -- no Java,
 #		no prog8c.jar. There is no build number here: it belongs to the engine, which prints its
 #		own (source/application/buildnum.txt).
 #
-#			make -C source/gpc			GPC.BASL -> GPC.SRC.PRG -> testing/GPC.PRG
+#			make -C source/gpc			GPC.BASL -> GPC.SRC.PRG -> drive/GPC.PRG
 #			make -C source/gpc release	build, then tokenise and compile the GPC.ERR helper
 #										in samples/GPC.ERR/
 #			make -C source/gpc run		build, then launch the front end in the emulator
@@ -51,9 +51,9 @@ all: build
 #		cannot find its runtime does not start, and `make run` would hit that first.
 #
 #		GPB.INC.BL is staged FIRST. BASLOAD resolves an #INCLUDE off the DRIVE, so the
-#		copy GPC.BASL includes has to be sitting in testing/ before the tokenise, not
+#		copy GPC.BASL includes has to be sitting in drive/ before the tokenise, not
 #		just in GPC-BASIC/. GPC-BASIC/ is the master and the staged copy is git-ignored.
-#		build_basl.py also stages GPC.BASL into testing/, so the source ships from there.
+#		build_basl.py also stages GPC.BASL into drive/, so the source ships from there.
 #
 build:
 	$(CCOPY) ..$(S)..$(S)GPC-BASIC$(S)GPB.INC.BL $(RELEASEDIR)GPB.INC.BL
@@ -65,7 +65,7 @@ build:
 #		release = the front-end build, then the GPC.ERR helper: tokenised to
 #		GPC.ERR.SRC.PRG, then compiled to GPC.ERR.PRG, both in GPCERRDIR. That folder is
 #		the emulator drive for the helper and holds its own GPC-BASIC/, GPC.BIN and
-#		runtimes, so nothing of GPC.ERR's is staged into testing/. build_basl.py with two
+#		runtimes, so nothing of GPC.ERR's is staged into drive/. build_basl.py with two
 #		args just tokenises, and skips when the source is absent or no newer than the PRG.
 #
 #		The helper is compiled SHARED, against the GPB.RT.nnn.BIN in that folder: the
@@ -87,7 +87,7 @@ release: build
 
 #
 #		Launch the freshly built front end. It chain-loads GPC.BIN, which must sit beside
-#		it on the drive -- so point the emulator's filesystem root at testing/.
+#		it on the drive -- so point the emulator's filesystem root at drive/.
 #
 run: build
 	$(EMULATOR) -fsroot $(RELEASEDIR) -prg $(RELEASEDIR)GPC.PRG -run

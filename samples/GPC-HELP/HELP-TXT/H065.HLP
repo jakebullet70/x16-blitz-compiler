@@ -11,7 +11,7 @@
 .
 :gpbmods-demo.bat
 .
-.The drive is testing/, not the sample folder. The object is compiled SHARED
+.The drive is drive/, not the sample folder. The object is compiled SHARED
 .and loads GPB.RT.nnn.BIN from there.
 .
 .No row is a stub. A chosen row calls the library for real and shows what

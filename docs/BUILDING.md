@@ -3,7 +3,7 @@
 Everything here is a plain command you type yourself. No AI, no IDE, no hidden steps.
 
 Three tools, three commands, about a minute. If you only want to *use* the compiler, you don't need
-any of this — grab the contents of `testing/` and read the [README](../README.md).
+any of this — grab the contents of `drive/` and read the [README](../README.md).
 
 ---
 
@@ -69,7 +69,7 @@ PYTHON = /usr/local/bin/python3.12
 
 ```sh
 ./release.sh                    # full build, then package release/gpc-release-<n>.zip
-./release.sh zip                # package the CURRENT testing/ build without rebuilding
+./release.sh zip                # package the CURRENT drive/ build without rebuilding
 ```
 
 **Use this to cut a release.** Doing the steps by hand is easy to get half-right: the trap is
@@ -81,16 +81,16 @@ the steps in the order that avoids it, and refuses to package if any required fi
 ### The steps, if you want them one at a time
 
 ```sh
-make libs                       # the five bin/*.library files + testing/GPC.BIN (engine)
+make libs                       # the five bin/*.library files + drive/GPC.BIN (engine)
                                 # NB: this BUMPS source/application/buildnum.txt
-make release                    # stage the engine, GPC.INPUT and the samples into testing/
-make -C source/runtime gpc-rt   # the shared runtime, testing/GPC.RT.<build>.BIN
-make -C source/gpc release      # GPC.PRG in testing/, GPC.ERR in samples/GPC.ERR/: both
+make release                    # stage the engine, GPC.INPUT and the samples into drive/
+make -C source/runtime gpc-rt   # the shared runtime, drive/GPC.RT.<build>.BIN
+make -C source/gpc release      # GPC.PRG in drive/, GPC.ERR in samples/GPC.ERR/: both
                                 # tokenised, then compiled SHARED. Builds gpc-rt itself,
                                 # so the line above is optional
 ```
 
-`testing/` **is** the build: it is what you copy to an SD card or point the emulator at. The zip
+`drive/` **is** the build: it is what you copy to an SD card or point the emulator at. The zip
 `release.sh` writes is smaller: the files needed to run, the two `.BASL` sources under `SRC/`,
 and the docs. Three of the shipped files come from `samples/` instead, because they build in
 their own folders: `GPC.ERR.PRG`, `GPC.ERR.OVL` and the help program. The rest of `samples/`
@@ -113,7 +113,7 @@ object. The helper does not run without that overlay.
 Then try it:
 
 ```sh
-USER-RUNSemu.bat GPC.PRG    # Windows; the launcher points the emulator at testing/
+USER-RUNSemu.bat GPC.PRG    # Windows; the launcher points the emulator at drive/
 ```
 
 ### What lands where
@@ -121,11 +121,11 @@ USER-RUNSemu.bat GPC.PRG    # Windows; the launcher points the emulator at test
 | Artifact | Built by | Notes |
 |---|---|---|
 | `bin/*.library` | `make libs` | assembler libraries, not distributables |
-| `testing/GPC.BIN` | `make libs` | the compiler engine; reads `GPC.INPUT` |
-| `testing/GPC.IMG.<n>.BIN` | `make libs` | the runtime the engine streams into every self-contained object — **it cannot compile without this** |
-| `testing/GPC.SRC.PRG` | `make -C source/gpc` | BASLOAD's output — compiler **input**, cannot be run |
-| `testing/GPC.PRG` | `make -C source/gpc` | the front end you actually launch, compiled from the above |
-| `testing/GPC.RT.<n>.BIN` | `make -C source/runtime gpc-rt` | shared runtime, SHARED mode only |
+| `drive/GPC.BIN` | `make libs` | the compiler engine; reads `GPC.INPUT` |
+| `drive/GPC.IMG.<n>.BIN` | `make libs` | the runtime the engine streams into every self-contained object — **it cannot compile without this** |
+| `drive/GPC.SRC.PRG` | `make -C source/gpc` | BASLOAD's output — compiler **input**, cannot be run |
+| `drive/GPC.PRG` | `make -C source/gpc` | the front end you actually launch, compiled from the above |
+| `drive/GPC.RT.<n>.BIN` | `make -C source/runtime gpc-rt` | shared runtime, SHARED mode only |
 
 The engine build number in `source/application/buildnum.txt` **auto-increments on every
 `make libs`**. That is expected; it is a daily-work counter, not a release version, and it is what

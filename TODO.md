@@ -194,7 +194,7 @@ compiled binary. Same reasoning retires `LIST` `NEW` `RUN` `CONT` `CLR` from the
 ## `POINTER` / `STRPTR` — CLOSED, not undecided
 
 Both hand back the address of a BASIC variable or string, and Blitz lays variables out its own way at
-compile time. `testing/POINTER.PRG` makes the mismatch concrete: it treats the result as a CBM
+compile time. `drive/POINTER.PRG` makes the mismatch concrete: it treats the result as a CBM
 `[len, ptr-lo, ptr-hi]` descriptor and walks it, and Blitz stores `[MaxLen][Control][ActLen][Data]` —
 a different shape — so that walk reads garbage whatever address is returned. **There is no address
 Blitz can hand back that makes an existing descriptor-walking program behave.**
@@ -217,13 +217,13 @@ still says the old names**: root `GPC-BASIC/`, `samples/editor`, `samples/GPC-HE
 three readmes and `color-demo.bat`. Copy the working copy over the root modules and sweep the callers
 in one pass; the two naming decisions below are already taken.
 
-**Proven by running it, not by reading it.** `testing/GPBTRN.BASL` builds the renamed modules the
+**Proven by running it, not by reading it.** `drive/GPBTRN.BASL` builds the renamed modules the
 way `GPBMODS` does — the library in bank 4 behind `SHIM.GUIBANK`'s shims — and pushes its keys through
 `kbdbuf_put`. `THEME.SELECT` fills the palette and `THEME.NEXT` still falls into it; `GUI.INPUT`
 comes back with `GUI.TEXT$` = `GPC` and `GUI.OK` 1 on RETURN, and puts `KEEP ME` back with
 `GUI.OK` 0 on ESC. **The rename costs no p-code**: `GPBMODS` compiles to the same `OK CODE 19730
 FREE 5888`. It costs 4 bytes of tokenised source, which leaves 779 under BASLOAD's 38,655.
-It needs the renamed modules copied into `testing/`, so run it after the sweep, not before.
+It needs the renamed modules copied into `drive/`, so run it after the sweep, not before.
 
 ### `GUI.TEXT` should be `GUI.INPUT` — DONE here, AND ITS STRING MOVED WITH IT
 
@@ -259,7 +259,7 @@ not keywords.
 variant — so a blind swap renames them too and then the new `THEME.LOAD` collides with the family it
 just created. Rename the branches to `THEME.SELECT.*` in the same pass, which is what was done
 here. Counted 2026-09-06,
-excluding `TODO.md` and the `testing/` mirror: **72 bare `THEME.LOAD` references, 131 including the
+excluding `TODO.md` and the `drive/` mirror: **72 bare `THEME.LOAD` references, 131 including the
 label family**, across the library, six samples, `GP-BASIC.md` and `GP-BASIC.GLOBALS.md`.
 `SHIM.GUIBANK.INC.BL` carries a shim, as it does for `GUI.INPUT`.
 
@@ -375,10 +375,10 @@ moved to its own entry under Build / infrastructure.** It is test coverage, not 
    the `make` target in item 2 should do.
 
 **Until then: after retiring ANY keyword, grep the whole tree for it — `GPC-BASIC`, `samples`, AND
-`testing`.** **Re-checked 2026-09-02 and the tracked tree is CLEAN**: every remaining mention of a
-retired token in `testing/GPC.ERR.BASL`, `testing/GPB.INC.BL` and `testing/STRCASE.INC.BL` is inside
+`drive`.** **Re-checked 2026-09-02 and the tracked tree is CLEAN**: every remaining mention of a
+retired token in `drive/GPC.ERR.BASL`, `drive/GPB.INC.BL` and `drive/STRCASE.INC.BL` is inside
 a comment, not a statement -- `GPC.ERR.BASL` moved to `STRCASE.INC.BL` in `51bff2c`. The stale copies
-under `testing/samples/editor/GPC-BASIC/` are UNTRACKED build output (`make samples` wipes and
+under `drive/samples/editor/GPC-BASIC/` are UNTRACKED build output (`make samples` wipes and
 re-copies that whole tree from `samples/`), so they are a local leftover, not a repo problem. Sweep
 excluding comment lines or it reads as broken when it is not:
 
@@ -414,7 +414,7 @@ reports **image 13311 bytes, GPBase $3800, ObjectBase $3c00** both before and af
 they fell inside the existing slack. That is the measurement to repeat before the next GP-block
 addition; do not assume the slack is still there.
 
-**The caller sweep came out as predicted.** Every `GP.FILL` in `GPC-BASIC`, `samples` and `testing`
+**The caller sweep came out as predicted.** Every `GP.FILL` in `GPC-BASIC`, `samples` and `drive`
 fills a space — literal `32`, `ASC(" ")`, or one of `GUI.SPACE` / `LINEINPUT.SPACE` /
 `MENUVERT.SPACE`, and all three of those are `#DEFINE`d to 32. $20 is a fixed point of the offset
 table, so none of them can change behaviour. The only non-space fills are `SCREEN.EXP.BL` (160, 166),
@@ -456,7 +456,7 @@ every value stock rejects, GPC now rejects:
 | `70000 AND -1` | `?ILLEGAL QUANTITY` | `OUT OF RANGE` |
 | `-1 OR 32768` | `?ILLEGAL QUANTITY` | `OUT OF RANGE` |
 
-**Why no suite caught it, and why MD5 did not.** `testing/MD5` needs 32-bit bitwise ops and gets them
+**Why no suite caught it, and why MD5 did not.** `drive/MD5` needs 32-bit bitwise ops and gets them
 by splitting every value into 16-bit halves — `FNUW(FNSW(XH) AND FNSW(YH))` at line 3320 — so it
 never hands `AND` anything above 16 bits and never touched the broken path. That is worth remembering
 before assuming MD5's green tick covers the bitwise operators: it covers exactly the 16-bit case.
@@ -500,7 +500,7 @@ slower" was reasoned from the code and is also wrong; it is a wash either way:
 | descending (never optimised) | 175 | 174 |
 
 And no program written for stock could contain one — a grep of every `.bas`/`.BASL` in `samples/`,
-`testing/` and `source/` found zero. Use `%` to shrink arrays (`DIM A%(n)` really is two bytes an
+`drive/` and `source/` found zero. Use `%` to shrink arrays (`DIM A%(n)` really is two bytes an
 element), not to speed up a loop.
 
 Verified against stock: `FOR I=1 TO N% STEP S%`, an `%` inside the body, `DIM A%()`, `STEP 0`, plain
@@ -2017,8 +2017,8 @@ row and greyed-out item wants exactly one of the two.
 
 **Shipped** as `samples/GPB-MODS-TESTING/GPC-BASIC/FILEIO.INC.BL` (**833 bytes**) and
 `FILEDIR.INC.BL` (**435 more**, and it BANKS — see below). The 900/878 written here before were
-guesses; both are measured from the map now. 33 assertions green headlessly — `testing/FILEIOT.BASL` and
-`testing/FILEDIRT.BASL`. Not yet promoted to the root `GPC-BASIC/`, and not yet wired into
+guesses; both are measured from the map now. 33 assertions green headlessly — `drive/FILEIOT.BASL` and
+`drive/FILEDIRT.BASL`. Not yet promoted to the root `GPC-BASIC/`, and not yet wired into
 `GPBMODS`'s DATA panel.
 
 In: `FILE.STATUS` `EXISTS` `DELETE` `RENAME` `COPY` `MKDIR` `CHDIR` `UP` `GETPATH` `SAVEARRAY`
@@ -2572,7 +2572,7 @@ then, so every `GOTO`/`GOSUB`/`ON` target has to be rewritten as lines merge, an
 is a silent branch into the middle of a statement. That is the whole trade — 646 bytes for owning
 line-number correctness.
 
-Test material is in `testing/`: `HELPC.BASL` (JOIN/KEEP), `HELPH.BASL` (HOIST), `HELPX.BASL`
+Test material is in `drive/`: `HELPC.BASL` (JOIN/KEEP), `HELPH.BASL` (HOIST), `HELPX.BASL`
 (JOIN+COLLAPSE), against `HELP.BASL`.
 
 ### RETURN in the editor was slow — FIXED, the table shift is GP.ASM now
@@ -3423,7 +3423,7 @@ to drive an interactive program headlessly.
 **The engine is `BASLOAD-GPC.BIN` now and the front end is `BASLOAD-GPC.PRG`**, the same division as
 `GPC.BIN` and `GPC.PRG`: the name a person types belongs to the thing a person runs. Every caller
 moved with it — `test/runtest.py`, `source/gpc/build_basl.py`, and `build_basl.py` stages both files
-into `testing/`.
+into `drive/`.
 
 The open questions closed as: **device 8, not asked for**; **an empty answer quits**, rather than
 error 2; **no last-name offer and no directory listing** — a bare prompt. The name is re-poked on
@@ -3464,9 +3464,9 @@ Open before writing it:
 ## Samples
 
 A `samples/` tree of real programs that show off what the compiler buys you, one directory per sample
-with its own `readme.md`. `make samples` mirrors the whole tree into `testing/samples/` (the emulator
+with its own `readme.md`. `make samples` mirrors the whole tree into `drive/samples/` (the emulator
 drive and the root of the release zip), so every sample is runnable in the emulator and ships in the
-release; `samples/` is the tracked master and `testing/samples/` is a wiped-and-recopied build
+release; `samples/` is the tracked master and `drive/samples/` is a wiped-and-recopied build
 artifact. Two exist:
 
 - **`samples/prg2basload/`** — the X16 ROM BASLOAD detokenizer written as BASLOAD source, whose own
@@ -3584,7 +3584,7 @@ Candidates, each meant to demonstrate one concrete reason to reach for the compi
 
 ### Check GPC.ERR — DONE
 
-`GPC.ERR` (the runtime error decoder; `testing/GPC.ERR.BASL` → `GPC.ERR.PRG`, freshened on release by
+`GPC.ERR` (the runtime error decoder; `drive/GPC.ERR.BASL` → `GPC.ERR.PRG`, freshened on release by
 `build_basl.py GPC.ERR.BASL GPC.ERR.PRG`) was given a pass. **Both halves check out, and the pass found
 a bug in the runtime rather than in GPC.ERR** — see "A runtime error named the line after the one that
 failed" below.
@@ -3603,7 +3603,7 @@ failed" below.
 a 46-character tail after `RUN` vanished completely and the program then waited forever at its first
 prompt. `-pastewarp`, and dropping `-warp`, change nothing. To test it headlessly, rebuild the same
 `.BASL` with only `CLEAR.KB` stubbed to a bare `RETURN` and drive that; the decode logic under test is
-untouched. (`LINPUT` programs such as `testing/MD5` are unaffected — no drain loop.)
+untouched. (`LINPUT` programs such as `drive/MD5` are unaffected — no drain loop.)
 
 ### `STASH.SLOT` — more than one rectangle in the same bank. BUILT 07/09/26
 
@@ -3973,7 +3973,7 @@ decide about the rest.
 
 The probe walks the block chain and prints one line per block; a Python pass turns that into the
 tables above. The harness lived in `tmp-heap/` (untracked) driven by `source/unit-tests/devprobe.py`
-with `GPCWORK` pointed at that directory, per the "do not build in `testing/`" rule.
+with `GPCWORK` pointed at that directory, per the "do not build in `drive/`" rule.
 
 Three things that cost cycles and will again:
 

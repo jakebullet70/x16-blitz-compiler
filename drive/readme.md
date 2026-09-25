@@ -1,4 +1,4 @@
-# `testing/` -- the emulator drive
+# `drive/` -- the emulator drive
 
 **This folder is `-fsroot`.** Every headless build run points the emulator here, so anything a
 program has to LOAD, OPEN or SAVE at run time has to be sitting in it. That is the whole reason

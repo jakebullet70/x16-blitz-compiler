@@ -31,7 +31,7 @@ Sources: `work/dcref-chk-off6.log`, `work/dcref-chk-dead4.log`, `work/dcstrip6.l
 ## 2. The test set
 
 - `dcref.PROGRAMS` loses RGX, GPBJ, GPBH, GPBK, GPBL, GPBF, GPBR, XBASE, CHAINTST and CHAINTST-E.
-  Their sources in `testing/` and their inputs in `work/dcref/inputs/` stay on disk.
+  Their sources in `drive/` and their inputs in `work/dcref/inputs/` stay on disk.
 - CHAINTST tested the variable carry across a LOAD chain, which runtime 121 removed.
 - `dcstrip.SLOW` and `--all` are deleted. All four of their programs are gone.
 - 17 programs remain, plus DC1–DC12.

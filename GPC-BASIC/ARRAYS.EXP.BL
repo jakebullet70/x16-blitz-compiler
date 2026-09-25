@@ -13,7 +13,7 @@
 ## **  the crunched names.
 ## **
 ## **  Build:  copy GPC-BASIC/GPB.INC.BL, GPC-BASIC/SORT.INC.BL and this
-## **          file into testing/, then
+## **          file into drive/, then
 ## **            python source/gpc/build_basl.py ARRAYS.EXP.BL ARRAYS.PRG
 ## **          and compile ARRAYS.PRG with GPC.BIN.
 ## **

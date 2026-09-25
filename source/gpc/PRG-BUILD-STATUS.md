@@ -63,16 +63,16 @@ Those two lines are tracked source. Agree the edit before making it.
 Three files read as finished programs and are not. This is the part that costs an afternoon if
 nobody says it first.
 
-**`testing/EDITOR.PRG` and `testing/BMXVIEW.PRG` are tokenised BASL, not objects.** The
+**`drive/EDITOR.PRG` and `drive/BMXVIEW.PRG` are tokenised BASL, not objects.** The
 tokeniser wrote them under the name reserved for the compiler's output. The first eight bytes
 separate the two kinds with no ambiguity:
 
 | File | Head | Reads as |
 |---|---|---|
-| `testing/EDITOR.PRG` 27,316 B | `01 08 09 08 01 00 89 35` | line 1, token `$89` `GOTO` — **tokenised source** |
-| `testing/BMXVIEW.PRG` 4,182 B | `01 08 09 08 01 00 89 34` | **tokenised source** |
-| `testing/COLORTST.SRC.PRG` 4,051 B | `01 08 09 08 01 00 89 31` | **tokenised source** |
-| `testing/COLORTST.PRG` 3,039 B | `01 08 13 08 0a 00 9e 20` | line 10, token `$9e` `SYS` — **object** |
+| `drive/EDITOR.PRG` 27,316 B | `01 08 09 08 01 00 89 35` | line 1, token `$89` `GOTO` — **tokenised source** |
+| `drive/BMXVIEW.PRG` 4,182 B | `01 08 09 08 01 00 89 34` | **tokenised source** |
+| `drive/COLORTST.SRC.PRG` 4,051 B | `01 08 09 08 01 00 89 31` | **tokenised source** |
+| `drive/COLORTST.PRG` 3,039 B | `01 08 13 08 0a 00 9e 20` | line 10, token `$9e` `SYS` — **object** |
 | `samples/edit/C.EDITOR.PRG` 26,411 B | `01 08 13 08 0a 00 9e 20` | **object** |
 
 A `.MAP` beside the file says the same thing: the compiler writes one and the tokeniser does
@@ -86,9 +86,9 @@ nothing. Searching each object for a runtime filename, after that rebuild:
 
 | Object | Runtime name inside | Mode |
 |---|---|---|
-| `testing/GPBMODS.PRG` | `GPB.RT.121` | SHARED |
-| `testing/COLORTST.PRG` | `GPB.RT.121` | SHARED |
-| `testing/GPC.PRG` | `GPB.RT.121` | SHARED |
+| `drive/GPBMODS.PRG` | `GPB.RT.121` | SHARED |
+| `drive/COLORTST.PRG` | `GPB.RT.121` | SHARED |
+| `drive/GPC.PRG` | `GPB.RT.121` | SHARED |
 | `samples/edit/C.EDITOR.PRG` | none | EMBEDDED, as its table entry says |
 | `samples/GPC-HELP/GPB.HELP.PRG` | `GPB.RT.121` | SHARED, matching its table entry |
 
@@ -106,7 +106,7 @@ source. It is not a placeholder and not this build's.
 
 | Bat | Runs? | Why |
 |---|---|---|
-| `gpbmods-demo.bat` | yes | its drive is `testing/`, and the object is current |
+| `gpbmods-demo.bat` | yes | its drive is `drive/`, and the object is current |
 | `color-demo.bat` | yes | same drive, same |
 | `help-demo.bat` | yes | on the EMBEDDED 08:08 object, not on this build's |
 | `bmx-demo.bat` | **no** | `demo/` does not exist |
@@ -160,7 +160,7 @@ whatever is in the folder, so that count follows the tree with no error either w
    This fixes BMXVIEW and EDITOR and makes all five sources consistent. Tracked source — agree
    it first. The alternative is to have `samplesbuild.py` read the `#SAVEAS` line out of the
    source and ask for that name, which changes no source at all.
-3. **Delete `testing/EDITOR.PRG` and `testing/BMXVIEW.PRG`** before the next run. They are
+3. **Delete `drive/EDITOR.PRG` and `drive/BMXVIEW.PRG`** before the next run. They are
    tokenised source under object names. `samplesbuild.py` removes them itself at the top of
    each build, so this only matters if something reads them first.
 4. ~~**Rebuild GPB.HELP** and confirm the object names a runtime and that `GPB.RT.nnn.BIN`

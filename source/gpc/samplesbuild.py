@@ -18,7 +18,7 @@
 import os, re, shutil, subprocess, sys, threading, time
 
 ROOT    = r"C:\dev\CmdrX16\dos_tools\x16-blitz-compiler"
-TESTING = os.path.join(ROOT, "testing")
+TESTING = os.path.join(ROOT, "drive")
 GPCDIR  = os.path.join(ROOT, "source", "gpc")
 ROOTLIB = os.path.join(ROOT, "GPC-BASIC")
 
@@ -29,11 +29,11 @@ ROOTLIB = os.path.join(ROOT, "GPC-BASIC")
 #       lib      the module folder that is upstream for this program's .INC.BL files
 #       extras   further sources included inline, which BASLOAD resolves off the drive
 #       shared   True compiles SHARED (needs GPB/GPC.RT.nnn.BIN at run time), False EMBEDDED
-#       install  where the object goes and under what name -- None leaves it in testing\,
+#       install  where the object goes and under what name -- None leaves it in drive\,
 #                which is already the drive its demo bat mounts
 #       data     further files the install folder needs beside the object
 #       inplace  build in the src folder, which is the drive: its #INCLUDEs name GPC-BASIC/,
-#                so nothing is staged into testing\ (the folder needs GPC.BIN beside it)
+#                so nothing is staged into drive\ (the folder needs GPC.BIN beside it)
 #
 PROGRAMS = [
     dict(name="GPBMODS",
@@ -168,7 +168,7 @@ def stage_sources(prog):
 def install(prog, stem, drive):
     #   No install folder means the object already sits on the drive its demo bat mounts.
     if not prog["install"]:
-        print("   stays in testing\\", flush=True)
+        print("   stays in drive\\", flush=True)
         return
 
     folder, asname = prog["install"]
@@ -203,7 +203,7 @@ def install(prog, stem, drive):
                 print("   installed:", os.path.join(folder, f), flush=True)
                 found += 1
         if not found:
-            print("   !! no GPB/GPC/GP1.RT.nnn.BIN in testing\\ -- build it with"
+            print("   !! no GPB/GPC/GP1.RT.nnn.BIN in drive\\ -- build it with"
                   " make -C source/runtime gpc-rt", flush=True)
 
     if "bmx" in prog["data"]:

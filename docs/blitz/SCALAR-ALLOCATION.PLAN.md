@@ -199,7 +199,7 @@ the figure into a `.varspace` operand, opcode `$E7`, at PRG offset 513:
 
 ```
 python source/gpc/samplesbuild.py GPBMODS
-python -c "b=open('testing/GPBMODS.PRG','rb').read(); print(b[513], b[514] | b[515]<<8)"
+python -c "b=open('drive/GPBMODS.PRG','rb').read(); print(b[513], b[514] | b[515]<<8)"
 ```
 
 The first number must be `231` (`$E7`, confirming the operand is where it is expected). The

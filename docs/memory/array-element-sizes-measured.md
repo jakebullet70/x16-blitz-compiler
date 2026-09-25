@@ -35,7 +35,7 @@ it has**, and the read runs up to 1,364 bytes off the end into whatever the work
 Latent rather than fired: the test directories were short enough never to reach 682 bytes. Fixed in
 the header 2026-09-07 to `DIM FD.BUF%(1022)` / `1023 * 2`.
 
-`testing/FILEDIRT.BASL` still sets `FILE.DIR.CAP = 2046` against `DIM FD.BUF%(340)` — another
+`drive/FILEDIRT.BASL` still sets `FILE.DIR.CAP = 2046` against `DIM FD.BUF%(340)` — another
 agent's file, not edited.
 
 **Where this bites generally:** any `GP.ARRPTR` buffer handed to assembly or to `memory_copy`.

@@ -42,9 +42,9 @@ the index of what comes next; this file is the state of the tree and how to work
 - **Before that:** the `GP.FN` string fix (`c55831e`), and `GP.ASM` reading the symbol file once a
   compile into RAM banks 13 and 14 (`798cfa7`, GPBMODS 317 s to 19.8 s). A slow GPBMODS or RGM
   compile now has a new cause; do not re-profile the symbol lookup first.
-- **GPC.BIN copies:** `source/application/` and `testing/` hold the current build, 30,345 B, MD5
+- **GPC.BIN copies:** `source/application/` and `drive/` hold the current build, 30,345 B, MD5
   `bf14df40…`. `samples/GPC-HELP/` still holds the guard build, 29,252 B, MD5 `2647c404…`. The runtime files built with it on 13 September (`GPC.RT.122.BIN`,
-  `GPB.RT.122.BIN` and `GPC.IMG.122.BIN`) are in `testing/` and `samples/GPC-HELP/`.
+  `GPB.RT.122.BIN` and `GPC.IMG.122.BIN`) are in `drive/` and `samples/GPC-HELP/`.
   `samples/GPC-HELP/GPB.HELP.PRG` has not been rebuilt since. The copies under `release/TMP/` and
   `work/` are older, and both places are ignored.
 - **Test references:** `gpctest.py full` passed on 14 September with the banked `GP.ASM` build in
@@ -89,7 +89,7 @@ Toolchain is off-PATH. In the Bash tool:
 |---|---|---|
 | anything under `source/application/source/` | `make -C source/application build` | `source/application/GPC.BIN` |
 | `source/compiler/` (compiler.library) | `make libs` at the root, then the application build | `bin/compiler.library` |
-| the runtime, `source/runtime/` or `source/gp-runtime/` | `make -C source/runtime gpc-rt` as well as `make libs` | `testing/GPB.RT.nnn.BIN` and `testing/GPC.RT.nnn.BIN` |
+| the runtime, `source/runtime/` or `source/gp-runtime/` | `make -C source/runtime gpc-rt` as well as `make libs` | `drive/GPB.RT.nnn.BIN` and `drive/GPC.RT.nnn.BIN` |
 
 - The application build does **not** rebuild `compiler.library`. `make libs` does not install the
   runtime.
@@ -125,11 +125,11 @@ The runner is `source/unit-tests/gpctest.py`. The plan and the measured times ar
   file. Only programs built from the GPB-MODS-TESTING library map.
 - `GPC.INPUT` has five lines: source PRG, object, map, `SHARED` or blank, and the removed-line
   file name or blank. A four-line engine stops at line four.
-- Each compile runs in its own drive under `work/`. `testing/` is shared with other sessions.
+- Each compile runs in its own drive under `work/`. `drive/` is shared with other sessions.
 - The banner is the finish line, not the file size (`docs/memory/compile-shared-timeout-fakes-success.md`).
 - Samples build in place: `build_basl.py --drive DIR` and `compile_shared.py --drive DIR`.
-  Do not stage a sample into `testing/`.
-- `dcref.snapshot()` copies `testing/NAME.SRC.PRG` and `.SYM` into `work/dcref/inputs/` only when
+  Do not stage a sample into `drive/`.
+- `dcref.snapshot()` copies `drive/NAME.SRC.PRG` and `.SYM` into `work/dcref/inputs/` only when
   they are missing, so an input stays frozen. After a program changes, replace its two input files
   by hand and run `gpctest.py ref --only NAME`.
 - **Banked regions:** `source/unit-tests/banktest3.py` runs each marked program against its unmarked
@@ -141,7 +141,7 @@ The runner is `source/unit-tests/gpctest.py`. The plan and the measured times ar
   and `BGC` are copied in from `work/bgosub/`, so `banktest3` alone covers the banked calls. A
   refused compile ends its emulator run on the error line; it used to wait out the 90 s timeout.
 - `build_basl.py --drive DIR BASL PRG` and `compile_shared.py --drive DIR SRC OBJ MAP` build in the
-  given drive. `build_basl.py`'s log still prints `testing/`.
+  given drive. `build_basl.py`'s log still prints `drive/`.
 
 ## 5. Removed lines as source file and line — worked out, not in the repo
 
@@ -248,7 +248,7 @@ the short variable names, so use it only as a fallback.
 - Kill `x16emu` by PID only, and only an emulator you started.
 - **Grep before reading these, never read them whole:** `TODO.md`, `GPBMODS.BASL`,
   `GP-BASIC.md`, `GP-BASIC.GLOBALS.md` and the `_library.asm` files.
-- **Samples build in place.** Never stage a sample's sources or modules into `testing/`.
+- **Samples build in place.** Never stage a sample's sources or modules into `drive/`.
 - **Library modules are edited in `samples/GPB-MODS-TESTING/GPC-BASIC/` first**, then copied whole
   to root `GPC-BASIC/`.
 - **No work on XBASE.** It will be dropped.

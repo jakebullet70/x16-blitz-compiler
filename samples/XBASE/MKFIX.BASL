@@ -27,7 +27,7 @@
 ## PARTS.BASL.
 ##
 ## Build:  copy GPB.INC.BL, STRINGS.INC.BL, DBFILE.INC.BL and DB.INC.BL into
-##         testing/ beside this file, then
+##         drive/ beside this file, then
 ##           python source/gpc/build_basl.py MKFIX.BASL MKFIX.PRG
 ##         and compile MKFIX.PRG with GPC.BIN.
 ## ============================================================================

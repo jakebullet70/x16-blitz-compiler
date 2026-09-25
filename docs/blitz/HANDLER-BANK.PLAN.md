@@ -186,7 +186,7 @@ Sizes are from `source/runtime/build/code.lbl` at runtime 122.
     `GPC-BASIC/MLCALL.EXP.BL:26-30` POKEs machine code into bank 1. None of the three calls a moved
     handler afterwards. They have no working copies.
   - `GMX.S.FILE` in GPBMODS selects bank 1 only to check that STASHFILE leaves it selected.
-    `testing/RGL.BASL` and `testing/RGN.BASL` select it and write nothing.
+    `drive/RGL.BASL` and `drive/RGN.BASL` select it and write nothing.
   - BNK64 in `source/unit-tests/banktest3.py` compiled regions in banks 1 to 64 and expected
     `TOO MANY GP.BANKED REGIONS` at the 64th. `ALL-BANKS.PLAN.md` step 11 retired it for BNK255,
     which uses banks 2, 100, 254 and 255. Both sources are in the untracked `work/banktest3/`.
@@ -274,8 +274,8 @@ Sizes are from `source/runtime/build/code.lbl` at runtime 122.
     higher. The help took the render delta. `H049` was taken whole, because it equalled a render of
     the old masters. The index (topic 49, 60 to 62 lines) and the three `.md` copies were patched,
     and the §3.12 reference adds 3.12 to 4.13's see-also line. Not changed: `GMX.S.FILE`'s `BANK 1`,
-    which selects the bank and writes nothing, `testing/RGL.BASL` and `RGN.BASL`, XBASE's two
-    `BANKMGR` copies, and the staged `testing/BANKMGR.INC.BL`. Nothing was built.
+    which selects the bank and writes nothing, `drive/RGL.BASL` and `RGN.BASL`, XBASE's two
+    `BANKMGR` copies, and the staged `drive/BANKMGR.INC.BL`. Nothing was built.
 
 ### Phase D: split the runtime, both links
 
@@ -356,7 +356,7 @@ Sizes are from `source/runtime/build/code.lbl` at runtime 122.
       `$A000`-`$BFFF` are `jmp (BankVectors,x)` and `jmp (BankShiftVectors,x)`.
     - `checkall` stops on the same storage overflow as before. The polynomials link is unchanged.
     - The runtime `build` link's object overwrote the last banked byte, an `rts` at `$3DFE`.
-      `testing/testend.asm` put `ObjectCodePreHeader` 2 B below the page after the code, and the
+      `drive/testend.asm` put `ObjectCodePreHeader` 2 B below the page after the code, and the
       banked section ended at `$3DFF`. Agreed 2026-09-15: `nextPage` counts the 2 B pre-header before
       it rounds up. The link is now 16,673 B, with the object at `$3EFE`.
 15. **Errors.** `RuntimeErrorHandler` selects `handlerBank` when the RAM bank reads 1, about
@@ -439,7 +439,7 @@ Sizes are from `source/runtime/build/code.lbl` at runtime 122.
     Done 2026-09-15: `bankImageName()` is `imageName()` with the third character changed, as
     `GP1.RT.nnn.BIN` is to `GPC.RT.nnn.BIN`, and the install writes `bank.prg` whole, `$A000` load
     address included, beside `GPC.IMG.nnn.BIN`. `release.sh` ships it and its README names it and
-    `GP1.RT.nnn.BIN`, `.gitignore` ignores the `testing/` copy, and `dcref.py` and `banktest3.py`
+    `GP1.RT.nnn.BIN`, `.gitignore` ignores the `drive/` copy, and `dcref.py` and `banktest3.py`
     copy it with the runtimes. Run in the scratchpad on step 20's link one: `GP1.IMG.123.BIN` is
     `bank.prg`, 2,434 B with its load address and opening `GE24`; `GPC.IMG.123.BIN` and
     `rtimage.gen.asm` are unchanged; a run without a destination installs nothing, and a refused bank
@@ -475,10 +475,10 @@ Sizes are from `source/runtime/build/code.lbl` at runtime 122.
 ### Phase G: build and test
 
 25. `make libs`, then `make -C source/runtime gpc-rt`, in the background.
-    Done 2026-09-15: both exit 0 with no errors. `testing/GPC.BIN` is 31,892 B,
+    Done 2026-09-15: both exit 0 with no errors. `drive/GPC.BIN` is 31,892 B,
     `GPC.IMG.123.BIN` 11,521 B and `GP1.IMG.123.BIN` 2,434 B, the sizes linked in the scratchpad in
     step 24. The runtime installs as `GPB.RT.123.BIN` ($6F00, 11,909 B), `GPC.RT.123.BIN` ($7700,
-    9,861 B) and `GP1.RT.123.BIN` ($A000, 2,432 B). The build 122 files are still in `testing/`.
+    9,861 B) and `GP1.RT.123.BIN` ($A000, 2,432 B). The build 122 files are still in `drive/`.
 26. **Tests**, in both modes:
     - every moved group, from low p-code and from inside a region (shared)
     - the step 7 `FMPLAY` literal
@@ -524,7 +524,7 @@ Sizes are from `source/runtime/build/code.lbl` at runtime 122.
       Embedded gains 8 pages (`GPBase` `$2F00`, `ObjectBase` `$3500`) and shared 9 (`RTBASE` `$7700`,
       `RTGPBASE` `$6F00`).
 28. The manual's §7 limits, the memory notes on the shared p-code cap, the runtime limits and the core
-    page cushion (52 B), the `.122.` file names (`testing/readme.md`, `help-demo.bat`, `fntest.py` and
+    page cushion (52 B), the `.122.` file names (`drive/readme.md`, `help-demo.bat`, `fntest.py` and
     the handoff docs), and TODO item 2 (after asking).
     Done 2026-09-15. The user left `TODO.md` as it is. The manual's section 1 and section 7, their three Markdown
     copies, `H001.HLP` and `H076.HLP` in both `HELP-TXT` folders carry build 123's bases, caps and
@@ -533,5 +533,5 @@ Sizes are from `source/runtime/build/code.lbl` at runtime 122.
     `gpc-shared-pcode-cap-is-rtbase`, `gpc-blitz-runtime-slack-and-limits`, `two-pass-compiler`
     and `gpc-core-page-cushion-below-gpbase` give the new caps and cushions: 52 B embedded, 379 B
     shared core, 633 B shared GP block. `EMBEDDED-VS-SHARED.md` says its figures are build 122's.
-    `testing/readme.md` lists the build 123 files. `help-demo.bat`, `fntest.py` and
+    `drive/readme.md` lists the build 123 files. `help-demo.bat`, `fntest.py` and
     `BUILD-HANDOFF.md` say `nnn`, because `samples/GPC-HELP` still holds build 122's files.

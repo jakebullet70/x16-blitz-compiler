@@ -12,9 +12,9 @@ rem  Source: GPC-BASIC\BMXVIEW.EXP.BL, on GPC-BASIC\BMX.INC.BL
 rem
 rem  demo\ is BUILD OUTPUT and is not in git. To make it:
 rem    1. copy GPB.INC.BL, APPSYS.INC.BL, BMX.INC.BL and BMXVIEW.EXP.BL
-rem       from GPC-BASIC\ into testing\
+rem       from GPC-BASIC\ into drive\
 rem    2. python source\gpc\build_basl.py BMXVIEW.EXP.BL BMXVIEW.PRG
-rem    3. compile testing\BMXVIEW.PRG with GPC.BIN, and put the object
+rem    3. compile drive\BMXVIEW.PRG with GPC.BIN, and put the object
 rem       in demo\ as C.BMXVIEW.PRG
 rem    4. copy any .BMX files you want into demo\ -- samples\BMXVIEWER\SAMPLES
 rem       has eight, one for each header shape the viewer has to handle

@@ -13,7 +13,7 @@ again. See [memory-is-git-tracked](memory-is-git-tracked.md).
 - [Ask before writing asm](ask-before-writing-asm.md) — standing order: agree GP.ASM or 64tass first
 - [Commit to main directly](commit-to-main-directly.md) — solo repo, no branch; [never commit OASIS](never-commit-oasis.md), stage by name
 - [Compiler must not cap program size](compiler-must-not-cap-program-size.md) — a build-side wall is a bug; and [no backward compatibility](no-backward-compatibility-needed.md), replaced layers get ripped out
-- [Library working copy, then root](library-working-copy-then-root.md) — edit in samples/GPB-MODS-TESTING/GPC-BASIC/, drift runs BOTH ways; [test in GPBMODS first](test-in-gpbmods-before-spreading.md); [samples build in place](samples-build-in-place.md), never staged into testing/
+- [Library working copy, then root](library-working-copy-then-root.md) — edit in samples/GPB-MODS-TESTING/GPC-BASIC/, drift runs BOTH ways; [test in GPBMODS first](test-in-gpbmods-before-spreading.md); [samples build in place](samples-build-in-place.md), never staged into drive/
 - [GUI only through verbs](gui-only-through-verbs.md) — no GOSUB GUI.* in a program; forms and pickers become verbs like MENU
 - [No ship language, no unasked builds](no-ship-language-this-is-dev.md) — [run builds in the background](run-builds-in-background.md), a typed message cancels an in-flight tool; [build, report, hand it back](build-report-dont-investigate.md)
 - [Compile shared, not embedded](compile-shared-not-embedded.md) — SHARED is the p-code number
@@ -23,7 +23,7 @@ again. See [memory-is-git-tracked](memory-is-git-tracked.md).
 ## Build and toolchain
 - [Build toolchain location](build-toolchain-location.md) — make, 64tass, python are off-PATH in C:\8bitProgramming; build setup is in docs/BUILDING.md
 - [Git Bash sed strips CRLF](git-bash-sed-strips-crlf.md) — `sed -i` writes LF and `grep -c $'\r$'` lies; count with Python bytes
-- [App make skips compiler.library](app-make-does-not-rebuild-compiler-library.md) — use `make libs`; [it does not install the runtime](make-libs-does-not-install-the-runtime.md) either; [the baseline is the application copy](baseline-compiler-is-the-application-copy.md), testing/GPC.BIN can be stale
+- [App make skips compiler.library](app-make-does-not-rebuild-compiler-library.md) — use `make libs`; [it does not install the runtime](make-libs-does-not-install-the-runtime.md) either; [the baseline is the application copy](baseline-compiler-is-the-application-copy.md), drive/GPC.BIN can be stale
 - [Measure p-code per module](measure-pcode-per-module.md) — map plus SYM gives bytes per include and routine
 - [Headless BASL build recipe](headless-basl-build-recipe.md) — the three emulator runs and their stop conditions; [a timeout once faked success](compile-shared-timeout-fakes-success.md), the banner is the finish line
 - [GPC.ERR builds in its sample folder](gpcerr-builds-in-its-sample-folder.md) — never standalone

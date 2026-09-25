@@ -50,7 +50,7 @@ core and `GP1.RT.nnn.BIN` by one patched name; `bootstrap2.asm` restoring the en
 16-page `.cerror`; the bank page's patch offset moved to step 24, with its label. Step 22 is done: `genrtimage.py` installs the embedded bank code as `GP1.IMG.nnn.BIN`
 beside the image. Step 23 is done: the compiler reads it into bank 15 before the object is created
 and writes it after the p-code at `BLC_CLOSEOUT`. Step 24 is done: `StartCode` copies it to bank 1 from the page `object.asm` patches and zeroes that
-page, so a RUN after END keeps the copy. Step 25 built the tree: `GPC.BIN` 31,892 B, build 123 image and runtime files in `testing/`.
+page, so a RUN after END keeps the copy. Step 25 built the tree: `GPC.BIN` 31,892 B, build 123 image and runtime files in `drive/`.
 Step 26 passed against a build 122 control: every moved group in both modes and in a region, the bank
 after a runtime error, the bank 1 LOAD chains, a mixed chain and the refusals. Embedded `SPRMEM` loses
 about 40 cycles a call, above §4's 30; the user kept it in bank 1.
@@ -65,14 +65,14 @@ build outputs), handler step 10 (`BANKMGR.INC.BL`, the three `.EXP.BL` samples, 
 help), handler step 11 (the two bank headers, `source/common.make`, the runtime and application
 Makefiles), handler step 12 (the moved handler files, the polynomial sources and generators,
 `runtime.inc`, `00runtime.asm`, `zzlowbank.footer`, the runtime and polynomials Makefiles), handler steps 13 and 14 (`vectors.py`, `genmapping.py`,
-`genx16.py`, the three generated files, `00runtime.asm`, `testing/testend.asm`), handler step 15 (`errors/errorhandler.asm`), handler step 17 (`common.inc`, `rtbuild.txt`,
+`genx16.py`, the three generated files, `00runtime.asm`, `drive/testend.asm`), handler step 15 (`errors/errorhandler.asm`), handler step 17 (`common.inc`, `rtbuild.txt`,
 `generated/version.asm`), handler step 18 (`common.inc`, `runtime/Makefile`), handler step 19 (`rtname.py`, `runtime/Makefile`, `release.sh`,
 `samplesbuild.py`, `banktest3.py`, `dcref.py`, `.gitignore`), handler step 20 (`bootstrap.asm`), handler step 21 (`genrtimage.py`, application `Makefile`), handler step 22 (`genrtimage.py`, application
 `Makefile`, `release.sh`, `.gitignore`, `dcref.py`, `banktest3.py`), handler step 23 (`object.asm`, `api.asm`,
 `bumpbuild.py`, `x16_storage.inc`), handler step 24 (`00rtimage.header`, `10object.divider`,
 `genrtimage.py`, `object.asm`, application `Makefile`), handler step 28 (the manual, the three help Markdown
 copies, `H001.HLP`, `H076.HLP` and `GPB.HELP.IDX` in both `HELP-TXT` folders, `README.md`, the GPBMODS
-`PLAN.md`, `testing/readme.md`, `help-demo.bat`, `fntest.py`, `BUILD-HANDOFF.md`, four notes), both plans and `docs/blitz/EMBEDDED-VS-SHARED.md`. Another agent changed
+`PLAN.md`, `drive/readme.md`, `help-demo.bat`, `fntest.py`, `BUILD-HANDOFF.md`, four notes), both plans and `docs/blitz/EMBEDDED-VS-SHARED.md`. Another agent changed
 `source/compiler/source/main/compiler.asm`; check it before staging.
 
 `banktest3.py` passed in full on 2026-09-14, with BNK64 retired.

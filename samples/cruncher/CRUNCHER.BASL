@@ -591,7 +591,7 @@ CX.FINDWORD:
 REM ============================================================================
 REM CX.SNIFF -- which line ending does the file on channel 2 use?
 REM
-REM THE REPO USES ALL THREE. EDITOR.BASL and the library are LF, testing/GPC.BASL
+REM THE REPO USES ALL THREE. EDITOR.BASL and the library are LF, drive/GPC.BASL
 REM is CRLF, and the editor itself writes CR -- BASLOAD takes any of them, so the
 REM cruncher has to as well, and has to write back what it found.
 REM

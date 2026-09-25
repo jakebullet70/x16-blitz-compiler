@@ -62,11 +62,11 @@ never correctness.
 ## Build and test cycle
 
 `python` and `make` are off-PATH ([[build-toolchain-location]]); Python 3.13 is at
-`C:\Users\Admin\AppData\Local\Programs\Python\Python313`. Stage into `testing/` first — BASLOAD
-resolves `#INCLUDE` off the drive and `build_basl.py` uses `testing/` as `-fsroot`:
+`C:\Users\Admin\AppData\Local\Programs\Python\Python313`. Stage into `drive/` first — BASLOAD
+resolves `#INCLUDE` off the drive and `build_basl.py` uses `drive/` as `-fsroot`:
 
 ```
-cp samples/cruncher/{CRUNCH,CRUNCHER}.BASL samples/cruncher/GPC-BASIC/*.INC.BL testing/
+cp samples/cruncher/{CRUNCH,CRUNCHER}.BASL samples/cruncher/GPC-BASIC/*.INC.BL drive/
 python source/gpc/build_basl.py CRUNCHER.BASL CRUNCHER.SRC.PRG
 python source/gpc/compile_shared.py [--embedded] CRUNCHER.SRC.PRG CRUNCH.BIN
 ```
@@ -90,7 +90,7 @@ commit it:
   then diffs both. **It must normalise `GP.IF` blocks to `IF c THEN body` in BOTH files** or every
   `COLLAPSE` reads as a mismatch. Editor: 1,317 statements, 96 THEN clauses.
 - **`runprg.py`** — run a PRG headless: `SDL_VIDEODRIVER=dummy`, `-warp -echo -prg NAME -run`,
-  cwd `testing/`, poll the log for a stop string, kill by PID.
+  cwd `drive/`, poll the log for a stop string, kill by PID.
 
 **`-echo` dumps an LF file's whole contents in one blob** because LF is not a PETSCII newline —
 grep the summary lines, do not read the log whole.

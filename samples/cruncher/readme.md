@@ -105,15 +105,15 @@ To crunch the editor instead, point the drive at `samples\edit` and drop `CRUNCH
 
 ## Rebuilding
 
-BASLOAD resolves `#INCLUDE` off the drive and `build_basl.py` uses `testing\` as the emulator's
+BASLOAD resolves `#INCLUDE` off the drive and `build_basl.py` uses `drive\` as the emulator's
 filesystem root, so both sources and the two includes stage there first. `python` and `make` are
 off-PATH; see `source/local.make`.
 
 ```
-copy samples\cruncher\CRUNCH.BASL             testing\
-copy samples\cruncher\CRUNCHER.BASL           testing\
-copy samples\cruncher\GPC-BASIC\GPB.INC.BL    testing\
-copy samples\cruncher\GPC-BASIC\STRCASE.INC.BL testing\
+copy samples\cruncher\CRUNCH.BASL             drive\
+copy samples\cruncher\CRUNCHER.BASL           drive\
+copy samples\cruncher\GPC-BASIC\GPB.INC.BL    drive\
+copy samples\cruncher\GPC-BASIC\STRCASE.INC.BL drive\
 python source\gpc\build_basl.py CRUNCH.BASL    CRUNCH.SRC.PRG
 python source\gpc\build_basl.py CRUNCHER.BASL  CRUNCHER.SRC.PRG
 python source\gpc\compile_shared.py --embedded CRUNCH.SRC.PRG   CRUNCH.PRG

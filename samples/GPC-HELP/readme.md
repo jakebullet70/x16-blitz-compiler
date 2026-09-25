@@ -111,7 +111,7 @@ since the page budget is the viewer's and part two of a split carries no Markdow
 
 ## Rebuilding the program
 
-It builds in this folder, with nothing staged into `testing\`. The source includes its modules as
+It builds in this folder, with nothing staged into `drive\`. The source includes its modules as
 `GPC-BASIC/NAME.INC.BL`, and `GPC.BIN` and `BASLOAD-GPC.BIN` sit beside it. `python` and `make`
 are off PATH; see `docs/BUILDING.md`.
 
@@ -120,7 +120,7 @@ python source\gpc\samplesbuild.py GPB.HELP
 ```
 
 That runs the two steps below, then copies `GPB.RT.nnn.BIN`, `GPC.RT.nnn.BIN` and `GP1.RT.nnn.BIN`
-from `testing\` into this folder. `nnn` is the build number, 124 today. Git ignores all three
+from `drive\` into this folder. `nnn` is the build number, 124 today. Git ignores all three
 copies.
 
 ```
@@ -218,7 +218,7 @@ run backwards (ADDRH bit 3) from the far end so the copy does not eat its own so
 **The bars are outside the rectangle**, so they neither move nor get repainted. The window is
 screen rows 1–28; the title is row 0 and the status line row 29.
 
-Measured on the bench in `testing/SCRLTST.BASL`, 50 slides each:
+Measured on the bench in `drive/SCRLTST.BASL`, 50 slides each:
 
 | one scroll step | jiffies |
 |---|---:|

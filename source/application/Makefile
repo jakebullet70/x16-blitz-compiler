@@ -116,8 +116,8 @@ release:  build
 	#
 	#		No archive is bundled. blitz.zip -- a git-tracked binary rebuilt on every release --
 	#		has been dropped: nothing in the tree ever consumed it, and its "*" glob swept
-	#		whatever else lived in testing/ (e.g. the XFMGR launcher) into the download. The
-	#		release is simply the contents of testing/.
+	#		whatever else lived in drive/ (e.g. the XFMGR launcher) into the download. The
+	#		release is simply the contents of drive/.
 	
 run: build	
 	$(CDEL) OBJECT.PRG

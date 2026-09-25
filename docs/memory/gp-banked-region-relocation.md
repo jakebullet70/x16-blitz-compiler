@@ -63,7 +63,7 @@ because the `$FF` they all stop at is now in the middle of the object.
 **IT RUNS FROM THE BANK, and that had to be READ OUT rather than inferred.** The region is still
 present at its old low-memory address in the loaded image -- the bootstrap copies it up, it does not
 remove it -- so a branch that wrongly pointed back at the low copy passes every behavioural test
-until the workspace grows over it. `testing/BANKP.BASL` reports codePtr and the bank register from a
+until the workspace grows over it. `drive/BANKP.BASL` reports codePtr and the bank register from a
 blob inside the region: **160 (`$A0xx`) and bank 5**, against `$09xx` from low memory.
 
 **The cross-boundary correction is ONE BYTE**, because both bases are page aligned so the difference
@@ -88,10 +88,10 @@ embedded raised `NOT IMPLEMENTED` at the program's last line.
 **The bank must stay selected at every fetch inside the region.** `PEEK`/`POKE` are safe (they save
 and restore); `BANK` inside a region is refused at compile time; `BANK`/`BLOAD`/`BSAVE` in LOW memory
 before a call into the region are equally fatal and are closed by a low-memory ENTRY SHIM per public
-library entry point (`BANK n : GOSUB body : RETURN`, ~12 bytes each). `testing/BANKR.BASL` hangs and
+library entry point (`BANK n : GOSUB body : RETURN`, ~12 bytes each). `drive/BANKR.BASL` hangs and
 `BANKS.BASL` -- the same program with the bank put back -- does not.
 
-Tests: `testing/BANK*.BASL`, thirteen of them, each marked program run against an otherwise
+Tests: `drive/BANK*.BASL`, thirteen of them, each marked program run against an otherwise
 identical unmarked control and compared on OUTPUT (the objects differ now, so a byte
 compare is no longer the test -- it was, for increment 1). `GPC.BIN` 16,409 -> 17,694, which costs
 nothing: see [[compiler-must-not-cap-program-size]], the buffer has thousands of bytes of slack over

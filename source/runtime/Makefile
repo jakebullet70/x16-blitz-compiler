@@ -56,7 +56,7 @@ build: prelim
 #		-D CodeStart is RTGPBASE, not RTBASE (28416 = $6F00 -- decimal dodges Make's $; keep
 #		it in step with RTGPBASE in common.inc). 05rtcore.divider pads the gap and stamps
 #		RTGPMAGIC; zzrt.footer still guards the top against $9F00. Written straight into
-#		testing/ so both sit beside the compiled programs on the emulator's disk.
+#		drive/ so both sit beside the compiled programs on the emulator's disk.
 #
 #		00rtbank.header opens the link and places the bank code at $A000, with the "GP" magic.
 #		$(ASMBANK) writes it to build/bank.prg, beside code.prg, and rtname.py installs it as

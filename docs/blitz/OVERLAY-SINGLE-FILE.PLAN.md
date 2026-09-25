@@ -89,7 +89,7 @@ throwaway either way, and GP.ASM is quicker to iterate.
 
 ### Measured, 2026-09-16 -- hostfs
 
-`testing/ACPTRBEN.BASL`, a GP.ASM blob, run at real speed under `-fsroot`. One `OPEN`, then four
+`drive/ACPTRBEN.BASL`, a GP.ASM blob, run at real speed under `-fsroot`. One `OPEN`, then four
 8,192-byte reads a phase into bank 4 at `$A000`, with a checksum of the bank afterwards so a fast
 number cannot be a number for bytes that never arrived. Both phases checked out at 496.
 
@@ -106,7 +106,7 @@ same gate, which settles the choice between the two byte-at-a-time calls as well
 ### The baseline, measured the same day
 
 A per-8K figure is not what a program pays. It pays for the bytes it actually has, and it pays
-them against what the `.nnn` files cost today rather than against zero. `testing/LOADBEN.BASL`
+them against what the `.nnn` files cost today rather than against zero. `drive/LOADBEN.BASL`
 measures both halves over the real GPBMODS data: eight `BLOAD`s of `GPBMODS.004` to `.011`, which
 is the KERNAL `LOAD` the bootstrap already calls, and then one `OPEN` and one `ACPTR` walk of a
 `GPBMODS.OVL` built to this plan's format. Both phases checksum the eight banks afterwards, and

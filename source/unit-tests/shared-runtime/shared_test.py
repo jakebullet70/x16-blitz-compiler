@@ -20,8 +20,8 @@
 #			      would ?RT-fail on the now-missing file).
 #
 #		Prerequisites (build them first -- see the Makefile's "build" target):
-#			testing/GPC.BIN   the compiler engine      (make libs)
-#			testing/GPC.RT.nnn.BIN  the resident runtime      (make -C source/runtime gpc-rt)
+#			drive/GPC.BIN   the compiler engine      (make libs)
+#			drive/GPC.RT.nnn.BIN  the resident runtime      (make -C source/runtime gpc-rt)
 #
 #		The emulator is launched with SDL_VIDEODRIVER=dummy so it never steals the desktop's
 #		keyboard focus, and each run is terminated by PID -- never by image name, because other
@@ -33,7 +33,7 @@
 import os, sys, time, subprocess
 
 ROOT     = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
-TESTING  = os.path.join(ROOT, "testing")
+TESTING  = os.path.join(ROOT, "drive")
 EMU      = os.path.join(ROOT, "bin", "x16emu", "x16emu.exe")
 ROM      = os.path.join(ROOT, "bin", "x16emu", "rom.bin")
 TOKENISE = os.path.join(ROOT, "bin", "tokenise.zip")
@@ -69,7 +69,7 @@ from rtname import rc_filename                                          # noqa: 
 RT_NAME  = rc_filename()
 RT_MAGIC = b"GP%02d" % RT_ABI          # "GP" + TWO digits: 4 bytes, room to ABI 99
 
-# Files this test creates in testing/ (the emulator's drive). All prefixed RT_ and cleaned up.
+# Files this test creates in drive/ (the emulator's drive). All prefixed RT_ and cleaned up.
 SRC_BAS   = "RT_SRC.BAS"
 SRC_PRG   = "RT_SRC.PRG"
 OBJ_PRG   = "RT_OBJ.PRG"

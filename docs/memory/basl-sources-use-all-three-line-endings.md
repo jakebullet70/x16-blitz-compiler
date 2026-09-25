@@ -9,7 +9,7 @@ metadata:
 ---
 
 **Any tool reading BASL source has to handle all three endings, because the tree uses all three:**
-`EDITOR.BASL` and everything in `GPC-BASIC/` are **LF**, `testing/GPC.BASL` is **CRLF**, and the
+`EDITOR.BASL` and everything in `GPC-BASIC/` are **LF**, `drive/GPC.BASL` is **CRLF**, and the
 editor itself **writes CR**. BASLOAD takes any of them, so a source-to-source tool must too — and
 must write back what it found.
 

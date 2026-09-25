@@ -10,7 +10,7 @@ current with every stage.
 | `GPC-BASIC/` | The master copy of the GP.BASIC library and its manual `GP-BASIC.md`. |
 | `BASLOAD-GPC/` | The BASLOAD tokeniser fork, with its vendored upstream. |
 | `samples/` | Every program built with GPC: the apps (help, editor, GUI, error viewer, XBase) and the examples. Each builds in its own folder. |
-| `testing/` | The emulator drive: the built compiler, runtimes and scratch test programs. |
+| `drive/` | The emulator drive: the built compiler, runtimes and scratch test programs. |
 | `USER-RUNS/` | The `.bat` launchers that run the emulator on a sample or the drive. |
 | `bin/` | The emulators (`x16emu/`, `box16/`) and the built `*.library` files. |
 | `bench/` | Speed benchmarks. |

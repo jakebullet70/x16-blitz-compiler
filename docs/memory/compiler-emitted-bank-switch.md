@@ -98,7 +98,7 @@ compile succeeds and prints 0. Write `DEF FN T(X)` and `FN T(1)` with the space.
   is stale** until the step 4 build is measured.
 - PICKDEMO dropped `MENUBAR.INC.BL`, which was there only because the GUI shim file named its labels.
 - Not touched: XBASE (to be dropped), the `samples/GPC-HELP/GPC-BASIC/` copies, the sample plan docs,
-  `testing/`.
+  `drive/`.
 - **2026-09-14, the help and the rest:** root `GPC-BASIC/STRCASE.INC.BL` is now the working copy's,
   verbs included. `GP-BASIC.md` (§1, §3.11, §3.12, §4 intro and topic, §4.8, §4.13, §4.14, §4.20,
   §7), `GP-BASIC.GLOBALS.md` §4 and its STRCASE entry, and `README.md` describe `.bgosub` with no
@@ -109,7 +109,7 @@ compile succeeds and prints 0. Write `DEF FN T(X)` and `FN T(1)` with the space.
 
 ## Step 4, the tests (2026-09-14)
 
-- `samplesbuild.py GPBMODS` (still staged in `testing/`): resident object **11,619 B, was 12,885**.
+- `samplesbuild.py GPBMODS` (still staged in `drive/`): resident object **11,619 B, was 12,885**.
   The code overlays kept their sizes (B04 7,938, B07 4,354, B08 1,538, B09 770, B10 770, B11 3,074);
   text pool B06 went from 4,610 to 4,354. Overlays total 30,224.
 - `gpctest.py full --only GPBMODS,GUIFRMT`: every compile OK and both stripped identities hold
@@ -122,16 +122,16 @@ compile succeeds and prints 0. Write `DEF FN T(X)` and `FN T(1)` with the space.
   that file has a label of its own. `BS.B.NUMS`, `BS.B.MEM`, `GP-BASIC.md` §4.20 (and the help) and
   the table in `samples/GPB-MODS-TESTING/readme.md` carry the figures; a rebuild after the edit gave
   the same sizes.
-- `banktest3.py` pointed at `testing/` and still expected BANKY refused; fixed below.
+- `banktest3.py` pointed at `drive/` and still expected BANKY refused; fixed below.
 
 ## Closed 2026-09-14
 
 - `gpctest.py ref` run with the current `GPC.BIN`: every program stored, PASS in 86 s.
-- **gpctest's inputs are frozen.** `dcref.snapshot` copies `testing/NAME.SRC.PRG` into
+- **gpctest's inputs are frozen.** `dcref.snapshot` copies `drive/NAME.SRC.PRG` into
   `work/dcref/inputs` only when the copy is missing, so gpctest's GPBMODS is the 2026-09-12 source,
   shims and all (77,062 B against 73,953 now). That is why its dead-code count stayed 1,600 B and
   its FREE stayed 8,192 through step 4. Delete an input to refresh it.
-- **Inputs refreshed.** GPBMODS's input is `testing/GPBMODS.SRC.PRG` and `.SYM` from the step 4
+- **Inputs refreshed.** GPBMODS's input is `drive/GPBMODS.SRC.PRG` and `.SYM` from the step 4
   build. GUIFRMT was tokenised and compiled in `work/guifrmt`, a drive holding the merged
   `GUIFRMT.BASL`, the library working copy flattened, the current `GPC.BIN` and the runtime files.
   The pre-merge inputs are kept in `work/dcref/inputs-premerge/`. `gpctest.py ref --only
@@ -141,10 +141,10 @@ compile succeeds and prints 0. Write `DEF FN T(X)` and `FN T(1)` with the space.
     dead code 129 lines, 1,275 B.
   - Both stripped identities hold.
 - `samples/GPB-MODS-TESTING/GPC-BASIC/GPB.INC.BL` (2,577 B, 2026-09-08) has drifted from the root
-  copy (18,436 B), which is the one `testing/` holds. Only the comments and the order of the four
+  copy (18,436 B), which is the one `drive/` holds. Only the comments and the order of the four
   `GP.DEFPROC`..`RETURNS` `#TOKEN` lines differ, and the token values are the same, so both give the
   same tokenised program.
-- The current GPBMODS (`testing/GPBMODS.PRG`, 11,619 B): workspace `$4000`..`$6600`, 9,728 B;
+- The current GPBMODS (`drive/GPBMODS.PRG`, 11,619 B): workspace `$4000`..`$6600`, 9,728 B;
   `.varspace` 3,292. §4.20, H056 and the readme carry it.
 - `banktest3.py`: `T` is `work/banktest3`, `build_basl.py` gets `--drive`, the current `GPC.BIN`
   and runtime files are copied onto the drive first, and BANKY left the reject list for a run check
@@ -201,9 +201,9 @@ What the guard changed in the tests:
 
 Results with the guard build (`GPC.BIN` MD5 `2647c404`): `gpctest.py full` PASS in 181 s, and
 `banktest3.py` ALL PASS in 190 s: 6 pairs the same, 13 refusals, `BANKY` runs. Not committed yet.
-- `testing/RGL.BASL` and `RGN.BASL`: each `GOTO X.END` now goes to `X.BODY.END`, the line before
+- `drive/RGL.BASL` and `RGN.BASL`: each `GOTO X.END` now goes to `X.BODY.END`, the line before
   `GP.ENDBANKED`, so it lands in low memory past the region.
-- `testing/RGM.BASL` no longer tokenised at all (`DUPLICATE SYMBOL IN APPSYS.INC.BL:54`: its
+- `drive/RGM.BASL` no longer tokenised at all (`DUPLICATE SYMBOL IN APPSYS.INC.BL:54`: its
   `LIB.*BANK.INC.BL` shims clash with the merged modules). It is rebuilt in GPBMODS's five-region
   merged shape. The three old sources and inputs are in `work/dcref/inputs-preguard/`, and the
   new references were built with the previous compiler, `acf427f1`.

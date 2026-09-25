@@ -200,7 +200,7 @@ load stopped, so the bank is selected again before the header is checked.
   reference copy, not the build path.
 - Place the module at `samples/KV-STORE/kvstore.p8` with a test program beside it. Samples in this
   repository build in place — see `docs/memory/samples-build-in-place.md` — and are never staged
-  into `testing/`.
+  into `drive/`.
 
 ## 8. Tests
 

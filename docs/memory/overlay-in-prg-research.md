@@ -40,10 +40,10 @@ forbids.
 **`ACPTR` was measured on 2026-09-16 and it passes.** Under hostfs, at real speed, a byte loop
 reads 8,192 bytes in **17 jiffies, 0.283 s**, against a 0.3 s threshold; `CHRIN` over the same
 file takes 19 jiffies and would fail. So the reader fits the existing extension page and `MACPTR`
-is not needed. The probe is `testing/ACPTRBEN.BASL` with `testing/PROBE.DAT` beside it.
+is not needed. The probe is `drive/ACPTRBEN.BASL` with `drive/PROBE.DAT` beside it.
 
 **The regression was then measured against the real data, not extrapolated.**
-`testing/LOADBEN.BASL` times both halves over GPBMODS' eight regions, which hold 32,000 bytes --
+`drive/LOADBEN.BASL` times both halves over GPBMODS' eight regions, which hold 32,000 bytes --
 125 pages, every one already an exact page multiple, so the `.OVL` padding costs GPBMODS nothing
 and the file is 32,016 bytes. Eight `BLOAD`s of the `.nnn` files take **1 jiffy**; one `OPEN` and
 an `ACPTR` walk of the `.OVL` take **75 jiffies, 1.25 s**. Both phases checksum the eight banks

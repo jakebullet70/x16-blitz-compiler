@@ -2660,7 +2660,7 @@ the worked example of `GP.BANKED`, `GP.BANKEDSTR` and `BANKMGR` in one place.
 gpbmods-demo.bat
 ```
 
-The drive is `testing/`, not the sample folder. The object is compiled SHARED and loads
+The drive is `drive/`, not the sample folder. The object is compiled SHARED and loads
 `GPB.RT.nnn.BIN` from there.
 
 **No row is a stub.** A chosen row calls the library for real and shows what came back, on the panel

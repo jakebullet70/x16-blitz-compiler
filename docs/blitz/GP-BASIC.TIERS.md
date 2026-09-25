@@ -870,7 +870,7 @@ Theme colours are read by *BASIC*, for `COLOR` — ASM never touches them — so
 runtime bought nothing and cost two tokens. As data they are **savable and loadable from disk** like
 any other array, and switching light for dark is reloading the array rather than invoking a keyword.
 
-**`#DEFINE` value substitution is confirmed** (`testing/MSEDIT/BASLOAD.MD:313-331`): *"defines a 16 bit
+**`#DEFINE` value substitution is confirmed** (`drive/MSEDIT/BASLOAD.MD:313-331`): *"defines a 16 bit
 integer constant… replaced by its integer value in the resulting generated code"*, with the worked
 example `#DEFINE MYPARAM 1` / `PRINT MYPARAM` → `PRINT 1`. So named slots cost **nothing** — no
 variable, no 6-byte scalar, no runtime lookup. This applies to every named constant in the library,
@@ -1195,7 +1195,7 @@ does not** — it runs on the X16 and knows only the ROM's keywords, so a BASL s
 is a syntax error until the tokens are declared to it.
 
 `GPC-BASIC/GPB.INC.BL` is that declaration, `#INCLUDE`d at the top of any BASL source using GP
-keywords. It is **staged flat into `testing/`** to be built, because `testing/` is the emulator's drive and
+keywords. It is **staged flat into `drive/`** to be built, because `drive/` is the emulator's drive and
 that is the shortest thing to type. `#INCLUDE` does take a path, so a user keeps the library in a
 `GPC-BASIC/` folder instead of copying it about; the flat staging is a convenience of this tree,
 not a restriction of BASLOAD:
@@ -1392,7 +1392,7 @@ a wasted debugging session. Generating this file from `c64tokens.py` at build ti
 hazard and is worth doing before the keyword list grows further.
 
 Token values are decimal because `#TOKEN <name> <int16>` takes an int16
-(`testing/MSEDIT/BASLOAD.MD`). They are allocated **downward from `$CE7F`** and never renumbered —
+(`drive/MSEDIT/BASLOAD.MD`). They are allocated **downward from `$CE7F`** and never renumbered —
 `GP.MENU` (52840) and `GP.SEL` (52839) were freed by the menu removal and are NOT to be reused.
 
 A `.PRG` containing a `$CE7x` byte is **compile-only**: the ROM cannot `LIST` or `RUN` it, because
@@ -1400,15 +1400,15 @@ there is no BASIC handler behind those tokens. Expected, not a fault.
 
 ### Building an example from the development tree
 
-`testing/` is the emulator's drive and `GPC-BASIC/` holds the masters, so a build stages the files
+`drive/` is the emulator's drive and `GPC-BASIC/` holds the masters, so a build stages the files
 across. (`#INCLUDE` accepts a path — `/GPC-BASIC/GPB.INC.BL` works, verified on R49 — so this flat
 staging is a habit of this tree, not something BASLOAD forces.) So:
 
 - edit the master in `GPC-BASIC/`
-- copy it and every module it includes into `testing/`
+- copy it and every module it includes into `drive/`
 - `python source/gpc/build_basl.py XXX.EXP.BL XXX.PRG`, then compile the PRG with `GPC.BIN`
 
-`testing/*.INC.BL` and `testing/*.EXP.BL` are gitignored precisely because they are staging copies;
+`drive/*.INC.BL` and `drive/*.EXP.BL` are gitignored precisely because they are staging copies;
 committing one puts a second copy of a library file in the repo, free to drift from the master.
 
 **Check the byte count `build_basl.py` prints.** A BASLOAD error still reports `OK` and writes a

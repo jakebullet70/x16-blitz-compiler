@@ -7,7 +7,7 @@ metadata:
 
 `GPC.ERR` turns a runtime `<MSG> @ $XXXX` back into a BASIC line by reading a `M.<source>` debug map.
 
-**It builds in `samples/GPC.ERR/`, which is the emulator drive.** Nothing is staged into `testing/`.
+**It builds in `samples/GPC.ERR/`, which is the emulator drive.** Nothing is staged into `drive/`.
 See [[samples-build-in-place]]. Two steps, from the repository root:
 
     python source/gpc/build_basl.py --drive samples/GPC.ERR GPC.ERR.BASL GPC.ERR.SRC.PRG

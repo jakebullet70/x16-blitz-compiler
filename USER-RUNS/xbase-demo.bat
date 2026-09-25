@@ -19,11 +19,11 @@ rem  MKFIX.BASL, which has not been built or run, so Open Database has nothing
 rem  to open. The menus, the bar, the dialogs and the GUI in bank 4 are what
 rem  this launch exercises.
 rem
-rem  THE DRIVE IS testing\, NOT the sample directory, and it needs more than the
+rem  THE DRIVE IS drive\, NOT the sample directory, and it needs more than the
 rem  PRG. XBASE.PRG is compiled SHARED, so it loads the resident GPC.RT.nnn.BIN
 rem  rather than carrying a copy; and it has one overlay, XBASE.004, the CUA GUI
 rem  library, which the bootstrap LOADs into bank 4 at startup. A missing one
-rem  stops with ?OVL. Both live in testing\ beside the PRG.
+rem  stops with ?OVL. Both live in drive\ beside the PRG.
 rem
 rem  Source: samples\XBASE\XBASE.BASL and XBMENUS.BASL, on the modules in
 rem  samples\XBASE\GPC-BASIC\ beside them. See that folder's readme.md, and
@@ -31,7 +31,7 @@ rem  GPC-BASIC\BANKED-OR-NOT.md for why six of those modules come in two files.
 rem ---------------------------------------------------------------------------
 setlocal
 for %%I in ("%~dp0..") do set "ROOT=%%~fI\"
-set "DRIVE=%ROOT%testing"
+set "DRIVE=%ROOT%drive"
 set "X16EMU=%ROOT%bin\x16emu\x16emu.exe"
 set "ROM=%ROOT%bin\x16emu\rom.bin"
 
@@ -45,16 +45,16 @@ if not exist "%ROM%" (
 )
 if not exist "%DRIVE%\XBASE.PRG" (
 	echo.
-	echo   testing\XBASE.PRG is not built. From the project root:
+	echo   drive\XBASE.PRG is not built. From the project root:
 	echo     python source\gpc\xbasebuild.py XBASE
-	echo   which copies the sources and the library into testing\ and runs both
+	echo   which copies the sources and the library into drive\ and runs both
 	echo   steps. Nothing else needs doing by hand.
 	echo.
 	exit /b 1
 )
 if not exist "%DRIVE%\XBASE.004" (
 	echo.
-	echo   testing\XBASE.004 is missing -- that is the GUI library overlay, and
+	echo   drive\XBASE.004 is missing -- that is the GUI library overlay, and
 	echo   XBASE stops with ?OVL without it. Rebuild:
 	echo     python source\gpc\xbasebuild.py XBASE
 	echo.

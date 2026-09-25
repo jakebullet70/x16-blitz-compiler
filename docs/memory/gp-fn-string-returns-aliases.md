@@ -26,6 +26,6 @@ sites. `gpctest.py quick` PASS in 113 s: no program in the set changed, because 
 three), the one-call-per-expression WARNING is out of both `STRCASE` headers, and the `TODO.md`
 bug entry and ranked item 0 read FIXED. The generated `GPC-HELP.md` copies still carry the old
 entry until the help is regenerated. `fntest.py` cannot run: its `DEFFN*` sources are gone from
-`testing/`.
+`drive/`.
 
 Related: [[gp-defproc-one-line-calls]], [[gpc-string-blocks-never-shrink]].

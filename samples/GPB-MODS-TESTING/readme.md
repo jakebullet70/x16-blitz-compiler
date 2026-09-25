@@ -64,7 +64,7 @@ block and nothing else — and no other menu moves.
 
 ## Build
 
-The drive is `testing/`, not this folder: the object is compiled shared and loads the resident
+The drive is `drive/`, not this folder: the object is compiled shared and loads the resident
 `GPC.RT.<ver>.BIN`, which lives there.
 
 ```
@@ -77,9 +77,9 @@ partway can still leave a plausible file behind, and one of those once cost the 
 seconds on a source that had never finished tokenising. By hand it is:
 
 ```
-copy samples\GPB-MODS-TESTING\GPBMODS.BASL       testing\
-copy samples\GPB-MODS-TESTING\GPC-BASIC\*.INC.BL testing\
-copy GPC-BASIC\GPB.INC.BL                        testing\
+copy samples\GPB-MODS-TESTING\GPBMODS.BASL       drive\
+copy samples\GPB-MODS-TESTING\GPC-BASIC\*.INC.BL drive\
+copy GPC-BASIC\GPB.INC.BL                        drive\
 python source\gpc\build_basl.py     GPBMODS.BASL     GPBMODS.SRC.PRG
 python source\gpc\compile_shared.py GPBMODS.SRC.PRG  GPBMODS.PRG  GPBMODS.MAP
 ```
@@ -121,7 +121,7 @@ text pools. Each section is a bank number and a page count followed by the pages
 ends with a `$01` marker. Every section loads to `$A000` in its own bank, so none of it counts
 against low RAM or the file ceiling.
 
-P-code bytes, differenced out of `testing/GPBMODS.MAP` against `testing/GPBMODS.SRC.SYM`. The
+P-code bytes, differenced out of `drive/GPBMODS.MAP` against `drive/GPBMODS.SRC.SYM`. The
 figures cover low memory and all seven regions, so the total is far larger than the resident
 object:
 

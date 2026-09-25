@@ -22,7 +22,7 @@ A source that died at 38,421 bytes with `ERROR: BASIC RAM FULL` now tokenises to
 compiles. See [The fork](#the-fork).
 
 `source/gpc/build_basl.py` drives this build now, not the ROM's, and stages both files into
-`testing/` beside `GPC.BIN`.
+`drive/` beside `GPC.BIN`.
 
 ## Build
 

@@ -7,7 +7,7 @@ rem  Bash. This wrapper just puts GNU make + 64tass on PATH and calls release.sh
 rem
 rem  Usage:
 rem     release          full build (libs, engine, shared runtime, front end),
-rem                      then package testing/ + docs into release.zip
+rem                      then package drive/ + docs into release.zip
 rem     release zip      package the CURRENT build only -- no rebuild, no bump
 rem ***************************************************************************
 setlocal
