@@ -283,6 +283,9 @@ GPC-BASIC-TOOLS-SRC/GPC-HELP/GPC.RC.*.BIN
 # and scratch/demo/, the build output for bmx-demo.bat.
 /source/scratch/
 
+# GPC-BASIC-TOOLS-SRC/GPC/ is the tool home, filled by "make install".
+/GPC-BASIC-TOOLS-SRC/GPC/
+
 # release/TMP/ is the release staging tree, wiped and rebuilt by "release.sh stage". It also
 # holds XFMGR and XT, which never go in the zip. release/ itself is tracked.
 /release/TMP/

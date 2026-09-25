@@ -29,6 +29,7 @@ again. See [memory-is-git-tracked](memory-is-git-tracked.md).
 - [Headless BASL build recipe](headless-basl-build-recipe.md) — the three emulator runs and their stop conditions; [a timeout once faked success](compile-shared-timeout-fakes-success.md), the banner is the finish line
 - [GPC.ERR builds in its sample folder](gpcerr-builds-in-its-sample-folder.md) — never standalone
 - [Runtime storage is the golden RAM](runtime-storage-is-golden-ram.md) — $0400 to StorageEnd, which MOVES; a test routine goes at $0780; [tests share the product's memory](tests-share-the-products-memory.md)
+- [/GPC/NAME opens from any folder](gpc-home-path-form.md) — measured on R49 hostfs; the plain form works, no CMD syntax needed
 - [Paste can't drive a running program](paste-cannot-drive-a-running-program.md) — use a fixed-answer variant. x16emu r49 runs tests, Box16 debugs
 - [File I/O dies in a GP.DO key loop](file-io-error-in-gpdo-key-loop.md) — the seven shapes already ruled out
 - [Retired keyword defers to runtime](retired-keyword-defers-to-runtime.md) — stale callers compile clean and explode

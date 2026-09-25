@@ -29,7 +29,7 @@ REVISION = r49
 #		release/ directory (now merged into source/drive/) -- make would see the directory, decide the
 #		target was already made, and skip it. Mark them phony so they always run regardless.
 #
-.PHONY: all libs release pullbuild latest samples
+.PHONY: all libs release pullbuild latest samples install
 
 all: libs samples
 
@@ -42,6 +42,22 @@ all: libs samples
 samples:
 	rm -rf $(RELEASEDIR)samples
 	cp -r GPC-BASIC-TOOLS-SRC $(RELEASEDIR)samples
+
+#
+#		Fill GPC-BASIC-TOOLS-SRC/GPC/, the tool home: the compiler, BASLOAD-GPC, the runtime and image
+#		files of the pinned build, and the GPC-BASIC library. It is the /GPC folder of an emulator run
+#		with GPC-BASIC-TOOLS-SRC/ as its root. Generated and not in git; run after "make libs".
+#
+GPCHOME = GPC-BASIC-TOOLS-SRC/GPC/
+RTBUILD := $(strip $(file < source/application/rtbuild.txt))
+
+install:
+	rm -rf $(GPCHOME)
+	mkdir -p $(GPCHOME)
+	cp $(RELEASEDIR)GPC.PRG $(RELEASEDIR)GPC.BIN $(RELEASEDIR)BASLOAD-GPC.PRG $(RELEASEDIR)BASLOAD-GPC.BIN $(GPCHOME)
+	cp $(RELEASEDIR)GPB.RT.$(RTBUILD).BIN $(RELEASEDIR)GPC.RT.$(RTBUILD).BIN $(RELEASEDIR)GP1.RT.$(RTBUILD).BIN $(GPCHOME)
+	cp $(RELEASEDIR)GPC.IMG.$(RTBUILD).BIN $(RELEASEDIR)GP1.IMG.$(RTBUILD).BIN $(GPCHOME)
+	cp -r GPC-BASIC $(GPCHOME)GPC-BASIC
 
 #
 #		Build the library version of the components. 

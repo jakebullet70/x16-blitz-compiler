@@ -11,7 +11,7 @@ current with every stage.
 | `source/gpc/` | The GPC front end and the build drivers: `samplesbuild.py`, `build_basl.py`, `compile_shared.py`. |
 | `GPC-BASIC/` | The master copy of the GP.BASIC library and its manual `GP-BASIC.md`. |
 | `BASLOAD-GPC/` | The BASLOAD tokeniser fork, with its vendored upstream. |
-| `GPC-BASIC-TOOLS-SRC/` | Every program built with GPC: the apps (help, editor, GUI, error viewer, XBase) and the examples. Each builds in its own folder. |
+| `GPC-BASIC-TOOLS-SRC/` | Every program built with GPC: the apps (help, editor, GUI, error viewer, XBase) and the examples. Each builds in its own folder. `GPC/` inside it is the tool home, filled by `make install`, not in git. |
 | `USER-RUNS/` | The `.bat` launchers that run the emulator on a sample or the drive. |
 | `bin/` | The emulators (`x16emu/`, `box16/`) and the built `*.library` files. |
 | `bench/` | Speed benchmarks. |
