@@ -15,6 +15,14 @@ So after a change under `source/gp-runtime/` or `source/runtime/`:
     make libs                          # gp.library, runtime.library, GPC.BIN -- all fresh
     make -C source/runtime gpc-rt      # ...and THIS is what testing/ runs against
 
+**An EMBEDDED compile needs the runtime IMAGES, and those ARE a `make libs` product.**
+`GPC.IMG.<nnn>.BIN` and `GP1.IMG.<nnn>.BIN` are streamed off the drive by the object writer, so
+the sample folder an embedded build runs in needs both beside `GPC.BIN`. Missing, the compile
+stops right after `PASS 1 ...` with `NO RUNTIME IMAGE` and writes no object. They are gitignored
+everywhere, so a fresh tree has none: run `make libs` (it only regenerates `version.asm`, no
+build-number bump) and copy the pair out of `testing/`. Hit 2026-09-24 on `samples/color-test`,
+where `testing/` carried the 124 runtimes but no 124 images at all.
+
 ## What it looks like when it bites
 
 Found 2026-09-08 building `GP.FN`. The compiler emitted the two new opcodes `$F1`/`$F2` correctly —

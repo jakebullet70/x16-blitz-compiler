@@ -26,7 +26,7 @@ again. See [memory-is-git-tracked](memory-is-git-tracked.md).
 - [App make skips compiler.library](app-make-does-not-rebuild-compiler-library.md) — use `make libs`; [it does not install the runtime](make-libs-does-not-install-the-runtime.md) either; [the baseline is the application copy](baseline-compiler-is-the-application-copy.md), testing/GPC.BIN can be stale
 - [Measure p-code per module](measure-pcode-per-module.md) — map plus SYM gives bytes per include and routine
 - [Headless BASL build recipe](headless-basl-build-recipe.md) — the three emulator runs and their stop conditions; [a timeout once faked success](compile-shared-timeout-fakes-success.md), the banner is the finish line
-- [GPC.ERR builds shared, in the main dir](gpcerr-build-shared-in-main-dir.md) — never standalone
+- [GPC.ERR builds in its sample folder](gpcerr-builds-in-its-sample-folder.md) — never standalone
 - [Runtime storage is the golden RAM](runtime-storage-is-golden-ram.md) — $0400 to StorageEnd, which MOVES; a test routine goes at $0780; [tests share the product's memory](tests-share-the-products-memory.md)
 - [Paste can't drive a running program](paste-cannot-drive-a-running-program.md) — use a fixed-answer variant. x16emu r49 runs tests, Box16 debugs
 - [File I/O dies in a GP.DO key loop](file-io-error-in-gpdo-key-loop.md) — the seven shapes already ruled out
@@ -49,6 +49,7 @@ again. See [memory-is-git-tracked](memory-is-git-tracked.md).
 - [Run-side workspace, read from the PRG](run-side-workspace-read-from-the-prg.md) — two bootstrap page numbers give the budget; [52 B cushion below GPBase](gpc-core-page-cushion-below-gpbase.md)
 - [Compiler-emitted bank switch](compiler-emitted-bank-switch.md) — .bgosub emitted, twins merged, shims deleted 2026-09-14; [banks work in progress](banks-work-in-progress.md) — ALL-BANKS done, HANDLER-BANK at step 28, both uncommitted
 - [Opcode numbers follow handler order](opcode-numbers-follow-handler-order.md) — moving a `;;` handler renumbers p-code; open a section per handler instead
+- [Library sizes owed to help](library-sizes-belong-in-help.md) — runtime 10,956 B always; GPC-BASIC costs only what you #INCLUDE
 - [Runtime footprint](blitz-x16-runtime-footprint.md) — 10,956 B in every program, and how to shrink it
 - [String heap scavenger](string-heap-scavenger.md) — SHIPPED: dead blocks reused, +1 page RT; [string blocks never shrink](gpc-string-blocks-never-shrink.md), never build a big temporary
 - [BINPUT# caps at 255 bytes](binput-caps-at-255-bytes.md) — three caps land on one number; it is a CHRIN loop
@@ -95,7 +96,7 @@ again. See [memory-is-git-tracked](memory-is-git-tracked.md).
 - [IF semantics](gpc-if-semantics.md) — a false IF skips the WHOLE line. Blitz gets this right.
 - [FOR STEP 0 semantics](gpc-for-step0-semantics.md) — STEP 0 needs EXACT equality. **Blitz gets this wrong.**
 - [FOR 1 TO 0 runs once](gpc-basic-for-loop-runs-once.md) — guard every FOR 1 TO LEN()
-- [X16 BASIC conformance](blitz-x16-basic-conformance.md) — 4 real defects vs stock BASIC
+- [X16 BASIC conformance](blitz-x16-basic-conformance.md) — 4 real defects fixed; `SLEEP 0` returns at once and still diverges
 - [No END crashes at exit](program-without-end-crashes.md) — runs off the last line into $ffff; end every test program with END
 - [X16 BASIC coverage](gpc-x16-basic-coverage.md) — the 7 lexer blockers on valid X16 BASIC
 - [R44+ keywords](blitz-x16-r44-plus-keywords.md) — CLOSED: all 10 are in; do not re-fix

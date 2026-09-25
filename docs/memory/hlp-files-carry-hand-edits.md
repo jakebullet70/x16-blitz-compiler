@@ -49,3 +49,16 @@ session's `GP-BASIC.md` hunks unstaged: `diff -u` the pre-edit snapshot against 
 [[help-topic-writing-rules]] a topic that is edited is rewritten from its master, so its committed
 hand edits are discarded rather than patched back. Keep the diff-and-patch machinery above for the
 topics the change does not touch; those still lose their trims to a plain `MKHELP.PY` run.
+
+**The hand edits are gone, and the dance with them** (2026-09-24). Checked by rendering the masters
+at each candidate commit and diffing against the committed `HELP-TXT`. Baseline is `6d344c9`: 81 of
+83 files render byte for byte, and the two that do not, `H024` and `H063`, differ only in
+`samples/editor` against `samples/edit`, which `5fa24b2` patched in and the masters now carry. The
+index matched exactly. A plain `MKHELP.PY` run therefore loses nothing.
+
+**How to check before assuming a carry is owed:** `git archive <commit> GPC-BASIC | tar -x` into
+scratch, render with `--src` and `--out`, and count the files that match the committed ones. A
+baseline that matches nearly all of them means render in place with the plain default command,
+which also reproduces the generated header's command line. Three commands rebuild the content:
+`MKHELP.PY` from `samples/GPC-HELP`, then `MKHELP.PY --mods samples/GPB-MODS-TESTING/GPC-BASIC
+--md-only --md-name GPC-HELP-TESTING.md` and `MKHELPWIN.PY` from the repository root.

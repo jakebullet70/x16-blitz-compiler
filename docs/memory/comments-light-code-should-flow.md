@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: 5591d6bc-636d-4001-b0b0-d858156d6ec0
-  modified: 2026-09-01T18:59:49.453Z
+  modified: 2026-09-24T13:10:33.889Z
 ---
 
 **User, 2026-09-01, with 40+ years of paid programming behind it:**
@@ -39,10 +39,26 @@ for a correct expectation) and described the dropdown frame two contradictory wa
 `GUI.INC.BL` still documented `GUI.GLYPH` as `GP.FILL` arguments. **Read for staleness while
 trimming — that is where the value is, not in the line count.**
 
-**Method that makes it safe**, and reusable: write it as a script of exact comment-block
-replacements rather than a rewrite, then prove the code did not move —
-`grep -v -E '^[[:space:]]*(##|REM([[:space:]]|$))'` old vs new must be identical — and rebuild to
-confirm the object is unchanged. Both editor rebuilds landed on `OK CODE 15166 RT 13055`.
+**Method that makes it safe**, and reusable: write it as a script keyed on line ranges of the
+original, then prove the code did not move — `grep -v -E '^[[:space:]]*(##|REM([[:space:]]|$))'`
+old vs new must be identical — and rebuild to confirm the object is unchanged. Both editor rebuilds
+landed on `OK CODE 15166 RT 13055`.
+
+**WARNING: the script must be delete-first. This is where the method failed on 2026-09-24.**
+A script of exact block *replacements* preserves every block by construction: each one goes in and
+comes out, reworded. That is a copy-edit, and it cannot do the job, because the taxonomy is mostly a
+delete operation. Build the range table so a range may map to the empty string. Tag every block
+contract / trap / checklist / signpost or nothing, and "nothing" means the lines go. Have the script
+print the comment line count before and after, because that number is the check the user can reject
+in three seconds. A pass that comes back within a few percent of where it started did not run the
+taxonomy, whatever the prose now reads like.
+
+**The judgment error to watch for, from the same day.** Recognising history in a block and then
+keeping the argument that sat on top of it. `GPB.HELP.BASL`'s `HELP.W` clamp had five lines: a
+measured anecdote (a line arriving as "Prefe") plus four lines arguing against indent 5. I cut the
+anecdote, kept the argument, and called the block done. **A rejected alternative is banned under the
+same rule as history.** If the fact is worth keeping, it is a rule to follow, not a defence of the
+code: "this cannot be one GP.CALL", not "the one call version does not work, because…".
 
 **Two traps in this repo:** `EDBENCH.BASL`'s `REM`s are the **GP.ASM source itself** under `#REM 1`
 and must not be touched, and `GUI.INC.BL` exists in **two copies** (`GPC-BASIC/` and
@@ -59,6 +75,16 @@ against 37.4 for a repaint", "158 jiffies, 2.6 seconds", "214 of 218 test bytes 
 already in `readme.md`, where a reader looking for the design goes. In the source keep the
 CONSTRAINT the number produced ("a KERNAL memory_copy cannot be given a bank") and drop the number.
 Written where a new file is being commented, not only where an old one is being swept.
+
+**RAISED A THIRD TIME 2026-09-24, on the same file** -- *"we have had this same conversation many
+times before… I ask you to refactor this file thinking we had fixed it."* It had been swept hours
+earlier the same day, 311 comment lines to 295, which is the replacement-script failure above. The
+delete-first pass then took it 293 → 230 against 763 of code. Twelve blocks went whole: six that
+restated the code or the define under them, two duplicates of a rule already stated once elsewhere,
+a pointer to `readme.md`, and three paragraphs of library internals a caller cannot act on.
+
+**A sweep is not done when the prose is better. It is done when blocks are gone.** Report which
+blocks were deleted by name, not how the surviving ones now read.
 
 **Progress:** `samples/edit/EDITOR.BASL` (709 → 423 prose lines), `STORE.BASL` and
 `GPC-BASIC/GUI.INC.BL` (372 → 256) are done. A library module cuts less than a sample — its

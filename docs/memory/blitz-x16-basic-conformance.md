@@ -1,6 +1,6 @@
 ---
 name: blitz-x16-basic-conformance
-description: Blitz-vs-stock-X16-BASIC conformance — all four defects fixed, plus the float PRINTER bug found underneath them
+description: Blitz-vs-stock-X16-BASIC conformance — the four lexer and semantics defects are fixed, the float PRINTER bug under them too, and SLEEP 0 is a fifth divergence still open
 metadata:
   type: project
 ---
@@ -75,6 +75,15 @@ To check float internals, bypass BASIC entirely: hand-build the stack slots in a
 
 ## Still open
 
+- **`SLEEP 0` does not wait, and stock X16 BASIC's does.** GPC ships its own `XCommandSleep`
+  (`source/runtime/source/system-specific/x16/commands/x16_sleep.asm`) rather than calling the ROM's. It
+  reads the 60 Hz jiffy clock, adds the argument, and busy-waits for equality, so it waits *n* ticks
+  where the ROM waits *n+1* VSYNC events. At 1 or more the gap is one frame and invisible; at 0 it is
+  the whole wait, so `SLEEP 0` and bare `SLEEP` return at once instead of at the next frame boundary.
+  The symptom is a loop running flat out, not a hang. **`SLEEP 1` IS the frame wait** — one tick is one
+  VSYNC — which is why prog8's `sys.waitvsync()` needs no `GP.VSYNC` here. Written up in `TODO.md` under
+  Bugs, 24th September 2026. The same busy-wait is the `-testbench` hang in
+  [[gpc-for-step0-semantics]].
 - **Cosmetic only:** Blitz prints `0.5`, real X16 BASIC prints `.5` (no leading zero). Trailing zeros are now gone.
 - `STR$` passes 8 decimal places, `PRINT` passes 7 — both go through the same rounding now.
 
