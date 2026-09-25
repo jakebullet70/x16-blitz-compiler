@@ -1,71 +1,120 @@
-@6. The traps, collected
+@3. The modules (7)
+=GUI-DIALOGS.INC.BL -- every dialog as a verb
 .
-=6. THE TRAPS, COLLECTED
+.Routines, arguments and examples: SEC 4.12.
 .
-.Each of these has cost a debugging session at least once.
+.MSGBOX, ASKYN, ASKOK, ASKTEXT, INPUTBOX, PICKMENU, LISTBOX and LISTBOXM are
+.the dialogs, each with an EX form that also takes the title and the second
+.and third lines. LIST.BEGIN, LIST.ARRAY, LIST.BANK, LISTTO.RUN, LIST.ITEM
+.and LIST.SORT build a list box a step at a time; PANELOPEN, PANELCLOSE and
+.the FORM. verbs do the same for a form. DLGRESET, DLGSHADOW, DLGSHADOWCLR,
+.DLGSTYLE and DLGGLYPH set what every dialog starts from, and KBCLEAR throws
+.away what is already typed.
 .
-.  P AND 255 on a heap or VRAM address
-.      WHAT HAPPENS: AND is 16-bit signed; above 32,767 it raises OUT OF
-.        RANGE instead of masking
-.      DO THIS: H = INT(P/256) : L = P - H*256
+.  in
+.      the arguments, in the call. They land in DLG. and NOT in the GUI.
+.        inputs: GUI.DEFAULTS runs after they are stored and would clear them
+.      DLGRESET bank -- the RAM bank every dialog saves the screen into,
+.        once, before the first one
+.      GUI.LIST.ITEM$() -- the rows, 1..count, for the array-backed list
+.        verbs, and the caller owns the DIM
 .
-.  an address in an A% variable
-.      WHAT HAPPENS: % is signed 16-bit and truncates without error -- A% =
-.        49152 reads back -16,384
-.      DO THIS: untyped variable, or split into page and offset
+.  out
+.      GUI.ANSWER -- ASKYN, ASKOK
+.      GUI.TEXT$ and GUI.OK -- INPUTBOX
+.      GUI.SEL -- PICKMENU
+.      GUI.LISTBOX.SEL .MARKS$ .MARKED -- the listbox verbs
+.      GUI.KEY -- 13 accepted, 27 cancelled
 .
-.  $0400 for machine code
-.      WHAT HAPPENS: stock BASIC leaves it free, a compiled GPC program does
-.        not -- runtime state lives there, and it is corrupted with no error
-.      DO THIS: banked RAM, $A000-$BFFF
+.  internal
+.      the whole of DLG.*
 .
-.  PRINT after GP.PRINTAT
-.      WHAT HAPPENS: GP drawing never calls the KERNAL, so the cursor is
-.        wherever it was
-.      DO THIS: LOCATE first, or stay in one world
+.In a multi-select list GUI.LISTBOX.SEL is not the answer -- it is where the
+.cursor was left. The marks are.
 .
-.  SORT.INC.BL with no #SYMFILE
-.      WHAT HAPPENS: {VAR} cannot resolve a crunched name -- {} NEEDS
-.        #SYMFILE
-.      DO THIS: #SYMFILE "@:PROG.SYM", before the #INCLUDEs
+.The scrolling list is not in this module. It is GUI.CT.LIST, one of
+.GUI.FORM's control types, and lives in GUI.INC.BL beside the field. This
+.file is the dialog around it: measure, open, hand the control its geometry,
+.add a button row, run the form, answer. GUI.LIST.FETCH, in GUI.INC.BL, is
+.the one place a row is read, and it reads either the array or a RAM bank
+.holding the GP.BSTR image layout -- which is how LIST.BANK shows a directory
+.that was never in low memory.
 .
-.  GP.BOX X,Y,W,H,,7
-.      WHAT HAPPENS: optionals cannot be skipped over
-.      DO THIS: GP.BOX X,Y,W,H,0,7
+=STASH.INC.BL -- save a text rectangle, and put it back
 .
-.  SCREEN after BMX.PAINT
-.      WHAT HAPPENS: reloads the default palette and throws the image's
-.        colours away
-.      DO THIS: set the mode first
+.  in
+.      STASH.BANK -- the RAM bank to keep the cells in, 1..255, and it is
+.        yours: this writes the whole of it
+.      STASH.X STASH.Y STASH.W STASH.H -- the rectangle, in cells, for
+.        STASH.SAVE
+.      STASH.MOVE -- non-zero pastes to STASH.X/STASH.Y instead of where it
+.        came from
 .
-.  STR.FIELD$ wanted bigger
-.      WHAT HAPPENS: auto-DIMed at 0..10 on first use, and you cannot DIM it
-.        after
-.      DO THIS: DIM it before the first call, set STR.MAX
+.  out
+.      STASH.OK -- -1 if it fitted and was saved, 0 if not
 .
-.  #DEFINE X 129536
-.      WHAT HAPPENS: #DEFINE takes an INT16 -- ERROR: INVALID PARAMETER
-.      DO THIS: an ordinary variable
+.  internal
+.      STASH.AT STASH.BASE STASH.BYTES STASH.HI STASH.MAPW STASH.MODE
+.        STASH.ROW STASH.STRIDE
+.      STASH.DEST% STASH.NBYTES% STASH.VADDR% STASH.VCTRL% STASH.WAS% -- the
+.        {VAR} slots the blobs read
 .
-.  GP.SUB above its GP.DEFPROC
-.      WHAT HAPPENS: the call carries an address, not a line number -- GP.SUB
-.        BEFORE ITS GP.DEFPROC
-.      DO THIS: declare the routine above every caller
+.  constants
+.      STASH.LCONFIG STASH.LMAPBASE STASH.WINDOW STASH.HEADER STASH.MAXBYTES
 .
-.  an array element as a GP.DEFPROC formal
-.      WHAT HAPPENS: GP.DEFPROC FORMAL IS NOT A VARIABLE
-.      DO THIS: plain scalar formals, and set the array before the call
+.STASH.RESTORE needs only the bank. Four header bytes -- w, h, x, y -- go in
+.first, so the rectangle describes itself and cannot be put back at the wrong
+.size.
 .
-.  a GP.DEFPROC body calling its own verb
-.      WHAT HAPPENS: one set of formals, so it writes over the arguments in
-.        use -- wrong answer, no error
-.      DO THIS: recursion needs its own saved copies, or a different shape
+.A bank is 8,192 bytes and a cell is two, so 4,094 cells fit: 63x63, larger
+.than any dialog and not a whole 80x60 screen. Too big is refused before the
+.first write with STASH.OK = 0, rather than running on into the next bank.
 .
-.  a variable called LEN, ST, POS, MB or CHAR
-.      WHAT HAPPENS: the name is a reserved word on its own
-.      DO THIS: dot it -- BASLOAD matches the whole identifier, so
-.        LINEINPUT.LEN works
+.It needs a #SYMFILE in your program, because it reads its arguments through
+.{VAR} names. It restores the caller's RAM bank on the way out -- it did not
+.always, and a caller that worked around that can stop.
 .
-=SEE ALSO
+.STASH.SLOT and STASH.NEXT are not in this copy. GP-BASIC.md SEC 3.6
+.describes them -- a byte offset into the bank, and the offset just past what
+.was written, so one bank holds a stack of rectangles instead of one a level.
+.They are in samples/GPB-MODS-TESTING/GPC-BASIC/STASH.INC.BL and have not
+.reached the root library yet. Until they do, one rectangle a bank.
 .
->85|4.7 SORT.INC.BL -- shell sort a string array
+=STASHFILE.INC.BL -- a saved text rectangle, through a file
+.
+.STASH.FILE.SAVE, STASH.FILE.LOAD and STASH.FILE.PUT, and no variables of its
+.own -- it sets STASH.* and calls through. The prefix exists to keep the
+.three routine names apart from the rest of STASH., not to hold state. Kept a
+.separate #INCLUDE: unless the compile removes dead code, the disk half is
+.127 bytes a program that never writes one would still carry.
+.
+=SORT.INC.BL -- shell sort a string array
+.
+.Routines, arguments and examples: SEC 4.7.
+.
+.  in
+.      SORT.PTR -- GP.ARRPTR of the array, element zero, the 3-byte header
+.        already skipped. A BASL subroutine cannot be passed an array, so the
+.        caller takes its address and this sorts through that
+.      SORT.DESCEND -- non-zero, largest first
+.      SORT.NOCASE -- non-zero folds case while comparing
+.
+.  out
+.      SORT.OK -- -1 if it sorted, 0 if it refused
+.      SORT.COUNT -- elements found in the array header
+.
+.  internal
+.      SORT.TYPE -- the type byte it read back
+.      SORT.BASE% SORT.CHR% SORT.CNT% SORT.DESC% SORT.FOLD% SORT.GAP% SORT.I%
+.        SORT.J% SORT.LL% SORT.LR% SORT.RN% SORT.TMP% -- every one a {VAR}
+.        slot
+.
+.Note SORT.COUNT is an output, read out of the array header, not a size you
+.hand in -- and SORT.PTR is GP.ARRPTR, not GP.STRPTR like the rest of the
+.library's pointer arguments. Both are easy to write the other way round.
+.
+.Also needs a #SYMFILE. 255 elements, so DIM A$(254) is the largest; beyond
+.that SORT.OK is 0 rather than a wrong answer. String arrays only. It moves
+.2-byte pointers rather than string data, so a swap is cheap and the array's
+.own storage never moves.
+.

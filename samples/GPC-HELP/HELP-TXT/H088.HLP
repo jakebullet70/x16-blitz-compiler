@@ -1,0 +1,22 @@
+@7. Memory, and what the compiler tells you (3)
+=Staying inside it
+.
+.  - Quote LOW FREE when you change anything. It is one line of the report
+.    and it is the only early warning; PROGRAM TOO BIG arrives once it is
+.    already too late.
+.  - Size a DIM to what is used, not to a round number. The cost is paid on
+.    the first line of the program, forever.
+.  - Put bulk in a RAM bank. A bank is 8,192 bytes that cost the workspace
+.    nothing. Anything held from start to finish and read a row at a time --
+.    a file's worth of text, a table, a screen -- is better in a bank with an
+.    offset table at the front, read back with PEEK under BANK. See SEC 4.5
+.    and STASH.INC.BL for the pattern.
+.  - A big temporary cannot be built and then freed. Freeing is not a thing
+.    that happens on demand: build it in a bank, or in pieces.
+.
+=SEE ALSO
+.
+>57|3.12 Code in a bank
+>51|3.10 Text in a bank
+>78|4.5 BMX.INC.BL -- a BMX bitmap into VERA
+>112|STASH.INC.BL -- save a text rectangle, and put it back.

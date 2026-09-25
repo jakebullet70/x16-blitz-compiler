@@ -12,7 +12,7 @@ python samples/GPC-HELP/MKHELP.PY
 python samples/GPC-HELP/MKHELPWIN.PY
 ```
 
-65 topics in 8 parts.
+68 topics in 8 parts.
 
 ## Contents
 
@@ -32,6 +32,7 @@ python samples/GPC-HELP/MKHELPWIN.PY
   - [3.1 Loops](#31-loops)
   - [3.2 Multi-way branch](#32-multi-way-branch)
   - [3.3 Machine code](#33-machine-code)
+  - [3.3.1 `GP.HIBYTE` / `GP.LOBYTE` — split an address into two bytes](#331-gphibyte--gplobyte--split-an-address-into-two-bytes)
   - [3.4 Strings](#34-strings)
   - [3.4.1 `GP.INSTR` — position of a substring](#341-gpinstr--position-of-a-substring)
   - [3.4.2 `GP.CONTAINS` — test for a substring](#342-gpcontains--test-for-a-substring)
@@ -56,13 +57,13 @@ python samples/GPC-HELP/MKHELPWIN.PY
   - [4.3 `APPSYS.INC.BL` — start politely, leave it as you found it](#43-appsysincbl--start-politely-leave-it-as-you-found-it)
   - [4.4 `LINEINPUT.INC.BL` — a positioned entry field](#44-lineinputincbl--a-positioned-entry-field)
   - [4.5 `BMX.INC.BL` — a BMX bitmap into VERA](#45-bmxincbl--a-bmx-bitmap-into-vera)
-  - [4.6 `MENUVERT.INC.BL` — a vertical menu](#46-menuvertincbl--a-vertical-menu)
+  - [4.6 `MENU.INC.BL` — menus built a row at a time](#46-menuincbl--menus-built-a-row-at-a-time)
   - [4.7 `SORT.INC.BL` — shell sort a string array](#47-sortincbl--shell-sort-a-string-array)
   - [4.8 `STRCASE.INC.BL` — case, in place](#48-strcaseincbl--case-in-place)
-  - [4.9 `MENUBAR.INC.BL` — a horizontal menu](#49-menubarincbl--a-horizontal-menu)
+  - [4.9 `MENUPULL.INC.BL` — a dropdown under a bar item](#49-menupullincbl--a-dropdown-under-a-bar-item)
   - [4.10 `STRUSING.INC.BL` — a number to a template](#410-strusingincbl--a-number-to-a-template)
-  - [4.11 `GUI.INC.BL` — four dialogs, in a box that puts the screen back](#411-guiincbl--four-dialogs-in-a-box-that-puts-the-screen-back)
-  - [4.12 `GUI2.INC.BL` — a listbox, single or multi select](#412-gui2incbl--a-listbox-single-or-multi-select)
+  - [4.11 `GUI.INC.BL` — the box that puts the screen back, and the form in it](#411-guiincbl--the-box-that-puts-the-screen-back-and-the-form-in-it)
+  - [4.12 `GUI-DIALOGS.INC.BL` — every dialog as a verb](#412-gui-dialogsincbl--every-dialog-as-a-verb)
   - [4.13 `BANKMGR.INC.BL` — who owns which RAM bank](#413-bankmgrincbl--who-owns-which-ram-bank)
   - [4.14 `KB.INC.BL` — the keyboard buffer, emptied](#414-kbincbl--the-keyboard-buffer-emptied)
   - [4.15 `FILEIO.INC.BL` — the drive: status, files, directories](#415-fileioincbl--the-drive-status-files-directories)
@@ -72,7 +73,9 @@ python samples/GPC-HELP/MKHELPWIN.PY
   - [4.19 `STASHVRAMGC.INC.BL` — close the holes in a STASHVRAM store](#419-stashvramgcincbl--close-the-holes-in-a-stashvram-store)
   - [4.20 `KV.INC.BL` — keys and values in one RAM bank](#420-kvincbl--keys-and-values-in-one-ram-bank)
   - [4.21 `CHECK.INC.BL` — a check box, `[X]` or `[ ]`](#421-checkincbl--a-check-box-x-or)
-  - [4.22 `GPBMODS` — the harness that drives every module](#422-gpbmods--the-harness-that-drives-every-module)
+  - [4.22 `MATH.INC.BL` — the smaller and the larger of two numbers](#422-mathincbl--the-smaller-and-the-larger-of-two-numbers)
+  - [4.23 `MEM.INC.BL` — a block copied, a block filled](#423-memincbl--a-block-copied-a-block-filled)
+  - [4.24 `GPBMODS` — the harness that drives every module](#424-gpbmods--the-harness-that-drives-every-module)
   - [STASH.INC.BL -- save a text rectangle, and put it back.](#stashincbl----save-a-text-rectangle-and-put-it-back)
   - [STASHFILE.INC.BL -- a saved text rectangle, through a file.](#stashfileincbl----a-saved-text-rectangle-through-a-file)
 - **[GLOBALS AND NAMING](#globals-and-naming)**
@@ -95,7 +98,13 @@ python samples/GPC-HELP/MKHELPWIN.PY
 
 ### 1. What GP.BASIC is
 
-**Core keywords.** 29 of them, compiled to p-code and handled by assembly in the runtime:
+GP.BASIC (GPB) is the keyword extension GPC compiles on top of BASL: 39 `GP.*` keywords and a
+library of BASL modules built on them. `#INCLUDE "GPB.INC.BL"` declares the keyword set; §2 has the
+rest of the setup.
+
+#### Core keywords
+
+29 keywords compile to p-code and are handled by assembly in the runtime.
 
     GP.DO GP.LOOP GP.EXITDO
     GP.IF GP.ELSEIF GP.ELSE GP.ENDIF
@@ -107,39 +116,60 @@ python samples/GPC-HELP/MKHELPWIN.PY
     GP.BANKEDSTR GP.ENDBANKEDSTR GP.BSTR
     GP.BANKED GP.ENDBANKED
 
-They are assembly because BASIC is slow at per-character string scans, screen fills and VERA writes.
+Their handlers are one block, `GPBase $2F00` to `ObjectBase $3500`: 1,536 bytes, page aligned, all
+or nothing. `ScanGPUsage` walks the finished p-code and drops the block from the object when nothing
+in it is reached. The compile report says `GP IN` or `CORE`.
 
-The handlers occupy `GPBase $2F00` to `ObjectBase $3500`: 1,536 bytes, page aligned, all or nothing.
-`ScanGPUsage` walks the finished p-code and drops the whole block from the object if nothing in it
-is reached.
+#### Composite keywords
 
-The block costs those 1,536 bytes once. The bytes in the object and the bytes off the workspace
-floor are the same bytes — `runtimeEndPage` is a single page number that decides how much of the
-runtime image is written out, where the p-code lands, and where the workspace starts. Maximum
-p-code is 20,992 bytes with the block and 22,528 without: `ObjectBase` or `GPBase` to `$9F00`, less
-the 2K frame stack and the 4K minimum workspace.
+10 keywords expand into opcodes that already exist. They take no handler and no vector slot.
 
-**Composites.** `GP.ASM`, `GP.ENDASM`, `GP.CHAR`, `GP.CONTAINS`, `GP.ISEMPTY`, `GP.HIBYTE`,
-`GP.LOBYTE`, `GP.BSTRCOUNT`, `GP.DEFPROC`, `GP.SUB`. The compiler expands each into opcodes that
-already exist. No handler, no vector slot, nothing in the block. Whether the block comes in is then
-the expansion's business, not the composite's: `GP.CHAR` runs `GP.FILL`'s handler and brings it in,
-while `GP.ASM`, `GP.ENDASM`, `GP.DEFPROC` and `GP.SUB` leave it out, and the report says `CORE`.
+    GP.ASM GP.ENDASM GP.CHAR GP.CONTAINS GP.ISEMPTY
+    GP.HIBYTE GP.LOBYTE GP.BSTRCOUNT GP.DEFPROC GP.SUB
 
-**The library.** `GPC-BASIC/`: 17 `.INC.BL` modules, 25 `.EXP.BL` examples. Ordinary BASL,
-`#INCLUDE`d by path, called with `GOSUB`. Zero runtime bytes — a module costs its own p-code, in the
-programs that include it. A program that has run out of low memory can put a module's `#INCLUDE`
-inside a `GP.BANKED` region and run it from a RAM bank, with no change to its callers; §3.12 is
-where that is explained. Menus vertical and bar, panels, themes, entry fields, in-place case, trim
-and splice, shell sort, a screen rectangle to a RAM bank or a file, BMX into VERA.
+Whether the block comes in is the expansion's business. `GP.CHAR` runs `GP.FILL`'s handler and
+brings it in. `GP.ASM`, `GP.ENDASM`, `GP.DEFPROC` and `GP.SUB` leave it out, and a program whose
+only GP.BASIC keywords are those reports `CORE`.
 
-`STASH.INC.BL`, `SORT.INC.BL`, `STRCASE.INC.BL` and `STRINGS.INC.BL` are `GP.ASM` and still
-modules: as keywords their bytes would sit in the block, paid by every GP program. `GP.ARRPTR` and
-`GP.STRPTR` are what lets them out — a BASL subroutine takes an address, not an array or a string.
+#### What the block costs
 
-The division is assembly for loops and bulk moves, BASIC for everything else. `LINEINPUT.GET`
-waits on the keyboard, so speed does not apply to it; writing it in BASL saved 166 runtime bytes.
+Maximum low p-code, in bytes:
 
-*See also: [3.12 Code in a bank](#312-code-in-a-bank), [STASH.INC.BL -- save a text rectangle, and put it back.](#stashincbl----save-a-text-rectangle-and-put-it-back), [4.7 `SORT.INC.BL` — shell sort a string array](#47-sortincbl--shell-sort-a-string-array), [4.8 `STRCASE.INC.BL` — case, in place](#48-strcaseincbl--case-in-place), [4.2 `STRINGS.INC.BL` — string helpers](#42-stringsincbl--string-helpers)*
+| mode | CORE | GP IN |
+|---|---|---|
+| embedded | 22,528 | 20,992 |
+| shared | 22,016 | 19,968 |
+
+A shared program with a banked region loses a further 256: 19,712. `LOW FREE` in the compile report,
+less 4,096, is how much more p-code will fit.
+
+#### The library
+
+`GPC-BASIC/` holds 26 `.INC.BL` modules and 29 `.EXP.BL` examples: menus, bars and dropdowns, panels,
+themes, entry fields, check boxes, combo boxes, in-place case, trim and splice, `PRINT USING`, shell
+sort, a screen rectangle to a RAM bank or a file, BMX images into VERA.
+
+A module is ordinary BASL. `#INCLUDE` it by name and call it with `GOSUB`, or with a `GP.SUB` /
+`GP.FN` verb where it offers one. It costs its own p-code in the programs that include it and
+nothing in the GP block.
+
+```basic
+#INCLUDE "GPB.INC.BL"
+#INCLUDE "STRCASE.INC.BL"
+
+A$ = "hello"
+GP.SUB STRCASE.APPLY, GP.STRPTR(A$), STRCASE.UPPER
+PRINT A$
+END
+```
+
+`STASH.INC.BL`, `SORT.INC.BL`, `STRCASE.INC.BL` and `STRINGS.INC.BL` are written in `GP.ASM` and are
+modules rather than keywords: their bytes land in the including program, not in the block.
+
+A program short of low memory can put a module's `#INCLUDE` inside a `GP.BANKED` region and run it
+from a RAM bank, with no change to its callers. §3.12 has the rules.
+
+*See also: [2. Using it](#2-using-it), [3.12 Code in a bank](#312-code-in-a-bank), [4.8 `STRCASE.INC.BL` — case, in place](#48-strcaseincbl--case-in-place), [STASH.INC.BL -- save a text rectangle, and put it back.](#stashincbl----save-a-text-rectangle-and-put-it-back), [4.7 `SORT.INC.BL` — shell sort a string array](#47-sortincbl--shell-sort-a-string-array), [4.2 `STRINGS.INC.BL` — string helpers](#42-stringsincbl--string-helpers)*
 
 ### 2. Using it
 
@@ -348,20 +378,31 @@ removes dead code, including a module costs its whole size whether or not it is 
 | `STASHVRAM.INC.BL` | rectangles and byte blobs in spare VRAM, addressed by handle. No `GP.ASM`, so no `#SYMFILE` |
 | `STASHVRAMGC.INC.BL` | closes the holes a `STASHVRAM` freed out of order. Its own file, so it costs nothing unless called |
 | `LINEINPUT.INC.BL` | a positioned, length-limited entry field |
-| `MENUVERT.INC.BL` | a vertical menu |
-| `MENUBAR.INC.BL` | a horizontal menu bar |
-| `GUI.INC.BL` | four dialogs — ask, say, type, choose — in a box that puts the screen back |
-| `GUI2.INC.BL` | a listbox, single or multi select |
+| `MENU.INC.BL` | menus built a row at a time: a popup and a bar, run with `MENUTO.VERT` and `MENUTO.BAR`. Needs `BANKMGR.INC.BL` and a SHARED compile |
+| `MENU.INC.BANKED.BL` | the menu row store, one `SPC` line per row the `MENU.*.MAX` sizes in `MENU.INC.BL` count. `#INCLUDE` it straight before `MENU.INC.BL` |
+| `MENUPULL.INC.BL` | a dropdown under a bar item, `MENUTO.PULLDOWN`. Needs `STASH.INC.BL` |
+| `GUI.INC.BL` | the box that puts the screen back, and the form and list controls inside it |
+| `GUI-DIALOGS.INC.BL` | every dialog as a verb: `MSGBOX`, `ASKYN`, `INPUTBOX`, `PICKMENU`, `LISTBOX`, the `LIST.` verbs and `FORM.`. `#INCLUDE` it after `GUI`, `COMBO` and `CHECK` |
+| `COMBO.INC.BL` | a drop-down list that folds into one row, a `GUI.FORM` control |
+| `CHECK.INC.BL` | a check box, a `GUI.FORM` control |
+| `FILEPICK.INC.BL` | a popup file picker, `PICKBANKS` / `PICKFILE` / `PICKSCAN`: reads the drive into a RAM bank, filters by suffix, answers with a name. Needs `GUI.INC.BL`, `GUI-DIALOGS.INC.BL`, `FILEIO.INC.BL` and `FILEDIR.INC.BL` |
 | `STRINGS.INC.BL` | the string helpers: BASIC where BASIC is enough, assembly where it is not |
 | `STRCASE.INC.BL` | case, rewriting a string in place, in assembly |
 | `STRUSING.INC.BL` | a number to a template: PRINT USING's mask, in BASIC |
 | `SORT.INC.BL` | shell sort a string array in place, in assembly |
 | `BMX.INC.BL` | load a BMX bitmap into VERA |
+| `BANKMGR.INC.BL` | which RAM bank belongs to whom: claim, allocate, release |
+| `KB.INC.BL` | empty the keyboard buffer |
+| `FILEIO.INC.BL` | the drive: status, exists, delete, rename, copy, directories, a string array to a file and back |
+| `FILEDIR.INC.BL` | read a directory, into a RAM bank or into low RAM |
+| `DOS.INC.BL` | a smaller alternative to `FILEIO.INC.BL`: `DOSX` sends a command to the drive and returns the error, `DOS.EXISTS` tests for a file. Include one of the two, not both |
 | `KV.INC.BL` | strings by key in one RAM bank, saved and loaded as one file. No `GP.ASM`, so no `#SYMFILE` |
+| `MATH.INC.BL` | the smaller and the larger of two numbers, as a `GOSUB` or as a verb |
+| `MEM.INC.BL` | a block copied and a block filled, through the KERNAL. Low RAM and the I/O page only |
 
 What each one costs in bytes is in the command reference, under *At a glance*.
 
-*See also: [4.1 `THEME.INC.BL` — named colour roles](#41-themeincbl--named-colour-roles), [4.3 `APPSYS.INC.BL` — start politely, leave it as you found it](#43-appsysincbl--start-politely-leave-it-as-you-found-it), [STASH.INC.BL -- save a text rectangle, and put it back.](#stashincbl----save-a-text-rectangle-and-put-it-back), [STASHFILE.INC.BL -- a saved text rectangle, through a file.](#stashfileincbl----a-saved-text-rectangle-through-a-file), [4.18 `STASHVRAM.INC.BL` — rectangles and blobs, kept in VRAM](#418-stashvramincbl--rectangles-and-blobs-kept-in-vram), [4.19 `STASHVRAMGC.INC.BL` — close the holes in a STASHVRAM store](#419-stashvramgcincbl--close-the-holes-in-a-stashvram-store), [4.4 `LINEINPUT.INC.BL` — a positioned entry field](#44-lineinputincbl--a-positioned-entry-field), [4.6 `MENUVERT.INC.BL` — a vertical menu](#46-menuvertincbl--a-vertical-menu), [4.9 `MENUBAR.INC.BL` — a horizontal menu](#49-menubarincbl--a-horizontal-menu), [4.11 `GUI.INC.BL` — four dialogs, in a box that puts the screen back](#411-guiincbl--four-dialogs-in-a-box-that-puts-the-screen-back), [4.12 `GUI2.INC.BL` — a listbox, single or multi select](#412-gui2incbl--a-listbox-single-or-multi-select), [4.2 `STRINGS.INC.BL` — string helpers](#42-stringsincbl--string-helpers)*
+*See also: [4.1 `THEME.INC.BL` — named colour roles](#41-themeincbl--named-colour-roles), [4.3 `APPSYS.INC.BL` — start politely, leave it as you found it](#43-appsysincbl--start-politely-leave-it-as-you-found-it), [STASH.INC.BL -- save a text rectangle, and put it back.](#stashincbl----save-a-text-rectangle-and-put-it-back), [STASHFILE.INC.BL -- a saved text rectangle, through a file.](#stashfileincbl----a-saved-text-rectangle-through-a-file), [4.18 `STASHVRAM.INC.BL` — rectangles and blobs, kept in VRAM](#418-stashvramincbl--rectangles-and-blobs-kept-in-vram), [4.19 `STASHVRAMGC.INC.BL` — close the holes in a STASHVRAM store](#419-stashvramgcincbl--close-the-holes-in-a-stashvram-store), [4.4 `LINEINPUT.INC.BL` — a positioned entry field](#44-lineinputincbl--a-positioned-entry-field), [4.6 `MENU.INC.BL` — menus built a row at a time](#46-menuincbl--menus-built-a-row-at-a-time), [4.13 `BANKMGR.INC.BL` — who owns which RAM bank](#413-bankmgrincbl--who-owns-which-ram-bank), [4.9 `MENUPULL.INC.BL` — a dropdown under a bar item](#49-menupullincbl--a-dropdown-under-a-bar-item), 4.11 GUI.INC.BL -- the box that puts the screen back, and the form in, [4.12 `GUI-DIALOGS.INC.BL` — every dialog as a verb](#412-gui-dialogsincbl--every-dialog-as-a-verb)*
 
 ### 6. `GPC-BASIC/` — the examples
 
@@ -381,7 +422,10 @@ One `.EXP.BL` per topic. Several are also the regression test for the module the
 | `MLCALL.EXP.BL` | `GP.CALL` with `GP.A` / `GP.X` / `GP.Y` / `GP.C` |
 | `ASM.EXP.BL` | `GP.ASM` / `GP.ENDASM`, inline 65C02 |
 | `MENU.EXP.BL` | a whole small application, in the shape the GP set is for |
-| `MENUDEMO.EXP.BL` | `MENUVERT` drawn the way an application would draw it |
+| `MENUDEMO.EXP.BL` | a menu drawn the way an application would draw it |
+| `MENUTO.EXP.BL` | `MENUTO.VERT`, `MENUTO.BAR` and `MENUTO.PULLDOWN` by hand: box styles, hints, hot keys, disabled rows |
+| `MENUBUILD.EXP.BL` | the menu builder, read back and checked |
+| `KV.EXP.BL` | every routine in `KV.INC.BL`, checked |
 | `GUI.EXP.BL` | the four dialogs, over a screen they have to put back |
 | `STASHVRAM.EXP.BL` | three panels nested in VRAM, a blob, and the compactor. Needs no `#SYMFILE`, which is the point |
 | `FORM.EXP.BL` | three fields you can move between, `LINEINPUT` style |
@@ -389,7 +433,9 @@ One `.EXP.BL` per topic. Several are also the regression test for the module the
 | `BMXPAL.EXP.BL` `BMXSPD.EXP.BL` | the palette question, and the speed of each path |
 | `SORT.EXP.BL` `STRCTST.EXP.BL` `STRTST.EXP.BL` `SPLITT.EXP.BL` | the regression tests for `SORT`, `STRCASE`, the `STRINGS` assembly and `STR.SPLIT` |
 | `USINGT.EXP.BL` | the regression test for `STR.USING`, thirty-nine cases |
-| `MENUTST.EXP.BL` `GUI2TST.EXP.BL` | the same for the menu and the listbox, driven through the keyboard buffer |
+| `MENUTST.EXP.BL` | the same for the menu, driven through the keyboard buffer |
+
+*See also: [4.20 `KV.INC.BL` — keys and values in one RAM bank](#420-kvincbl--keys-and-values-in-one-ram-bank)*
 
 ### 7. The documents
 
@@ -432,7 +478,7 @@ Three implementations, and what each costs:
 | **Inline assembly** | COMPOSITE | `GP.ASM` `GP.ENDASM` — free, and leaves the block out, see §3.9 |
 | **Strings** | ASM | `GP.INSTR` `GP.STRPTR` `GP.COMP` |
 | **Strings** | COMPOSITE | `GP.CONTAINS` `GP.ISEMPTY` — free, see §3.4 |
-| **Addresses** | COMPOSITE | `GP.HIBYTE` `GP.LOBYTE` — free, see §3.3 |
+| **Addresses** | COMPOSITE | `GP.HIBYTE` `GP.LOBYTE` — free, see §3.3.1 |
 | **Arrays** | ASM | `GP.ARRPTR` |
 | **Banked text** | ASM | `GP.BANKEDSTR` `GP.ENDBANKEDSTR` `GP.BSTR` · `GP.BSTRCOUNT` is COMPOSITE — see §3.10 |
 | **Routine calls** | COMPOSITE | `GP.DEFPROC` `GP.SUB` — free, and leaves the block out, see §3.11 |
@@ -444,10 +490,10 @@ Three implementations, and what each costs:
 | **Screen etiquette, panels** | BASIC | `APPSYS.INC.BL` — `STARTUP` `RESTORE` `PANEL.SAVE/LOAD/PUT` `ISEMU` · §4.3 |
 | **Entry fields** | BASIC | `LINEINPUT.INC.BL` — `LINEINPUT.GET`, `LINEINPUT.ASK` · §4.4 |
 | **Bitmaps** | BASIC | `BMX.INC.BL` — `BMX.SHOW`, `BMX.RESTORE` · §4.5 |
-| **Menus** | BASIC | `MENUVERT.INC.BL` — `RUN` `DRAW` `ROW` `HOTFIND` · §4.6 |
-| **Menus** | BASIC | `MENUBAR.INC.BL` — `RUN` `DRAW` `ITEM` `MARK` `WHERE`, the other axis · §4.9 |
+| **Menus** | BASIC | `MENU.INC.BL` — `MENU.BEGIN` `ITEM` `ITEMX` `SELECTED` `DRAWBAR`, `MENUTO.VERT` `MENUTO.BAR` · §4.6 |
+| **Menus** | BASIC | `MENUPULL.INC.BL` — `MENUTO.PULLDOWN`, a dropdown under a bar item · §4.9 |
 | **Dialogs** | BASIC | `GUI.INC.BL` — `GUI.SAY` `GUI.YN` `GUI.MENU` `GUI.INPUT` `GUI.OPEN` `GUI.CLOSE` · §4.11 |
-| **Dialogs** | BASIC | `GUI2.INC.BL` — `GUI.LISTBOX`, single or multi select · §4.12 |
+| **Dialogs** | BASIC | `GUI-DIALOGS.INC.BL` — every dialog as a one-line verb · §4.12 |
 | **Dialogs** | BASIC | `COMBO.INC.BL` — `COMBO.ADD`, a drop-down that folds into one row · §4.17 |
 | **Dialogs** | BASIC | `CHECK.INC.BL` — `CHECK.ADD`, a check box, `[X]` or `[ ]` · §4.21 |
 | **Code in a bank** | ASM | `GP.BANKED` `GP.ENDBANKED` — p-code at `$A000`, out of the low-memory budget, see §3.12 |
@@ -458,16 +504,16 @@ Three implementations, and what each costs:
 | **The drive** | BASIC | `FILEDIR.INC.BL` — `FILE.DIR.INIT` `OPEN` `NEXT`, into a bank or low RAM · §4.16 |
 | **Screen — stash** | BASIC | `STASHVRAM.INC.BL` — `SV.SAVE` `SV.RESTORE` `SV.PUT` `SV.GET`, kept in VRAM · §4.18 |
 | **Screen — stash** | BASIC | `STASHVRAMGC.INC.BL` — `SV.COMPACT` · §4.19 |
+| **Numbers** | BASIC | `MATH.INC.BL` — `MATH.MIN` `MATH.MAX` · §4.22 |
+| **Memory** | BASIC | `MEM.INC.BL` — `MEM.COPY` `MEM.FILL`, the KERNAL's block move · §4.23 |
 
 The rule is in §1: assembly for tight loops and bulk data moves, BASIC for everything else, and a
-composite for anything that is only a spelling of keywords already present. A menu waits on a human,
-so `MENUVERT` is BASIC; as a keyword it would cost every GP program 462 bytes whether or not it used
-a menu.
+composite for anything that is only a spelling of keywords already present.
 
 The keywords in detail. Square brackets mean optional. Optionals cannot be skipped over:
 `GP.BOX X,Y,W,H,,7` is a syntax error — write out the default you are passing through.
 
-*See also: [4. Module reference — the BASL library](#4-module-reference--the-basl-library), [3.8 Block IF](#38-block-if), [3.9 Inline assembly](#39-inline-assembly), [3.4 Strings](#34-strings), [3.3 Machine code](#33-machine-code), [3.10 Text in a bank](#310-text-in-a-bank), [3.11 Calling a routine in one statement](#311-calling-a-routine-in-one-statement), [4.1 `THEME.INC.BL` — named colour roles](#41-themeincbl--named-colour-roles), [4.2 `STRINGS.INC.BL` — string helpers](#42-stringsincbl--string-helpers), [4.3 `APPSYS.INC.BL` — start politely, leave it as you found it](#43-appsysincbl--start-politely-leave-it-as-you-found-it), [4.4 `LINEINPUT.INC.BL` — a positioned entry field](#44-lineinputincbl--a-positioned-entry-field), [4.5 `BMX.INC.BL` — a BMX bitmap into VERA](#45-bmxincbl--a-bmx-bitmap-into-vera)*
+*See also: [4. Module reference — the BASL library](#4-module-reference--the-basl-library), [3.8 Block IF](#38-block-if), [3.9 Inline assembly](#39-inline-assembly), [3.4 Strings](#34-strings), [3.3.1 `GP.HIBYTE` / `GP.LOBYTE` — split an address into two bytes](#331-gphibyte--gplobyte--split-an-address-into-two-bytes), [3.10 Text in a bank](#310-text-in-a-bank), [3.11 Calling a routine in one statement](#311-calling-a-routine-in-one-statement), [4.1 `THEME.INC.BL` — named colour roles](#41-themeincbl--named-colour-roles), [4.2 `STRINGS.INC.BL` — string helpers](#42-stringsincbl--string-helpers), [4.3 `APPSYS.INC.BL` — start politely, leave it as you found it](#43-appsysincbl--start-politely-leave-it-as-you-found-it), [4.4 `LINEINPUT.INC.BL` — a positioned entry field](#44-lineinputincbl--a-positioned-entry-field), [4.5 `BMX.INC.BL` — a BMX bitmap into VERA](#45-bmxincbl--a-bmx-bitmap-into-vera)*
 
 ### 3.1 Loops
 
@@ -527,7 +573,7 @@ forward to it.
 A case body may take its statements on the same line, after a colon:
 
 ```basic
-GP.SELECT ED.KEY
+GP.SELECT ED.KEY%
   GP.CASE 157 : GOSUB ED.MOVE.LEFT
   GP.CASE 29  : GOSUB ED.MOVE.RIGHT
   GP.CASE 27  : MENU.ACTIVE = 0 : GOSUB ED.OPEN.MENUBAR
@@ -577,7 +623,7 @@ They are keywords, not variables: `X = GP.A` reads, `GP.A = 5` is a syntax error
 `$030C`–`$030F`, so they also read what a plain `SYS` left behind.
 
 ```basic
-GP.CALL $FF5F, 0, 0, 0, 1          ' KERNAL screen_mode, carry set = report
+GP.CALL $FF5F, 0, 0, 0, 1 : REM KERNAL screen_mode, carry set = report
 COLS = GP.X : ROWS = GP.Y
 ```
 
@@ -586,36 +632,40 @@ free for the user; a compiled GPC program does not. That page holds runtime stat
 (`stringHighMemory`, `storeStartHigh`, `variableStartPage`), and code POKEd over it corrupts the
 program without raising an error.
 
-#### Splitting an address — `GP.HIBYTE` / `GP.LOBYTE`
-
-| Form | Does |
-|---|---|
-| `GP.HIBYTE(n)` | `INT(n / 256)` — which 256-byte page. **Composite** |
-| `GP.LOBYTE(n)` | `MOD(n, 256)` — the offset within it. **Composite** |
-
-A 6502 address is sixteen bits and everything that consumes one takes eight bits at a time:
-`GP.CALL`'s registers, VERA's `$9F20`/`$9F21`. Every address passed from BASIC to machine code is
-therefore split. `GP.STRPTR` and `GP.ARRPTR` produce the addresses to pass:
-
-```basic
-P = GP.STRPTR(A$)
-GP.CALL $A000, GP.LOBYTE(P), GP.HIBYTE(P)
-```
-
-Do not write `P AND 255` for the low byte. `AND` is 16-bit signed in GPC, and any address worth
-splitting is above 32,767 (the string heap always is), so it raises `OUT OF RANGE` rather than
-masking. `GP.LOBYTE` is built on `MOD`, which uses the full 32-bit divide.
-
-Range is 0–65,535, which covers every address on the machine. Both are composite: no runtime code,
-compiling to `INT(n/256)` and `MOD(n,256)`.
-
 Example: [`MLCALL.EXP.BL`](MLCALL.EXP.BL)
 
 For anything longer than a few bytes use `GP.ASM` (§3.9) instead of `GP.CALL` and a POKE loop. It
 assembles into the program: no bank to reserve, and no list of numbers to keep in step with a
 comment.
 
-*See also: [3.9 Inline assembly](#39-inline-assembly)*
+*See also: [3.3.1 `GP.HIBYTE` / `GP.LOBYTE` — split an address into two bytes](#331-gphibyte--gplobyte--split-an-address-into-two-bytes), [3.9 Inline assembly](#39-inline-assembly)*
+
+### 3.3.1 `GP.HIBYTE` / `GP.LOBYTE` — split an address into two bytes
+
+```
+  Syntax    GP.HIBYTE(n)   GP.LOBYTE(n)
+  Returns   GP.HIBYTE: INT(n / 256), the 256-byte page.
+            GP.LOBYTE: MOD(n, 256), the offset within that page.
+  Kind      COMPOSITE. Expands to INT(n/256) and MOD(n,256). No
+            runtime code, and neither needs the GP block.
+  Notes     n is 0-65,535, which covers every address on the machine.
+            Everything that consumes an address takes eight bits at a
+            time: GP.CALL's registers, VERA's $9F20/$9F21. The
+            addresses to split come from GP.STRPTR (§3.4.5) and
+            GP.ARRPTR (§3.5).
+  WARNING   Never write P AND 255 for the low byte. AND is 16-bit
+            signed and any address worth splitting is above 32,767,
+            so it raises OUT OF RANGE instead of masking. GP.LOBYTE
+            is built on MOD, which uses the full 32-bit divide.
+```
+
+**Example**
+```basic
+            P = GP.STRPTR(A$)
+            GP.CALL $A000, GP.LOBYTE(P), GP.HIBYTE(P)
+```
+
+*See also: [3.4.5 `GP.STRPTR` — address of a string block](#345-gpstrptr--address-of-a-string-block), [3.5 Arrays](#35-arrays)*
 
 ### 3.4 Strings
 
@@ -713,9 +763,9 @@ Example: [`STRINGS.EXP.BL`](STRINGS.EXP.BL)
   Kind      ASM. Needs the GP block.
   Notes     The length byte is at the address, the first character at
             +1, the block capacity at -2.
-            With GP.CALL, machine code can fill a string in place and
-            set its length. Stock BASIC cannot do that.
-  WARNING   Split the address with GP.LOBYTE / GP.HIBYTE (§3.3),
+            With GP.CALL (§3.3), machine code can fill a string in
+            place and set its length. Stock BASIC cannot do that.
+  WARNING   Split the address with GP.LOBYTE / GP.HIBYTE (§3.3.1),
             never with P AND 255. AND is 16-bit signed and the string
             heap is above 32,767, so P AND 255 raises OUT OF RANGE.
             The longhand H = INT(P / 256) : L = P - H * 256 is what
@@ -730,7 +780,7 @@ Example: [`STRINGS.EXP.BL`](STRINGS.EXP.BL)
             GP.CALL $A000, GP.LOBYTE(P), GP.HIBYTE(P)
 ```
 
-*See also: [3.3 Machine code](#33-machine-code), [3.5 Arrays](#35-arrays)*
+*See also: [3.3 Machine code](#33-machine-code), [3.3.1 `GP.HIBYTE` / `GP.LOBYTE` — split an address into two bytes](#331-gphibyte--gplobyte--split-an-address-into-two-bytes), [3.5 Arrays](#35-arrays)*
 
 ### 3.5 Arrays
 
@@ -835,7 +885,7 @@ translate to. A style value of 256 or more is instead the address of eight glyph
 tile index is a character code, so ASCII `+ - |` make a usable frame:
 
 ```
-ISO.GLYPH$ = "++++--||"                        ' TR TL BR BL TOP BOTTOM LEFT RIGHT
+ISO.GLYPH$ = "++++--||" : REM TR TL BR BL TOP BOTTOM LEFT RIGHT
 GP.BOX 50, 26, 4, 3, GP.STRPTR(ISO.GLYPH$) + 1, 1
 ```
 
@@ -860,21 +910,26 @@ GP.ELSE
 GP.ENDIF
 ```
 
-Each of the four keywords is alone on its line, and `THEN` is required. There is no one-line form:
-`GP.IF X > 5 THEN PRINT` is a syntax error. Allowing it would mean a block that swallowed every line
-down to the next `GP.ENDIF`. Stock `IF ... THEN` is unchanged and remains the one-line form.
+| Part | Rule |
+|---|---|
+| `GP.IF` | one per block, alone on its line, `THEN` required |
+| `GP.ELSEIF` | any number of them, `THEN` required |
+| `GP.ELSE` | optional, at most one |
+| `GP.ENDIF` | required; without it the compile stops on `STRUCTURE IMBALANCE` |
+| condition | a numeric expression |
 
-`GP.ELSEIF` may repeat any number of times; `GP.ELSE` is optional. The first true condition wins and
-nothing below it runs, so there is no break to omit. If nothing matches and there is no `GP.ELSE`
-the block is skipped, which is not an error. Conditions are numeric expressions.
+The first true condition runs and nothing below it does, so there is no break to omit. A block whose
+conditions are all false and which has no `GP.ELSE` is skipped, which is not an error.
 
-`GP.IF` and `GP.SELECT` cover different cases. A select fetches one value and compares it against
-each alternative — a sparse key code, a state machine. A block IF tests a different condition in
-every branch: ranges, compound conditions, a string in one arm and a number in the next.
+There is no one-line form. `GP.IF X > 5 THEN PRINT` is a syntax error. Stock `IF ... THEN` is
+unchanged and is the one-line form.
 
-`GP.ENDIF` is required, but unlike `GP.ENDSEL` it does no work: the condition is evaluated and
-consumed on the line it is written, so there is no frame to release and a `GOTO` out of a `GP.IF` is
-safe. Omitting `GP.ENDIF` stops the compile with `STRUCTURE IMBALANCE`.
+Blocks nest freely: inside each other, inside a `GP.CASE` body (§3.2) and inside a `GP.DO` loop
+(§3.1). Use `GP.SELECT` (§3.2) where one value is compared against each alternative, and a block IF
+where each branch tests a different condition.
+
+A `GOTO` out of a block is safe. The condition is evaluated and consumed on the line it is written,
+so `GP.ENDIF` releases nothing. The block costs 14 runtime bytes.
 
 ```basic
 GP.IF N < 0 THEN
@@ -886,13 +941,9 @@ GP.ELSE
 GP.ENDIF
 ```
 
-IFs nest freely — inside each other, inside a `GP.CASE` body, and inside a `GP.DO` loop.
-
-It costs 14 runtime bytes, none of them code. All four p-code opcodes reuse existing handlers: the
-two branches are `.goto.z` and `.goto` under different names, and the two markers share one four-byte
-no-op. See §11 of `docs/blitz/GP-BASIC.TIERS.md`.
-
 Example: [`IF.EXP.BL`](IF.EXP.BL)
+
+*See also: [3.2 Multi-way branch](#32-multi-way-branch), [3.1 Loops](#31-loops)*
 
 ### 3.9 Inline assembly
 
@@ -1088,33 +1139,33 @@ through byte for byte — case, leading spaces and trailing spaces included. The
 lines and must not be: BASLOAD upper-cases `REM` text.
 
 **Blocks are named, and you may write as many as you like.** Each is indexed from zero within
-itself, so inserting a line in one group moves nothing outside it. All the groups in a program
-share one bank, which is why every block names the same one — written on each block rather than
-only the first so a block can be read where it sits.
+itself, so inserting a line in one group moves nothing outside it. A block names the bank its text
+goes in, written on each block rather than only the first so a block can be read where it sits.
+Groups that name the same bank share it and fill it in the order the compiler reads them.
 
 **The name costs nothing at run time.** It is resolved while the program compiles, into the
 group's first index, and the compiler adds that to your index for you. No letter of the name
 reaches the object, which is the whole reason the lookup is not in the bank.
 
 `GP.BSTRCOUNT(NAME)` is a composite: it compiles to a plain number, so
-`FOR I = 0 TO GP.BSTRCOUNT(MENU.FILE) - 1` costs no more than writing the count out.
+`FOR I = 0 TO GP.BSTRCOUNT(BS.FILE) - 1` costs no more than writing the count out.
 
 ```basic
 #DEFINE GM.TEXTBANK 5
 
-GP.BANKEDSTR GM.TEXTBANK MENU.FILE
+GP.BANKEDSTR GM.TEXTBANK BS.FILE
   " OPEN "
   " SAVE "
   " QUIT "
 GP.ENDBANKEDSTR
 
-GP.BANKEDSTR GM.TEXTBANK MENU.EDIT
+GP.BANKEDSTR GM.TEXTBANK BS.EDIT
   " CUT "
   " PASTE "
 GP.ENDBANKEDSTR
 
-  FOR I = 0 TO GP.BSTRCOUNT(MENU.EDIT) - 1
-    PRINT GP.BSTR(MENU.EDIT, I)
+  FOR I = 0 TO GP.BSTRCOUNT(BS.EDIT) - 1
+    PRINT GP.BSTR(BS.EDIT, I)
   NEXT I
 ```
 
@@ -1125,9 +1176,12 @@ while the object is written, so `BANKMGR` has to be told rather than asked:
 BANKMGR.WANT = GM.TEXTBANK : GOSUB BANKMGR.CLAIM
 ```
 
-**Compile SHARED.** The text goes into the program's one `NAME.OVL` file, which the shared
-bootstrap reads into its bank. An embedded program is one file, so an embedded compile stops at the
-first `GP.BANKEDSTR` with `GP.BANKEDSTR NEEDS SHARED`.
+**Either build.** Both put the text in one `NAME.OVL` file beside the program: the bootstrap
+reads it for a shared build and `StartCode` reads it for an embedded one, so an embedded
+program with banked text is a `.PRG` and a `.OVL` together. The runtime finds which bank a slot went to in a
+sixteen-byte table at `$07F0`, in the low-memory hole both builds leave alone — the bootstrap
+extension page writes it there for a shared program, and `StartCode` copies it out of the
+image for an embedded one.
 
 **A group name is not a variable.** No `$`, no `%`, no `(` — any of those is a syntax error rather
 than something quietly ignored. A name that no block declared is a syntax error at the line that
@@ -1139,12 +1193,23 @@ text.
 program does can produce one out of range, so an index past the end of a group reads whatever
 follows it. That is the same bargain the array fast path makes.
 
-One bank of text a program, up to 8 KB of it, up to 128 groups. `GP.BSTR` is an ordinary GP
-keyword, so it pulls in the 1 KB GP block; the two block keywords do not, and neither does
-`GP.BSTRCOUNT`.
+**A program may have more than one text bank.** Sixteen of them, which is the range of the slot
+field a group carries and the length of the table at `$07F0` — `BSTR_MAX_BANKS` in
+`source/common-source/source/common.inc`. That matters when a library already owns one: `MENU`
+keeps its rows in `MENU.TEXTBANK`, so a program using it and wanting a pool of its own names a
+second bank rather than crowding into `MENU`'s. The other limits are 8 KB a bank, 128 groups a
+program and 4,096 strings a bank.
+
+Each text bank is a region, so it counts toward the 127 regions (§3.12) and no two regions may
+share a bank.
+
+`GP.BSTR` is an ordinary GP keyword, so it pulls in the 1 KB GP block; the two block keywords do
+not, and neither does `GP.BSTRCOUNT`.
 
 Reading it from inside a `GP.BANKED` region works: the handler puts the caller's bank back before
 it returns.
+
+*See also: [3.12 Code in a bank](#312-code-in-a-bank)*
 
 ### 3.11 Calling a routine in one statement
 
@@ -1218,8 +1283,12 @@ The refusals, all at compile time:
             A formal is a plain scalar variable, numeric or string.
             Up to 12 of them.
             RETURNS names a plain scalar variable too, and it is what
-            GP.FN reads after the call. Its type is the type of the
-            call. Without it the verb is GP.SUB-only.
+            GP.FN (§3.11.3) reads after the call. Its type is the
+            type of the call. Without it the verb is callable with
+            GP.SUB (§3.11.2) only.
+            Call the verb with GP.SUB as a statement, or with GP.FN
+            inside an expression. Every call sits below the
+            GP.DEFPROC that declares it.
   WARNING   An array or an array element cannot be a formal, and it
             cannot be the RETURNS variable either. A module whose
             arguments are array elements takes the verb and no
@@ -1237,7 +1306,13 @@ The refusals, all at compile time:
               GP.DEFPROC AREA, A.W, A.H RETURNS A.R
               A.R = A.W * A.H
               RETURN
+
+            REM calling them, anywhere below the declarations
+              GP.SUB DBSELECT, 1
+              PRINT "AREA "; GP.FN(AREA, 3, 4)
 ```
+
+*See also: [3.11.3 `GP.FN` — call a verb from inside an expression](#3113-gpfn--call-a-verb-from-inside-an-expression), [3.11.2 `GP.SUB` — call a verb](#3112-gpsub--call-a-verb)*
 
 ### 3.11.2 `GP.SUB` — call a verb
 
@@ -1247,13 +1322,14 @@ The refusals, all at compile time:
             then calls the routine.
   Kind      COMPOSITE. Expands to an assignment per formal and a
             GOSUB.
-  Notes     The count and the types must match the declaration.
+  Notes     The count and the types must match the declaration. For
+            the same call inside an expression use GP.FN (§3.11.3).
             A call into a GP.BANKED region selects its bank. A call
             into or out of a region comes back with the caller's
             bank selected.
-  WARNING   The call must sit below its GP.DEFPROC. It carries an
-            address and not a line number, so a forward call is
-            refused rather than compiled.
+  WARNING   The call must sit below its GP.DEFPROC (§3.11.1). It
+            carries an address and not a line number, so a forward
+            call is refused rather than compiled.
 ```
 
 **Example**
@@ -1262,6 +1338,8 @@ The refusals, all at compile time:
             GP.SUB DBFIND, PRICE, "ACME", TRUE
             GP.SUB DBWRITE
 ```
+
+*See also: [3.11.3 `GP.FN` — call a verb from inside an expression](#3113-gpfn--call-a-verb-from-inside-an-expression), [3.11.1 `GP.DEFPROC` — declare a verb and its arguments](#3111-gpdefproc--declare-a-verb-and-its-arguments)*
 
 ### 3.11.3 `GP.FN` — call a verb from inside an expression
 
@@ -1286,7 +1364,8 @@ The refusals, all at compile time:
             A string result costs 3 bytes more: it is copied into a
             temporary, so two calls to one verb may share an
             expression.
-  WARNING   The call must sit below its GP.DEFPROC, as GP.SUB's does.
+  WARNING   The call must sit below its GP.DEFPROC (§3.11.1), as
+            GP.SUB's (§3.11.2) does.
             The body must not call its own verb: there is one set of
             formals and it would write over the arguments in use.
             An argument may be as deep an expression as any other,
@@ -1302,6 +1381,8 @@ The refusals, all at compile time:
             PRINT GP.FN(TAG, "AB") + GP.FN(TAG, "CD")
             PRINT GP.FN(AREA, 2, GP.FN(AREA, 3, 4))
 ```
+
+*See also: [3.11.1 `GP.DEFPROC` — declare a verb and its arguments](#3111-gpdefproc--declare-a-verb-and-its-arguments), [3.11.2 `GP.SUB` — call a verb](#3112-gpsub--call-a-verb)*
 
 ### 3.12 Code in a bank
 
@@ -1320,16 +1401,20 @@ line is.
 
 This is how a program gets past the shared p-code ceiling. Low-memory p-code has to fit under the
 runtime — about 17,920 bytes, §7 — and a region does not count against it. Every region of the
-program goes into one overlay file, `NAME.OVL`, written beside the `.PRG` and read in with it.
+program goes into one overlay file, `NAME.OVL`, written beside the `.PRG` and read in at startup.
+That is true of an EMBEDDED build as well, so a banked program is two files in either mode.
 
 ```basic
 #DEFINE MY.GUICODE 4
 GOTO MY.LIBEND
 GP.BANKED MY.GUICODE
-#INCLUDE "MENUVERT.INC.BL"
+#INCLUDE "MENU.INC.BANKED.BL"
+#INCLUDE "MENU.INC.BL"
 #INCLUDE "LINEINPUT.INC.BL"
 #INCLUDE "GUI.INC.BL"
-#INCLUDE "GUI2.INC.BL"
+#INCLUDE "COMBO.INC.BL"
+#INCLUDE "CHECK.INC.BL"
+#INCLUDE "GUI-DIALOGS.INC.BL"
 GP.ENDBANKED
 MY.LIBEND:
 ```
@@ -1411,11 +1496,16 @@ those pages come next. Then the next region, and so on to end of file. So **a re
 padded page count plus two bytes**, the padding rather than the p-code in it, and the banks may be
 in any order with any gaps between them.
 
-`NAME.OVL` ships beside the `.PRG` and must travel with it. A missing or truncated one stops the
-program with `?OVL`, and a region for a bank the machine does not have stops it with `?RAM`.
-Reading it costs about a second at startup for 32K of regions, once per load.
+The overlay ships beside the `.PRG`, in both builds. The program reads it once per load, not once
+per `RUN`, and a missing or truncated one stops it with `?OVL`; a region for a bank the machine does not
+have stops it with `?RAM`. Nothing pairs a `.OVL` to its `.PRG`, so a stale one is read. §7 lists
+every file a program ships.
 
-*See also: [7. Memory, and what the compiler tells you](#7-memory-and-what-the-compiler-tells-you), [4.18 `STASHVRAM.INC.BL` — rectangles and blobs, kept in VRAM](#418-stashvramincbl--rectangles-and-blobs-kept-in-vram), [3.10 Text in a bank](#310-text-in-a-bank), [3.9 Inline assembly](#39-inline-assembly), [4.6 `MENUVERT.INC.BL` — a vertical menu](#46-menuvertincbl--a-vertical-menu), [4.4 `LINEINPUT.INC.BL` — a positioned entry field](#44-lineinputincbl--a-positioned-entry-field), [4.11 `GUI.INC.BL` — four dialogs, in a box that puts the screen back](#411-guiincbl--four-dialogs-in-a-box-that-puts-the-screen-back), [4.12 `GUI2.INC.BL` — a listbox, single or multi select](#412-gui2incbl--a-listbox-single-or-multi-select)*
+**Reading it costs time at startup.** The bootstrap reads the file a byte at a time, at roughly
+26,000 bytes a second, so a program with 32K of regions waits about a second and a quarter before
+its first line runs. Nothing else in the program pays it.
+
+*See also: [7. Memory, and what the compiler tells you](#7-memory-and-what-the-compiler-tells-you), [4.18 `STASHVRAM.INC.BL` — rectangles and blobs, kept in VRAM](#418-stashvramincbl--rectangles-and-blobs-kept-in-vram), [3.10 Text in a bank](#310-text-in-a-bank), [3.9 Inline assembly](#39-inline-assembly), [4.6 `MENU.INC.BL` — menus built a row at a time](#46-menuincbl--menus-built-a-row-at-a-time), [4.4 `LINEINPUT.INC.BL` — a positioned entry field](#44-lineinputincbl--a-positioned-entry-field), 4.11 GUI.INC.BL -- the box that puts the screen back, and the form in, [4.17 `COMBO.INC.BL` — a drop-down list that folds into one row](#417-comboincbl--a-drop-down-list-that-folds-into-one-row), [4.21 `CHECK.INC.BL` — a check box, `[X]` or `[ ]`](#421-checkincbl--a-check-box-x-or), [4.12 `GUI-DIALOGS.INC.BL` — every dialog as a verb](#412-gui-dialogsincbl--every-dialog-as-a-verb)*
 
 ## BASL MODULES
 
@@ -1444,11 +1534,27 @@ runtime and every `#INCLUDE` spends it; a region spends 8,192 bytes of a RAM ban
 not using. Bank what you can. A module called inside a loop goes where the loop is: a call between
 a region and anywhere outside it switches the bank twice.
 
-The banked form needs the program built SHARED. The regions are in one `NAME.OVL` file, which the
-shared bootstrap reads into their banks. An embedded program is one file, so an embedded compile
-stops at the first `GP.BANKED` with `GP.BANKED NEEDS SHARED`.
+The banked form works in either build, and both write the same `NAME.OVL` beside the program.
+A SHARED program's bootstrap opens it; an EMBEDDED program opens it itself, at startup, before
+the runtime begins. **So the first banked module makes an EMBEDDED program two files**: ship
+the `.OVL` with the `.PRG`, and a program that cannot find it stops with `?OVL`. A program with
+no region at all has no `.OVL` and is one file as before. Either way it loads with `LOAD` and
+`RUN`.
+
+The regions are never in the file the loader reads, so nothing caps them but the banks the
+machine has; a region asking for a bank that is not there stops with `?RAM`. A banked embedded
+program does carry the whole runtime rather than the smaller core, whether or not it calls a
+GP.BASIC keyword.
 
 `samples/GPB-MODS-TESTING/PICKDEMO.BASL` is a complete program in this shape, in 99 lines.
+
+Banking a module makes room in either build, and it used to make room in only one. An embedded
+object once carried its regions appended to the `.PRG`, so a byte moved into a region was still
+a byte in the file and the last byte landed where it always had. The regions go in the `.OVL`
+now, which the loader never reads, so a banked module leaves low memory and leaves the file
+with it. Splitting the modules across more regions costs two header bytes a region and nothing
+else. What a region does not buy is a smaller `.OVL`: the bytes are still shipped, in the file
+beside the program rather than inside it.
 
 | | low memory | a RAM bank |
 |---|---|---|
@@ -1465,10 +1571,13 @@ GP.BANKED MY.THEMECODE
 #INCLUDE "THEME.INC.BL"
 GP.ENDBANKED
 GP.BANKED MY.GUICODE
-#INCLUDE "MENUVERT.INC.BL"
+#INCLUDE "MENU.INC.BANKED.BL"
+#INCLUDE "MENU.INC.BL"
 #INCLUDE "LINEINPUT.INC.BL"
 #INCLUDE "GUI.INC.BL"
-#INCLUDE "GUI2.INC.BL"
+#INCLUDE "COMBO.INC.BL"
+#INCLUDE "CHECK.INC.BL"
+#INCLUDE "GUI-DIALOGS.INC.BL"
 GP.ENDBANKED
 MY.LIBEND:
 ```
@@ -1483,21 +1592,21 @@ the first `#INCLUDE` and the second produces nothing.
 
 §3.12 has the rules, what a region may not contain, and the `.OVL` file a banked program ships.
 
-*See also: [3.12 Code in a bank](#312-code-in-a-bank), [4.18 `STASHVRAM.INC.BL` — rectangles and blobs, kept in VRAM](#418-stashvramincbl--rectangles-and-blobs-kept-in-vram), [4.1 `THEME.INC.BL` — named colour roles](#41-themeincbl--named-colour-roles), [4.6 `MENUVERT.INC.BL` — a vertical menu](#46-menuvertincbl--a-vertical-menu), [4.4 `LINEINPUT.INC.BL` — a positioned entry field](#44-lineinputincbl--a-positioned-entry-field), [4.11 `GUI.INC.BL` — four dialogs, in a box that puts the screen back](#411-guiincbl--four-dialogs-in-a-box-that-puts-the-screen-back), [4.12 `GUI2.INC.BL` — a listbox, single or multi select](#412-gui2incbl--a-listbox-single-or-multi-select)*
+*See also: [3.12 Code in a bank](#312-code-in-a-bank), [4.18 `STASHVRAM.INC.BL` — rectangles and blobs, kept in VRAM](#418-stashvramincbl--rectangles-and-blobs-kept-in-vram), [4.1 `THEME.INC.BL` — named colour roles](#41-themeincbl--named-colour-roles), [4.6 `MENU.INC.BL` — menus built a row at a time](#46-menuincbl--menus-built-a-row-at-a-time), [4.4 `LINEINPUT.INC.BL` — a positioned entry field](#44-lineinputincbl--a-positioned-entry-field), 4.11 GUI.INC.BL -- the box that puts the screen back, and the form in, [4.17 `COMBO.INC.BL` — a drop-down list that folds into one row](#417-comboincbl--a-drop-down-list-that-folds-into-one-row), [4.21 `CHECK.INC.BL` — a check box, `[X]` or `[ ]`](#421-checkincbl--a-check-box-x-or), [4.12 `GUI-DIALOGS.INC.BL` — every dialog as a verb](#412-gui-dialogsincbl--every-dialog-as-a-verb)*
 
 ### 4.1 `THEME.INC.BL` — named colour roles
 
 | Routine | in | out |
 |---|---|---|
-| `THEME.SELECT` | `THEME.ID` | fills `THEME.CLR()` |
-| `THEME.NEXT` | `THEME.ID` | the following theme, loaded |
-| `THEME.RESET` | `THEME.ID` | the selected theme's shipped values, reloaded |
-| `THEME.SET` | `THEME.ATTR` | issues `COLOR` — makes it the colour `PRINT` uses |
-| `THEME.HI` | `THEME.ATTR` | `THEME.INV`, the inverse attribute |
+| `THEME.SELECT` | `THEME.ID%` | fills `THEME.CLR()` |
+| `THEME.NEXT` | `THEME.ID%` | the following theme, loaded |
+| `THEME.RESET` | `THEME.ID%` | the selected theme's shipped values, reloaded |
+| `THEME.SET` | `THEME.ATTR%` | issues `COLOR` — makes it the colour `PRINT` uses |
+| `THEME.HI` | `THEME.ATTR%` | `THEME.INV%`, the inverse attribute |
 
 Five themes, `THEME.COUNT` of them:
 
-| `THEME.ID` | | |
+| `THEME.ID%` | | |
 |---:|---|---|
 | 0 | `X16` | blue page, white text, cyan headings. The default |
 | 1 | `DARK` | black page, light grey text |
@@ -1515,22 +1624,28 @@ exception is a cold start — `CUSTOM` selected before any other theme has been 
 is nothing to keep and it takes `X16`'s values. `THEME.RESET` goes back to those.
 
 `samples/color-test` edits the roles against a mock of the GUI and prints the `THEME.CLR()` lines
-to paste back in here. **It carries its own `GPC-BASIC` folder and is still at seven roles**, so it
-does not yet offer `THEME.FOCUS`.
+to paste back in here. **It carries its own `GPC-BASIC` folder and is still at nine roles**, so it
+offers `THEME.FOCUS` and `THEME.BAR` but not `THEME.SHADOW`.
 
 Roles, for indexing `THEME.CLR()`: `THEME.PAGE` `THEME.TEXT` `THEME.TITLE` `THEME.BORDER`
-`THEME.HILITE` `THEME.DIMMED` `THEME.WARN` `THEME.FOCUS`, and `THEME.SLOTS` = 8.
+`THEME.HILITE` `THEME.DIMMED` `THEME.WARN` `THEME.FOCUS` `THEME.BAR` `THEME.SHADOW`, and
+`THEME.SLOTS` = 10.
 
-`THEME.FOCUS` is the eighth and newest: what a focused control wears while `GUI.FORM` has the
-keyboard (§4.11). It is a separate role from `THEME.HILITE` because a dialog shows both at once —
-the highlighted row of a list, and the control the TAB key has landed on.
+`THEME.FOCUS` is the eighth: what a focused control wears while `GUI.FORM` has the keyboard
+(§4.11). It is a separate role from `THEME.HILITE` because a dialog shows both at once — the
+highlighted row of a list, and the control the TAB key has landed on. `THEME.BAR` is the ninth,
+the band a menu bar or status line sits on, and `THEME.SHADOW` the tenth and newest, the colour
+a drop shadow is filled with.
 
-**The routine used to be `THEME.LOAD`.** It became `THEME.SELECT` when the library was split into
-banked and low-memory files, and it stayed when they were merged again. A program still calling the
-old name stops at `LABEL NOT FOUND`.
+The module's own scalars are int16: `THEME.ID%`, `THEME.ATTR%` and `THEME.INV%`. `THEME.CLR()`
+is not — it stays an untyped array, and it is `DIM`med to `THEME.SLOTS - 1`, which is the last
+role and no element beyond it.
+
+Usage is `THEME.ID%`, one `GOSUB THEME.SELECT`, then `THEME.CLR(role)` wherever an attribute is
+wanted:
 
 ```basic
-THEME.ID = 1 : GOSUB THEME.SELECT
+THEME.ID% = 1 : GOSUB THEME.SELECT
 GP.BOX 4,2,30,8, 2, THEME.CLR(THEME.BORDER)
 GP.PRINTAT 6,3, "TITLE", THEME.CLR(THEME.TITLE)
 ```
@@ -1546,7 +1661,7 @@ The readable name costs no variable and no lookup.
 Formatting a NUMBER into a column is `STRUSING.INC.BL` (§4.10), a separate
 module: it needs no `#SYMFILE` and neither module depends on the other.
 
-*See also: [4.11 `GUI.INC.BL` — four dialogs, in a box that puts the screen back](#411-guiincbl--four-dialogs-in-a-box-that-puts-the-screen-back), [4.10 `STRUSING.INC.BL` — a number to a template](#410-strusingincbl--a-number-to-a-template), [4.1 `THEME.INC.BL` — named colour roles](#41-themeincbl--named-colour-roles)*
+*See also: 4.11 GUI.INC.BL -- the box that puts the screen back, and the form in, [4.10 `STRUSING.INC.BL` — a number to a template](#410-strusingincbl--a-number-to-a-template), [4.1 `THEME.INC.BL` — named colour roles](#41-themeincbl--named-colour-roles)*
 
 ### 4.2 `STRINGS.INC.BL` — string helpers
 
@@ -1567,64 +1682,57 @@ module: it needs no `#SYMFILE` and neither module depends on the other.
 `#INCLUDE`s and named after the source PRG. The three trims are `GP.ASM` and reach BASIC's
 variables through `{VAR}`; without a symbol file the compile stops with `{} NEEDS #SYMFILE`.
 
-**The two halves take their argument differently, and one question decides which:** does the
-routine GROW the string. The pads and `SPLICE` do, so they are BASIC — they take the string by
-value in `STR.STR$` and hand it back there, and an assignment reallocates for free. The trims only
-ever shrink, so they are assembly — they take its ADDRESS in `STR.PTR` and rewrite the block where
-it lies, which is the only way a `GOSUB` can edit a caller's string without two allocations and two
-copies a call. Never pass a literal to those: `GP.STRPTR("hello")` is an address inside the
-p-code.
-The three pad routines leave a string that is already at or past the width unchanged. They pad and
-never truncate; use `STR.RTRIM` to shorten.
+#### How a routine takes its string
 
-`SPLIT` reads `STR.STR$` without modifying it. `STR.MAX` of 0 means 10. Empty fields are preserved:
-`"A,,C"` is three fields and `"A,"` is two. Splitting an empty string gives one empty field, never
-zero. Reaching the limit is not an error and loses nothing — the last field receives the unsplit
-remainder, delimiters included.
+The pads, `SPLIT`, `REPLACE` and `SPLICE` take the text by value in `STR.STR$` and hand the result
+back in it. The three trims take an ADDRESS in `STR.PTR`, from `GP.STRPTR` (§3.4.5), and rewrite
+the block in place.
+
+WARNING: never pass a literal to a trim. `GP.STRPTR("hello")` is an address inside the p-code.
+
+#### The pads
+
+`STR.WIDTH` is the target width. A string already at or past it is returned unchanged: the pads
+never truncate. Use `STR.RTRIM` to shorten.
+
+#### `STR.SPLIT`
+
+Reads `STR.STR$` and does not modify it. `STR.MAX` of 0 means 10. Empty fields are kept, so `"A,,C"`
+is three fields and `"A,"` is two. An empty string gives one empty field, never zero. Reaching the
+limit is not an error: the last field takes the unsplit remainder, delimiters included.
 
 `STR.FIELD$` is the one array the library does not `DIM`. Left alone, GPC's implicit `DIM` gives
 0..10. For more, `DIM` it before the first call and set `STR.MAX` to match. `DIM`ming an array GPC
-has already auto-dimensioned is an error, so it is one or the other. Note that this is the reverse
-of `THEME.CLR`, which the module `DIM`s.
+has already auto-dimensioned is an error, so it is one or the other.
 
-`REPLACE` swaps every occurrence of `STR.FIND$` for `STR.REPL$`, modifying `STR.STR$` in place. The
-replacement may be shorter, longer, or `""` to delete. It is case sensitive, because `GP.INSTR`
-compares raw bytes.
+#### `STR.REPLACE`
 
-A replacement that contains the search text is safe: `"A"` to `"AA"` terminates and doubles the As,
-where a naive in-place version would not. The routine builds a new string and never re-scans what it
-has emitted. An empty `STR.FIND$` leaves the string unchanged rather than hanging, because
-`GP.INSTR` reports not-found for a zero-length needle. Like the pad routines it is not length
-checked: a longer replacement can push the result past 255 characters.
+Swaps every occurrence of `STR.FIND$` for `STR.REPL$` in `STR.STR$`. The replacement may be shorter,
+longer, or `""` to delete. It is case sensitive: `GP.INSTR` (§3.4.1) compares raw bytes. A
+replacement that contains the search text terminates — `"A"` to `"AA"` doubles the As. An empty
+`STR.FIND$` leaves the string unchanged.
 
-`PET2SCR` converts a PETSCII code to the screen code the tile map holds, for `TILE`, `TDATA` and
-`VPOKE`. `GP.PRINTAT` and `GP.FILL` do this internally.
+#### `STR.SPLICE`
 
-The three trims are three entry labels sharing one blob, so there is no mode to forget to set. A
-zero-length string and an all-spaces string are not special cases: the walk counts down and
-reaching zero is the answer.
+Replaces `STR.CUT` characters at `STR.AT` with `STR.SUB$`, so one routine inserts, overwrites and
+deletes: `STR.CUT` of 0 inserts, `LEN(STR.SUB$)` overwrites, an empty `STR.SUB$` deletes. `STR.AT`
+is 1-based. Past the end appends, below 1 clamps to 1, and a cut running past the end takes the rest
+of the string. `STR.AT` and `STR.CUT` are clamped in place, so read them back after the call.
 
-`SPLICE` edits by POSITION where `REPLACE` edits by content: it replaces `STR.CUT` characters at
-`STR.AT` with `STR.SUB$`. One routine covers all three of insert, overwrite and delete, because
-they are the same operation with a different count — `STR.CUT` of 0 inserts, `LEN(STR.SUB$)`
-overwrites, and an empty `STR.SUB$` deletes. `STR.AT` is 1-based, matching `GP.INSTR`.
+#### `STR.PET2SCR`
 
-Past the end appends and below 1 clamps to 1, both falling out of `LEFT$` and `MID$` rather than
-being tested for; a cut running past the end takes the rest of the string. It is not length
-checked, like `REPLACE` and the pads. `SPLICE` clamps `STR.AT` and `STR.CUT` in place, so read them
-back rather than assuming what you set survived the call.
+Converts the PETSCII code in `STR.PET` to the screen code the tile map holds, in `STR.SCR`, for
+`TILE`, `TDATA` and `VPOKE`. `GP.PRINTAT` and `GP.FILL` do this conversion themselves.
 
-It was written in `GP.ASM` first and rewritten in BASIC, which is worth knowing because the reason
-generalises: the assembly could overwrite and delete but never insert, because in-place work cannot
-grow a string, and it cost about 280 bytes of p-code where the one BASIC line costs about 40.
+#### Limitation
+
+The pads, `REPLACE` and `SPLICE` are not length checked. A longer replacement can push the result
+past 255 characters.
 
 Examples: [`SPLITT.EXP.BL`](SPLITT.EXP.BL), [`STRINGS.EXP.BL`](STRINGS.EXP.BL). Regression test:
-[`STRTST.EXP.BL`](STRTST.EXP.BL), thirty-three cases — the trim edges, every splice mode, both
-clamps, appending past the end, splicing an empty string, growing a 200-character string past the
-block it was born with, and guard strings either side to catch an off-by-one write into the
-neighbouring block.
+[`STRTST.EXP.BL`](STRTST.EXP.BL), thirty-three cases.
 
-*See also: [4.2 `STRINGS.INC.BL` — string helpers](#42-stringsincbl--string-helpers)*
+*See also: [3.4.5 `GP.STRPTR` — address of a string block](#345-gpstrptr--address-of-a-string-block), [3.4.1 `GP.INSTR` — position of a substring](#341-gpinstr--position-of-a-substring), [4.2 `STRINGS.INC.BL` — string helpers](#42-stringsincbl--string-helpers)*
 
 ### 4.3 `APPSYS.INC.BL` — start politely, leave it as you found it
 
@@ -1638,7 +1746,7 @@ neighbouring block.
 A screen rectangle through a file is `STASH.FILE.SAVE` / `.LOAD` / `.PUT` in `STASHFILE.INC.BL`.
 
 GOSUB APPSYS.STARTUP
-' ... the application, laid out with APPSYS.COLS / APPSYS.ROWS ...
+REM ... the application, laid out with APPSYS.COLS / APPSYS.ROWS ...
 GOSUB APPSYS.RESTORE : END
 ```
 
@@ -1759,7 +1867,7 @@ before the display is torn down:
 BMX.FILE$ = F$
 GOSUB BMX.OPEN
 IF BMX.ERROR$ <> "" THEN GOTO COMPLAIN
-' ... BMX.WIDTH, BMX.HEIGHT, BMX.PALUSED readable here ...
+REM ... BMX.WIDTH, BMX.HEIGHT, BMX.PALUSED readable here ...
 SCREEN 128
 GOSUB BMX.PAINT
 ```
@@ -1775,7 +1883,7 @@ in spare VRAM first, and `BMX.RESTORE` writes them back:
 BMX.FILE$ = "TITLE.BMX"
 SCREEN 128
 GOSUB BMX.SHOW
-' ... the title screen ...
+REM ... the title screen ...
 GOSUB BMX.RESTORE
 ```
 
@@ -1801,107 +1909,159 @@ Examples: [`BMXVIEW.EXP.BL`](BMXVIEW.EXP.BL), and [`BMXPAL.EXP.BL`](BMXPAL.EXP.B
 
 *See also: [4.5 `BMX.INC.BL` — a BMX bitmap into VERA](#45-bmxincbl--a-bmx-bitmap-into-vera)*
 
-### 4.6 `MENUVERT.INC.BL` — a vertical menu
+### 4.6 `MENU.INC.BL` — menus built a row at a time
 
 | Routine | in | out |
 |---|---|---|
-| `MENUVERT.RUN` | the variables below | `MENUVERT.SEL` `MENUVERT.KEY` |
-| `MENUVERT.DRAW` | the same | draws the menu without driving it |
-| `MENUVERT.ROW` | `MENUVERT.DRAWROW` `MENUVERT.DRAWATTR` | one row, in the attribute you name |
-| `MENUVERT.HOTFIND` | `MENUVERT.DRAWROW` `MENUVERT.DRAWTEXT$` | `MENUVERT.HOTAT` — where that row's hotkey letter sits, 1-based, or **0 for "do not tint"** |
+| `GP.SUB MENU.BEGIN, slot` | `MENU.BAR` or `MENU.POPUP` | the slot emptied; the rows that follow go into it |
+| `GP.SUB MENU.ITEM, text$` | the row's text | a row appended, with no hint, enabled |
+| `GP.SUB MENU.ITEMX, text$, hint$, on` | the text, the hint, and `on`, tested `<> 0` | a row appended |
+| `GP.SUB MENU.SELECTED, n` | the row the next run opens on | — |
+| `R = GP.FN(MENU.HOTROW, slot, key)` | a slot and a key code | `R`, the first live row with that hot key, matched without case, or 0 |
+| `N = GP.FN(MENUTO.VERT, row, col, style)` | the popup slot, and the inputs below | `N`, 1 to the row count, or 0 for ESC. `MENU.EXITKEY` |
+| `N = GP.FN(MENUTO.BAR, row, col, style)` | the bar slot, `MENU.GAP` `MENU.BARFLAGS` | `N` `MENU.EXITKEY` `MENU.BARNUM` `MENU.SELX` `MENU.SELW` `MENU.MARKED` |
+| `GP.SUB MENU.DRAWBAR, row, col, style` | the bar slot, `MENU.MARKED` | the bar on screen, not run, with `MENU.MARKED` lit |
 
-The menu is BASIC rather than assembly, which keeps 462 bytes of code and 11 of storage out of the
-block every GP program carries. Assembly would only be needed to move the highlight without knowing
-the text underneath it, by swapping the cell's attribute nibbles instead of redrawing. A BASIC menu
-owns the item array and can reprint the row.
+```basic
+#INCLUDE "GPB.INC.BL"
+#INCLUDE "BANKMGR.INC.BL"
+#INCLUDE "MENU.INC.BANKED.BL"
+#INCLUDE "MENU.INC.BL"
 
-The difference is not visible: a nibble swap is 59 cycles a cell, `GP.FILL` 31 and `GP.PRINTAT` 94,
-so redrawing two rows costs about a millisecond against the swap's half, in a 16.7 ms frame.
+GOSUB BANKMGR.INIT
+MENU.ATTR = 6 * 16 + 1
+MENU.HOTATTR = 6 * 16 + 7
+MENU.DISATTR = 6 * 16 + 12
+GP.SUB MENU.BEGIN, MENU.POPUP
+GP.SUB MENU.ITEMX, "&ADD RECORD", "APPEND A BLANK RECORD", MENU.ON
+GP.SUB MENU.ITEMX, "&DEL RECORD", "", MENU.OFF
+GP.SUB MENU.ITEM, "-"
+GP.SUB MENU.ITEM, "&QUIT"
+N = GP.FN(MENUTO.VERT, 4, 10, MENU.ROUND)
+IF N = 0 THEN <cancelled>
+```
+
+Requires `GPB.INC.BL` and `BANKMGR.INC.BL`, with `BANKMGR.INIT` run before the first
+`MENU.BEGIN`, and a SHARED compile. `#INCLUDE "MENU.INC.BANKED.BL"` straight before
+`MENU.INC.BL`. Its groups are banked, so the program gets a `NAME.OVL` beside its `.PRG`.
+Ship both.
+
+A menu is built into a slot, then run from it. There are two slots, so the bar survives while its
+dropdown is built:
+
+| slot | rows |
+|---|---|
+| `MENU.BAR` | 16 |
+| `MENU.POPUP` | 32 |
+
+A row past the slot's size is dropped, and so is a row added before any `MENU.BEGIN`. The sizes
+are `MENU.BAR.MAX`, `MENU.POPUP.MAX`, `MENU.POOL.MAX` and `MENU.POOLBASE`, declared in
+`MENU.INC.BL`. A group in `MENU.INC.BANKED.BL` holds one `SPC` line per row it counts, so raising
+a define means adding lines to the group to match. A define that does not match its lines silently
+loses rows off the end of a menu. `MENU.POOLBASE` is `MENU.BAR.MAX + MENU.POPUP.MAX`.
+
+The text and hints are kept in bank `MENU.TEXTBANK`, which the first `MENU.BEGIN` claims from
+`BANKMGR` (§4.13). It is 62 unless the program writes `#DEFINE MENU.TEXTBANK n` before the
+`#INCLUDE`. If another owner has claimed that bank, `MENU.OK` is 0 and every row is dropped.
+Text is cut to 30 characters and a hint to 50. `MENU.FLAG$()`, `MENU.HOTKEY$()` and
+`MENU.HOTCOL$()` are the module's own arrays, `DIM`med on the first `MENU.BEGIN`. Do not `DIM` them.
+
+`MENU.SELECTED` sets the row the next run opens on. The next `MENU.BEGIN` or run clears it, and
+without it a run opens on row 1.
+
+`MENU.HOTROW` looks a key up the way a run does. Use it on a key a `MENU.KEYEXIT` run handed back,
+to open the bar item with that letter, or for an ALT+letter the program reads itself.
+
+#### Rows
+
+`&` marks the hot key: `"SAVE &AS"` is stored as `SAVE AS` with hot key A at column 6. Only the
+first `&` counts, `&&` is a literal `&`, and a trailing `&` stays in the text. A hot key is matched
+without case, the first live row with it wins, and it chooses the row at once.
+
+A row whose text is one hyphen, `"-"`, is a separator. It draws as a line of `MENU.SEPCHR`, still
+counts as a row, and the cursor steps over it.
+
+`MENU.ITEMX` with `on` 0 adds a disabled row. The cursor steps over it, its hot key and RETURN are
+refused, and it draws in `MENU.DISATTR`.
+
+A caller keeping its rows in `GP.BANKEDSTR` groups (§3.10) can put the enable mask at index 0 of
+the hint group, `"1"` for on and `"0"` for off a row, and pass `VAL(MID$(GP.BSTR(HH, 0), I, 1))`
+as `on`.
+
+#### Colours, hints and the gap
+
+Set once by the caller, and read by every run:
 
 | in | |
 |---|---|
-| `MENUVERT.X` `.Y` | top left of the **first row**, not of a frame — draw the border yourself with `GP.BOX`, so the menu owes nothing to one style of border |
-| `MENUVERT.WIDTH` | cells wide. This is the width of the **highlight**, so it is the width of the menu whatever the text happens to do |
-| `MENUVERT.COUNT` | how many rows |
-| `MENUVERT.ITEM$()` | the rows, `1..COUNT` — **the caller owns the `DIM`**, see below |
-| `MENUVERT.ATTR` | packed attribute, `background * 16 + foreground` |
-| `MENUVERT.HIATTR` | the same for the highlighted row. **0 means invert `MENUVERT.ATTR`** |
-| `MENUVERT.HOT$` | one character a row, `""` for none |
-| `MENUVERT.HOTATTR` | paint the hotkey letter in this attribute. **0 is off, and off is the default** |
-| `MENUVERT.FLAGS` | added together, below |
-| `MENUVERT.SEL` | the row to start on; 0 starts at 1 |
+| `MENU.ATTR` | the rows, `background * 16 + foreground` |
+| `MENU.HIATTR` | the highlighted row. 0 inverts `MENU.ATTR` |
+| `MENU.HOTATTR` | the hot key letter. 0 leaves it untinted. Only rows drawn in `MENU.ATTR` are tinted |
+| `MENU.DISATTR` | a disabled row. 0 is `MENU.ATTR` |
+| `MENU.SEPATTR` | separator lines and the frame. 0 is `MENU.ATTR` |
+| `MENU.SEPCHR` | the separator glyph. 0 is `MENU.LINE`, 192, the stroke `GP.BOX` style 1 draws with |
+| `MENU.FLAGS` | the popup's flags, added together |
+| `MENU.BARFLAGS` | the bar's flags |
+| `MENU.GAP` | cells between bar items. 0 is none |
+| `MENU.HINTX` `MENU.HINTY` `MENU.HINTW` `MENU.HINTATTR` | the hint field. `MENU.HINTW` 0 turns hints off |
 
-| out | |
-|---|---|
-| `MENUVERT.SEL` | `1..COUNT`, or **0 if cancelled** |
-| `MENUVERT.KEY` | the key that ended it — 13 chose, 27 cancelled, or the hotkey itself |
+A hint is shown only when the highlight moves, never on opening. The field is cleared to
+`MENU.HINTATTR` first, and a hint longer than `MENU.HINTW` is cut.
+
+#### The frame
+
+Both runners draw a `GP.BOX` with its corner at `row`, `col`, one cell bigger all round than the
+rows, in `MENU.SEPATTR`. `style` is `MENU.SOLID` 0, `MENU.THIN` 1, `MENU.ROUND` 2, `MENU.THICK` 3,
+or 256 and up for the address of an eight-character glyph table:
 
 ```basic
-MENUVERT.X = 8 : MENUVERT.Y = 6
-MENUVERT.WIDTH = 24 : MENUVERT.COUNT = 4
-MENUVERT.ITEM$(1) = " NEW GAME"           ' ... and so on
-MENUVERT.ATTR = THEME.CLR(THEME.TEXT)
-MENUVERT.HIATTR = THEME.CLR(THEME.HILITE)
-MENUVERT.HOT$ = "NLOQ"
-GOSUB MENUVERT.RUN
-IF MENUVERT.SEL = 0 THEN GOTO CANCELLED
+T.GLYPH$ = "++++--!!"
+N = GP.FN(MENUTO.VERT, 4, 10, GP.STRPTR(T.GLYPH$) + 1)
 ```
+
+`MENU.NOBOX`, 255, draws no frame and puts the first row at `row`, `col`.
+
+A popup row, and its highlight, is as wide as the widest row. A bar item is as wide as its own text,
+with `MENU.GAP` cells between items, so spaces inside the text are how a bar item gets padding.
+
+#### Keys and flags
 
 | Key | |
 |---|---|
-| cursor up / down | move |
-| RETURN | choose |
-| ESC or STOP | cancel |
-| a hotkey | chooses its row at once |
+| UP, DOWN | move, on the popup |
+| LEFT, RIGHT | move, on the bar |
+| RETURN | choose a live row |
+| ESC or STOP | cancel, and return 0 |
+| a hot key | choose its row at once |
 
-| flags, added together | |
-|---:|---|
-| 1 | **must select** — ESC does not cancel |
-| 2 | **keep mark** — leave the chosen row highlighted on the way out |
-| 4 | **no wrap** — stop at the ends instead of wrapping round |
-| 8 | **gamepad** — drive it from the SNES pad in port 1 as well as the keyboard |
+| flag | value | |
+|---|---:|---|
+| `MENU.MUSTSEL` | 1 | ESC and STOP do not cancel |
+| `MENU.KEEPMARK` | 2 | the chosen row stays lit. On the bar, `MENUTO.BAR` sets `MENU.MARKED` to it |
+| `MENU.NOWRAP` | 4 | stop at the ends instead of wrapping |
+| `MENU.GAMEPAD` | 8 | the SNES pad in port 1 as well: directions move, B or START chooses |
+| `MENU.DOWNEXIT` | 16 | bar only: DOWN chooses the item |
+| `MENU.UPEXIT` | 32 | bar only: UP chooses the item |
+| `MENU.KEYEXIT` | 64 | a key the menu has no use for ends the run, and the row it was on is returned |
+| `MENU.HINTMID` | 128 | centre the hint in its field |
 
-The constants `MENUVERT.MUSTSEL`, `.KEEPMARK`, `.NOWRAP` and `.GAMEPAD` are defined; add those
-rather than the numbers.
+On the bar, UP and DOWN do nothing unless `MENU.UPEXIT` or `MENU.DOWNEXIT` is set.
 
-A hotkey chooses its row rather than moving to it. `MENUVERT.HOT$` is one character per row in
-order, matched without case. It may be shorter than `MENUVERT.COUNT`, in which case the later rows
-have no hotkey.
+The pad acts on new presses only, one step a press. Cancel is keyboard only. With no pad connected
+the flag changes nothing; in the emulator a pad needs `-joy1`.
 
-`MENUVERT.HOTATTR` paints the hotkey letter in a second attribute. The letter is located in the
-row's own text — the first case-insensitive match for that row's `MENUVERT.HOT$` character — so
-nothing extra is passed in and `" START"` with hotkey `S` needs no markup. A row whose text does not
-contain its hotkey is left untinted rather than reported; the hotkey still works. Only rows in the
-normal attribute are tinted: on the selected row the highlight carries the meaning.
+`MENU.EXITKEY` is the key that ended the run: 13 for RETURN, 27 for ESC, 3 for STOP, the hot key,
+or the key `MENU.KEYEXIT` handed back. A pad press is reported as the key it stands for.
 
-The caller owns the `DIM`. A module cannot be passed an array in BASIC, so it names one; `DIM`ming
-it inside the module would fix a bound and then fail for a caller who wanted more rows. Leave
-`MENUVERT.ITEM$` undimensioned and GPC's implicit `DIM` gives 0..10, a ten-row menu. `DIM` it
-yourself for more. Do not do both.
+`MENU.BARNUM` is the bar's row count. `MENU.SELX` and `MENU.SELW` are the chosen bar item's column
+and width, for placing a panel under it. `MENU.MARKED` is the bar item left lit by `MENU.KEEPMARK`
+or by `MENUTO.PULLDOWN` (§4.9). `MENU.DRAWBAR` redraws the bar with it lit, to repaint a bar that a
+panel has covered.
 
-#### The gamepad flag
+Examples: [`MENUTO.EXP.BL`](MENUTO.EXP.BL) runs a popup, a bar and a dropdown by hand, and
+[`MENUBUILD.EXP.BL`](MENUBUILD.EXP.BL) builds both slots and reads them back.
 
-With flag 8, up and down move the highlight and B or Start chooses. Cancel remains keyboard-only:
-ESC and STOP have no unambiguous pad equivalent, and a must-select menu has no cancel.
-
-It reads port 1, the physical pad, not port 0. Port 0 is the keyboard presented as a joystick, and
-the menu reads the keyboard directly, so reading both would move the highlight twice for one cursor
-key. Port 0 is also unreliable, reporting absent on roughly half of all reads (measured in
-AlienAirlift: 2,060 negative against 2,057 valid over 14 seconds).
-
-One step per press, no auto-repeat. The wait loop spins as fast as the CPU allows, so the pad is
-edge-triggered and holding a direction moves once. A button still held from whatever opened the menu
-is not read as a fresh
-press either, so a menu cannot answer itself on the way in.
-
-With no pad connected the flag changes nothing: the pad is read only when the keyboard is quiet,
-and an absent pad reads as nothing held. In the emulator a real pad needs `-joy1`, which binds
-physical hardware and does not map the keyboard.
-
-Examples: [`MENUDEMO.EXP.BL`](MENUDEMO.EXP.BL) on its own, [`MENU.EXP.BL`](MENU.EXP.BL) inside a
-whole small application, and [`MENUTST.EXP.BL`](MENUTST.EXP.BL) for the 21-case regression test.
-
-*See also: [4.6 `MENUVERT.INC.BL` — a vertical menu](#46-menuvertincbl--a-vertical-menu)*
+*See also: [4.13 `BANKMGR.INC.BL` — who owns which RAM bank](#413-bankmgrincbl--who-owns-which-ram-bank), [3.10 Text in a bank](#310-text-in-a-bank), [4.9 `MENUPULL.INC.BL` — a dropdown under a bar item](#49-menupullincbl--a-dropdown-under-a-bar-item), [4.6 `MENU.INC.BL` — menus built a row at a time](#46-menuincbl--menus-built-a-row-at-a-time)*
 
 ### 4.7 `SORT.INC.BL` — shell sort a string array
 
@@ -2006,34 +2166,56 @@ with the trims, to [`STRTST.EXP.BL`](STRTST.EXP.BL).
 
 *See also: [3.11 Calling a routine in one statement](#311-calling-a-routine-in-one-statement), [4.2 `STRINGS.INC.BL` — string helpers](#42-stringsincbl--string-helpers), [4.8 `STRCASE.INC.BL` — case, in place](#48-strcaseincbl--case-in-place)*
 
-### 4.9 `MENUBAR.INC.BL` — a horizontal menu
+### 4.9 `MENUPULL.INC.BL` — a dropdown under a bar item
 
 | Routine | in | out |
 |---|---|---|
-| `MENUBAR.RUN` | `MENUBAR.X` `MENUBAR.Y` `MENUBAR.GAP` `MENUBAR.FLAGS` `MENUBAR.SEL`, and `MENUVERT.COUNT` `MENUVERT.ITEM$()` `MENUVERT.ATTR` `MENUVERT.HIATTR` `MENUVERT.HOT$` `MENUVERT.HOTATTR` | `MENUBAR.SEL` `MENUBAR.KEY` `MENUBAR.SELX` `MENUBAR.SELW` |
-| `MENUBAR.DRAW` | the same | the bar on screen, undriven |
-| `MENUBAR.ITEM` | `MENUBAR.FIND` and an attribute | one item, repainted |
-| `MENUBAR.MARK` | `MENUBAR.FIND` | that item highlighted |
-| `MENUBAR.WHERE` | `MENUBAR.FIND` | `MENUBAR.AT` `MENUBAR.WIDE` |
+| `N = GP.FN(MENUTO.PULLDOWN, barnum, style)` | the popup slot, the bar `MENUTO.BAR` or `MENU.DRAWBAR` last drew, `MENU.STASHBANK` | `N` `MENU.EXITKEY` `MENU.NEXTBAR` `MENU.BARNUM` `MENU.SELX` `MENU.SELW` |
 
-`MENUVERT` is the vertical menu; this is the other axis. **It reads `MENUVERT`'s items, attributes
-and hotkeys rather than defining its own**, because a bar and the dropdown under it are one thing to
-the user — so it does not build without `MENUVERT.INC.BL`, and the caller refills
-`MENUVERT.ITEM$()` between drawing the bar and opening the menu.
+```basic
+MENU.BARFLAGS = MENU.DOWNEXIT
+B = GP.FN(MENUTO.BAR, 0, 0, MENU.NOBOX)
+GP.DO
+    IF B = 0 THEN GP.EXITDO
+    GOSUB MY.FILL
+    N = GP.FN(MENUTO.PULLDOWN, B, MENU.ROUND)
+    B = MENU.NEXTBAR
+GP.LOOP
+```
 
-**An item is as wide as its own text.** There is no `MENUBAR.WIDTH` and no column width; the air
-goes in the item string, so `" FILE "` is how a highlight gets padding. `MENUBAR.GAP` is the space
-*between* two items and defaults to 0 for the same reason.
+`MY.FILL` is the caller's: `MENU.BEGIN MENU.POPUP` and the rows for bar item `B`.
 
-**Up and down are optional exits, off by default.** `MENUBAR.DOWNEXIT` ends the bar on DOWN and
-`MENUBAR.UPEXIT` on UP, handing the key back in `MENUBAR.KEY` so the caller can open the panel
-under `MENUBAR.SELX`. A bar that is only a bar leaves both off and arrows across the grain do
-nothing. `MENUVERT`'s `MENUHELP.KEYEXIT` is the other half of that handshake.
+Requires `MENU.INC.BL` (§4.6) and `STASH.INC.BL` (§3.6), included by the caller, and a `#SYMFILE`
+for `STASH`. A program with no dropdown leaves this file out and does not carry `STASH`.
 
-Flags, added together: `MENUBAR.MUSTSEL` `MENUBAR.KEEPMARK` `MENUBAR.NOWRAP` `MENUBAR.GAMEPAD`
-`MENUBAR.DOWNEXIT` `MENUBAR.UPEXIT`.
+`MENUTO.PULLDOWN` marks bar item `barnum`, opens the popup slot under it and runs it. A `barnum`
+out of range or disabled returns 0 and draws nothing. The bar is the one last drawn, where it was
+drawn, read with `MENU.GAP` and `MENU.BARFLAGS` as they are now. The item the last call marked is
+unmarked and `barnum` is marked. It stays marked on the way out, in `MENU.MARKED`.
 
-*See also: [4.9 `MENUBAR.INC.BL` — a horizontal menu](#49-menubarincbl--a-horizontal-menu), [4.6 `MENUVERT.INC.BL` — a vertical menu](#46-menuvertincbl--a-vertical-menu)*
+The dropdown's corner is the item's column on the row under the bar, moved left if the box would
+run off the screen. The screen width comes from the KERNAL's `screen_mode`. The style and colours
+are `MENUTO.VERT`'s (§4.6), and the run adds `MENU.KEYEXIT` to `MENU.FLAGS`.
+
+| out | |
+|---|---|
+| `N` | the row, for RETURN or a hot key. Any other exit is 0 |
+| `MENU.EXITKEY` | the key that ended it |
+| `MENU.NEXTBAR` | the bar item LEFT or RIGHT walks to, stepping over disabled items as the bar does. With no live neighbour it is `barnum`. 0 for any other exit |
+| `MENU.BARNUM` | the bar's row count |
+| `MENU.SELX` `MENU.SELW` | the item's column and width |
+
+The screen under the dropdown is saved first and put back after, in `STASH` slot 0 of bank
+`MENU.STASHBANK`. Set it before the first call to choose the bank. Left at 0, the first call takes
+one from `BANKMGR.GET.FREE.BANK`. If none is free, the dropdown still runs and the screen is not put
+back.
+
+WARNING: `MENUTO.PULLDOWN` sets `STASH.BANK`, `STASH.SLOT`, `STASH.MOVE`, `STASH.X`, `STASH.Y`,
+`STASH.W` and `STASH.H`. Set them again before the caller's own next `STASH` call.
+
+Example: pass 6 of [`MENUTO.EXP.BL`](MENUTO.EXP.BL).
+
+*See also: [4.6 `MENU.INC.BL` — menus built a row at a time](#46-menuincbl--menus-built-a-row-at-a-time), [3.6 Screen — stash and restore](#36-screen--stash-and-restore), [4.9 `MENUPULL.INC.BL` — a dropdown under a bar item](#49-menupullincbl--a-dropdown-under-a-bar-item), [STASH.INC.BL -- save a text rectangle, and put it back.](#stashincbl----save-a-text-rectangle-and-put-it-back)*
 
 ### 4.10 `STRUSING.INC.BL` — a number to a template
 
@@ -2047,7 +2229,7 @@ Flags, added together: `MENUBAR.MUSTSEL` `MENUBAR.KEEPMARK` `MENUBAR.NOWRAP` `ME
 
 STR.USING.NUM = 1234.5 : STR.USING.MASK$ = "#,##0.00"
 GOSUB STR.USING
-PRINT STR.USING.STR$                    ' 1,234.50
+PRINT STR.USING.STR$ : REM 1,234.50
 ```
 
 Pure BASIC. It needs no `#SYMFILE` and depends on no other module, so a program can take it
@@ -2111,86 +2293,126 @@ the result is a field, so a right answer in the wrong number of columns still br
 
 *See also: [4.2 `STRINGS.INC.BL` — string helpers](#42-stringsincbl--string-helpers), [4.10 `STRUSING.INC.BL` — a number to a template](#410-strusingincbl--a-number-to-a-template)*
 
-### 4.11 `GUI.INC.BL` — four dialogs, in a box that puts the screen back
+### 4.11 `GUI.INC.BL` — the box that puts the screen back, and the form in it
 
 | Routine | in | out |
 |---|---|---|
-| `GUI.SAY` | `GUI.MSG$` | `GUI.KEY` — something to say, and one way out |
-| `GUI.YN` | `GUI.MSG$` | `GUI.ANSWER`, -1 for yes |
-| `GUI.MENU` | `GUI.COUNT` `GUI.SEL` `GUI.FLAGS`, over `MENUVERT.ITEM$()` | `GUI.SEL`, or 0 if cancelled |
-| `GUI.INPUT` | `GUI.LEN` `GUI.TEXT$` `GUI.MASK` | `GUI.TEXT$` `GUI.OK` |
-| `GUI.OPEN` | `GUI.BODY.ROWS` `GUI.BODY.WIDTH` | `GUI.INNER.LEFT` `.TOP` `.WIDTH` — the box on its own, for a dialog of your own |
+| `GUI.OPEN` | `GUI.BODY.ROWS` `GUI.BODY.WIDTH` | `GUI.INNER.LEFT` `.TOP` `.WIDTH` — the box on its own |
 | `GUI.CLOSE` | — | the screen as it was |
 
+**The dialogs are not here.** They are one-line verbs in `GUI-DIALOGS.INC.BL`, §4.12, and a program
+calls those. This file is what they are built out of: the box, the control block, and `GUI.FORM`,
+the loop that runs a mix of controls under one focus.
+
 ```basic
-THEME.ID = 0 : GOSUB THEME.SELECT
-GUI.BANK = 8
-GUI.MSG$ = "DELETE THE FILE?"
-GOSUB GUI.YN
-IF GUI.ANSWER THEN <yes>
+GP.SUB PANELOPEN, " READY ", "", 4, 30
+GP.PRINTAT GUI.INNER.LEFT, GUI.INNER.TOP, "MY OWN ROWS", THEME.CLR(THEME.TEXT)
+GP.SUB PANELCLOSE
 ```
 
-Requires `GPB.INC.BL`, `STASH.INC.BL`, `THEME.INC.BL`, `MENUVERT.INC.BL` and `LINEINPUT.INC.BL`,
-and `#INCLUDE`s none of them. **All five, whichever dialog you call** — BASLOAD resolves every
-label in the file, so leaving one out is `LABEL NOT FOUND`. It wants a `#SYMFILE`, because
-`STASH` does.
+Requires `GPB.INC.BL`, `STASH.INC.BL`, `THEME.INC.BL`, `BANKMGR.INC.BL`, `MENU.INC.BL`,
+`LINEINPUT.INC.BL`, `COMBO.INC.BL` and `CHECK.INC.BL`, and `#INCLUDE`s none of them. All of them
+are needed whichever dialog you call: BASLOAD resolves every label in the file, so leaving one out
+is `LABEL NOT FOUND`. `MENU.INC.BL` goes in before `GUI.INC.BL`, for its `#DEFINE`s.
+`COMBO.INC.BL` and `CHECK.INC.BL` go in after it. It wants a `#SYMFILE`, because `STASH` does.
+
+`PICKMENU` runs the popup slot inside its box. Build the rows with `MENU.BEGIN MENU.POPUP` and
+`MENU.ITEM` first. `&` hot keys are tinted in `GUI.BORDER`, and the highlight is as wide as the
+widest row.
 
 Everything the box takes — three message lines, a title, the style, the placement, the shadow, the
 frame glyphs, the bank the covered cells go to — is listed in full in
 [GP-BASIC.GLOBALS.md](GP-BASIC.GLOBALS.md) §3. `GUI.BANK = 0` does not save the cells, and then the
 box is still on screen when the call returns.
 
-**Every control has a focus, and TAB moves it.** The dialogs no longer own their key loops: each
-states its controls and `GUI.FORM` runs them. A control is a button, a field, a list, a combo (§4.17) or a check box (§4.21); it hands
-back one of six verdicts — stay, next, previous, press, default, cancel — and the dispatcher stays
-one loop whatever the mix. A caller that never presses TAB sees what it always saw.
+**Every control has a focus, and TAB moves it.** A dialog states its controls and `GUI.FORM` runs
+them. A control is a button, a field, a list, a combo (§4.17) or a check box (§4.21); it hands back
+one of six verdicts — stay, next, previous, press, default, cancel — and the dispatcher is one loop
+whatever the mix.
 
 **The default button and the focused control are different things.** The default is what RETURN
 presses from anywhere and is drawn `<<LIKE THIS>>`; the focus is where TAB has got to and is drawn
-in `THEME.FOCUS`. `GUI.INPUT` opens with the default on OK and the focus in the field — which is
+in `THEME.FOCUS`. `INPUTBOX` opens with the default on OK and the focus in the field — which is
 the point of keeping the two apart, and `GUI.DEFAULT` sets only the first.
 
 **The answers are buttons.** `GUI.BTN.ONE$` and `GUI.BTN.TWO$` carry them, and `&` marks the
 accelerator: `"&CANCEL"` lights the C. **An accelerator is live only while the focused control does
 not eat printable keys**, so C presses CANCEL from the button row or from inside a list, and types
-a C in a field. That is the whole rule, and `GUIFRMT`'s T14, T15 and T22 are the three assertions
-that hold it.
+a C in a field.
 
-`GUI.HINT$` is gone — the dimmed line naming two keys became the button row, and it is the one
-interface this took away.
+The typing dialog's answer is `GUI.TEXT$`, and the verb is `INPUTBOX`. BASLOAD will not have a
+label and a variable of one name, and the `$` does not separate them.
 
-**The typing dialog and its string swapped names**: it was `GUI.TEXT` returning `GUI.INPUT$`, and it
-is `GUI.INPUT` returning `GUI.TEXT$`. BASLOAD will not have a label and a variable of one name and
-the `$` does not separate them. A program written against the older library **compiles clean and
-reads the wrong one back**.
+#### Fields on a form
+
+| Routine | in | out |
+|---|---|---|
+| `GUI.FORM.ADD.FIELD` | `LINEINPUT.X` `.Y` `.LEN` `.TEXT$` and the rest of `LINEINPUT`'s inputs | `GUI.CTRL.N` — the field's control number |
+
+```basic
+LINEINPUT.X = GUI.INNER.LEFT : LINEINPUT.Y = GUI.INNER.TOP
+LINEINPUT.LEN = 20 : LINEINPUT.TEXT$ = "UNTITLED"
+GOSUB GUI.FORM.ADD.FIELD
+NAME.CTRL = GUI.CTRL.N
+REM ... run the form ...
+PRINT GUI.CTRL.TEXT$(NAME.CTRL)
+```
+
+**The text belongs to the control**, in `GUI.CTRL.TEXT$(n)`. `LINEINPUT` has one buffer, so a field
+copies its text in when it takes the focus and back out when it leaves. Read `GUI.CTRL.TEXT$(n)`
+after `GUI.FORM.RUN`. That is what lets one form carry several fields.
+
+The field is painted as soon as it is added, so a field that never takes the focus is still drawn.
 
 **Upper case, on the default charset.** `GP.PRINTAT` converts PETSCII and BASLOAD passes literals
 through as source bytes, so charset 2 lands lower case on the graphics half of the font. ISO mode
 fixes the text and breaks the frame, `GP.BOX`'s `$40`–`$7D` being letters. Upper case with a frame,
 mixed case without one, or re-order the font and set `GUI.GLYPH`.
 
-Example: [`GUI.EXP.BL`](GUI.EXP.BL). Regression test: `samples/GPB-MODS-TESTING/GUIFRMT.BASL`,
-twenty-four assertions driven by keys pushed into the KERNAL buffer — the only way to drive a `GET`
-loop headlessly.
+Example: [`GUI.EXP.BL`](GUI.EXP.BL).
 
-*See also: [3. Command reference](#3-command-reference), [4.17 `COMBO.INC.BL` — a drop-down list that folds into one row](#417-comboincbl--a-drop-down-list-that-folds-into-one-row), [4.21 `CHECK.INC.BL` — a check box, `[X]` or `[ ]`](#421-checkincbl--a-check-box-x-or), [4.11 `GUI.INC.BL` — four dialogs, in a box that puts the screen back](#411-guiincbl--four-dialogs-in-a-box-that-puts-the-screen-back), [STASH.INC.BL -- save a text rectangle, and put it back.](#stashincbl----save-a-text-rectangle-and-put-it-back), [4.1 `THEME.INC.BL` — named colour roles](#41-themeincbl--named-colour-roles), [4.6 `MENUVERT.INC.BL` — a vertical menu](#46-menuvertincbl--a-vertical-menu), [4.4 `LINEINPUT.INC.BL` — a positioned entry field](#44-lineinputincbl--a-positioned-entry-field)*
+*See also: [4.12 `GUI-DIALOGS.INC.BL` — every dialog as a verb](#412-gui-dialogsincbl--every-dialog-as-a-verb), [3. Command reference](#3-command-reference), [4.17 `COMBO.INC.BL` — a drop-down list that folds into one row](#417-comboincbl--a-drop-down-list-that-folds-into-one-row), [4.21 `CHECK.INC.BL` — a check box, `[X]` or `[ ]`](#421-checkincbl--a-check-box-x-or), 4.11 GUI.INC.BL -- the box that puts the screen back, and the form in, [STASH.INC.BL -- save a text rectangle, and put it back.](#stashincbl----save-a-text-rectangle-and-put-it-back), [4.1 `THEME.INC.BL` — named colour roles](#41-themeincbl--named-colour-roles), [4.13 `BANKMGR.INC.BL` — who owns which RAM bank](#413-bankmgrincbl--who-owns-which-ram-bank), [4.6 `MENU.INC.BL` — menus built a row at a time](#46-menuincbl--menus-built-a-row-at-a-time), [4.4 `LINEINPUT.INC.BL` — a positioned entry field](#44-lineinputincbl--a-positioned-entry-field)*
 
-### 4.12 `GUI2.INC.BL` — a listbox, single or multi select
+### 4.12 `GUI-DIALOGS.INC.BL` — every dialog as a verb
+
+A dialog is a call with its arguments in it. Nothing is set up in globals first, and nothing a
+previous dialog set carries into the next one.
 
 | Routine | in | out |
 |---|---|---|
-| `GUI.LISTBOX` | `GUI.LISTBOX.COUNT` `.ROWS` `.MULTI` `.MARKS$` `.SEL`, over `MENUVERT.ITEM$()` | `GUI.LISTBOX.SEL` `.MARKS$` `.MARKED` `GUI.KEY` |
+| `DLGRESET bank` | the RAM bank the covered cells go to | every other input back to its default |
+| `DLGSHADOW on` · `DLGGLYPH on` | non-zero | the shadow and the frame glyphs, for every box after it |
+| `DLGSHADOWCLR attr` | a packed colour | the shadow's own colour; 0, the default, is black on black |
+| `DLGSTYLE style` | a `GP.BOX` style (§3.7); 0, the default, is a solid block | the frame every box after it draws; `DLGGLYPH` overrides it |
+| `KBCLEAR` | — | the keyboard buffer emptied |
+| `MSGBOX msg$` | | `GUI.KEY` — something to say, and one way out |
+| `ASKYN msg$` · `ASKOK msg$` | | -1 for yes, or OK |
+| `ASK3 t$, m$, b1$, b2$, b3$, dflt, esc` | | the button pressed, 1..3; `esc` is the one ESC means, and `b3$` `""` leaves two |
+| `ASKTEXT msg$, len` | | the typed line, `""` when cancelled |
+| `INPUTBOX msg$, start$, len` | | the text either way; `GUI.OK` says which |
+| `PICKMENU msg$, sel` | the popup slot of `MENU.INC.BL` (§4.6) | the row, 1..N, or 0 cancelled |
+| `LISTBOX msg$, count, rows` | `GUI.LIST.ITEM$()` | the row, or 0 cancelled |
+| `LISTBOXM msg$, count, rows` | the same | how many are marked; `GUI.LISTBOX.MARKS$` which |
+| `ASKLINE x, y, label$, len` | | a line typed in place, no box; `LINEINPUT.KEY` 27 cancelled |
+| `PANELOPEN t$, m$, rows, width` · `PANELCLOSE` | | an empty box at `GUI.INNER.LEFT` and `.TOP`, and the screen back |
 
 ```basic
-DIM MENUVERT.ITEM$(200)
-GUI.LISTBOX.COUNT = N : GUI.LISTBOX.ROWS = 8 : GUI.LISTBOX.MULTI = 1
-GUI.MSG$ = "PICK FILES" : GUI.BANK = 8
-GOSUB GUI.LISTBOX
-IF GUI.LISTBOX.SEL = 0 THEN <cancelled>
+GP.SUB DLGRESET, 8
+GP.SUB MSGBOX, "DISK FULL"
+IF GP.FN(ASKYN, "DELETE THE FILE?") THEN GOSUB DELETEIT
+F$ = GP.FN(ASKTEXT, "FILE NAME?", 16)
 ```
 
-Its own `#INCLUDE` on top of `GUI.INC.BL`, because nothing else in the library wants a set of marks
-or a footer counting them. **The caller owns the `DIM`** of `MENUVERT.ITEM$()`.
+**Every verb has an `EX` form** that takes a title and three message lines first, always in that
+order, then its own arguments: `MSGBOXEX t$, m$, m2$, m3$, btn$`, `ASKYNEX t$, m$, m2$, m3$, dflt,
+okc`, `INPUTBOXEX ... start$, len, mask`, `PICKMENUEX ... sel, flags`, `LISTBOXEX ... count, rows,
+multi`. `dflt` 2 makes the second button the default; `okc` non-zero says OK and CANCEL rather than
+YES and NO; `flags` are `MENU.MUSTSEL`, `.NOWRAP` and `.GAMEPAD`.
+
+`#INCLUDE` it after `GUI.INC.BL`, `COMBO.INC.BL` and `CHECK.INC.BL`: a verb is compiled before any
+call to it, and this one calls all of them. **The rows are filled first**, because an array cannot
+be an argument — `MENU.BEGIN`/`MENU.ITEM` for `PICKMENU`, `GUI.LIST.ITEM$(1..count)` for the
+listbox, and the caller owns that `DIM`.
 
 Up and down move, PgUp and PgDn page, HOME and END jump, SPACE toggles a mark in multi. TAB moves
 to the buttons and back, RETURN takes `<<OK>>` from anywhere, ESC and STOP cancel — and O and C
@@ -2198,18 +2420,40 @@ press their buttons while the eye is still in the list, which a list can offer a
 cannot.
 
 **In multi, `GUI.LISTBOX.SEL` is not the answer** — it is where the cursor was left. The marks are:
-`GUI.LISTBOX.MARKS$` is `COUNT` characters with `"1"` for marked, and it goes in as well as out, so
-a list reopens with its marks. Any other length, `""` included, starts with none.
+`GUI.LISTBOX.MARKS$` is `count` characters with `"1"` for marked. They are cleared on every call,
+so one run never reports the run before it.
 
 The bottom frame edge reads `2 SELECTED OF 20` in multi, `20 ITEMS` for a single list too long to
 see at once, and is blank for one that fits.
 
-**The scrolling list itself is not in this module.** It is `GUI.CT.LIST`, one of `GUI.FORM`'s five
-control types, and lives in `GUI.INC.BL` beside the field; this file is the dialog around it.
+#### A list built a step at a time, out of an array or out of a bank
 
-Example: [`GUI2TST.EXP.BL`](GUI2TST.EXP.BL).
+| Routine | in | out |
+|---|---|---|
+| `LIST.BEGIN title$, rows` | | a list box declared, not yet drawn |
+| `LIST.ARRAY count` | `GUI.LIST.ITEM$()` | its rows come from the array |
+| `LIST.BANK bank, first, last` | a RAM bank in the `GP.BSTR` image layout | its rows come from the bank |
+| `LISTTO.RUN` | | the row, or 0 cancelled |
+| `LIST.ITEM n` | | row `n` as text |
+| `LIST.SORT bank, first, last` | | that bank's rows in order, in place |
 
-*See also: [4.12 `GUI2.INC.BL` — a listbox, single or multi select](#412-gui2incbl--a-listbox-single-or-multi-select), [4.11 `GUI.INC.BL` — four dialogs, in a box that puts the screen back](#411-guiincbl--four-dialogs-in-a-box-that-puts-the-screen-back)*
+```basic
+GP.SUB LIST.BEGIN, " OPEN FILE ", 12
+GP.SUB LIST.BANK, MY.BANK%, 0, N - 1
+SEL = GP.FN(LISTTO.RUN)
+IF SEL > 0 THEN F$ = GP.FN(LIST.ITEM, SEL)
+```
+
+**A bank list never comes into low memory.** The bank holds the `GP.BSTR` image layout — a 16-bit
+count at `$A000`, an offset a row at `$A002`, then the records — and `GUI.LIST.FETCH` reads one row
+at a time, as it is drawn. That is how `FILEPICK` (§4.20) shows a directory of any length in a
+program with no room for it. `LIST.SORT` moves the two-byte offsets and not the records, so a
+pointer into one stays good afterwards; it reaches the bank through `STASH.SELECT`, which is what
+lets the whole module sit inside a `GP.BANKED` region.
+
+Example: [`GUI.EXP.BL`](GUI.EXP.BL).
+
+*See also: [3.7 Screen — drawing](#37-screen--drawing), [4.6 `MENU.INC.BL` — menus built a row at a time](#46-menuincbl--menus-built-a-row-at-a-time), [4.20 `KV.INC.BL` — keys and values in one RAM bank](#420-kvincbl--keys-and-values-in-one-ram-bank), [4.12 `GUI-DIALOGS.INC.BL` — every dialog as a verb](#412-gui-dialogsincbl--every-dialog-as-a-verb), 4.11 GUI.INC.BL -- the box that puts the screen back, and the form in, [4.17 `COMBO.INC.BL` — a drop-down list that folds into one row](#417-comboincbl--a-drop-down-list-that-folds-into-one-row), [4.21 `CHECK.INC.BL` — a check box, `[X]` or `[ ]`](#421-checkincbl--a-check-box-x-or)*
 
 ### 4.13 `BANKMGR.INC.BL` — who owns which RAM bank
 
@@ -2275,7 +2519,7 @@ drawn and scrolls on after the key is let go.
 could not call another bank. Fix one and fix the other. There are only the two, and a second
 `#INCLUDE` of this file cannot supply the copy — the `#IFNDEF` guard makes it produce nothing.
 
-*See also: [4.14 `KB.INC.BL` — the keyboard buffer, emptied](#414-kbincbl--the-keyboard-buffer-emptied), [4.11 `GUI.INC.BL` — four dialogs, in a box that puts the screen back](#411-guiincbl--four-dialogs-in-a-box-that-puts-the-screen-back)*
+*See also: [4.14 `KB.INC.BL` — the keyboard buffer, emptied](#414-kbincbl--the-keyboard-buffer-emptied), 4.11 GUI.INC.BL -- the box that puts the screen back, and the form in*
 
 ### 4.15 `FILEIO.INC.BL` — the drive: status, files, directories
 
@@ -2309,7 +2553,7 @@ IF FILE.OK THEN N = GP.FN(FILE.SIZE, "SCORES.DAT")
 Everything else in the table is a plain `GOSUB`.
 
 `FILE.DEVICE` is the drive and 0 means 8. `FILE.ISO` non-zero folds names to PETSCII on the way out.
-`FILE.LINE$()` is the caller's `DIM`, as `MENUVERT.ITEM$` is; left alone the implicit `DIM` gives
+`FILE.LINE$()` is the caller's `DIM`, as `GUI.LIST.ITEM$` is; left alone the implicit `DIM` gives
 0 to 10. `FILE.ROWS` is an input to `SAVEARRAY` and an output from `LOADARRAY`.
 
 **`FILE.ERR` under 20 is success.** 0 is OK. 1 is *files scratched* and carries the count in
@@ -2385,10 +2629,10 @@ time.
 **Two destinations, one code path**: the reader takes an address and a size.
 
 ```basic
-' a bank -- 8,192 bytes at $A000, about 250 entries
+REM a bank -- 8,192 bytes at $A000, about 250 entries
 FILE.DIR.BANK = BANKMGR.BANK
 
-' low RAM
+REM low RAM
 FILE.DIR.BANK = 0
 DIM FD.BUF%(1022)
 FILE.DIR.PTR = GP.ARRPTR(FD.BUF%())
@@ -2412,15 +2656,15 @@ low memory when the module is in a region.
 
 | Routine | in | out |
 |---|---|---|
-| `COMBO.ADD` | `COMBO.X` `COMBO.Y` `COMBO.W` `COMBO.COUNT` `COMBO.SEL` `COMBO.BANK`, over `MENUVERT.ITEM$()` | `COMBO.SEL` |
+| `COMBO.ADD` | `COMBO.X` `COMBO.Y` `COMBO.W` `COMBO.COUNT` `COMBO.SEL` `COMBO.BANK`, over `COMBO.ITEM$()` | `COMBO.SEL` |
 
 ```basic
-MENUVERT.ITEM$(1) = " TEXAS"
-MENUVERT.ITEM$(2) = " UTAH"
+COMBO.ITEM$(1) = " TEXAS"
+COMBO.ITEM$(2) = " UTAH"
 COMBO.X = GUI.INNER.LEFT : COMBO.Y = GUI.INNER.TOP
 COMBO.W = 16 : COMBO.COUNT = 2 : COMBO.SEL = 1
 GOSUB COMBO.ADD
-' ... run the form ... the answer is in COMBO.SEL
+REM ... run the form ... the answer is in COMBO.SEL
 ```
 
 **Only `COMBO.ADD` is called by an application.** `COMBO.DRAW`, `COMBO.KEY` and `COMBO.OPEN` are
@@ -2429,21 +2673,27 @@ between `GUI.OPEN` and `GUI.FORM.RUN`.
 
 `COMBO.W` is the width in cells, brackets included; 5 is the floor and anything less is raised to
 it. `COMBO.BANK` is where the dropdown saves the cells it covers, and 0 takes `GUI.BANK` — which is
-what the dialog around it is already using. **The caller owns the `DIM`** of `MENUVERT.ITEM$()`.
+what the dialog around it is already using. The caller owns the `DIM` of `COMBO.ITEM$()`.
 
-**One combo to a dialog.** The items are read out of `MENUVERT.ITEM$` when the dropdown opens and
-not when the control is added, because copying them would mean a second array the same size. A
-second combo on the same form would find the first one's items there.
+One combo to a dialog, since there is one `COMBO.ITEM$()`. The dropdown is the popup slot of
+`MENU.INC.BL` (§4.6), loaded from `COMBO.ITEM$()` each time it opens, so whatever the caller last
+built in that slot is gone after. An item is a menu row: `&` marks a hot key and `"-"` is a
+separator. The `MENU.*` colours and flags it sets are put back.
 
-**A long list belongs in `GUI.LISTBOX`** (§4.12). The dropdown shows every item at once:
-`MENUVERT.RUN` does not scroll, its own header says so, and a scrolling key loop is the listbox's
-job rather than this one's.
+A long list belongs in `GUI.LISTBOX` (§4.12). The dropdown shows every item at once, 32 at most,
+and does not scroll.
+
+**The dropdown is framed like the dialog behind it.** With `GUI.GLYPH` non-zero it draws from
+`GUI.EDGE.H`, `GUI.EDGE.V`, `GUI.CORNER.TL`, `.TR`, `.BL` and `.BR`, the same six a dialog frames
+with, so a re-ordered charset gets its own frame here too. With `GUI.GLYPH = 0` the frame is
+`GP.BOX` style 1.
 
 **It is required by `GUI.INC.BL`**, which names `COMBO.DRAW` and `COMBO.KEY`. BASLOAD resolves every
 label in a file, so a program that includes the GUI and leaves this one out stops with
-`LABEL NOT FOUND` whether it ever draws a combo or not.
+`LABEL NOT FOUND` whether it ever draws a combo or not. It needs `MENU.INC.BL`, and what that
+requires.
 
-*See also: [4.12 `GUI2.INC.BL` — a listbox, single or multi select](#412-gui2incbl--a-listbox-single-or-multi-select), [4.17 `COMBO.INC.BL` — a drop-down list that folds into one row](#417-comboincbl--a-drop-down-list-that-folds-into-one-row), [4.11 `GUI.INC.BL` — four dialogs, in a box that puts the screen back](#411-guiincbl--four-dialogs-in-a-box-that-puts-the-screen-back)*
+*See also: [4.6 `MENU.INC.BL` — menus built a row at a time](#46-menuincbl--menus-built-a-row-at-a-time), [4.12 `GUI-DIALOGS.INC.BL` — every dialog as a verb](#412-gui-dialogsincbl--every-dialog-as-a-verb), [4.17 `COMBO.INC.BL` — a drop-down list that folds into one row](#417-comboincbl--a-drop-down-list-that-folds-into-one-row), 4.11 GUI.INC.BL -- the box that puts the screen back, and the form in*
 
 ### 4.18 `STASHVRAM.INC.BL` — rectangles and blobs, kept in VRAM
 
@@ -2464,7 +2714,7 @@ SV.MAX = 16 : DIM SV.PAGE%(16), SV.PAGES%(16)
 GOSUB SV.INIT
 SV.X = 10 : SV.Y = 5 : SV.W = 40 : SV.H = 12 : GOSUB SV.SAVE
 IF SV.HND = 0 THEN <it did not fit>
-' ... draw over it ...
+REM ... draw over it ...
 GOSUB SV.RESTORE
 ```
 
@@ -2637,7 +2887,7 @@ CHECK.X = GUI.INNER.LEFT : CHECK.Y = GUI.INNER.TOP
 CHECK.TEXT$ = "SHOW HIDDEN FILES" : CHECK.ON = -1
 GOSUB CHECK.ADD
 HIDDEN = CHECK.CTRL
-' ... run the form ...
+REM ... run the form ...
 IF (GUI.CTRL.FLAGS%(HIDDEN) AND GUI.CF.CHECKED) <> 0 THEN PRINT "TICKED"
 ```
 
@@ -2649,9 +2899,8 @@ IF (GUI.CTRL.FLAGS%(HIDDEN) AND GUI.CF.CHECKED) <> 0 THEN PRINT "TICKED"
 right. `CHECK.TEXT$ = ""` draws a bare box. A non-zero `CHECK.ON` starts the box ticked.
 `CHECK.CTRL` is the control's number, and 0 when the form is already full.
 
-**The state is a flag on the control**, `GUI.CF.CHECKED` in `GUI.CTRL.FLAGS%()`, and not a variable
-of the module's. Keep `CHECK.CTRL` and test the flag after `GUI.FORM.RUN`. That is why one form
-carries several boxes where it carries only one combo.
+**The state is a flag on the control**, `GUI.CF.CHECKED` in `GUI.CTRL.FLAGS%()`. Keep `CHECK.CTRL`
+and test the flag after `GUI.FORM.RUN`. One form carries as many boxes as it has controls.
 
 | key | does |
 |---|---|
@@ -2669,11 +2918,76 @@ Any other key is offered to the buttons' marked letters.
 file, as `COMBO.INC.BL` does. A program that includes the GUI and leaves this one out stops with
 `LABEL NOT FOUND`.
 
-`GPBMODS` (§4.22) runs three boxes and a combo on one form, under DIALOG > CHECK BOX + COMBO.
+`GPBMODS` (§4.24) runs three boxes and a combo on one form, under DIALOG > CHECK BOX + COMBO.
 
-*See also: [4.22 `GPBMODS` — the harness that drives every module](#422-gpbmods--the-harness-that-drives-every-module), [4.21 `CHECK.INC.BL` — a check box, `[X]` or `[ ]`](#421-checkincbl--a-check-box-x-or), [4.11 `GUI.INC.BL` — four dialogs, in a box that puts the screen back](#411-guiincbl--four-dialogs-in-a-box-that-puts-the-screen-back), [4.17 `COMBO.INC.BL` — a drop-down list that folds into one row](#417-comboincbl--a-drop-down-list-that-folds-into-one-row)*
+*See also: [4.24 `GPBMODS` — the harness that drives every module](#424-gpbmods--the-harness-that-drives-every-module), [4.21 `CHECK.INC.BL` — a check box, `[X]` or `[ ]`](#421-checkincbl--a-check-box-x-or), 4.11 GUI.INC.BL -- the box that puts the screen back, and the form in, [4.17 `COMBO.INC.BL` — a drop-down list that folds into one row](#417-comboincbl--a-drop-down-list-that-folds-into-one-row)*
 
-### 4.22 `GPBMODS` — the harness that drives every module
+### 4.22 `MATH.INC.BL` — the smaller and the larger of two numbers
+
+| Routine | in | out |
+|---|---|---|
+| `MATH.MIN` | `MATH.FIRST` `MATH.SECOND` | `MATH.RESULT` |
+| `MATH.MAX` | `MATH.FIRST` `MATH.SECOND` | `MATH.RESULT` |
+
+```basic
+#INCLUDE "GPB.INC.BL"
+#INCLUDE "MATH.INC.BL"
+
+MATH.FIRST = WANTED : MATH.SECOND = AVAILABLE
+GOSUB MATH.MIN
+ROWS = MATH.RESULT
+```
+
+Both routines share all three variables. The verbs are `MATH.MINOF` and `MATH.MAXOF`, so the same
+answer comes back from `GP.SUB MATH.MINOF, WANTED, AVAILABLE` or from `GP.FN(MATH.MINOF, WANTED,
+AVAILABLE)` inside an expression.
+
+**`GP.FN` brings the GP block in**, 1,536 bytes. `GOSUB` and `GP.SUB` leave it out.
+
+Floats and integers both, and no range check. Equal arguments answer `MATH.FIRST`.
+
+A module rather than a keyword because choosing between two values needs a branch, and a composite
+cannot have one (§1).
+
+*See also: [1. What GP.BASIC is](#1-what-gpbasic-is), [4.22 `MATH.INC.BL` — the smaller and the larger of two numbers](#422-mathincbl--the-smaller-and-the-larger-of-two-numbers)*
+
+### 4.23 `MEM.INC.BL` — a block copied, a block filled
+
+| Routine | in | out |
+|---|---|---|
+| `MEM.COPY` | `MEM.SOURCE` `MEM.TARGET` `MEM.COUNT` | `MEM.OK` |
+| `MEM.FILL` | `MEM.TARGET` `MEM.COUNT` `MEM.VALUE` | `MEM.OK` |
+
+```basic
+#INCLUDE "GPB.INC.BL"
+#INCLUDE "MEM.INC.BL"
+
+MEM.TARGET = 4096 : MEM.COUNT = 1000 : MEM.VALUE = 32
+GOSUB MEM.FILL
+IF MEM.OK = 0 THEN PRINT "REFUSED"
+```
+
+The KERNAL's `memory_copy` and `memory_fill`. The verbs are `MEM.BLOCKCOPY` and `MEM.BLOCKFILL`, and
+the two routines share `MEM.TARGET`, `MEM.COUNT` and `MEM.OK`.
+
+`MEM.COUNT` is 1 to 65535. Anything outside that is refused and `MEM.OK` comes back 0, never
+truncated. A longer block goes a chunk at a time; a chunk size above `$4000` cannot be a `#DEFINE`,
+which is signed. `STASHVRAMGC.INC.BL` (§4.19) is the worked example.
+
+Regions may overlap with the target below the source.
+
+**WARNING: both ends are low RAM below `$9F00`, or a `$9F00-$9FFF` I/O port.** No bank survives the
+call, so `$A000-$BFFF` cannot be reached. Move a banked block a window at a time.
+
+An address in `$9F00-$9FFF` is used without being stepped. Point a VERA data port at the start of a
+run and pass `$9F23` or `$9F24` to move a whole block in one call. `STASHVRAM.INC.BL` (§4.18) does
+that by hand.
+
+Either routine brings the GP block in, 1,536 bytes, because `GP.CALL` lives there.
+
+*See also: [4.19 `STASHVRAMGC.INC.BL` — close the holes in a STASHVRAM store](#419-stashvramgcincbl--close-the-holes-in-a-stashvram-store), [4.18 `STASHVRAM.INC.BL` — rectangles and blobs, kept in VRAM](#418-stashvramincbl--rectangles-and-blobs-kept-in-vram), [4.23 `MEM.INC.BL` — a block copied, a block filled](#423-memincbl--a-block-copied-a-block-filled)*
+
+### 4.24 `GPBMODS` — the harness that drives every module
 
 `samples/GPB-MODS-TESTING/GPBMODS.BASL`. A menu bar of nine dropdowns whose rows reach nearly every
 public entry point in this section. It is the one program that holds all twenty-one modules at once, and
@@ -2688,13 +3002,13 @@ The drive is `testing/`, not the sample folder. The object is compiled SHARED an
 
 **No row is a stub.** A chosen row calls the library for real and shows what came back, on the panel
 and on the LAST line at the foot of the page. Three modules are under test before any row is chosen:
-`MENUBAR` draws the bar, `MENUVERT` every dropdown, and `STASH` puts the screen back under a closed
+`MENU` draws the bar, `MENUPULL` every dropdown, and `STASH` puts the screen back under a closed
 one.
 
 | | |
 |---|---|
-| DIALOG — **D** | `GUI` `GUI2` `COMBO` `CHECK` |
-| LISTS — **L** | `MENUBAR` `MENUVERT` |
+| DIALOG — **D** | `GUI` `GUI-DIALOGS` `COMBO` `CHECK` |
+| LISTS — **L** | `MENU` |
 | INPUT — **I** | `LINEINPUT` |
 | SCREEN — **S** | `STASH` `STASHFILE` `STASHVRAM` |
 | STRINGS — **G** | `STRINGS` `STRCASE` `STRUSING` |
@@ -2704,8 +3018,7 @@ one.
 | FILES — **F** | `FILEIO` `FILEDIR` |
 
 `APPSYS` runs at startup and at exit rather than from a row. STRINGS answers to **G** because SCREEN
-has taken S: a hotkey need not be an item's initial, and `MENUVERT.HOTATTR` tints whichever letter
-it finds.
+has taken S: a hot key need not be an item's initial, and `&` marks it, as in `" STRIN&GS "`.
 
 **Twenty-one modules are included and nineteen are driven.** `KB` and `STASHVRAMGC` are compiled
 in and have entry points — `KB.CLEARKB`, `SV.COMPACT` — that no panel calls.
@@ -2715,34 +3028,37 @@ in and have entry points — `KB.CLEARKB`, `SV.COMPACT` — that no panel calls.
 **WARNING: FILES writes to the drive.** Four of its rows do. Everything they make is named
 `GPBFILE.*` or `GPBDIR`, and the row that makes each one removes it.
 
-#### Eleven banks
+#### Thirteen banks
 
-Eight are named at compile time and claimed from `BANKMGR` (§4.13) at startup, because the compiler
-picks them while the object is written and the manager is told rather than asked. Three more are
-allocated at run time: the cells a dropdown covers, the cells a dialog covers, and `FILEDIR`'s
-directory buffer.
+Ten are named at compile time. Nine are claimed from `BANKMGR` (§4.13) at startup, because the
+compiler picks them while the object is written and the manager is told rather than asked. The
+tenth, 62, is claimed by the first `MENU.BEGIN` when the bar is built, before any bank is allocated.
+Three more are allocated at run time: the cells a dropdown covers, preset into `MENU.STASHBANK`, the
+cells a dialog covers, and `FILEDIR`'s directory buffer.
 
 | | |
 |---|---|
-| bank 4, 7,936 bytes | `MENUVERT` `MENUBAR` `LINEINPUT` `GUI` `GUI2` |
-| bank 5, 7,424 bytes | literal text, pool one |
-| bank 6, 4,608 bytes | literal text, pool two |
-| bank 7, 4,864 bytes | `APPSYS` `BANKMGR` `KB` `SORT` `STASHVRAM` `STASHVRAMGC` `STRCASE` `STRINGS` `STRUSING` |
+| bank 4, 5,632 bytes | `LINEINPUT` `GUI` `GUI-DIALOGS` |
+| bank 5, 7,936 bytes | literal text, pool one |
+| bank 6, 5,120 bytes | literal text, pool two |
+| bank 7, 5,120 bytes | `APPSYS` `BANKMGR` `KB` `SORT` `STASHVRAM` `STASHVRAMGC` `STRCASE` `STRINGS` `STRUSING` |
 | bank 8, 1,792 bytes | `FILEIO` `FILEDIR` |
 | bank 9, 768 bytes | `THEME` |
 | bank 10, 1,536 bytes | `COMBO` `CHECK` |
 | bank 11, 3,072 bytes | the two biggest dropdown handlers, this program's own code |
+| bank 12, 2,816 bytes | `MENU` `MENUPULL` |
+| bank 62, 4,352 bytes | the menu store, `MENU.TEXTS` and `MENU.HINTS` |
 
-Six of those are `GP.BANKED` code regions (§3.12) and two are `GP.BANKEDSTR` text pools (§3.10).
-All eight are in one `GPBMODS.OVL`, each behind its own bank and page-count bytes. The resident
-object is 11,523 bytes and the overlay is 32,016 -- the eight regions come to 32,000 between them
-and the sixteen header bytes are the rest.
+Seven of those are `GP.BANKED` code regions (§3.12) and three are `GP.BANKEDSTR` text pools
+(§3.10). All ten are in one `GPBMODS.OVL`, each behind its own bank and page-count bytes, with a
+one-byte end marker. `GPBMODS.PRG` is 11,542 bytes and `GPBMODS.OVL` is 38,165: the ten sections
+come to 38,144, the header bytes to 20, and the end marker is the last byte.
 
 **Only what holds a `BANK` statement stays in low RAM.** `STASH` and `STASHFILE` execute `BANK`,
 which the compiler refuses inside a region; `STASHVRAM` (§4.18) is the one to reach for from inside
 one.
 
-**Six regions and not one**, because a region holds at most 8,192 bytes and the GUI fills its own.
+**Seven regions and not one**, because a region holds at most 8,192 bytes and the GUI fills its own.
 A region may call another: the call selects the other bank and its `RETURN` puts the caller's back.
 
 **A nearly empty region still costs a whole page count.** Bank 9 holds 502 bytes of `THEME` in
@@ -2757,9 +3073,9 @@ with `GP.BSTR`. Two pools, because one pool is a hard 8,192 bytes and `BStrPoolW
 compile when one fills. Which pool a group is in costs the call site nothing, so moving a group is
 the whole of the answer to a full one.
 
-**Every menu is a block of its own**, index 0 the dropdown's title and 1 upwards the rows.
-`MENUVERT.COUNT` comes from `GP.BSTRCOUNT` and a loop reads the rows, so a row is added by adding a
-line to the block, and no other menu moves.
+**Every menu is a block of its own**, index 0 the menu's title and 1 upwards the rows. A loop to
+`GP.BSTRCOUNT` passes each row to `MENU.ITEM`, so a row is added by adding a line to the block, and
+no other menu moves.
 
 The numbers under `ABOUT / BANK MEMORY` and `ABOUT / MODULE SIZES` are typed into `GP.BANKEDSTR`
 blocks, so they are only true of the build they were taken from.
@@ -2788,25 +3104,16 @@ upstream for it, and the build copies root's over this folder's every time.
       STASH.SAVE      copy a rectangle of the screen into a RAM bank
       STASH.RESTORE   copy it back, where it was or somewhere else
 
-  For the same rectangle through a FILE see STASHFILE.INC.BL, built on this and
-  kept separate so a program wanting only the bank does not carry the disk half --
-  uncalled code stays in unless the compile removes it, and those three are 127 bytes.
+  The same rectangle through a FILE is STASHFILE.INC.BL, built on this.
 
-  A MODULE, NOT A RUNTIME KEYWORD, so it costs its bytes only in the programs that
-  ask for it: as a keyword it would be 329 bytes carried by every program that never
-  stashed anything.
-
-  YOUR PROGRAM MUST HAVE A #SYMFILE. The assembly reaches BASIC's variables through
-  {VAR} and BASLOAD crunches every name first -- STASH.VADDR% is some two-letter
-  name by then. Without it the compile stops with "{} NEEDS #SYMFILE", naming
-  the cause but not the file. Name it to match the PRG:
+  The program needs a #SYMFILE, before the includes and named after the source
+  PRG. The assembly reaches BASIC's variables through {VAR} and BASLOAD crunches
+  every name first; without one the compile stops with "{} NEEDS #SYMFILE".
 
       #SAVEAS "@:MYPROG.PRG"
       #SYMFILE "@:MYPROG.SYM"
       #INCLUDE "GPB.INC.BL"
       #INCLUDE "STASH.INC.BL"
-
-  Both directives go BEFORE the includes.
 
   Usage:
       STASH.BANK = 8
@@ -2820,32 +3127,42 @@ upstream for it, and the build copies root's over this folder's every time.
         STASH.X  STASH.Y     top left, in CELLS
         STASH.W  STASH.H     size, in cells
 
+        STASH.SLOT     byte offset into the bank. Default 0, which is what
+                       every caller that never heard of it holds
+
    out  STASH.OK       -1 if it fitted and was saved, 0 if not
+        STASH.NEXT     the offset just past what was written
 
-  RESTORE NEEDS ONLY THE BANK: four header bytes go in first -- w, h, x, y -- so the
-  rectangle describes itself and cannot be put back at the wrong size. STASH.MOVE = 1
-  with STASH.X / STASH.Y pastes it somewhere else instead.
+  RESTORE needs only the bank: four header bytes go in first -- w, h, x, y --
+  so the rectangle describes itself. STASH.MOVE = 1 with STASH.X / STASH.Y
+  pastes it somewhere else instead.
 
-  A BANK IS 8,192 BYTES AND A CELL IS TWO, so 4,094 cells fit -- 63x63, larger than
-  any dialog and NOT a whole 80x60 screen (9,600 bytes). Too big is refused before
-  the first write, with STASH.OK = 0, rather than running on into the next bank.
+  A bank is 8,192 bytes and a cell is two, so 4,094 cells fit -- 63x63, and
+  NOT a whole 80x60 screen. Too big is refused before the first write, with
+  STASH.OK = 0.
 
-  WHY THE SPLIT IS WHERE IT IS: the address of a row is worked out in BASIC, once a
-  row, and the 160 bytes are copied in assembly. That keeps the assembly free of any
-  pointer needing zero page -- and there is none to have, because a GP.ASM blob runs
-  with the interpreter live and codePtr, zTemp0, NSStatus and the mantissas must all
-  survive it. The destination goes into the OPERAND of the instruction that uses it,
-  which is the idiom samples/edit's renderers are built on.
+  MORE THAN ONE RECTANGLE IN A BANK. Feed STASH.NEXT back in as the next
+  STASH.SLOT and the bank holds a stack of them, which is what nested
+  dialogs want -- one bank for the lot rather than one bank a level. That
+  is a bump allocator in two variables, and release is LIFO by remembering
+  the offset. STASHVRAM.INC.BL allocates the same way.
 
-  EACH BLOCK IS WRAPPED IN #REM 1 / #REM 0. Without it BASLOAD's default strips the
-  body and the block reaches the compiler EMPTY, which gpasm.asm deliberately
-  refuses as "block mismatch" rather than compiling a program that quietly contains
-  none of the code. The #REM 0 after each block restores BASLOAD's default.
+  RESTORE READS THE SLOT IT IS GIVEN. Nothing checks that two saves do not
+  overlap and nothing records which is which: the header describes a
+  rectangle's SIZE, not its identity, so restoring the wrong offset
+  restores whatever is there. The offsets are the caller's to keep
+  straight, the same way the bank number already is.
 
-  The whole STASH.* name space belongs to this file.
+  A row's address is worked out in BASIC, once a row, and the row is copied in
+  assembly. That keeps the assembly free of any pointer needing zero page: a blob
+  runs with the interpreter live, so codePtr, zTemp0, NSStatus and the mantissas
+  must survive it. The destination goes into the OPERAND of the store instead.
+
+  #REM 1 is load bearing: without it BASLOAD strips the body and the block reaches
+  the compiler empty, refused as "block mismatch". #REM 0 restores the default.
 ```
 
-*See also: [STASHFILE.INC.BL -- a saved text rectangle, through a file.](#stashfileincbl----a-saved-text-rectangle-through-a-file)*
+*See also: [STASHFILE.INC.BL -- a saved text rectangle, through a file.](#stashfileincbl----a-saved-text-rectangle-through-a-file), [4.18 `STASHVRAM.INC.BL` — rectangles and blobs, kept in VRAM](#418-stashvramincbl--rectangles-and-blobs-kept-in-vram)*
 
 ### STASHFILE.INC.BL -- a saved text rectangle, through a file.
 
@@ -2857,10 +3174,9 @@ upstream for it, and the build copies root's over this folder's every time.
       STASH.FILE.LOAD   a saved file, back where it came from
       STASH.FILE.PUT    a saved file, pasted somewhere else
 
-  REQUIRES, and does not #INCLUDE for you:
+  Requires, and does not #INCLUDE for you:
       GPB.INC.BL      GP.ASM
-      STASH.INC.BL    which does the actual copying
-  and, like it, a #SYMFILE in your program. See that file's header.
+      STASH.INC.BL    which does the copying, and wants a #SYMFILE
 
   Usage:
       STASH.BANK = 8 : STASH.FILE$ = "PANEL.BIN"
@@ -2870,25 +3186,15 @@ upstream for it, and the build copies root's over this folder's every time.
       GOSUB STASH.FILE.LOAD
 
    in   STASH.FILE$    the name
-        STASH.DEV      the device. 0 means 8, the usual drive
+        STASH.DEV      the device. 0 means 8
         STASH.BANK     the bank to stage through
         and, for SAVE, the geometry STASH.SAVE wants
 
-  A SEPARATE FILE FROM STASH.INC.BL ON PURPOSE: uncalled code stays in unless the
-  compile removes it, and these three are 127 bytes. A dialog that stashes to a bank and
-  puts it back never goes near a disk and should not pay for one.
+  The four header bytes go out with the cells, so loading one back needs
+  nothing but the name.
 
-  THE FILE IS SELF-DESCRIBING BECAUSE THE STASH IS -- the four header bytes go out
-  with the cells, so loading one back needs nothing but the name. That is the flaw
-  dotBASIC admits to in its own .CUT/.PASTE, which "requires correctly
-  re-describing the width and height of each cut".
-
-  BSAVE's end address is EXCLUSIVE, so this writes the header and the cells and no
-  padding. The length is w * h * 2 + 4, which BASIC works out for itself -- which
-  is why no GP.END keyword was ever spent on telling BSAVE where a stash ended.
-
-  The STASH.FILE.* names belong to this file; the rest of STASH.* is
-  STASH.INC.BL's.
+  BSAVE's end address is EXCLUSIVE, so this writes the header and the cells
+  and no padding. The length is w * h * 2 + 4.
 ```
 
 *See also: [STASH.INC.BL -- save a text rectangle, and put it back.](#stashincbl----save-a-text-rectangle-and-put-it-back)*
@@ -2912,15 +3218,19 @@ The convention is one dotted prefix per module, and nothing writes outside its o
 | `THEME.` | `THEME.INC.BL` |
 | `APPSYS.` | `APPSYS.INC.BL` |
 | `LINEINPUT.` | `LINEINPUT.INC.BL` |
-| `MENUVERT.` | `MENUVERT.INC.BL` |
-| `MENUBAR.` | `MENUBAR.INC.BL` |
+| `MENU.` | `MENU.INC.BL`, and `MENUPULL.INC.BL`'s variables |
+| `MENUTO.` | the runners in `MENU.INC.BL` and `MENUPULL.INC.BL` |
+| `MENUPULL.` | `MENUPULL.INC.BL`'s labels |
 | `GUI.` | `GUI.INC.BL` |
-| `GUI.LISTBOX.` | `GUI2.INC.BL`, kept apart from the rest of `GUI.` |
+| `GUI.LISTBOX.` | `GUI-DIALOGS.INC.BL`, kept apart from the rest of `GUI.` |
+| `DLG.` | `GUI-DIALOGS.INC.BL`, the dialog verbs’ arguments and internals |
 | `STASH.` / `STASH.FILE.` | `STASH.INC.BL` / `STASHFILE.INC.BL` |
 | `SORT.` | `SORT.INC.BL` |
 | `STRCASE.` | `STRCASE.INC.BL` |
 | `BMX.` / `BMXK.` | `BMX.INC.BL` (variables / its KERNAL constants) |
 | `KV.` | `KV.INC.BL` |
+| `MATH.` | `MATH.INC.BL` |
+| `MEM.` | `MEM.INC.BL`, its two KERNAL constants included |
 
 Use any other prefix for your own program: `GAME.`, `MAP.`, `AIRLIFT.`. A prefix costs nothing at
 runtime — BASLOAD crunches every identifier to a short BASIC variable, so a long readable name and a
@@ -2934,8 +3244,8 @@ one library update from not being.
 `GPB.INC.BL` defines no variables. It is 27 keyword declarations and nothing else.
 
 ```basic
-GP.A = 5          ' SYNTAX ERROR — GP.A is a keyword
-X = GP.A          ' correct
+GP.A = 5 : REM SYNTAX ERROR — GP.A is a keyword
+X = GP.A : REM correct
 ```
 
 The value words are `GP.A` `GP.X` `GP.Y` `GP.C`, the registers after `GP.CALL`, and that is all of
@@ -2947,7 +3257,7 @@ The complete per-module in / out / internal register is
 [GP-BASIC.GLOBALS.md](GP-BASIC.GLOBALS.md), with a script in §6 of that file for re-checking it
 after a change.
 
-*See also: [6. The traps, collected](#6-the-traps-collected), [4.2 `STRINGS.INC.BL` — string helpers](#42-stringsincbl--string-helpers), [4.1 `THEME.INC.BL` — named colour roles](#41-themeincbl--named-colour-roles), [4.3 `APPSYS.INC.BL` — start politely, leave it as you found it](#43-appsysincbl--start-politely-leave-it-as-you-found-it), [4.4 `LINEINPUT.INC.BL` — a positioned entry field](#44-lineinputincbl--a-positioned-entry-field), [4.6 `MENUVERT.INC.BL` — a vertical menu](#46-menuvertincbl--a-vertical-menu), [4.9 `MENUBAR.INC.BL` — a horizontal menu](#49-menubarincbl--a-horizontal-menu), [4.11 `GUI.INC.BL` — four dialogs, in a box that puts the screen back](#411-guiincbl--four-dialogs-in-a-box-that-puts-the-screen-back), [4.12 `GUI2.INC.BL` — a listbox, single or multi select](#412-gui2incbl--a-listbox-single-or-multi-select), [STASH.INC.BL -- save a text rectangle, and put it back.](#stashincbl----save-a-text-rectangle-and-put-it-back), [STASHFILE.INC.BL -- a saved text rectangle, through a file.](#stashfileincbl----a-saved-text-rectangle-through-a-file), [4.7 `SORT.INC.BL` — shell sort a string array](#47-sortincbl--shell-sort-a-string-array)*
+*See also: [6. The traps, collected](#6-the-traps-collected), [4.2 `STRINGS.INC.BL` — string helpers](#42-stringsincbl--string-helpers), [4.1 `THEME.INC.BL` — named colour roles](#41-themeincbl--named-colour-roles), [4.3 `APPSYS.INC.BL` — start politely, leave it as you found it](#43-appsysincbl--start-politely-leave-it-as-you-found-it), [4.4 `LINEINPUT.INC.BL` — a positioned entry field](#44-lineinputincbl--a-positioned-entry-field), [4.6 `MENU.INC.BL` — menus built a row at a time](#46-menuincbl--menus-built-a-row-at-a-time), [4.9 `MENUPULL.INC.BL` — a dropdown under a bar item](#49-menupullincbl--a-dropdown-under-a-bar-item), 4.11 GUI.INC.BL -- the box that puts the screen back, and the form in, [4.12 `GUI-DIALOGS.INC.BL` — every dialog as a verb](#412-gui-dialogsincbl--every-dialog-as-a-verb), [STASH.INC.BL -- save a text rectangle, and put it back.](#stashincbl----save-a-text-rectangle-and-put-it-back), [STASHFILE.INC.BL -- a saved text rectangle, through a file.](#stashfileincbl----a-saved-text-rectangle-through-a-file), [4.7 `SORT.INC.BL` — shell sort a string array](#47-sortincbl--shell-sort-a-string-array)*
 
 ### 1. The prefixes that are taken
 
@@ -2960,10 +3270,12 @@ after a change.
 | `APPSYS.` | `APPSYS.INC.BL` | screen save/restore, panels to disk |
 | `LINEINPUT.` | `LINEINPUT.INC.BL` | entry fields |
 | `KB.` | `KB.INC.BL` | the keyboard drain |
-| `MENUVERT.` | `MENUVERT.INC.BL` | vertical menus |
-| `MENUBAR.` | `MENUBAR.INC.BL` | the other axis — a horizontal menu bar |
-| `GUI.` | `GUI.INC.BL` | the dialogs, the box they sit in, and the form that runs them |
-| `GUI.LISTBOX.` | `GUI2.INC.BL` | the listbox dialog, kept apart from the rest of `GUI.` |
+| `MENU.` | `MENU.INC.BL` | menus: the row store, the popup and the bar. `MENUPULL.INC.BL`'s variables too |
+| `MENUTO.` | `MENU.INC.BL` `MENUPULL.INC.BL` | the runners, called with `GP.FN` |
+| `MENUPULL.` | `MENUPULL.INC.BL` | a dropdown under a bar item: labels and one constant |
+| `GUI.` | `GUI.INC.BL` | the box the dialogs sit in, and the form and controls inside it |
+| `GUI.LISTBOX.` | `GUI-DIALOGS.INC.BL` | the listbox dialog’s answer, kept apart from the rest of `GUI.` |
+| `DLG.` | `GUI-DIALOGS.INC.BL` | the dialog verbs: their arguments, and their internals |
 | `STASH.` | `STASH.INC.BL` | a text rectangle into a RAM bank, and back |
 | `STASH.FILE.` | `STASHFILE.INC.BL` | the same rectangle through a file, kept apart from the rest of `STASH.` |
 | `SORT.` | `SORT.INC.BL` | shell sort a string array in place |
@@ -2974,6 +3286,8 @@ after a change.
 | `FILE.DIR.` | `FILEDIR.INC.BL` | reading a directory, kept apart from the rest of `FILE.` |
 | `SV.` | `STASHVRAM.INC.BL` | the VRAM store. `SVGC.` is `STASHVRAMGC.INC.BL`'s one constant |
 | `KV.` | `KV.INC.BL` | keys and values in one RAM bank |
+| `MATH.` | `MATH.INC.BL` | the smaller and the larger of two numbers |
+| `MEM.` | `MEM.INC.BL` | a block copied, a block filled, and the two KERNAL constants |
 
 Pick anything else for your own program. `AIRLIFT.`, `GAME.`, `MAP.` — a prefix costs nothing at
 runtime because BASLOAD crunches every identifier down to a short BASIC variable, so a long
@@ -2982,7 +3296,7 @@ readable name and a two-letter one compile to exactly the same thing.
 Do not reuse a taken prefix for a name the module has not defined. `THEME.MINE` looks
 free today; it is one library update away from not being.
 
-*See also: [2. Using it](#2-using-it), [4.2 `STRINGS.INC.BL` — string helpers](#42-stringsincbl--string-helpers), [4.10 `STRUSING.INC.BL` — a number to a template](#410-strusingincbl--a-number-to-a-template), [4.1 `THEME.INC.BL` — named colour roles](#41-themeincbl--named-colour-roles), [4.3 `APPSYS.INC.BL` — start politely, leave it as you found it](#43-appsysincbl--start-politely-leave-it-as-you-found-it), [4.4 `LINEINPUT.INC.BL` — a positioned entry field](#44-lineinputincbl--a-positioned-entry-field), [4.14 `KB.INC.BL` — the keyboard buffer, emptied](#414-kbincbl--the-keyboard-buffer-emptied), [4.6 `MENUVERT.INC.BL` — a vertical menu](#46-menuvertincbl--a-vertical-menu), [4.9 `MENUBAR.INC.BL` — a horizontal menu](#49-menubarincbl--a-horizontal-menu), [4.11 `GUI.INC.BL` — four dialogs, in a box that puts the screen back](#411-guiincbl--four-dialogs-in-a-box-that-puts-the-screen-back), [4.12 `GUI2.INC.BL` — a listbox, single or multi select](#412-gui2incbl--a-listbox-single-or-multi-select), [STASH.INC.BL -- save a text rectangle, and put it back.](#stashincbl----save-a-text-rectangle-and-put-it-back)*
+*See also: [2. Using it](#2-using-it), [4.2 `STRINGS.INC.BL` — string helpers](#42-stringsincbl--string-helpers), [4.10 `STRUSING.INC.BL` — a number to a template](#410-strusingincbl--a-number-to-a-template), [4.1 `THEME.INC.BL` — named colour roles](#41-themeincbl--named-colour-roles), [4.3 `APPSYS.INC.BL` — start politely, leave it as you found it](#43-appsysincbl--start-politely-leave-it-as-you-found-it), [4.4 `LINEINPUT.INC.BL` — a positioned entry field](#44-lineinputincbl--a-positioned-entry-field), [4.14 `KB.INC.BL` — the keyboard buffer, emptied](#414-kbincbl--the-keyboard-buffer-emptied), [4.6 `MENU.INC.BL` — menus built a row at a time](#46-menuincbl--menus-built-a-row-at-a-time), [4.9 `MENUPULL.INC.BL` — a dropdown under a bar item](#49-menupullincbl--a-dropdown-under-a-bar-item), 4.11 GUI.INC.BL -- the box that puts the screen back, and the form in, [4.12 `GUI-DIALOGS.INC.BL` — every dialog as a verb](#412-gui-dialogsincbl--every-dialog-as-a-verb), [STASH.INC.BL -- save a text rectangle, and put it back.](#stashincbl----save-a-text-rectangle-and-put-it-back)*
 
 ### 2. `GP.*` is keywords, not variables — and the difference bites
 
@@ -3006,28 +3320,36 @@ The full keyword list lives in `GPC-BASIC/GPB.INC.BL`.
 Each table is **in** (set before the `GOSUB`), **out** (read after it), and **internal** (do not
 read, do not write, do not rely on).
 
-#### `THEME.INC.BL`
+#### `THEME.INC.BL` — named colour roles
+
+Routines, arguments and examples: §4.1.
 
 | | |
 |---|---|
-| in | `THEME.ID` — 0 x16, 1 dark, 2 light, 3 gray, 4 custom, read by `THEME.SELECT`<br>`THEME.ATTR` — a packed attribute, for `THEME.SET` and `THEME.HI` |
-| out | `THEME.CLR(role)` — the colour array, `DIM`med to `THEME.SLOTS`<br>`THEME.INV` — the inverse attribute, from `THEME.HI` |
-| internal | `THEME.READY` |
-| constants | `THEME.PAGE` `THEME.TEXT` `THEME.TITLE` `THEME.BORDER` `THEME.HILITE` `THEME.DIMMED` `THEME.WARN` `THEME.FOCUS` `THEME.SLOTS` `THEME.COUNT` |
+| in | `THEME.ID%` — 0 x16, 1 dark, 2 light, 3 gray, 4 custom, read by `THEME.SELECT`<br>`THEME.ATTR%` — a packed attribute, for `THEME.SET` and `THEME.HI` |
+| out | `THEME.CLR(role)` — the colour array, `DIM`med to `THEME.SLOTS - 1`<br>`THEME.INV%` — the inverse attribute, from `THEME.HI` |
+| internal | `THEME.READY%` `THEME.FIRST%` |
+| constants | `THEME.PAGE` `THEME.TEXT` `THEME.TITLE` `THEME.BORDER` `THEME.HILITE` `THEME.DIMMED` `THEME.WARN` `THEME.FOCUS` `THEME.BAR` `THEME.SHADOW` `THEME.SLOTS` `THEME.COUNT` |
+
+To use it: set `THEME.ID%`, `GOSUB THEME.SELECT`, then index `THEME.CLR()` with a role wherever a
+drawing routine wants an attribute. §4.1 is the module's own entry, with the five themes and the
+other four routines.
+
+```basic
+THEME.ID% = 1 : GOSUB THEME.SELECT
+GP.PRINTAT 2, 2, "READY", THEME.CLR(THEME.TEXT)
+```
 
 `THEME.CLR` is the array this module `DIM`s. Do not `DIM` it yourself — the module owns it, and
 `DIM`ming an array GPC has already dimensioned is an error.
 
-**The routine is `THEME.SELECT`, and it used to be `THEME.LOAD`.** The name changed when the
-library was split into banked and low-memory files, and it stayed when they were merged again; a
-program written against the older library calls `THEME.LOAD` and stops with `LABEL NOT FOUND`,
-which is the good kind of failure.
+`THEME.FOCUS` is the eighth role: the attribute a focused control wears while `GUI.FORM` has the
+keyboard. `THEME.BAR` and `THEME.SHADOW` are the ninth and tenth, so `THEME.SLOTS` is 10, and
+`THEME.COUNT` stays 5 — the first is how many roles there are, the second how many themes.
 
-`THEME.FOCUS` is the eighth role and the newest: the attribute a focused control wears while
-`GUI.FORM` has the keyboard. `THEME.SLOTS` is 8 because of it, and `THEME.COUNT` stays 5 — the
-first is how many roles there are, the second how many themes.
+#### `APPSYS.INC.BL` — start politely, leave it as you found it
 
-#### `APPSYS.INC.BL`
+Routines, arguments and examples: §4.3.
 
 | | |
 |---|---|
@@ -3039,7 +3361,9 @@ first is how many roles there are, the second how many themes.
 Lay the screen out from `APPSYS.COLS` and `APPSYS.ROWS`. Do not assume 80x60 —
 the X16 boots there but `SCREEN 0` is 40×30, and someone who prefers larger text is running one.
 
-#### `STRINGS.INC.BL`
+#### `STRINGS.INC.BL` — string helpers
+
+Routines, arguments and examples: §4.2.
 
 | | |
 |---|---|
@@ -3053,7 +3377,9 @@ the X16 boots there but `SCREEN 0` is 40×30, and someone who prefers larger tex
 one or the other. This is the opposite of `THEME.CLR`, which the module owns outright; the two are
 worth keeping straight.
 
-#### `STRUSING.INC.BL`
+#### `STRUSING.INC.BL` — a number to a template
+
+Routines, arguments and examples: §4.10.
 
 | | |
 |---|---|
@@ -3073,7 +3399,9 @@ The prefix is `STR.USING.`, a sub-prefix of `STRINGS.INC.BL`'s `STR.`, on the sa
 `FILE.DIR.` inside `FILE.`. Nothing here is written by `STRINGS.INC.BL` and nothing there is
 written by this module, so either can be included alone.
 
-#### `KB.INC.BL`
+#### `KB.INC.BL` — the keyboard buffer, emptied
+
+Routines, arguments and examples: §4.14.
 
 | | |
 |---|---|
@@ -3082,7 +3410,9 @@ written by this module, so either can be included alone.
 
 One routine, `KB.CLEARKB`, and one variable it drains into. Nothing else is in the prefix.
 
-#### `LINEINPUT.INC.BL`
+#### `LINEINPUT.INC.BL` — a positioned entry field
+
+Routines, arguments and examples: §4.4.
 
 | | |
 |---|---|
@@ -3095,7 +3425,9 @@ One routine, `KB.CLEARKB`, and one variable it drains into. Nothing else is in t
 *displayed*, which is what you want if you are repainting a masked field yourself. `FORM.EXP.BL`
 uses it for exactly that.
 
-#### `BMX.INC.BL`
+#### `BMX.INC.BL` — a BMX bitmap into VERA
+
+Routines, arguments and examples: §4.5.
 
 | | |
 |---|---|
@@ -3114,7 +3446,9 @@ first
 rather than `0` switches the stash off: `0` already means "never set". `BMX.KEPT` is the once-per-run
 guard that makes a slideshow restore the *machine's* palette rather than the previous picture's.
 
-#### `FILEIO.INC.BL`
+#### `FILEIO.INC.BL` — the drive: status, files, directories
+
+Routines, arguments and examples: §4.15.
 
 Needs a `#SYMFILE` — `FILE.TOPET` is a `GP.ASM` blob.
 
@@ -3128,10 +3462,12 @@ Needs a `#SYMFILE` — `FILE.TOPET` is a `GP.ASM` blob.
 **This module is the missing `DS` and `DS$`.** `FILE.ERR` is `DS` and `FILE.MSG$` is `DS$`. `ST` is
 *not* a disk status — it is the KERNAL's serial bus status and cannot report `FILE NOT FOUND`.
 
-`FILE.ROWS` is both an input and an output, the way `MENUVERT.SEL` is. `FILE.LINE$()` is the caller's
-`DIM`, like `MENUVERT.ITEM$` and unlike `THEME.CLR`.
+`FILE.ROWS` is both an input and an output, the way `KV.SLOT` is. `FILE.LINE$()` is the caller's
+`DIM`, like `GUI.LIST.ITEM$` and unlike `THEME.CLR`.
 
-#### `FILEDIR.INC.BL`
+#### `FILEDIR.INC.BL` — a directory, into a bank or into low RAM
+
+Routines, arguments and examples: §4.16.
 
 Needs `FILEIO.INC.BL`, and a `#SYMFILE` — it is two `GP.ASM` blobs.
 
@@ -3155,7 +3491,9 @@ assembly to write into, and creates every `{VAR}` slot. **Do not assign `FILE.NA
 `FILE.NAME$` is shared with `FILEIO` on purpose: the name a picker chose is the name `FILE.EXISTS`
 and `FILE.DELETE` want.
 
-#### `STASHVRAM.INC.BL`
+#### `STASHVRAM.INC.BL` — rectangles and blobs, kept in VRAM
+
+Routines, arguments and examples: §4.18.
 
 Needs `GPB.INC.BL`, and **no `#SYMFILE`** — there is no `GP.ASM` in it. The cells never leave
 VRAM: one data port reads, the other writes, and `memory_copy` moves between them without
@@ -3180,7 +3518,9 @@ That is the difference from `STASH.INC.BL`, which cannot.
 **WARNING: `BMX.STASH` defaults to `$13000`, inside the default window.** A program using both
 must move one of them. There is one allocator and no collision check.
 
-#### `KV.INC.BL`
+#### `KV.INC.BL` — keys and values in one RAM bank
+
+Routines, arguments and examples: §4.20.
 
 Plain BASL: no `GP.*` keyword and no `GP.ASM`, so it needs neither `GPB.INC.BL` nor a `#SYMFILE`.
 
@@ -3194,50 +3534,47 @@ Plain BASL: no `GP.*` keyword and no `GP.ASM`, so it needs neither `GPB.INC.BL` 
 `KV.SLOT` is both an input and an output, the way `FILE.ROWS` is. `KV.AT` writes `KV.KEY$`, so a loop
 over the slots keeps its own key in a variable of its own.
 
-#### `MENUVERT.INC.BL`
+#### `MENU.INC.BL` — menus built a row at a time
+
+Routines, arguments and examples: §4.6.
 
 | | |
 |---|---|
-| in | `MENUVERT.X` `MENUVERT.Y` — top left of the first row<br>`MENUVERT.WIDTH` — cells wide, which is the width of the highlight<br>`MENUVERT.COUNT` — how many rows<br>`MENUVERT.ITEM$()` — the rows, 1..COUNT; **the caller owns the `DIM`**<br>`MENUVERT.ATTR` — packed attribute<br>`MENUVERT.HIATTR` — the highlighted row; 0 inverts `MENUVERT.ATTR`<br>`MENUVERT.HOT$` — one hotkey character a row<br>`MENUVERT.HOTATTR` — tint for the hotkey letter; 0 is off<br>`MENUVERT.FLAGS` — added together<br>`MENUVERT.SEL` — the row to start on |
-| out | `MENUVERT.SEL` — 1..COUNT, or 0 if cancelled<br>`MENUVERT.KEY` — the key that ended it |
-| internal | `MENUVERT.SCAN` `MENUVERT.EACH` `MENUVERT.DONE` `MENUVERT.CODE` `MENUVERT.INCHAR$` `MENUVERT.PREVSEL` `MENUVERT.HIGHLIGHT` `MENUVERT.DRAWROW` `MENUVERT.DRAWATTR` `MENUVERT.DRAWTEXT$` `MENUVERT.DRAWY` `MENUVERT.HOTCODE` `MENUVERT.HOTLAST` `MENUVERT.WANTCODE` `MENUVERT.HOTAT` `MENUVERT.HOTWANT` `MENUVERT.HOTHERE` `MENUVERT.HOTSCAN` `MENUVERT.PADNOW` `MENUVERT.PADNEW` `MENUVERT.PADHELD` `MENUVERT.PADRAW` |
-| constants | `MENUVERT.MUSTSEL` `MENUVERT.KEEPMARK` `MENUVERT.NOWRAP` `MENUVERT.GAMEPAD` `MENUVERT.UP` `MENUVERT.DOWN` `MENUVERT.ENTER` `MENUVERT.ESCAPE` `MENUVERT.STOP` `MENUVERT.SPACE` `MENUVERT.PORT` `MENUVERT.PAD.UP` `MENUVERT.PAD.DOWN` `MENUVERT.PAD.B` `MENUVERT.PAD.START` |
+| verbs | `MENU.BEGIN` `MENU.ITEM` `MENU.ITEMX` `MENU.SELECTED` `MENU.DRAWBAR`, called with `GP.SUB`<br>`MENUTO.VERT` `MENUTO.BAR`, called with `GP.FN` |
+| in | `MENU.ATTR` — the rows, packed attribute<br>`MENU.HIATTR` — the highlighted row; 0 inverts `MENU.ATTR`<br>`MENU.HOTATTR` — the hot key letter; 0 leaves it untinted<br>`MENU.DISATTR` — a disabled row; 0 is `MENU.ATTR`<br>`MENU.SEPATTR` — separators and the frame; 0 is `MENU.ATTR`<br>`MENU.SEPCHR` — the separator glyph; 0 is `MENU.LINE`<br>`MENU.FLAGS` — the popup's flags<br>`MENU.BARFLAGS` — the bar's flags<br>`MENU.GAP` — cells between bar items<br>`MENU.HINTX` `MENU.HINTY` `MENU.HINTW` `MENU.HINTATTR` — the hint field; `MENU.HINTW` 0 is off<br>`MENU.MARKED` — the bar item `MENU.DRAWBAR` lights |
+| out | `MENU.EXITKEY` — the key that ended the run<br>`MENU.BARNUM` — the bar's row count<br>`MENU.SELX` `MENU.SELW` — the chosen bar item's column and width<br>`MENU.MARKED` — the bar item left lit<br>`MENU.OK` — 0 if bank `MENU.TEXTBANK` was already claimed |
+| formals | `MENU.SLOT` `MENU.SEL` `MENU.ROWTEXT$` `MENU.ROWHINT$` `MENU.ROWON` `MENU.RUNROW` `MENU.RUNCOL` `MENU.STYLE` `MENU.CHOSEN` |
+| arrays | `MENU.FLAG$()` `MENU.HOTKEY$()` `MENU.HOTCOL$()` — `DIM`med by the module on the first `MENU.BEGIN` |
+| banked groups | `MENU.TEXTS` `MENU.HINTS`, in `MENU.INC.BANKED.BL` |
+| internal | `MENU.ATCOL` `MENU.ATROW` `MENU.BARX` `MENU.BARY` `MENU.BASE` `MENU.BOXH` `MENU.BOXW` `MENU.CAP` `MENU.CODE` `MENU.COUNT` `MENU.CUR` `MENU.DONE` `MENU.DRAWN` `MENU.DRAWX` `MENU.DRAWY` `MENU.EACH` `MENU.EXITBIT` `MENU.FRAME` `MENU.GLYPH` `MENU.HAVE` `MENU.HILITE` `MENU.HINTAT` `MENU.HOTAT` `MENU.HOTCH$` `MENU.HOTHIT` `MENU.INKEY$` `MENU.LEFTW` `MENU.MOVE` `MENU.PADHELD` `MENU.PADNEW` `MENU.PADNOW` `MENU.PADRAW` `MENU.PAINT` `MENU.READY` `MENU.ROW` `MENU.ROWFLAG$` `MENU.ROWIS$` `MENU.ROWW` `MENU.RUNBASE` `MENU.RUNFLAGS` `MENU.RUNSLOT` `MENU.SCAN` `MENU.SHOW$` `MENU.SKIPS` `MENU.SPAN` `MENU.STEP` `MENU.TEXTW` `MENU.TINTAT` `MENU.USE` `MENU.WANT` `MENU.WAS` `MENU.WIDE` |
+| constants | `MENU.TEXTBANK` `MENU.BAR` `MENU.POPUP` `MENU.BAR.MAX` `MENU.POPUP.MAX` `MENU.ON` `MENU.OFF`<br>`MENU.SOLID` `MENU.THIN` `MENU.ROUND` `MENU.THICK` `MENU.NOBOX`<br>`MENU.MUSTSEL` `MENU.KEEPMARK` `MENU.NOWRAP` `MENU.GAMEPAD` `MENU.DOWNEXIT` `MENU.UPEXIT` `MENU.KEYEXIT` `MENU.HINTMID`<br>`MENU.DOWN` `MENU.UP` `MENU.LEFT` `MENU.RIGHT` `MENU.ENTER` `MENU.ESC` `MENU.STOP` `MENU.LINE`<br>`MENU.PORT` `MENU.PAD.UP` `MENU.PAD.DOWN` `MENU.PAD.LEFT` `MENU.PAD.RIGHT` `MENU.PAD.B` `MENU.PAD.START` |
 
-`MENUVERT.SEL` is both an input and an output: the row to start on going in, and the row
-chosen coming out, so a menu reopened without clearing it reopens where it was. That is usually what
-you want; set it to 0 when it is not.
+The formals are the verbs' arguments. `GP.DEFPROC` formals are ordinary shared variables (§3.11), so a formal holds the last value passed until the next call.
 
-`MENUVERT.DRAWROW`, `MENUVERT.DRAWATTR` and `MENUVERT.DRAWTEXT$` are listed internal but are the
-documented arguments to `MENUVERT.ROW`, which is public: they are internal to `MENUVERT.RUN`, not to
-you. `MENUVERT.HOTFIND` reads the first two and answers in `MENUVERT.HOTAT`.
+`GUI.INC.BL` sets `MENU.RUNSLOT`, reads `MENU.READY`, `MENU.COUNT` and `MENU.WIDE`, and calls
+`MENU.MEASURE`. A program of your own should not.
 
-#### `MENUBAR.INC.BL`
+#### `MENUPULL.INC.BL` — a dropdown under a bar item
 
-| | |
-|---|---|
-| in | `MENUBAR.X` `MENUBAR.Y` — where the bar starts<br>`MENUBAR.GAP` — cells BETWEEN items. 0 is the default, because the air belongs in the item text<br>`MENUBAR.FLAGS` — added together<br>`MENUBAR.SEL` — the item to start on; 0 starts at 1<br>**and `MENUVERT.COUNT`, `MENUVERT.ITEM$()`, `MENUVERT.ATTR`, `MENUVERT.HIATTR`, `MENUVERT.HOT$`, `MENUVERT.HOTATTR`** |
-| out | `MENUBAR.SEL` — 1..COUNT, or 0 if cancelled<br>`MENUBAR.KEY` — 13 chose, 27 cancelled, 17 or 145 on a cross-axis exit, or the hotkey itself<br>`MENUBAR.SELX` `MENUBAR.SELW` — the column the chosen item starts at and how wide it is, so a caller can drop a panel under it<br>`MENUBAR.AT` `MENUBAR.WIDE` — the same two for whichever item `MENUBAR.FIND` named, from `MENUBAR.WHERE` |
-| internal | `MENUBAR.CI` `MENUBAR.CODE` `MENUBAR.DRAWN` `MENUBAR.EACH` `MENUBAR.FIND` `MENUBAR.HC` `MENUBAR.HIT` `MENUBAR.HK` `MENUBAR.IN$` `MENUBAR.PAD` `MENUBAR.PAINT` `MENUBAR.WANT` `MENUBAR.WAS` |
-| constants | `MENUBAR.MUSTSEL` `MENUBAR.KEEPMARK` `MENUBAR.NOWRAP` `MENUBAR.GAMEPAD` `MENUBAR.DOWNEXIT` `MENUBAR.UPEXIT` `MENUBAR.LEFT` `MENUBAR.RIGHT` `MENUBAR.UP` `MENUBAR.DOWN` `MENUBAR.ENTER` `MENUBAR.ESCAPE` `MENUBAR.STOP` `MENUBAR.PORT` `MENUBAR.PAD.LEFT` `MENUBAR.PAD.RIGHT` `MENUBAR.PAD.B` `MENUBAR.PAD.START` |
-
-**It has no items array, no attributes and no hotkeys of its own — it reads `MENUVERT`'s.** A bar
-and a dropdown are one thing to the user, so the two modules share the whole of that half of the
-interface, and the caller refills `MENUVERT.ITEM$()` between drawing the bar and opening the menu
-under it. Nothing else in the library reaches across a prefix like this, and `MENUBAR.INC.BL`
-therefore does not build without `MENUVERT.INC.BL`.
-
-**There is no `MENUBAR.WIDTH`.** An item is as wide as its own text, which is the difference from
-a vertical menu.
-
-`MENUBAR.DOWNEXIT` and `MENUBAR.UPEXIT` are the cross-axis exits: they end the bar on a key rather
-than swallowing it, so the caller can open the dropdown and hand control on. `MENUVERT`'s
-`MENUHELP.KEYEXIT` is the other half of the same handshake.
-
-#### `GUI.INC.BL`
+Routines, arguments and examples: §4.9. Its variables use the `MENU.` prefix; `MENUPULL.` is its
+labels and one constant.
 
 | | |
 |---|---|
-| in | `GUI.MSG$` `GUI.MSG2$` `GUI.MSG3$` — up to three message lines. `""` for none, and no gap left behind<br>`GUI.TITLE$` — a name in the top edge<br>`GUI.BANK` — a spare RAM bank for the covered cells. 0 does not save<br>`GUI.STYLE` — `GP.BOX` style 0..3<br>`GUI.PANEL.IN` `GUI.BORDER.IN` — attributes. 0 takes `THEME.TEXT` and `THEME.BORDER`<br>`GUI.GLYPH` — non-zero frames from `GUI.EDGE.H` `GUI.EDGE.V` `GUI.CORNER.TL` `.TR` `.BL` `.BR`<br>`GUI.PLACE` `GUI.X` `GUI.Y` `GUI.ROW.OFFSET` — where the box goes<br>`GUI.SHADOW` `GUI.SHADOW.ATTR` — the drop shadow<br>`GUI.BTN.ONE$` `GUI.BTN.TWO$` — the button labels, `&` marking the accelerator<br>`GUI.DEFAULT` — which button is the default. 2 is the second, anything else the first<br>`GUI.COUNT` `GUI.SEL` `GUI.FLAGS` — `GUI.MENU`, over `MENUVERT.ITEM$()`<br>`GUI.LEN` `GUI.TEXT$` `GUI.MASK` — `GUI.INPUT`<br>`GUI.BODY.ROWS` `GUI.BODY.WIDTH` — `GUI.OPEN`, when you call it yourself |
+| verbs | `MENUTO.PULLDOWN`, called with `GP.FN` |
+| in | `MENU.STASHBANK` — the bank the covered cells go to; 0 takes one from `BANKMGR` on the first call |
+| out | `MENU.NEXTBAR` — the bar item LEFT or RIGHT walks to, or 0<br>`MENU.EXITKEY` `MENU.BARNUM` `MENU.SELX` `MENU.SELW` `MENU.MARKED`, as for `MENU.INC.BL` |
+| formals | `MENU.PULLAT` `MENU.STYLE` `MENU.CHOSEN` |
+| internal | `MENU.COLS` `MENU.EDGE` `MENU.LEFTOF` `MENU.RIGHTOF` `MENU.STASHED`, and `STASH.BANK` `STASH.SLOT` `STASH.MOVE` `STASH.X` `STASH.Y` `STASH.W` `STASH.H`, which it sets |
+| constants | `MENUPULL.SCRMODE` |
+
+#### `GUI.INC.BL` — four dialogs, in a box that puts the screen back
+
+Routines, arguments and examples: §4.11.
+
+| | |
+|---|---|
+| in | `GUI.MSG$` `GUI.MSG2$` `GUI.MSG3$` — up to three message lines. `""` for none, and no gap left behind<br>`GUI.TITLE$` — a name in the top edge<br>`GUI.BANK` — a spare RAM bank for the covered cells. 0 does not save<br>`GUI.STYLE` — `GP.BOX` style 0..3<br>`GUI.PANEL.IN` `GUI.BORDER.IN` — attributes. 0 takes `THEME.TEXT` and `THEME.BORDER`<br>`GUI.GLYPH` — non-zero frames from `GUI.EDGE.H` `GUI.EDGE.V` `GUI.CORNER.TL` `.TR` `.BL` `.BR`<br>`GUI.PLACE` `GUI.X` `GUI.Y` `GUI.ROW.OFFSET` — where the box goes<br>`GUI.SHADOW` `GUI.SHADOW.ATTR` — the drop shadow<br>`GUI.BTN.ONE$` `GUI.BTN.TWO$` — the button labels, `&` marking the accelerator<br>`GUI.DEFAULT` — which button is the default. 2 is the second, anything else the first<br>`GUI.FLAGS` — `GUI.MENU`, over the popup slot of `MENU.INC.BL`<br>`GUI.LEN` `GUI.TEXT$` `GUI.MASK` — `GUI.INPUT`<br>`GUI.BODY.ROWS` `GUI.BODY.WIDTH` — `GUI.OPEN`, when you call it yourself |
 | out | `GUI.KEY` — the key that ended it, whichever call<br>`GUI.ANSWER` — `GUI.YN`<br>`GUI.OK` — `GUI.INPUT`: -1 accepted, 0 cancelled<br>`GUI.TEXT$` — what was typed<br>`GUI.SEL` — the row chosen, or 0<br>`GUI.STASHED` — -1 if the covered cells were saved<br>`GUI.LEFT` `GUI.TOP` `GUI.WIDTH` `GUI.HEIGHT` — where the box went<br>`GUI.INNER.LEFT` `GUI.INNER.TOP` `GUI.INNER.WIDTH` — the usable area, from `GUI.OPEN`<br>`GUI.PANEL` `GUI.BORDER` — the attributes it settled on |
 | internal | `GUI.ADD.W` `GUI.BOTTOM` `GUI.BOX.STYLE` `GUI.CLR.K$` `GUI.FIELD.LEFT` `GUI.GAP.ROWS` `GUI.GLYPH$` `GUI.HEAD.ROWS` `GUI.INDEX` `GUI.MOVE.BY` `GUI.MOVE.TRIES` `GUI.MOVE.WAS` `GUI.OKCANCEL` `GUI.PAINT.N` `GUI.PRESSED$` `GUI.RIGHT` `GUI.SAVE.W` `GUI.SAVE.H` `GUI.SCAN` `GUI.SCREEN.COLS` `GUI.SCREEN.ROWS` `GUI.SH.BW` `GUI.SH.W` `GUI.SH.H` `GUI.STEP.TYPE` `GUI.TITLE.LEFT` `GUI.WAS$`<br>the button row: `GUI.BTN.AMP` `.AT` `.ATTR` `.DEF` `.FOCUSED` `.HEAD$` `.HI` `.KEY` `.KEY.ONE` `.KEY.TWO` `.LC` `.MARK$` `.OF` `.RIGHT` `.TAIL$` `.TEXT$` `.TOTAL` `.UC` `.W.ONE` `.W.TWO` `.WIDE` `.X` `.Y`<br>the form: `GUI.CTRL.TYPE%` `.X%` `.Y%` `.W%` `.FLAGS%` `.KEY%` `GUI.CTRL.TEXT$` `GUI.CTRL.N` `GUI.FOCUS` `GUI.FORM.DIMMED` `.DONE` `.HIT` `.KEY` `.NAV`<br>the list control: `GUI.LIST.ATTR` `.COUNT` `.DIGITS` `.EACH` `.EDGE$` `.HI` `.I` `.MARKED` `.MARKP` `.MARKY` `.NOTE$` `.NOTE.LEFT` `.NOTEW` `.NUM$` `.ROW` `.ROWS` `.SEL` `.W` `.WAS` `.WAS.SCROLL` `.X` `.Y` |
 | constants | `GUI.SCRMODE` `GUI.LINEBOX` `GUI.MAXCELLS` `GUI.PADX` `GUI.PADY` `GUI.ESCAPE` `GUI.STOP` `GUI.RETURN` `GUI.SPACE` `GUI.BTN.GAP` `GUI.FORM.MAX`<br>`GUI.CT.BUTTON` `GUI.CT.FIELD` `GUI.CT.LIST` — what a control is<br>`GUI.CF.DEFAULT` `GUI.CF.NOFOCUS` — what is true of it<br>`GUI.NAV.STAY` `.NEXT` `.PREV` `.PRESS` `.DEFAULT` `.CANCEL` — the six verdicts<br>`GUI.K.TAB` `GUI.K.SHTAB` `GUI.K.DOWN` `GUI.K.UP` `GUI.K.RIGHT` `GUI.K.LEFT` |
@@ -3265,23 +3602,34 @@ the one rename here that fails silently.
 `GUI.CTRL.*` are the seven parallel arrays that are the control block: one element a control, up to
 `GUI.FORM.MAX`. `GUI.INC.BL` `DIM`s them. Do not `DIM` them yourself.
 
-#### `GUI2.INC.BL`
+#### `GUI-DIALOGS.INC.BL` — every dialog as a verb
+
+Routines, arguments and examples: §4.12.
+
+`MSGBOX`, `ASKYN`, `ASKOK`, `ASKTEXT`, `INPUTBOX`, `PICKMENU`, `LISTBOX` and `LISTBOXM` are the
+dialogs, each with an `EX` form that also takes the title and the second and third lines.
+`LIST.BEGIN`, `LIST.ARRAY`, `LIST.BANK`, `LISTTO.RUN`, `LIST.ITEM` and `LIST.SORT` build a list box
+a step at a time; `PANELOPEN`, `PANELCLOSE` and the `FORM.` verbs do the same for a form.
+`DLGRESET`, `DLGSHADOW`, `DLGSHADOWCLR`, `DLGSTYLE` and `DLGGLYPH` set what every dialog starts
+from, and `KBCLEAR` throws away what is already typed.
 
 | | |
 |---|---|
-| in | `GUI.LISTBOX.COUNT` — how many items. 0 or less returns cancelled<br>`MENUVERT.ITEM$()` — the items, 1..COUNT, and **the caller owns the `DIM`**<br>`GUI.LISTBOX.ROWS` — rows visible at once. 0 takes 10, then cut to COUNT and to the screen<br>`GUI.LISTBOX.MULTI` — 0 chooses one row, 1 marks a set with SPACE<br>`GUI.LISTBOX.MARKS$` — multi only, **in as well as out**: COUNT characters, `"1"` marked. Any other length, `""` included, starts with none<br>`GUI.LISTBOX.SEL` — the item to start on. 0 starts at 1<br>plus everything `GUI.OPEN` reads |
-| out | `GUI.LISTBOX.SEL` — the item under the highlight, or 0 if cancelled<br>`GUI.LISTBOX.MARKS$` — multi only: which are marked<br>`GUI.LISTBOX.MARKED` — multi only: how many<br>`GUI.KEY` — 13 accepted, 27 cancelled |
-| internal | `GUI.LISTBOX.I` `GUI.LISTBOX.MARKOFF` `GUI.LISTBOX.TEXTW` |
+| in | the arguments, in the call. They land in `DLG.*` and NOT in the `GUI.*` inputs: `GUI.DEFAULTS` runs after they are stored and would clear them<br>`DLGRESET bank` — the RAM bank every dialog saves the screen into, once, before the first one<br>`GUI.LIST.ITEM$()` — the rows, 1..count, for the array-backed list verbs, and **the caller owns the `DIM`** |
+| out | `GUI.ANSWER` — `ASKYN`, `ASKOK`<br>`GUI.TEXT$` and `GUI.OK` — `INPUTBOX`<br>`GUI.SEL` — `PICKMENU`<br>`GUI.LISTBOX.SEL` `.MARKS$` `.MARKED` — the listbox verbs<br>`GUI.KEY` — 13 accepted, 27 cancelled |
+| internal | the whole of `DLG.*` |
 
-**In multi-select `GUI.LISTBOX.SEL` is not the answer** — it is where the cursor was left. The marks
-are the answer.
+**In a multi-select list `GUI.LISTBOX.SEL` is not the answer** — it is where the cursor was left.
+The marks are.
 
-**The scrolling list is not in this module.** It is `GUI.CT.LIST`, one of `GUI.FORM`'s three control
-types, and lives in `GUI.INC.BL` beside the field. `GUI2.INC.BL` is the dialog around it: measure,
-open, hand the control its geometry, add a button row, run the form, answer. That is why the
-internals here are three variables and not thirty — the `GUI.LIST.*` set does the work.
+**The scrolling list is not in this module.** It is `GUI.CT.LIST`, one of `GUI.FORM`'s control
+types, and lives in `GUI.INC.BL` beside the field. This file is the dialog around it: measure, open,
+hand the control its geometry, add a button row, run the form, answer. `GUI.LIST.FETCH`, in
+`GUI.INC.BL`, is the one place a row is read, and it reads either the array or a RAM bank holding
+the `GP.BSTR` image layout — which is how `LIST.BANK` shows a directory that was never in low
+memory.
 
-#### `STASH.INC.BL`
+#### `STASH.INC.BL` — save a text rectangle, and put it back
 
 | | |
 |---|---|
@@ -3306,14 +3654,16 @@ offset into the bank, and the offset just past what was written, so one bank hol
 rectangles instead of one a level. They are in `samples/GPB-MODS-TESTING/GPC-BASIC/STASH.INC.BL`
 and have not reached the root library yet. Until they do, one rectangle a bank.
 
-#### `STASHFILE.INC.BL`
+#### `STASHFILE.INC.BL` — a saved text rectangle, through a file
 
 `STASH.FILE.SAVE`, `STASH.FILE.LOAD` and `STASH.FILE.PUT`, and **no variables of its own** — it sets
 `STASH.*` and calls through. The prefix exists to keep the three routine names apart from the rest
 of `STASH.`, not to hold state. Kept a separate `#INCLUDE`: unless the compile removes dead code, the
 disk half is 127 bytes a program that never writes one would still carry.
 
-#### `SORT.INC.BL`
+#### `SORT.INC.BL` — shell sort a string array
+
+Routines, arguments and examples: §4.7.
 
 | | |
 |---|---|
@@ -3329,7 +3679,9 @@ Also needs a `#SYMFILE`. **255 elements**, so `DIM A$(254)` is the largest; beyo
 is 0 rather than a wrong answer. String arrays only. It moves 2-byte pointers rather than string
 data, so a swap is cheap and the array's own storage never moves.
 
-#### `STRCASE.INC.BL`
+#### `STRCASE.INC.BL` — case, in place
+
+Routines, arguments and examples: §4.8.
 
 | | |
 |---|---|
@@ -3345,19 +3697,51 @@ data, so a swap is cheap and the array's own storage never moves.
 `#SYMFILE` again. **Do not write `#AUTONUM` in a program that includes this** — it sets the STEP,
 and only the default 1 survives.
 
-*See also: [3.6 Screen — stash and restore](#36-screen--stash-and-restore), [4.1 `THEME.INC.BL` — named colour roles](#41-themeincbl--named-colour-roles), [4.3 `APPSYS.INC.BL` — start politely, leave it as you found it](#43-appsysincbl--start-politely-leave-it-as-you-found-it), [4.2 `STRINGS.INC.BL` — string helpers](#42-stringsincbl--string-helpers), [4.10 `STRUSING.INC.BL` — a number to a template](#410-strusingincbl--a-number-to-a-template), [4.14 `KB.INC.BL` — the keyboard buffer, emptied](#414-kbincbl--the-keyboard-buffer-emptied), [4.4 `LINEINPUT.INC.BL` — a positioned entry field](#44-lineinputincbl--a-positioned-entry-field), [4.5 `BMX.INC.BL` — a BMX bitmap into VERA](#45-bmxincbl--a-bmx-bitmap-into-vera), [4.15 `FILEIO.INC.BL` — the drive: status, files, directories](#415-fileioincbl--the-drive-status-files-directories), [4.16 `FILEDIR.INC.BL` — a directory, into a bank or into low RAM](#416-filedirincbl--a-directory-into-a-bank-or-into-low-ram), [4.18 `STASHVRAM.INC.BL` — rectangles and blobs, kept in VRAM](#418-stashvramincbl--rectangles-and-blobs-kept-in-vram), [STASH.INC.BL -- save a text rectangle, and put it back.](#stashincbl----save-a-text-rectangle-and-put-it-back)*
+#### `MATH.INC.BL` — the smaller and the larger of two numbers
+
+Routines, arguments and examples: §4.22.
+
+| | |
+|---|---|
+| in | `MATH.FIRST` `MATH.SECOND` — the two numbers, in either order |
+| out | `MATH.RESULT` — the answer, and what `GP.FN` reads back |
+| verbs | `MATH.MINOF` `MATH.MAXOF` — the same two routines called in one line |
+| internal | — |
+
+All three names are shared by `MATH.MIN` and `MATH.MAX`. The formals of a `GP.DEFPROC` are ordinary
+variables, so `GP.SUB MATH.MINOF` writes `MATH.FIRST` and `MATH.SECOND` exactly as a `GOSUB` caller
+would.
+
+#### `MEM.INC.BL` — a block copied, a block filled
+
+Routines, arguments and examples: §4.23.
+
+| | |
+|---|---|
+| in | `MEM.SOURCE` — where `MEM.COPY` reads, 0 to 65535<br>`MEM.TARGET` — where either routine writes<br>`MEM.COUNT` — 1 to 65535, refused outside that<br>`MEM.VALUE` — the byte `MEM.FILL` writes, 0 to 255 |
+| out | `MEM.OK` — -1 done, 0 refused, and what `GP.FN` reads back |
+| verbs | `MEM.BLOCKCOPY` `MEM.BLOCKFILL` |
+| internal | — |
+| constants | `MEM.MEMORYCOPY` `MEM.MEMORYFILL` — the two KERNAL entry points |
+
+`MEM.TARGET`, `MEM.COUNT` and `MEM.OK` are shared by both routines, so a fill overwrites the target
+a copy was set up with.
+
+*See also: [4.1 `THEME.INC.BL` — named colour roles](#41-themeincbl--named-colour-roles), [4.3 `APPSYS.INC.BL` — start politely, leave it as you found it](#43-appsysincbl--start-politely-leave-it-as-you-found-it), [4.2 `STRINGS.INC.BL` — string helpers](#42-stringsincbl--string-helpers), [4.10 `STRUSING.INC.BL` — a number to a template](#410-strusingincbl--a-number-to-a-template), [4.14 `KB.INC.BL` — the keyboard buffer, emptied](#414-kbincbl--the-keyboard-buffer-emptied), [4.4 `LINEINPUT.INC.BL` — a positioned entry field](#44-lineinputincbl--a-positioned-entry-field), [4.5 `BMX.INC.BL` — a BMX bitmap into VERA](#45-bmxincbl--a-bmx-bitmap-into-vera), [4.15 `FILEIO.INC.BL` — the drive: status, files, directories](#415-fileioincbl--the-drive-status-files-directories), [4.16 `FILEDIR.INC.BL` — a directory, into a bank or into low RAM](#416-filedirincbl--a-directory-into-a-bank-or-into-low-ram), [4.18 `STASHVRAM.INC.BL` — rectangles and blobs, kept in VRAM](#418-stashvramincbl--rectangles-and-blobs-kept-in-vram), [4.20 `KV.INC.BL` — keys and values in one RAM bank](#420-kvincbl--keys-and-values-in-one-ram-bank), [4.6 `MENU.INC.BL` — menus built a row at a time](#46-menuincbl--menus-built-a-row-at-a-time)*
 
 ### 4. Labels are global too
 
 Every `NAME:` in every module is a jump target in one flat space, including the ones you were never
-meant to call. `BMX.STREAM.MORE`, `LINEINPUT.REDRAW`, `THEME.SELECT.DARK` and most of `MENUVERT.*`
+meant to call. `BMX.STREAM.MORE`, `LINEINPUT.REDRAW`, `THEME.SELECT.DARK` and most of `MENU.*`
 are internal, and a `GOSUB` to one will do something, just not something useful.
 
-`MENUVERT` is the module with the most of them, because driving a menu is mostly branching:
-**`MENUVERT.RUN`, `MENUVERT.DRAW` and `MENUVERT.ROW` are the three you may call**, and
-`MENUVERT.HOTFIND` is a fourth.
-`MENUVERT.WAIT`, `.KEYED`, `.SETTLE`, `.WRAPTOP`, `.WRAPBOT`, `.CANCEL`, `.HOTKEY`, `.PADKEY`,
-`.PADREAD` and the three `FOLD` helpers are not.
+`MENU.INC.BL` is called through its verbs, `MENU.BEGIN`, `ITEM`, `ITEMX`, `SELECTED` and `DRAWBAR`
+with `GP.SUB` and `MENUTO.VERT` and `MENUTO.BAR` with `GP.FN`, and `MENUPULL.INC.BL` through
+`MENUTO.PULLDOWN`. Every label in both files is internal: the `.BODY` labels behind the verbs,
+`MENU.RUN`, `.WAIT`, `.KEYED`, `.TURN`, `.MOVED`, `.WRAPTOP`, `.WRAPBOT`, `.CANCEL`, `.KEYHOT`,
+`.HOTTAKE`, `.SKIPOFF`, `.SKIPLOOP`, `.LIGHT`, `.DRAWALL`, `.SPOT`, `.DRAWROW`, `.SEPROW`,
+`.HINTSHOW`, `.PADKEY`, `.PADREAD`, `.STRIP`, `.CREATE`, `.MEASURE`, `.FRAMEBOX`, `.BARPLACE`, and
+`MENUPULL.MARK`, `.BESIDE`, `.PLACE` and `.SAVE`.
 
 `FILE.*` has a great many, because most of the module is one routine feeding another: **the
 callable names are `FILE.STATUS`, `EXISTS`, `DELETE`, `RENAME`, `COPY`, `MKDIR`, `CHDIR`, `UP`,
@@ -3374,16 +3758,11 @@ runs with whatever `STR.OP%` last held. The callable names are `STR.PADR`, `PADL
 `SPLIT`, `REPLACE`, `PET2SCR`, `TRIM`, `LTRIM`, `RTRIM` and `SPLICE`.
 
 `GUI.INC.BL` has more internal labels than anything else in the library, because `GUI.FORM` is a
-dispatcher and every arm of it is one. **The callable names are `GUI.SAY`, `GUI.YN`, `GUI.MENU`,
-`GUI.INPUT`, `GUI.OPEN` and `GUI.CLOSE`**, plus `GUI.LISTBOX` from `GUI2.INC.BL`. `GUI.FORM` and
-`GUI.CLEARKB` are usable and undocumented — they are the module's own. Everything else, the whole of `GUI.FORM.*`, `GUI.BUTTON*`, `GUI.BTN.*`,
+dispatcher and every arm of it is one. **The callable names are `GUI.OPEN` and
+`GUI.CLOSE`** — the dialogs themselves are verbs, in `GUI-DIALOGS.INC.BL`. `GUI.FORM` is usable
+and undocumented, the module's own. Everything else, the whole of `GUI.FORM.*`, `GUI.BUTTON*`, `GUI.BTN.*`,
 `GUI.LIST.*`, `GUI.FIELD.DRAW`, `GUI.FRAME`, `GUI.GLYPHS`, `GUI.SHADOW.*`, `GUI.SIZE`,
 `GUI.PLACE.BOX`, `GUI.PLACE.SCROLL` and `GUI.SCREEN`, is not.
-
-`MENUBAR` mirrors `MENUVERT` exactly: **`MENUBAR.RUN`, `MENUBAR.DRAW`, `MENUBAR.ITEM`,
-`MENUBAR.MARK` and `MENUBAR.WHERE` are the five you may call.** `MENUBAR.WAIT`, `.KEYED`,
-`.SETTLE`, `.SETTLE.GO`, `.WRAPLEFT`, `.WRAPRIGHT`, `.CANCEL`, `.CHOSE`, `.HOTKEY`, `.HOTDONE`,
-`.PADKEY`, `.PADRELEASE`, `.PADREAD` and `.COLUMN` are not.
 
 #### A module in a bank keeps its names
 
@@ -3401,8 +3780,8 @@ banked `.BODY` and a low-memory front door, and a program that calls a `.BODY` n
 the first `#INCLUDE` and the second produces nothing.
 
 Each module also has a skip label it jumps over itself with — `THEME.SKIP`, `APPSYS.SKIP`,
-`STR.SKIP`, `BMX.MODULE.END`, `LINEINPUT.MODULE.END`, `MENUVERT.MODULE.END`,
-`MENUBAR.MODULE.END`, `GUI.MODULE.END`, `GUI.LISTBOX.MODULE.END`, `STASH.MODULE.END`,
+`STR.SKIP`, `BMX.MODULE.END`, `LINEINPUT.MODULE.END`, `MENU.MODULE.END`,
+`MENUPULL.MODULE.END`, `GUI.MODULE.END`, `GUI.LISTBOX.MODULE.END`, `STASH.MODULE.END`,
 `STASHFILE.MODULE.END`, `SORT.MODULE.END` and `STRCASE.MODULE.END`.
 Those exist so an include can sit anywhere in the file, the top included. **Do not branch to one.**
 
@@ -3410,13 +3789,13 @@ BASLOAD refuses a name used as both a label and a variable (`BASLOAD.MD:319`). `
 byte-skip counter, so the module's skip label had to
 be `BMX.MODULE.END` — a name is either a label or a variable, never both.
 
-*See also: [4.11 `GUI.INC.BL` — four dialogs, in a box that puts the screen back](#411-guiincbl--four-dialogs-in-a-box-that-puts-the-screen-back), [4.12 `GUI2.INC.BL` — a listbox, single or multi select](#412-gui2incbl--a-listbox-single-or-multi-select)*
+*See also: [4.6 `MENU.INC.BL` — menus built a row at a time](#46-menuincbl--menus-built-a-row-at-a-time), [4.9 `MENUPULL.INC.BL` — a dropdown under a bar item](#49-menupullincbl--a-dropdown-under-a-bar-item), 4.11 GUI.INC.BL -- the box that puts the screen back, and the form in, [4.12 `GUI-DIALOGS.INC.BL` — every dialog as a verb](#412-gui-dialogsincbl--every-dialog-as-a-verb)*
 
 ### 5. TRUE IS -1
 
 **Every flag the library hands back is -1 for true and 0 for false**, and anything written
 against it should be too. `GUI.OK` `GUI.ANSWER` `GUI.STASHED` `STASH.OK` `SORT.OK`
-`MENUVERT.HOTHIT` `FILE.OK` `BANKMGR.OK` `APPSYS.IS.EMULATOR` — all of them.
+`MENU.OK` `FILE.OK` `BANKMGR.OK` `APPSYS.IS.EMULATOR` — all of them.
 
 That is what a comparison in this compiler evaluates to, so a flag and a test read the same
 way, and it is the value `NOT` wants: `NOT` is `-x-1`, so `NOT -1` is 0 while `NOT 1` is -2,
@@ -3424,10 +3803,10 @@ which is still true. `IF` itself tests non-zero, so `IF FLAG THEN` works either 
 `IF FLAG = 1 THEN` is the spelling that breaks.
 
 ```basic
-IF GUI.OK THEN <accepted>            ' yes
-IF NOT GUI.OK THEN <cancelled>       ' yes
-IF GUI.OK = 0 THEN <cancelled>       ' yes
-IF GUI.OK = 1 THEN <accepted>        ' NO -- it is -1
+IF GUI.OK THEN <accepted> : REM yes
+IF NOT GUI.OK THEN <cancelled> : REM yes
+IF GUI.OK = 0 THEN <cancelled> : REM yes
+IF GUI.OK = 1 THEN <accepted> : REM NO -- it is -1
 ```
 
 **A flag the CALLER sets is read as non-zero**, so `LINEINPUT.MASK = 1` and `STASH.MOVE = 1`
@@ -3443,7 +3822,7 @@ prints `1`.
 `ERROR: INVALID PARAMETER`, not a warning — which is why `BMX.PALBASE` (VRAM `$1FA00`, 129536) is an
 ordinary variable and not a `#DEFINE`. Every VRAM address past `$FFFF` has the same problem.
 
-**A dotted name whose tail is a reserved word is fine.** `MENUVERT.COUNT`, `THEME.CLR`,
+**A dotted name whose tail is a reserved word is fine.** `MENU.COUNT`, `THEME.CLR`,
 `LINEINPUT.LEN` and `LINEINPUT.RETURN` all contain keywords and all work, because BASLOAD matches the whole identifier. An
 *undotted* one does not: `POS`, `MB`, `ST`, `LEN` and `CHAR` cannot be variables at all. This is the
 main reason the library is dotted throughout.
@@ -3613,6 +3992,26 @@ Two budgets come off `LOW FREE`:
 A program can be comfortable on one and out of room on the other. `LOW FREE 4096` is 4K to run in
 and nowhere left to grow; `GPBMODS` at `LOW FREE 12288` has both.
 
+#### What ships with the program
+
+`nnn` in a runtime name is the compiler build, so a runtime file serves only programs from its own
+build.
+
+| mode | files |
+|---|---|
+| EMBEDDED | `NAME.PRG`. The runtime and the bank 1 code are in the object |
+| | `NAME.OVL`, holding every `BANK` line's region — only if the program has one |
+| SHARED | `NAME.PRG` |
+| | `GPB.RT.nnn.BIN` when the report says `GPBASIC`, `GPC.RT.nnn.BIN` when it says `CORE` |
+| | `GP1.RT.nnn.BIN`, always |
+| | `NAME.OVL`, holding every `BANK` line's region, beside the `.PRG` |
+
+The bootstrap looks for the runtime in the current directory, then at the root of the SD card, so
+one copy at `/` serves every program. `GP1.RT.nnn.BIN` must sit in the same place as the runtime
+that loaded. A runtime file that is not found prints `?RT`.
+
+`GPC.BIN`, `GPC.IMG.nnn.BIN` and `GP1.IMG.nnn.BIN` are the compiler and its inputs and do not ship.
+
 #### Removing dead code
 
 With `REMOVE DEAD CODE?` answered `Y` in `GPC.PRG`, or a file named on line 5 of `GPC.INPUT`, the
@@ -3700,7 +4099,7 @@ What a region costs instead:
   caller's bank again.
 - **A file that has to travel.** `NAME.OVL` ships beside the `.PRG`. A program without it, or
   with a truncated one, stops with `?OVL` before it runs.
-- **A second or so of startup**, once per load, while the bootstrap reads the overlay in.
+- **A second or so of startup**, once per load, while the overlay is read in.
 
 Banked text is the same bargain on the data side: a `GP.BANKEDSTR` group (§3.10) is out of the
 workspace, and inside a region it costs no p-code at all.

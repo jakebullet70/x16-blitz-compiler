@@ -1,0 +1,115 @@
+@7. Memory, and what the compiler tells you
+.
+=7. MEMORY, AND WHAT THE COMPILER TELLS YOU
+.
+=What GPC prints when it finishes
+.
+.One item a line. GPBMODS, built shared:
+.
+:OK LOW CODE 11520, SHARED GPBASIC
+:LOW FREE 12288, FRAME STACK 2048
+:LINES 3795
+:BANK   7 CODE  4864 USED  3328 FREE
+:BANK   9 CODE   768 USED  7424 FREE
+:BANK   4 CODE  7680 USED   512 FREE
+:BANK  10 CODE   768 USED  7424 FREE
+:BANK   8 CODE  1792 USED  6400 FREE
+:BANK  11 CODE  3072 USED  5120 FREE
+:BANK   5 TEXT  7424 USED   768 FREE
+:BANK   6 TEXT  4352 USED  3840 FREE
+:TOTAL BANKS 8, 30720 USED
+.
+.An embedded build prints a RUNTIME line second. GPCTEST-E:
+.
+:OK LOW CODE 969, EMBEDDED GPBASIC
+:RUNTIME 11519
+:LOW FREE 24064, FRAME STACK 2048
+.
+.  LOW CODE
+.      the p-code in low memory, in bytes. P-code and GP.ASM blocks in a
+.        GP.BANKED region are not in it
+.
+.  SHARED EMBEDDED
+.      SHARED loads a resident runtime file at run time. EMBEDDED carries the
+.        runtime in the object
+.
+.  GPBASIC CORE
+.      GPBASIC when a GP. keyword reached the 1,024-byte handler block:
+.        shared, the program loads GPB.RT.nnn.BIN; embedded, the block is in
+.        the object. CORE when none did: shared, it loads GPC.RT.nnn.BIN;
+.        embedded, ScanGPUsage dropped the block
+.
+.  RUNTIME
+.      embedded only. The runtime bytes carried in the object
+.
+.  LOW FREE
+.      what is left in low memory for variables, strings and arrays. This is
+.        the number that runs out. It ends at $9F00 embedded, and at the
+.        resident runtime shared
+.
+.  FRAME STACK
+.      the 2,048 bytes reserved between the p-code and the workspace for
+.        GOSUB and FOR frames. LOW FREE does not include them
+.
+.  LINES
+.      the source lines compiled, the lines of GP.ASM and GP.BANKEDSTR blocks
+.        included. Lines left out as dead code are not counted
+.
+.  DEAD CODE
+.      printed only when dead code is removed: the source lines left out, and
+.        the p-code bytes they would have taken. LOW CODE is already without
+.        them
+.
+.  BANK
+.      printed only when the program has a region or banked text. One line a
+.        bank: CODE for a GP.BANKED region, TEXT for GP.BANKEDSTR, then the
+.        bytes used and free of its 8,192. Both are whole pages, so FREE is
+.        room that is certainly there
+.
+.  TOTAL BANKS
+.      after the BANK lines: how many, and the bytes they use
+.
+.Two budgets come off LOW FREE:
+.
+.  - LOW FREE is the workspace the running program has for its data.
+.  - LOW FREE minus 4,096 is how much more low-memory p-code will fit.
+.    WriteObjectCode refuses to leave less than 4K of workspace, so a build
+.    reporting LOW FREE 4096 is one page from PROGRAM TOO BIG.
+.
+.A program can be comfortable on one and out of room on the other. LOW FREE
+.4096 is 4K to run in and nowhere left to grow; GPBMODS at LOW FREE 12288 has
+.both.
+.
+=What ships with the program
+.
+.nnn in a runtime name is the compiler build, so a runtime file serves only
+.programs from its own build.
+.
+.  EMBEDDED
+.      FILES: NAME.PRG. The runtime and the bank 1 code are in the object
+.
+.    
+.      FILES: NAME.OVL, holding every BANK line's region -- only if the
+.        program has one
+.
+.  SHARED
+.      FILES: NAME.PRG
+.
+.    
+.      FILES: GPB.RT.nnn.BIN when the report says GPBASIC, GPC.RT.nnn.BIN
+.        when it says CORE
+.
+.    
+.      FILES: GP1.RT.nnn.BIN, always
+.
+.    
+.      FILES: NAME.OVL, holding every BANK line's region, beside the .PRG
+.
+.The bootstrap looks for the runtime in the current directory, then at the
+.root of the SD card, so one copy at / serves every program. GP1.RT.nnn.BIN
+.must sit in the same place as the runtime that loaded. A runtime file that
+.is not found prints ?RT.
+.
+.GPC.BIN, GPC.IMG.nnn.BIN and GP1.IMG.nnn.BIN are the compiler and its inputs
+.and do not ship.
+.

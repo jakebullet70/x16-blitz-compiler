@@ -1,56 +1,56 @@
-@4.7 SORT.INC.BL -- shell sort a string array
+@4.6 MENU.INC.BL -- menus built a row at a time (2)
+=Colours, hints and the gap
 .
-=4.7 SORT.INC.BL -- SHELL SORT A STRING ARRAY
+.Set once by the caller, and read by every run:
 .
-=DESCRIPTION
+.  MENU.ATTR
+.      the rows, background * 16 + foreground
 .
-.  SORT.RUN
-.      IN: SORT.PTR SORT.DESCEND SORT.NOCASE
-.      OUT: SORT.OK SORT.COUNT
+.  MENU.HIATTR
+.      the highlighted row. 0 inverts MENU.ATTR
 .
-:#SYMFILE "@:MYPROG.SYM"
-:#INCLUDE "SORT.INC.BL"
-:
-:SORT.PTR = GP.ARRPTR(NAME$())
-:SORT.DESCEND = 0 : SORT.NOCASE = 0
-:GOSUB SORT.RUN
+.  MENU.HOTATTR
+.      the hot key letter. 0 leaves it untinted. Only rows drawn in MENU.ATTR
+.        are tinted
 .
-.Shell sort with Ciura's gap sequence -- 132, 57, 23, 10, 4, 1 -- moving the
-.2-byte element pointers rather than string data. A swap costs the same
-.whatever the strings are: no temporary, no copy, no heap traffic.
+.  MENU.DISATTR
+.      a disabled row. 0 is MENU.ATTR
 .
-.The array is passed as an address because a BASL subroutine cannot be passed
-.an array; GP.ARRPTR is a keyword for this purpose. The empty parentheses in
-.GP.ARRPTR(A$()) are required -- A$ and A$() are different variables.
+.  MENU.SEPATTR
+.      separator lines and the frame. 0 is MENU.ATTR
 .
-.SORT.OK is -1 when it sorted and 0 if the sort was refused: more than 255
-.elements, so DIM A$(254) is the largest accepted (DIM A$(255) is 256
-.elements), or an array whose elements are not strings. The element count and
-.the type are read from the array's own header, three bytes below what
-.GP.ARRPTR returns, so a wrong count cannot be passed in.
+.  MENU.SEPCHR
+.      the separator glyph. 0 is MENU.LINE, 192, the stroke GP.BOX style 1
+.        draws with
 .
-.Never-assigned elements are empty strings, not garbage. A DIM A$(20) with
-.five entries filled sorts its fifteen empties to the front; a null pointer
-.reads as "", as it does elsewhere in the runtime.
+.  MENU.FLAGS
+.      the popup's flags, added together
 .
-.SORT.DESCEND and SORT.NOCASE are ordinary variables rather than arguments,
-.so they are sticky. Set both on every call.
+.  MENU.BARFLAGS
+.      the bar's flags
 .
-.The program must have a #SYMFILE, placed before the #INCLUDEs. The assembly
-.reaches BASIC's variables through {VAR}, and BASLOAD crunches every name
-.before the compiler sees it; without the mapping the compile stops with {}
-.NEEDS #SYMFILE.
+.  MENU.GAP
+.      cells between bar items. 0 is none
 .
-.Example: ARRAYS.EXP.BL. Regression test: SORT.EXP.BL, eight cases including
-.a 200-element array -- element 128 is where the doubled index stops fitting
-.in a byte. Every case checks content as well as order: a sort that reads the
-.wrong element leaves the array in order with a string duplicated.
+.  MENU.HINTX MENU.HINTY MENU.HINTW MENU.HINTATTR
+.      the hint field. MENU.HINTW 0 turns hints off
 .
-=EXAMPLE PROGRAM
+.A hint is shown only when the highlight moves, never on opening. The field
+.is cleared to MENU.HINTATTR first, and a hint longer than MENU.HINTW is cut.
 .
-.  ARRAYS.EXP.BL -- runnable, in the GPC-BASIC folder
-.  SORT.EXP.BL -- runnable, in the GPC-BASIC folder
+=The frame
 .
-=SEE ALSO
+.Both runners draw a GP.BOX with its corner at row, col, one cell bigger all
+.round than the rows, in MENU.SEPATTR. style is MENU.SOLID 0, MENU.THIN 1,
+.MENU.ROUND 2, MENU.THICK 3, or 256 and up for the address of an
+.eight-character glyph table:
 .
->85|4.7 SORT.INC.BL -- shell sort a string array
+:T.GLYPH$ = "++++--!!"
+:N = GP.FN(MENUTO.VERT, 4, 10, GP.STRPTR(T.GLYPH$) + 1)
+.
+.MENU.NOBOX, 255, draws no frame and puts the first row at row, col.
+.
+.A popup row, and its highlight, is as wide as the widest row. A bar item is
+.as wide as its own text, with MENU.GAP cells between items, so spaces inside
+.the text are how a bar item gets padding.
+.

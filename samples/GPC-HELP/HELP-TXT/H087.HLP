@@ -1,0 +1,107 @@
+@7. Memory, and what the compiler tells you (2)
+=Removing dead code
+.
+.With REMOVE DEAD CODE? answered Y in GPC.PRG, or a file named on line 5 of
+.GPC.INPUT, the compiler leaves out every source line that no path from the
+.first line reaches. It writes the numbers of those lines to the file, one a
+.line. GPC.PRG names it D. and the source name. The numbers are the BASIC
+.line numbers BASLOAD gave, not lines of the .BASL file.
+.
+.The option adds one pass, PASS 0. With it off, the passes and the object are
+.unchanged.
+.
+.A line is reached through:
+.
+.  - GOTO, GOSUB, IF ... THEN a line number, ON ... GOTO, ON ... GOSUB,
+.    RESTORE a line number
+.  - FN, GP.SUB and GP.FN
+.  - the line before, unless that line's last statement is GOTO, RETURN, END
+.    or STOP. A line holding IF ... THEN and a statement always reaches the
+.    next.
+.
+.Kept although nothing reaches them:
+.
+.  - a line holding DATA, DIM or GP.DEFPROC
+.  - the GP.BANKED and GP.ENDBANKED lines, and a whole GP.BANKEDSTR group
+.  - every line of a GP.IF, GP.DO, GP.SELECT or GP.ASM block when any line of
+.    it is kept
+.
+.A variable that only removed lines use is not in the object. If the
+.compiler's tables fill, it prints DEAD CODE TABLE FULL, NOTHING REMOVED and
+.compiles every line.
+.
+.A keep region makes every line between its two marker lines reached.
+.
+:#REM 1
+:REM GP.KEEP
+:#REM 0
+:DEBUG.DUMP:
+:  PRINT A,B
+:  RETURN
+:#REM 1
+:REM GP.ENDKEEP
+:#REM 0
+.
+.  - BASLOAD drops a REM unless #REM 1 is in force. A dropped marker leaves
+.    no region and no error.
+.  - BASLOAD-GPC also takes #GPC KEEP and #GPC ENDKEEP, one line each.
+.  - The words match in either case. The marker lines are judged like any
+.    other line.
+.  - A KEEP inside a region, an ENDKEEP outside one, or a region open at the
+.    end of the source stops the compile with BLOCK MISMATCH.
+.  - With the option off, the markers are ordinary REMs.
+.
+.{VAR} on a removed variable. A GP.ASM {VAR} naming a variable that only
+.removed lines create stops the compile with UNKNOWN VARIABLE IN {}. With the
+.option off it compiles. Create the variable in live code or in a keep
+.region.
+.
+=OUT OF MEMORY
+.
+.Everything the program allocates comes out of the one LOW FREE pool:
+.scalars, arrays, and the string heap. There is no separate heap to run out
+.of.
+.
+.  - A DIM costs its full size whether the entries are used or not. DIM
+.    A$(120) is 121 string slots from the moment it runs. Five arrays
+.    dimensioned to the same 120 is 1,210 bytes gone before a single row
+.    exists.
+.  - A string block never shrinks. Assigning a shorter string to a variable
+.    that already holds a longer one reuses the block it has; assigning a
+.    longer one allocates a new block and abandons the old. The abandoned
+.    blocks are reclaimed by the heap scavenger when one of the right size is
+.    wanted again, not immediately.
+.  - What fails is therefore a high-water mark, not a total. The allocation
+.    that raises OUT OF MEMORY is rarely the large one -- it is an ordinary
+.    one that arrives after the heap has been churned. The same key on the
+.    same screen can work or not depending on what was visited first, which
+.    is what makes it read as intermittent.
+.
+.The error itself comes from the runtime library and names an address in it,
+.not a line in your program: OUT OF MEMORY @ $03A5 library. It tells you the
+.allocator refused, and nothing about which of your strings was asking.
+.
+=A region does not come out of it
+.
+.LOW CODE and LOW FREE describe low memory only. P-code inside a GP.BANKED
+.region (SEC 3.12) is not in either figure, and neither is a GP.ASM block in
+.the region without LOW. The region is reported on its own BANK line and
+.written into the program's NAME.OVL overlay file. Moving a module into a
+.region takes its bytes off LOW CODE and gives them to LOW FREE.
+.
+.What a region costs instead:
+.
+.  - A whole bank, and 32 pages is the ceiling. $A000-$BFFF, 8,192 bytes,
+.    with the bridges, the padding and the region's GP.ASM blocks counted in.
+.    No two regions may share a bank.
+.  - A byte a call site, and two bank switches a call. A call into the region
+.    from outside it, or out of it to low memory, is a .bgosub, one byte
+.    longer than a GOSUB. RETURN selects the caller's bank again.
+.  - A file that has to travel. NAME.OVL ships beside the .PRG. A program
+.    without it, or with a truncated one, stops with ?OVL before it runs.
+.  - A second or so of startup, once per load, while the overlay is read in.
+.
+.Banked text is the same bargain on the data side: a GP.BANKEDSTR group (SEC
+.3.10) is out of the workspace, and inside a region it costs no p-code at
+.all.
+.

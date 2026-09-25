@@ -1,112 +1,16 @@
-@4.22 GPBMODS -- the harness that drives every module
+@4.20 KV.INC.BL -- keys and values in one RAM bank (2)
+:+8        the value's length, 0-119
+:+9..      the value
+:slot 0    "*KVSTORE", 2, the version (1), the slot count (64)
 .
-=4.22 GPBMODS -- THE HARNESS THAT DRIVES EVERY MODULE
+.KV.EXP.BL, in samples/GPB-MODS-TESTING/GPC-BASIC/, calls every routine.
 .
-=DESCRIPTION
+=EXAMPLE PROGRAM
 .
-.samples/GPB-MODS-TESTING/GPBMODS.BASL. A menu bar of nine dropdowns whose
-.rows reach nearly every public entry point in this section. It is the one
-.program that holds all twenty-one modules at once, and the worked example of
-.GP.BANKED, GP.BANKEDSTR and BANKMGR in one place.
+.  KV.EXP.BL -- runnable, in the GPC-BASIC folder
 .
-:gpbmods-demo.bat
+=SEE ALSO
 .
-.The drive is testing/, not the sample folder. The object is compiled SHARED
-.and loads GPB.RT.nnn.BIN from there.
-.
-.No row is a stub. A chosen row calls the library for real and shows what
-.came back, on the panel and on the LAST line at the foot of the page. Three
-.modules are under test before any row is chosen: MENUBAR draws the bar,
-.MENUVERT every dropdown, and STASH puts the screen back under a closed one.
-.
-.  DIALOG -- D
-.      GUI GUI2 COMBO CHECK
-.
-.  LISTS -- L
-.      MENUBAR MENUVERT
-.
-.  INPUT -- I
-.      LINEINPUT
-.
-.  SCREEN -- S
-.      STASH STASHFILE STASHVRAM
-.
-.  STRINGS -- G
-.      STRINGS STRCASE STRUSING
-.
-.  DATA -- A
-.      SORT
-.
-.  THEME -- T
-.      THEME
-.
-.  ABOUT -- B
-.      BANKMGR
-.
-.  FILES -- F
-.      FILEIO FILEDIR
-.
-.APPSYS runs at startup and at exit rather than from a row. STRINGS answers
-.to G because SCREEN has taken S: a hotkey need not be an item's initial, and
-.MENUVERT.HOTATTR tints whichever letter it finds.
-.
-.Twenty-one modules are included and nineteen are driven. KB and STASHVRAMGC
-.are compiled in and have entry points -- KB.CLEARKB, SV.COMPACT -- that no
-.panel calls. BMX (SEC 4.5) is not included: it wants a bitmap file and a
-.screen mode of its own, and the BMXVIEW example in GPC-BASIC/ covers it.
-.
-.WARNING: FILES writes to the drive. Four of its rows do. Everything they
-.make is named GPBFILE.* or GPBDIR, and the row that makes each one removes
-.it.
-.
-=Eleven banks
-.
-.Eight are named at compile time and claimed from BANKMGR (SEC 4.13) at
-.startup, because the compiler picks them while the object is written and the
-.manager is told rather than asked. Three more are allocated at run time: the
-.cells a dropdown covers, the cells a dialog covers, and FILEDIR's directory
-.buffer.
-.
-.  bank 4, 7,936 bytes
-.      MENUVERT MENUBAR LINEINPUT GUI GUI2
-.
-.  bank 5, 7,424 bytes
-.      literal text, pool one
-.
-.  bank 6, 4,608 bytes
-.      literal text, pool two
-.
-.  bank 7, 4,864 bytes
-.      APPSYS BANKMGR KB SORT STASHVRAM STASHVRAMGC STRCASE STRINGS STRUSING
-.
-.  bank 8, 1,792 bytes
-.      FILEIO FILEDIR
-.
-.  bank 9, 768 bytes
-.      THEME
-.
-.  bank 10, 1,536 bytes
-.      COMBO CHECK
-.
-.  bank 11, 3,072 bytes
-.      the two biggest dropdown handlers, this program's own code
-.
-.Six of those are GP.BANKED code regions (SEC 3.12) and two are GP.BANKEDSTR
-.text pools (SEC 3.10). All eight are in one GPBMODS.OVL, each behind its own
-.bank and page-count bytes. The resident object is 11,523 bytes and the
-.overlay is 32,016 -- the eight regions come to 32,000 between them and the
-.sixteen header bytes are the rest.
-.
-.Only what holds a BANK statement stays in low RAM. STASH and STASHFILE
-.execute BANK, which the compiler refuses inside a region; STASHVRAM (SEC
-.4.18) is the one to reach for from inside one.
-.
-.Six regions and not one, because a region holds at most 8,192 bytes and the
-.GUI fills its own. A region may call another: the call selects the other
-.bank and its RETURN puts the caller's back.
-.
-.A nearly empty region still costs a whole page count. Bank 9 holds 502 bytes
-.of THEME in three pages. Below about a page and a half of p-code, a region
-.gives back less than it looks like. Bank 10 held 705 bytes of COMBO in 768
-.the same way, until CHECK moved in beside it.
-.
+>57|3.12 Code in a bank
+>95|4.13 BANKMGR.INC.BL -- who owns which RAM bank
+>102|4.20 KV.INC.BL -- keys and values in one RAM bank

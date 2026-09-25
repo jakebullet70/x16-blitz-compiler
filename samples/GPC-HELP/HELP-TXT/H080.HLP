@@ -1,93 +1,92 @@
-@8. Known bugs
+@3. The modules (8)
+=STRCASE.INC.BL -- case, in place
 .
-=8. KNOWN BUGS
+.Routines, arguments and examples: SEC 4.8.
 .
-.Three, all live on 12th September 2026 and all reproducible. Each says what
-.happens, what causes it, and what to do instead. A bug leaves this list when
-.it is fixed, not when it is understood.
+.  in
+.      STRCASE.PTR -- GP.STRPTR of the string
+.      STRCASE.MODE -- STRCASE.UPPER or STRCASE.LOWER
 .
-=A string never gives memory back
+.  out
+.      the string itself, rewritten in place
 .
-.A$ = "" frees nothing. A string variable owns its block: the assignment sets
-.the length to zero and keeps the capacity. The heap scavenger reclaims only
-.a block a string outgrew and abandoned, never one a variable still holds. A
-.working buffer that has once held a 250-character line is spoken for until
-.the program ends.
+.  verbs
+.      STR.UCASE STR.LCASE -- a string in, a cased copy back, through
+.        STRCASE.S$
 .
-.So a big temporary cannot be built and then freed. It has to not be built.
+.  internal
+.      STRCASE.ADDR% STRCASE.OP% STRCASE.S$
 .
-.Measured 2026-09-02. The editor's find folded the needle and every line it
-.scanned into new strings and compared with MID$ per position: 579 bytes gone
-.for the rest of the run, from a workspace with 1,489 free, and the GUI
-.dialogs then died on what was left. Rewritten to fold in place through
-.GP.STRPTR with one GP.INSTR per line, a find costs 81 bytes, and the program
-.came out 59 bytes smaller.
+.  constants
+.      STRCASE.UPPER STRCASE.LOWER
 .
-.Do this -- PRINT FRE(0) at eight points down the run and read the descent.
-.It is a high-water ceiling, so it only falls, and the step that falls is the
-.culprit.
+.STR.UCASE and STR.LCASE are the two STR. names this file owns. The rest of
+.STR. is STRINGS.INC.BL's, and the two verbs are named for the module they
+.are to move into.
 .
-=BINPUT# stops at 255 bytes
+.#SYMFILE again. Do not write #AUTONUM in a program that includes this -- it
+.sets the STEP, and only the default 1 survives.
 .
-.BINPUT# n, A$, len cannot read more than 255 bytes. Three independent caps
-.land on that one number, so there is no single constant to raise.
+=MATH.INC.BL -- the smaller and the larger of two numbers
 .
-.  the read buffer is 255 bytes
-.      WHERE: ReadBuffer: .fill 255
+.Routines, arguments and examples: SEC 4.22.
 .
-.  the count argument is 8 bit, and unchecked
-.      WHERE: GetInteger8Bit takes mantissa byte 0 and returns
+.  in
+.      MATH.FIRST MATH.SECOND -- the two numbers, in either order
 .
-.  a BASIC string is 255 characters
-.      WHERE: nowhere to put a longer record in any case
+.  out
+.      MATH.RESULT -- the answer, and what GP.FN reads back
 .
-.The second is the trap. BINPUT# 12, A$, 256 sets the count to 0 and hands
-.back an empty string, silently. 300 gives 44 bytes.
+.  verbs
+.      MATH.MINOF MATH.MAXOF -- the same two routines called in one line
 .
-.It is also not a block read. It is a CHRIN loop, one KERNAL call per byte
-.with an EOF check on top of that. BINPUT# is one statement, not one
-.transfer, so anything costing a BINPUT# per record pays that stride per
-.record.
+.  internal
+.      --
 .
-.LINPUT# shares the same buffer and stops at 255 too, but runs on to the
-.delimiter afterwards, so the next read starts at a line boundary.
+.All three names are shared by MATH.MIN and MATH.MAX. The formals of a
+.GP.DEFPROC are ordinary variables, so GP.SUB MATH.MINOF writes MATH.FIRST
+.and MATH.SECOND exactly as a GOSUB caller would.
 .
-.Do this -- a record cannot be one string. Make it N strings of 255, or keep
-.it in a bank and copy out the part that is needed.
+=MEM.INC.BL -- a block copied, a block filled
 .
-=File I/O in a GP.DO key loop
+.Routines, arguments and examples: SEC 4.23.
 .
-.A save routine reached from inside a program's own GP.DO key loop writes its
-.file completely and correctly, and then the program stops with
+.  in
+.      MEM.SOURCE -- where MEM.COPY reads, 0 to 65535
+.      MEM.TARGET -- where either routine writes
+.      MEM.COUNT -- 1 to 65535, refused outside that
+.      MEM.VALUE -- the byte MEM.FILL writes, 0 to 255
 .
-:INPUT/OUTPUT ERROR @ $005B
+.  out
+.      MEM.OK -- -1 done, 0 refused, and what GP.FN reads back
 .
-.The address is identical in every failing build, which says a clobbered
-.instruction pointer rather than a real device error.
+.  verbs
+.      MEM.BLOCKCOPY MEM.BLOCKFILL
 .
-.Seven shapes have been compiled and probed. Do not bisect them again.
+.  internal
+.      --
 .
-.  OPEN/PRINT#/CLOSE at top level
-.      RESULT: passes
+.  constants
+.      MEM.MEMORYCOPY MEM.MEMORYFILL -- the two KERNAL entry points
 .
-.  four consecutive PRINT#, no PRINT between
-.      RESULT: passes
+.MEM.TARGET, MEM.COUNT and MEM.OK are shared by both routines, so a fill
+.overwrites the target a copy was set up with.
 .
-.  the same inside GP.DO ... GP.EXITDO
-.      RESULT: passes
+=EXAMPLE PROGRAM
 .
-.  the same behind a GOSUB inside a GP.DO
-.      RESULT: passes
+.  FORM.EXP.BL -- runnable, in the GPC-BASIC folder
 .
-.  the same behind GP.SELECT then GOSUB inside a GP.DO
-.      RESULT: passes
+=SEE ALSO
 .
-.  the real routine called from the top level of the same program
-.      RESULT: passes
-.
-.  the real routine reached from the program's own GP.DO key loop
-.      RESULT: fails
-.
-.Do this -- a plain PRINT immediately after the CLOSE makes it pass. Channel
-.0 output runs CLRCHN; a non-zero channel runs CHKOUT and READST instead, so
-.the suspect is channel state left behind rather than the file I/O.
+>66|4.1 THEME.INC.BL -- named colour roles
+>76|4.3 APPSYS.INC.BL -- start politely, leave it as you found it
+>67|4.2 STRINGS.INC.BL -- string helpers
+>89|4.10 STRUSING.INC.BL -- a number to a template
+>96|4.14 KB.INC.BL -- the keyboard buffer, emptied
+>77|4.4 LINEINPUT.INC.BL -- a positioned entry field
+>78|4.5 BMX.INC.BL -- a BMX bitmap into VERA
+>97|4.15 FILEIO.INC.BL -- the drive: status, files, directories
+>98|4.16 FILEDIR.INC.BL -- a directory, into a bank or into low RAM
+>100|4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM
+>102|4.20 KV.INC.BL -- keys and values in one RAM bank
+>79|4.6 MENU.INC.BL -- menus built a row at a time

@@ -1,58 +1,12 @@
-@4.3 APPSYS.INC.BL -- start politely, leave it as you found it
+@4.2 STRINGS.INC.BL -- string helpers (2)
+=EXAMPLE PROGRAM
 .
-=4.3 APPSYS.INC.BL -- START POLITELY, LEAVE IT AS YOU FOUND IT
-.
-=DESCRIPTION
-.
-.  APPSYS.STARTUP
-.      IN: --
-.      OUT: APPSYS.MODE APPSYS.COLS APPSYS.ROWS APPSYS.COLOUR
-.
-.  APPSYS.RESTORE
-.      IN: those
-.      OUT: screen mode and colour put back
-.
-.  APPSYS.ISEMU
-.      IN: --
-.      OUT: APPSYS.IS.EMULATOR -- -1 under x16emu, 0 otherwise
-.
-:A screen rectangle through a file is `STASH.FILE.SAVE` / `.LOAD` / `.PUT` in
-:
-:GOSUB APPSYS.STARTUP
-:REM ... the application, laid out with APPSYS.COLS / APPSYS.ROWS ...
-:GOSUB APPSYS.RESTORE : END
-.
-.Call STARTUP before any SCREEN or COLOR of your own. It records the state as
-.it finds it, so anything changed beforehand is what gets restored.
-.
-.Lay out from APPSYS.COLS / APPSYS.ROWS rather than assuming 80x60. The X16
-.boots 80x60, but SCREEN 0 is 40x30 and a user who prefers larger text is
-.running one.
-.
-.APPSYS.DEV defaults to 8. The panel routines are implemented in
-.STASHFILE.INC.BL. A panel file is self-describing -- it carries the stash's
-.4-byte header -- so loading one needs only its name.
-.
-.APPSYS.ISEMU answers the question a timing loop has to ask. $9FBE and $9FBF
-.are the last of the emulator's own I/O registers and read as "1" and "6"
-.under x16emu, with the debugger on or off; the routine is those two PEEKs
-.and a comparison.
-.
-:GOSUB APPSYS.ISEMU
-:IF APPSYS.IS.EMULATOR THEN PRINT "EMULATED"
-:IF NOT APPSYS.IS.EMULATOR THEN PRINT "NOT x16emu"
-.
-.The flag is -1, not 1, so NOT works on it: NOT is -x-1 here, so NOT -1 is 0
-.while NOT 1 is -2 -- still true. -1 is also what a comparison hands back, so
-.the flag reads like one. IF itself tests non-zero, so either value would
-.have worked with the plain form.
-.
-.It answers for x16emu and nothing else. A 0 means "not x16emu" -- a real
-.machine, or another emulator that does not carry those registers. And
-.$9FA0-$9FBF is expansion card I/O on the real machine, so a card at I/O5
-.could in principle answer "16" as well: a 1 is strong, a 0 is certain.
+.  SPLITT.EXP.BL -- runnable, in the GPC-BASIC folder
+.  STRINGS.EXP.BL -- runnable, in the GPC-BASIC folder
+.  STRTST.EXP.BL -- runnable, in the GPC-BASIC folder
 .
 =SEE ALSO
 .
->75|4.3 APPSYS.INC.BL -- start politely, leave it as you found it
->116|STASHFILE.INC.BL -- a saved text rectangle, through a file.
+>38|3.4.5 GP.STRPTR -- address of a string block
+>34|3.4.1 GP.INSTR -- position of a substring
+>67|4.2 STRINGS.INC.BL -- string helpers

@@ -1,121 +1,92 @@
-@4.6 MENUVERT.INC.BL -- a vertical menu
+@4.5 BMX.INC.BL -- a BMX bitmap into VERA
 .
-=4.6 MENUVERT.INC.BL -- A VERTICAL MENU
+=4.5 BMX.INC.BL -- A BMX BITMAP INTO VERA
 .
 =DESCRIPTION
 .
-.  MENUVERT.RUN
-.      IN: the variables below
-.      OUT: MENUVERT.SEL MENUVERT.KEY
+.  BMX.OPEN
+.      IN: BMX.FILE$
+.      OUT: BMX.ERROR$, and the header -- BMX.WIDTH .HEIGHT .DEPTH .VERSION
+.        .PALUSED .PALFIRST .DATAOFF .PACKED
 .
-.  MENUVERT.DRAW
-.      IN: the same
-.      OUT: draws the menu without driving it
+.  BMX.PAINT
+.      IN: an open file
+.      OUT: palette and pixels in VRAM, file closed
 .
-.  MENUVERT.ROW
-.      IN: MENUVERT.DRAWROW MENUVERT.DRAWATTR
-.      OUT: one row, in the attribute you name
+.  BMX.SHOW
+.      IN: BMX.FILE$
+.      OUT: both of the above
 .
-.  MENUVERT.HOTFIND
-.      IN: MENUVERT.DRAWROW MENUVERT.DRAWTEXT$
-.      OUT: MENUVERT.HOTAT -- where that row's hotkey letter sits, 1-based,
-.        or 0 for "do not tint"
+.  BMX.CLOSE
+.      IN: --
+.      OUT: abandons a file opened by BMX.OPEN
 .
-.  MENUVERT.X .Y
-.      top left of the first row, not of a frame -- draw the border yourself
-.        with GP.BOX, so the menu owes nothing to one style of border
+.  BMX.RESTORE
+.      IN: --
+.      OUT: puts the machine's own palette back
 .
-.  MENUVERT.WIDTH
-.      cells wide. This is the width of the highlight, so it is the width of
-.        the menu whatever the text happens to do
+.BMX.ERROR$ empty means it worked.
 .
-.  MENUVERT.COUNT
-.      how many rows
+:BMX.FILE$ = "TITLE.BMX"
+:SCREEN 128
+:GOSUB BMX.SHOW
+:IF BMX.ERROR$ <> "" THEN PRINT BMX.ERROR$
 .
-.  MENUVERT.ITEM$()
-.      the rows, 1..COUNT -- the caller owns the DIM, see below
+.Use the long form to read the size before committing to a screen mode, or to
+.report a bad file before the display is torn down:
 .
-.  MENUVERT.ATTR
-.      packed attribute, background * 16 + foreground
+:BMX.FILE$ = F$
+:GOSUB BMX.OPEN
+:IF BMX.ERROR$ <> "" THEN GOTO COMPLAIN
+:REM ... BMX.WIDTH, BMX.HEIGHT, BMX.PALUSED readable here ...
+:SCREEN 128
+:GOSUB BMX.PAINT
 .
-.  MENUVERT.HIATTR
-.      the same for the highlighted row. 0 means invert MENUVERT.ATTR
+.Set the screen mode before BMX.PAINT, not after. SCREEN reloads the default
+.palette, so a mode change after painting discards the image's colours:
+.correct pixels, wrong palette.
 .
-.  MENUVERT.HOT$
-.      one character a row, "" for none
+.BMX.PAINT writes the image's colours over the machine's palette, and nothing
+.on the X16 restores them -- not SCREEN, not the KERNAL's screen_mode.
+.BMX.PAINT therefore stashes all 256 entries in spare VRAM first, and
+.BMX.RESTORE writes them back:
 .
-.  MENUVERT.HOTATTR
-.      paint the hotkey letter in this attribute. 0 is off, and off is the
-.        default
+:BMX.FILE$ = "TITLE.BMX"
+:SCREEN 128
+:GOSUB BMX.SHOW
+:REM ... the title screen ...
+:GOSUB BMX.RESTORE
 .
-.  MENUVERT.SEPATTR
-.      the separator line's attribute. 0 draws it in MENUVERT.ATTR, and 0 is
-.        the default
+.A program that keeps the machine need never call it. A program that returns
+.the machine to BASIC or chains to another calls it once. It is safe to call
+.at any time: with nothing stashed there is nothing to do, so a program whose
+.image failed to load can still call it on the way out. All 256 entries are
+.kept, not the range the file claims, and they are kept once per run -- so a
+.slideshow restores the machine's own palette rather than the previous
+.image's.
 .
-.  MENUVERT.SEPCHR
-.      the separator's glyph. 0 is MENUVERT.LINE, the PETSCII stroke, and is
-.        the default. On a charset where a byte is its own tile index -- ISO,
-.        CP437 -- name the code point the program's own frames use
+.BMX.STASH is the VRAM address they go to, $13000 by default, which is free
+.above the 320x240 framebuffer in the mode this module paints into. A caller
+.using tiles, sprites or a second bitmap there must move it or switch it off
+.with BMX.STASH = -1. The address is checked: a stash inside the bitmap or
+.overlapping the PSG registers is reported and nothing is painted.
 .
-.  MENUVERT.DIS$
-.      one character a row; a "1" disables that row. "" is the default and a
-.        short string leaves the rest live. Read once and cleared by both
-.        MENUVERT.RUN and MENUVERT.DRAW
+.Use -1 to switch it off, not 0. Zero is what the variable holds before it is
+.set, and BMX.INIT runs at the first BMX.OPEN, after a caller would have set
+.it, so 0 has to keep meaning unset.
 .
-.  MENUVERT.DISATTR
-.      the disabled rows' attribute. 0 draws them in MENUVERT.ATTR, and 0 is
-.        the default
+.The module handles 8 bits per pixel, uncompressed, which is what SCREEN 128
+.displays without a decompressor. Anything else is reported rather than
+.attempted. The image is centred, and anything larger than 320x240 is
+.clipped.
 .
-.  MENUVERT.HINT$()
-.      one help line a row, 1..COUNT. The caller owns this DIM, and only when
-.        it uses hints
+.Examples: BMXVIEW.EXP.BL, and BMXPAL.EXP.BL for the palette
 .
-.  MENUVERT.HINTW
-.      the hint field's width in cells. 0 is off, and off is the default;
-.        with it off MENUVERT.HINT$ is never read
+=EXAMPLE PROGRAM
 .
-.  MENUVERT.HINTX .HINTY
-.      where the hint field starts
+.  BMXVIEW.EXP.BL -- runnable, in the GPC-BASIC folder
+.  BMXPAL.EXP.BL -- runnable, in the GPC-BASIC folder
 .
-.  MENUVERT.HINTATTR
-.      the hint field's attribute, for the clear as well as the text
+=SEE ALSO
 .
-.  MENUVERT.FLAGS
-.      added together, below
-.
-.  MENUVERT.SEL
-.      the row to start on; 0 starts at 1
-.
-.  MENUVERT.SCROLL
-.      items hidden above row 1, so screen row R draws ITEM$(SCROLL + R). 0
-.        is none and is the default. MENUVERT.RUN does not change it
-.
-.  MENUVERT.SEL
-.      1..COUNT, or 0 if cancelled. Under KEYEXIT it is left alone --
-.        whatever row was highlighted when the key arrived
-.
-.  MENUVERT.KEY
-.      the key that ended it -- 13 chose, 27 cancelled, the hotkey itself, or
-.        the key KEYEXIT hands back
-.
-:MENUVERT.X = 8 : MENUVERT.Y = 6
-:MENUVERT.WIDTH = 24 : MENUVERT.COUNT = 4
-:MENUVERT.ITEM$(1) = " NEW GAME" : REM ... and so on
-:MENUVERT.ATTR = THEME.CLR(THEME.TEXT)
-:MENUVERT.HIATTR = THEME.CLR(THEME.HILITE)
-:MENUVERT.HOT$ = "NLOQ"
-:GOSUB MENUVERT.RUN
-:IF MENUVERT.SEL = 0 THEN GOTO CANCELLED
-.
-.  cursor up / down
-.      move
-.
-.  RETURN
-.      choose
-.
-.  ESC or STOP
-.      cancel
-.
-.  a hotkey
-.      chooses its row at once
-.
+>78|4.5 BMX.INC.BL -- a BMX bitmap into VERA

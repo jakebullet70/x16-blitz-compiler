@@ -1,39 +1,76 @@
-@3.1 Loops
+@3. Command reference (2)
+.      BASIC
+.      COMBO.INC.BL -- COMBO.ADD, a drop-down that folds into one row - SEC
+.        4.17
 .
-=3.1 LOOPS
+.  Dialogs
+.      BASIC
+.      CHECK.INC.BL -- CHECK.ADD, a check box, [X] or [ ] - SEC 4.21
 .
-=SYNTAX
+.  Code in a bank
+.      ASM
+.      GP.BANKED GP.ENDBANKED -- p-code at $A000, out of the low-memory
+.        budget, see SEC 3.12
 .
-:GP.DO [count]
-:    ...
-:GP.LOOP
+.  Bank ownership
+.      BASIC
+.      BANKMGR.INC.BL -- INIT CLAIM GET.FREE.BANK RELEASE COUNT - SEC 4.13
 .
-=WHAT IT COSTS
+.  Key-value store
+.      BASIC
+.      KV.INC.BL -- INIT GET PUT DEL FIND AT WIPE SAVE LOAD, strings in one
+.        RAM bank - SEC 4.20
 .
-.  ASM: GP.DO GP.LOOP GP.EXITDO
-.    ASM -- machine code in the GP runtime block. One GP keyword pays for the
-.    whole block.
+.  Keyboard
+.      BASIC
+.      KB.INC.BL -- KB.CLEARKB - SEC 4.14
 .
-=DESCRIPTION
+.  The drive
+.      BASIC
+.      FILEIO.INC.BL -- STATUS EXISTS SIZE DELETE RENAME COPY MKDIR CHDIR
+.        SAVEARRAY LOADARRAY - SEC 4.15
 .
-.Counted loop, modelled on prog8's repeat. A count of 0, or no count, loops
-.forever. Loops nest.
+.  The drive
+.      BASIC
+.      FILEDIR.INC.BL -- FILE.DIR.INIT OPEN NEXT, into a bank or low RAM -
+.        SEC 4.16
 .
-:GP.EXITDO
+.  Screen -- stash
+.      BASIC
+.      STASHVRAM.INC.BL -- SV.SAVE SV.RESTORE SV.PUT SV.GET, kept in VRAM -
+.        SEC 4.18
 .
-.Leaves the innermost GP.DO, closing its stack frame. A GOTO out of a GP.DO
-.closes its frames too -- see SEC 3.2 -- but GP.EXITDO is two bytes and needs
-.no branch target.
+.  Screen -- stash
+.      BASIC
+.      STASHVRAMGC.INC.BL -- SV.COMPACT - SEC 4.19
 .
-:GP.DO
-:  TICK = TICK + 1
-:  IF TICK = 9 THEN GP.EXITDO
-:GP.LOOP
+.  Numbers
+.      BASIC
+.      MATH.INC.BL -- MATH.MIN MATH.MAX - SEC 4.22
 .
-=EXAMPLE PROGRAM
+.  Memory
+.      BASIC
+.      MEM.INC.BL -- MEM.COPY MEM.FILL, the KERNAL's block move - SEC 4.23
 .
-.  LOOPS.EXP.BL -- runnable, in the GPC-BASIC folder
+.The rule is in SEC 1: assembly for tight loops and bulk data moves, BASIC
+.for everything else, and a composite for anything that is only a spelling of
+.keywords already present.
+.
+.The keywords in detail. Square brackets mean optional. Optionals cannot be
+.skipped over: GP.BOX X,Y,W,H,,7 is a syntax error -- write out the default
+.you are passing through.
 .
 =SEE ALSO
 .
->29|3.2 Multi-way branch
+>64|4. Module reference -- the BASL library
+>43|3.8 Block IF
+>44|3.9 Inline assembly
+>33|3.4 Strings
+>32|3.3.1 GP.HIBYTE / GP.LOBYTE -- split an address into two bytes
+>51|3.10 Text in a bank
+>52|3.11 Calling a routine in one statement
+>66|4.1 THEME.INC.BL -- named colour roles
+>67|4.2 STRINGS.INC.BL -- string helpers
+>76|4.3 APPSYS.INC.BL -- start politely, leave it as you found it
+>77|4.4 LINEINPUT.INC.BL -- a positioned entry field
+>78|4.5 BMX.INC.BL -- a BMX bitmap into VERA

@@ -1,112 +1,76 @@
-@7. Memory, and what the compiler tells you
+@4. Labels are global too
 .
-=7. MEMORY, AND WHAT THE COMPILER TELLS YOU
+=4. LABELS ARE GLOBAL TOO
 .
-=What GPC prints when it finishes
+.Every NAME: in every module is a jump target in one flat space, including
+.the ones you were never meant to call. BMX.STREAM.MORE, LINEINPUT.REDRAW,
+.THEME.SELECT.DARK and most of MENU.* are internal, and a GOSUB to one will
+.do something, just not something useful.
 .
-.One item a line. GPBMODS, built shared:
+.MENU.INC.BL is called through its verbs, MENU.BEGIN, ITEM, ITEMX, SELECTED
+.and DRAWBAR with GP.SUB and MENUTO.VERT and MENUTO.BAR with GP.FN, and
+.MENUPULL.INC.BL through MENUTO.PULLDOWN. Every label in both files is
+.internal: the .BODY labels behind the verbs, MENU.RUN, .WAIT, .KEYED, .TURN,
+..MOVED, .WRAPTOP, .WRAPBOT, .CANCEL, .KEYHOT, .HOTTAKE, .SKIPOFF, .SKIPLOOP,
+..LIGHT, .DRAWALL, .SPOT, .DRAWROW, .SEPROW, .HINTSHOW, .PADKEY, .PADREAD,
+..STRIP, .CREATE, .MEASURE, .FRAMEBOX, .BARPLACE, and MENUPULL.MARK, .BESIDE,
+..PLACE and .SAVE.
 .
-:OK LOW CODE 11520, SHARED GPBASIC
-:LOW FREE 12288, FRAME STACK 2048
-:LINES 3795
-:BANK   7 CODE  4864 USED  3328 FREE
-:BANK   9 CODE   768 USED  7424 FREE
-:BANK   4 CODE  7680 USED   512 FREE
-:BANK  10 CODE   768 USED  7424 FREE
-:BANK   8 CODE  1792 USED  6400 FREE
-:BANK  11 CODE  3072 USED  5120 FREE
-:BANK   5 TEXT  7424 USED   768 FREE
-:BANK   6 TEXT  4352 USED  3840 FREE
-:TOTAL BANKS 8, 30720 USED
+.FILE.* has a great many, because most of the module is one routine feeding
+.another: the callable names are FILE.STATUS, EXISTS, DELETE, RENAME, COPY,
+.MKDIR, CHDIR, UP, GETPATH, SAVEARRAY and LOADARRAY, plus FILE.DIR.INIT,
+..OPEN and .NEXT. FILE.CMD, .DONE, .PETNAME, .PETNEW, .TOPET, .PATHWALK,
+..WRITEROWS, .READROWS, .ROWREAL, .ROWDROP, .KEEPROW, FILE.DIR.WHERE,
+..LOWRAM, .ASKFOR, .SUCK, .SKIPDISK, .FILL and .STEP are not. FILE.DIR.FILL
+.and FILE.DIR.STEP are the two assembly blobs and enter with no arguments set
+.up at all.
 .
-.An embedded build prints a RUNTIME line second. GPCTEST-E:
+.STRINGS has three of its own. STR.SPLIT.NEXT and STR.REPLACE.NEXT are loop
+.continuations rather than entry points: enter either directly and you resume
+.a loop whose accumulators were never initialised. STR.TRIM.GO is the shared
+.body of the three trims and runs with whatever STR.OP% last held. The
+.callable names are STR.PADR, PADL, PADC, SPLIT, REPLACE, PET2SCR, TRIM,
+.LTRIM, RTRIM and SPLICE.
 .
-:OK LOW CODE 969, EMBEDDED GPBASIC
-:RUNTIME 11519
-:LOW FREE 24064, FRAME STACK 2048
+.GUI.INC.BL has more internal labels than anything else in the library,
+.because GUI.FORM is a dispatcher and every arm of it is one. The callable
+.names are GUI.OPEN and GUI.CLOSE -- the dialogs themselves are verbs, in
+.GUI-DIALOGS.INC.BL. GUI.FORM is usable and undocumented, the module's own.
+.Everything else, the whole of GUI.FORM., GUI.BUTTON, GUI.BTN., GUI.LIST.,
+.GUI.FIELD.DRAW, GUI.FRAME, GUI.GLYPHS, GUI.SHADOW.*, GUI.SIZE,
+.GUI.PLACE.BOX, GUI.PLACE.SCROLL and GUI.SCREEN, is not.
 .
-.  LOW CODE
-.      the p-code in low memory, in bytes. P-code and GP.ASM blocks in a
-.        GP.BANKED region are not in it
+=A module in a bank keeps its names
 .
-.  SHARED EMBEDDED
-.      SHARED loads a resident runtime file at run time. EMBEDDED carries the
-.        runtime in the object
+.Where a module's #INCLUDE sits changes none of its names. THEME.SELECT is
+.THEME.SELECT in low memory and inside a GP.BANKED region, and a GOSUB to it
+.compiles to what reaches it: an ordinary GOSUB from inside the same region,
+.and a .bgosub that selects the region's bank from anywhere else.
+.BANKED-OR-NOT.md has the rules.
 .
-.  GPBASIC CORE
-.      GPBASIC when a GP. keyword reached the 1,024-byte handler block:
-.        shared, the program loads GPB.RT.nnn.BIN; embedded, the block is in
-.        the object. CORE when none did: shared, it loads GPC.RT.nnn.BIN;
-.        embedded, ScanGPUsage dropped the block
+.So a name is callable from anywhere, in any build. An older library gave
+.some modules a banked .BODY and a low-memory front door, and a program that
+.calls a .BODY name stops with LABEL NOT FOUND. What this section calls
+.internal is still internal.
 .
-.  RUNTIME
-.      embedded only. The runtime bytes carried in the object
+.Include a module once. One #INCLUDE in low memory and another in a region is
+.DUPLICATE SYMBOL where the module has no #IFNDEF guard. Where it has one,
+.the module lands at the first #INCLUDE and the second produces nothing.
 .
-.  LOW FREE
-.      what is left in low memory for variables, strings and arrays. This is
-.        the number that runs out. It ends at $9F00 embedded, and at the
-.        resident runtime shared
+.Each module also has a skip label it jumps over itself with -- THEME.SKIP,
+.APPSYS.SKIP, STR.SKIP, BMX.MODULE.END, LINEINPUT.MODULE.END,
+.MENU.MODULE.END, MENUPULL.MODULE.END, GUI.MODULE.END,
+.GUI.LISTBOX.MODULE.END, STASH.MODULE.END, STASHFILE.MODULE.END,
+.SORT.MODULE.END and STRCASE.MODULE.END. Those exist so an include can sit
+.anywhere in the file, the top included. Do not branch to one.
 .
-.  FRAME STACK
-.      the 2,048 bytes reserved between the p-code and the workspace for
-.        GOSUB and FOR frames. LOW FREE does not include them
+.BASLOAD refuses a name used as both a label and a variable (BASLOAD.MD:319).
+.BMX.SKIP is the byte-skip counter, so the module's skip label had to be
+.BMX.MODULE.END -- a name is either a label or a variable, never both.
 .
-.  LINES
-.      the source lines compiled, the lines of GP.ASM and GP.BANKEDSTR blocks
-.        included. Lines left out as dead code are not counted
+=SEE ALSO
 .
-.  DEAD CODE
-.      printed only when dead code is removed: the source lines left out, and
-.        the p-code bytes they would have taken. LOW CODE is already without
-.        them
-.
-.  BANK
-.      printed only when the program has a region or banked text. One line a
-.        bank: CODE for a GP.BANKED region, TEXT for GP.BANKEDSTR, then the
-.        bytes used and free of its 8,192. Both are whole pages, so FREE is
-.        room that is certainly there
-.
-.  TOTAL BANKS
-.      after the BANK lines: how many, and the bytes they use
-.
-.Two budgets come off LOW FREE:
-.
-.  - LOW FREE is the workspace the running program has for its data.
-.  - LOW FREE minus 4,096 is how much more low-memory p-code will fit.
-.    WriteObjectCode refuses to leave less than 4K of workspace, so a build
-.    reporting LOW FREE 4096 is one page from PROGRAM TOO BIG.
-.
-.A program can be comfortable on one and out of room on the other. LOW FREE
-.4096 is 4K to run in and nowhere left to grow; GPBMODS at LOW FREE 12288 has
-.both.
-.
-=What ships with the program
-.
-.nnn in a runtime name is the compiler build, so a runtime file serves only
-.programs from its own build.
-.
-.  EMBEDDED
-.      FILES: NAME.PRG only. The runtime and the bank 1 code are in the
-.        object
-.
-.  SHARED
-.      FILES: NAME.PRG
-.
-.    
-.      FILES: GPB.RT.nnn.BIN when the report says GPBASIC, GPC.RT.nnn.BIN
-.        when it says CORE
-.
-.    
-.      FILES: GP1.RT.nnn.BIN, always
-.
-.    
-.      FILES: NAME.OVL, holding every BANK line's region, beside the .PRG
-.
-.The bootstrap looks for the runtime in the current directory, then at the
-.root of the SD card, so one copy at / serves every program. GP1.RT.nnn.BIN
-.must sit in the same place as the runtime that loaded. A runtime file that
-.is not found prints ?RT.
-.
-.GPC.BIN, GPC.IMG.nnn.BIN and GP1.IMG.nnn.BIN are the compiler and its inputs
-.and do not ship.
-.
+>79|4.6 MENU.INC.BL -- menus built a row at a time
+>88|4.9 MENUPULL.INC.BL -- a dropdown under a bar item
+>90|4.11 GUI.INC.BL -- the box that puts the screen back, and the form in 
+>92|4.12 GUI-DIALOGS.INC.BL -- every dialog as a verb

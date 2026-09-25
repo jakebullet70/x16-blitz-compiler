@@ -1,27 +1,47 @@
-@3.3.1 GP.HIBYTE / GP.LOBYTE -- split an address into two bytes
+@3.3 Machine code
 .
-=3.3.1 GP.HIBYTE / GP.LOBYTE
+=3.3 MACHINE CODE
 .
-.  Syntax    GP.HIBYTE(n)   GP.LOBYTE(n)
-.  Returns   GP.HIBYTE: INT(n / 256), the 256-byte page.
-.            GP.LOBYTE: MOD(n, 256), the offset within that page.
-.  Kind      COMPOSITE. Expands to INT(n/256) and MOD(n,256). No
-.            runtime code, and neither needs the GP block.
-.  Notes     n is 0-65,535, which covers every address on the machine.
-.            Everything that consumes an address takes eight bits at a
-.            time: GP.CALL's registers, VERA's $9F20/$9F21. The
-.            addresses to split come from GP.STRPTR (SEC 3.4.5) and
-.            GP.ARRPTR (SEC 3.5).
-.  WARNING   Never write P AND 255 for the low byte. AND is 16-bit
-.            signed and any address worth splitting is above 32,767,
-.            so it raises OUT OF RANGE instead of masking. GP.LOBYTE
-.            is built on MOD, which uses the full 32-bit divide.
-.  Example
+=SYNTAX
 .
-:            P = GP.STRPTR(A$)
-:            GP.CALL $A000, GP.LOBYTE(P), GP.HIBYTE(P)
+:GP.CALL address [,a] [,x] [,y] [,carry]
+:GP.A   GP.X   GP.Y   GP.C
+.
+=WHAT IT COSTS
+.
+.  ASM: GP.CALL GP.A GP.X GP.Y GP.C
+.    ASM -- machine code in the GP runtime block. One GP keyword pays for the
+.    whole block.
+.
+=DESCRIPTION
+.
+.Calls machine code with the registers set. All four arguments are optional
+.and default to 0. The four value words read the registers back afterwards.
+.
+.They are keywords, not variables: X = GP.A reads, GP.A = 5 is a syntax
+.error. They share SYS's $030C-$030F, so they also read what a plain SYS left
+.behind.
+.
+:GP.CALL $FF5F, 0, 0, 0, 1 : REM KERNAL screen_mode, carry set = report
+:COLS = GP.X : ROWS = GP.Y
+.
+.Put machine code in banked RAM, $A000-$BFFF, not at $0400. Stock X16 BASIC
+.leaves $0400 free for the user; a compiled GPC program does not. That page
+.holds runtime state (stringHighMemory, storeStartHigh, variableStartPage),
+.and code POKEd over it corrupts the program without raising an error.
+.
+.For anything longer than a few bytes use GP.ASM (SEC 3.9) instead of GP.CALL
+.and a POKE loop. It assembles into the program: no bank to reserve, and no
+.list of numbers to keep in step with a comment.
+.
+=IN THIS SECTION
+.
+>32|3.3.1 GP.HIBYTE / GP.LOBYTE -- split an address into two bytes
+.
+=EXAMPLE PROGRAM
+.
+.  MLCALL.EXP.BL -- runnable, in the GPC-BASIC folder
 .
 =SEE ALSO
 .
->37|3.4.5 GP.STRPTR -- address of a string block
->38|3.5 Arrays
+>44|3.9 Inline assembly

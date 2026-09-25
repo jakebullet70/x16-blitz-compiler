@@ -1,101 +1,15 @@
-@6. GPC-BASIC/ -- the examples
+@5. GPC-BASIC/ -- the library (2)
+=SEE ALSO
 .
-=6. GPC-BASIC/ -- THE EXAMPLES
-.
-.One .EXP.BL per topic. Several are also the regression test for the module
-.they sit beside.
-.
-.  LOOPS.EXP.BL
-.      GP.DO / GP.LOOP / GP.EXITDO
-.
-.  IF.EXP.BL
-.      GP.IF / GP.ELSEIF / GP.ELSE / GP.ENDIF
-.
-.  SELECT.EXP.BL
-.      GP.SELECT / GP.CASE / GP.OTHER / GP.ENDSEL
-.
-.  UNWIND.EXP.BL
-.      a GOTO may leave a GP.SELECT or a GP.DO
-.
-.  STRINGS.EXP.BL
-.      the GP.BASIC string set
-.
-.  STRUSING.EXP.BL
-.      one value through six masks, a column, and the overflows
-.
-.  ARRAYS.EXP.BL
-.      the GP.BASIC array set
-.
-.  SCREEN.EXP.BL
-.      the GP.BASIC text drawing set
-.
-.  ISO.EXP.BL
-.      GP.PRINTAT and GP.BOX in ISO mode
-.
-.  MLCALL.EXP.BL
-.      GP.CALL with GP.A / GP.X / GP.Y / GP.C
-.
-.  ASM.EXP.BL
-.      GP.ASM / GP.ENDASM, inline 65C02
-.
-.  MENU.EXP.BL
-.      a whole small application, in the shape the GP set is for
-.
-.  MENUDEMO.EXP.BL
-.      MENUVERT drawn the way an application would draw it
-.
-.  GUI.EXP.BL
-.      the four dialogs, over a screen they have to put back
-.
-.  STASHVRAM.EXP.BL
-.      three panels nested in VRAM, a blob, and the compactor. Needs no
-.        #SYMFILE, which is the point
-.
-.  FORM.EXP.BL
-.      three fields you can move between, LINEINPUT style
-.
-.  BMXVIEW.EXP.BL
-.      a BMX bitmap viewer, in about thirty lines
-.
-.  BMXPAL.EXP.BL BMXSPD.EXP.BL
-.      the palette question, and the speed of each path
-.
-.  SORT.EXP.BL STRCTST.EXP.BL STRTST.EXP.BL SPLITT.EXP.BL
-.      the regression tests for SORT, STRCASE, the STRINGS assembly and
-.        STR.SPLIT
-.
-.  USINGT.EXP.BL
-.      the regression test for STR.USING, thirty-nine cases
-.
-.  MENUTST.EXP.BL GUI2TST.EXP.BL
-.      the same for the menu and the listbox, driven through the keyboard
-.        buffer
-.
-=EXAMPLE PROGRAM
-.
-.  LOOPS.EXP.BL -- runnable, in the GPC-BASIC folder
-.  IF.EXP.BL -- runnable, in the GPC-BASIC folder
-.  SELECT.EXP.BL -- runnable, in the GPC-BASIC folder
-.  UNWIND.EXP.BL -- runnable, in the GPC-BASIC folder
-.  STRINGS.EXP.BL -- runnable, in the GPC-BASIC folder
-.  STRUSING.EXP.BL -- runnable, in the GPC-BASIC folder
-.  ARRAYS.EXP.BL -- runnable, in the GPC-BASIC folder
-.  SCREEN.EXP.BL -- runnable, in the GPC-BASIC folder
-.  ISO.EXP.BL -- runnable, in the GPC-BASIC folder
-.  MLCALL.EXP.BL -- runnable, in the GPC-BASIC folder
-.  ASM.EXP.BL -- runnable, in the GPC-BASIC folder
-.  MENU.EXP.BL -- runnable, in the GPC-BASIC folder
-.  MENUDEMO.EXP.BL -- runnable, in the GPC-BASIC folder
-.  GUI.EXP.BL -- runnable, in the GPC-BASIC folder
-.  STASHVRAM.EXP.BL -- runnable, in the GPC-BASIC folder
-.  FORM.EXP.BL -- runnable, in the GPC-BASIC folder
-.  BMXVIEW.EXP.BL -- runnable, in the GPC-BASIC folder
-.  BMXPAL.EXP.BL -- runnable, in the GPC-BASIC folder
-.  BMXSPD.EXP.BL -- runnable, in the GPC-BASIC folder
-.  SORT.EXP.BL -- runnable, in the GPC-BASIC folder
-.  STRCTST.EXP.BL -- runnable, in the GPC-BASIC folder
-.  STRTST.EXP.BL -- runnable, in the GPC-BASIC folder
-.  SPLITT.EXP.BL -- runnable, in the GPC-BASIC folder
-.  USINGT.EXP.BL -- runnable, in the GPC-BASIC folder
-.  MENUTST.EXP.BL -- runnable, in the GPC-BASIC folder
-.  GUI2TST.EXP.BL -- runnable, in the GPC-BASIC folder
+>66|4.1 THEME.INC.BL -- named colour roles
+>76|4.3 APPSYS.INC.BL -- start politely, leave it as you found it
+>112|STASH.INC.BL -- save a text rectangle, and put it back.
+>116|STASHFILE.INC.BL -- a saved text rectangle, through a file.
+>100|4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM
+>101|4.19 STASHVRAMGC.INC.BL -- close the holes in a STASHVRAM store
+>77|4.4 LINEINPUT.INC.BL -- a positioned entry field
+>79|4.6 MENU.INC.BL -- menus built a row at a time
+>95|4.13 BANKMGR.INC.BL -- who owns which RAM bank
+>88|4.9 MENUPULL.INC.BL -- a dropdown under a bar item
+>90|4.11 GUI.INC.BL -- the box that puts the screen back, and the form in 
+>92|4.12 GUI-DIALOGS.INC.BL -- every dialog as a verb

@@ -1,41 +1,66 @@
-@4.22 GPBMODS -- the harness that drives every module (2)
-=The text is in a bank
+@4.21 CHECK.INC.BL -- a check box, [X] or [ ]
 .
-.542 strings in 72 named groups, 11,776 bytes across two pools, none of it in
-.low RAM. Every string the shell says sits in a GP.BANKEDSTR block in front
-.of the routine that says it and is read back with GP.BSTR. Two pools,
-.because one pool is a hard 8,192 bytes and BStrPoolWrite stops the compile
-.when one fills. Which pool a group is in costs the call site nothing, so
-.moving a group is the whole of the answer to a full one.
+=4.21 CHECK.INC.BL -- A CHECK BOX, [X] OR [ ]
 .
-.Every menu is a block of its own, index 0 the dropdown's title and 1 upwards
-.the rows. MENUVERT.COUNT comes from GP.BSTRCOUNT and a loop reads the rows,
-.so a row is added by adding a line to the block, and no other menu moves.
+=DESCRIPTION
 .
-.The numbers under ABOUT / BANK MEMORY and ABOUT / MODULE SIZES are typed
-.into GP.BANKEDSTR blocks, so they are only true of the build they were taken
-.from.
+.  CHECK.ADD
+.      IN: CHECK.X CHECK.Y CHECK.TEXT$ CHECK.ON
+.      OUT: CHECK.CTRL
 .
-=The room it runs in
+:CHECK.X = GUI.INNER.LEFT : CHECK.Y = GUI.INNER.TOP
+:CHECK.TEXT$ = "SHOW HIDDEN FILES" : CHECK.ON = -1
+:GOSUB CHECK.ADD
+:HIDDEN = CHECK.CTRL
+:REM ... run the form ...
+:IF (GUI.CTRL.FLAGS%(HIDDEN) AND GUI.CF.CHECKED) <> 0 THEN PRINT "TICKED"
 .
-.The workspace is what is left between the program's own p-code and the
-.resident runtime: $4000 to $6600, 9,728 bytes. The first p-code opcode is
-..varspace and its operand is what the scalars take -- 3,292 here, leaving
-.about 6,436 for the string arrays and the whole string heap.
+.Only CHECK.ADD is called by an application. CHECK.DRAW and CHECK.KEY are
+.reached by GUI.FORM, which dispatches a GUI.CT.CHECK control to them by
+.name. The call goes between GUI.FORM.BEGIN and GUI.FORM.RUN.
 .
-.Moving code into a bank moves no scalars. A banked routine's variables are
-.the same workspace variables low memory sees, so .varspace grows as panels
-.are added whatever bank they run from.
+.CHECK.X and CHECK.Y are the cell the [ goes in, and the caption starts four
+.cells to the right. CHECK.TEXT$ = "" draws a bare box. A non-zero CHECK.ON
+.starts the box ticked. CHECK.CTRL is the control's number, and 0 when the
+.form is already full.
 .
-.GPC-BASIC/ inside the sample folder is the library working copy and it is
-.ahead of the root copy. A module is proved here and copied whole into root.
-.GPB.INC.BL runs the other way: root is upstream for it, and the build copies
-.root's over this folder's every time.
+.The state is a flag on the control, GUI.CF.CHECKED in GUI.CTRL.FLAGS%().
+.Keep CHECK.CTRL and test the flag after GUI.FORM.RUN. One form carries as
+.many boxes as it has controls.
+.
+.  X
+.      DOES: ticks the box
+.
+.  DEL
+.      DOES: clears it
+.
+.  SPACE
+.      DOES: flips it
+.
+.  TAB RIGHT DOWN
+.      DOES: the next control
+.
+.  SHIFT+TAB LEFT UP
+.      DOES: the previous control
+.
+.  RETURN
+.      DOES: presses the default button
+.
+.  ESC STOP
+.      DOES: cancels the form
+.
+.Any other key is offered to the buttons' marked letters.
+.
+.It is required by GUI.INC.BL, which names CHECK.DRAW and CHECK.KEY. It goes
+.in after that file, as COMBO.INC.BL does. A program that includes the GUI
+.and leaves this one out stops with LABEL NOT FOUND.
+.
+.GPBMODS (SEC 4.24) runs three boxes and a combo on one form, under DIALOG >
+.CHECK BOX + COMBO.
 .
 =SEE ALSO
 .
->77|4.5 BMX.INC.BL -- a BMX bitmap into VERA
->93|4.13 BANKMGR.INC.BL -- who owns which RAM bank
->56|3.12 Code in a bank
->50|3.10 Text in a bank
->98|4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM
+>107|4.24 GPBMODS -- the harness that drives every module
+>104|4.21 CHECK.INC.BL -- a check box, [X] or [ ]
+>90|4.11 GUI.INC.BL -- the box that puts the screen back, and the form in 
+>99|4.17 COMBO.INC.BL -- a drop-down list that folds into one row

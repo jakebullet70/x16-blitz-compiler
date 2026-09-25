@@ -1,116 +1,43 @@
-@3.12 Code in a bank
+@3.11.3 GP.FN -- call a verb from inside an expression
 .
-=3.12 CODE IN A BANK
+=3.11.3 GP.FN
 .
-=SYNTAX
+.  Syntax    GP.FN(verb [, expression ...])
+.  Does      Assigns each expression to the matching formal, calls the
+.            routine, and gives back the variable the declaration
+.            named after RETURNS.
+.  Kind      FUNCTION. Two runtime opcodes bracket the call.
+.  Notes     The verb must be declared RETURNS. Its type is the type
+.            of the term, so a verb returning a string is a string
+.            term and concatenates.
+.            The body may be as long as it likes and may print, read
+.            files, open blocks and call other verbs. The caller's
+.            half-built expression and its string temporaries are
+.            carried across it.
+.            Costs 5 bytes of p-code at the call site against GP.SUB's
+.            3, plus the read of the RETURNS variable that the long
+.            spelling pays anyway, plus 2 bytes for each argument
+.            after the first -- an argument waits on the frame stack
+.            until the call, so the number of formals is not a limit.
+.            A string result costs 3 bytes more: it is copied into a
+.            temporary, so two calls to one verb may share an
+.            expression.
+.  WARNING   The call must sit below its GP.DEFPROC (SEC 3.11.1), as
+.            GP.SUB's (SEC 3.11.2) does.
+.            The body must not call its own verb: there is one set of
+.            formals and it would write over the arguments in use.
+.            An argument may be as deep an expression as any other,
+.            and however many there are only one of them is on the
+.            evaluation stack at a time.
+.  Example
 .
-:GP.BANKED <bank>
-:    ... p-code ...
-:GP.ENDBANKED
+:            PRINT "AREA "; GP.FN(AREA, 3, 4)
+:            T = A + GP.FN(AREA, 3, 4) * 2
+:            PRINT "X" + GP.FN(TAG, "AB") + "Y"
+:            PRINT GP.FN(TAG, "AB") + GP.FN(TAG, "CD")
+:            PRINT GP.FN(AREA, 2, GP.FN(AREA, 3, 4))
 .
-=WHAT IT COSTS
+=SEE ALSO
 .
-.  ASM: GP.BANKED GP.ENDBANKED
-.    ASM -- machine code in the GP runtime block. One GP keyword pays for the
-.    whole block.
-.
-=DESCRIPTION
-.
-.Marks a run of p-code as belonging at $A000 in that RAM bank rather than in
-.low memory. Both keywords are alone on their line and the bank is a decimal
-.constant.
-.
-.They are compile-time markers and select nothing. BANK is the statement that
-.selects a bank, and these are deliberately not spelled like it. Nothing
-.happens at run time where the GP.BANKED line is.
-.
-.This is how a program gets past the shared p-code ceiling. Low-memory p-code
-.has to fit under the runtime -- about 17,920 bytes, SEC 7 -- and a region
-.does not count against it. Every region of the program goes into one overlay
-.file, NAME.OVL, written beside the .PRG and read in with it.
-.
-:#DEFINE MY.GUICODE 4
-:GOTO MY.LIBEND
-:GP.BANKED MY.GUICODE
-:#INCLUDE "MENUVERT.INC.BL"
-:#INCLUDE "LINEINPUT.INC.BL"
-:#INCLUDE "GUI.INC.BL"
-:#INCLUDE "GUI2.INC.BL"
-:GP.ENDBANKED
-:MY.LIBEND:
-.
-.The GOTO over the region is not optional. Falling in through the bridge
-.GP.BANKED leaves works at program start and stops working the day anything
-.selects another bank first. The compiler does not catch a fall-in.
-.
-.#DEFINE the bank above the GP.BANKED line. BASLOAD replaces a name only once
-.it has read its #DEFINE, and the number is then fixed when the program
-.compiles.
-.
-.Claim the bank, or something else hands it out:
-.
-:BANKMGR.SET.BANK = MY.GUICODE : GOSUB BANKMGR.CLAIM
-.
-=What fits
-.
-.32 pages -- the whole of $A000-$BFFF, 8,192 bytes. The entry bridge, the
-.alignment padding, the exit bridge, the end marker and every GP.ASM block in
-.the region are part of what has to fit, so the usable payload is a little
-.under the window. Past it the compiler stops and names the region's
-.GP.BANKED line, not the line it happened to be on when it ran out.
-.
-.Banks 2 to 255, and at most 127 regions. Bank 0 is the KERNAL's and bank 1
-.is reserved for the runtime; the compiler refuses both. A 512 K X16 has
-.banks up to 63 and a 2 MB one up to 255, and a program that names a bank the
-.machine does not have prints ?RAM and returns to READY before it loads
-.anything. GP.BANKEDSTR banks count toward the 127: one region over it stops
-.the compile with TOO MANY GP.BANKED REGIONS, and one text bank over it with
-.NO REGION LEFT FOR GP.BANKEDSTR TEXT. No two regions may share a bank: the
-.second would land at $A000 on top of the first.
-.
-=What a region may not contain
-.
-.BANK is the one statement refused inside a region. Code fetched from the
-.window cannot be running when the window changes, and BANK changes it and
-.leaves it changed. PEEK and POKE put the bank back after each access, and
-.BLOAD and BSAVE are not refused. A BANK statement keeps STASH and STASHFILE
-.in low memory; STASHVRAM (SEC 4.18) has none, so it goes in.
-.
-.GP.BANKEDSTR (SEC 3.10) inside a region is free: it emits no p-code at all,
-.so a text group costs the region nothing.
-.
-.A GP.ASM block inside a region goes into the region's bank. A block that
-.writes $00, the RAM bank register, must be GP.ASM LOW (SEC 3.9). The
-.compiler refuses a direct store to $00 without it.
-.
-=Calling in, and calling out
-.
-.A call into a region selects the region's bank. A GOSUB, GP.SUB, GP.FN or FN
-.whose target is inside a region, from anywhere outside that region, compiles
-.to .bgosub. It keeps the selected bank, selects the region's, and RETURN
-.selects the kept one again. The caller may be in low memory or in another
-.region, and the calls nest like any GOSUB. A call that stays inside one
-.region is an ordinary GOSUB.
-.
-.A call out of a region to low memory is a banked call too. A GOSUB, GP.SUB,
-.GP.FN or FN from inside a region to a target in low memory compiles to
-..bgosub with the region's own bank. RETURN selects that bank again, so a low
-.routine that executes BANK returns into the region under the right bank.
-.
-.A GOTO selects nothing, so a GOTO into a region from outside it is refused
-.with NOT IMPLEMENTED, from low memory or from another region. IF ... GOTO,
-.IF ... THEN <line> and ON ... GOTO are refused the same way. Enter a region
-.by a call. A GOTO that stays inside one region, or leaves one for low
-.memory, compiles.
-.
-.ON ... GOSUB makes no banked call. An ON entry is three bytes and a .bgosub
-.is four. ON ... GOSUB compiles when the caller and every target are in low
-.memory, or all in the same region. Into a region, out of a region to low
-.memory, or from one region to another, the compile stops with ON GOSUB IN OR
-.OUT OF GP.BANKED. Write a GP.SELECT or one IF ... GOSUB a case instead. A
-.plain GOSUB makes the banked call.
-.
-.A call between a region and anywhere outside it costs a byte and two bank
-.switches. .bgosub is a GOSUB with the bank after the address. Put a module
-.called inside a tight loop in the same place as the loop.
-.
+>54|3.11.1 GP.DEFPROC -- declare a verb and its arguments
+>55|3.11.2 GP.SUB -- call a verb

@@ -1,54 +1,47 @@
-@STASHFILE.INC.BL -- a saved text rectangle, through a file.
+@4.23 MEM.INC.BL -- a block copied, a block filled
 .
-=STASHFILE.INC.BL
+=4.23 MEM.INC.BL -- A BLOCK COPIED, A BLOCK FILLED
 .
-.  a saved text rectangle, through a file.
+=DESCRIPTION
 .
-=MODULE HEADER
+.  MEM.COPY
+.      IN: MEM.SOURCE MEM.TARGET MEM.COUNT
+.      OUT: MEM.OK
 .
-:      STASH.FILE.SAVE   a rectangle of the screen, out to a file
-:      STASH.FILE.LOAD   a saved file, back where it came from
-:      STASH.FILE.PUT    a saved file, pasted somewhere else
+.  MEM.FILL
+.      IN: MEM.TARGET MEM.COUNT MEM.VALUE
+.      OUT: MEM.OK
 .
-.  REQUIRES, and does not #INCLUDE for you:
-:      GPB.INC.BL      GP.ASM
-:      STASH.INC.BL    which does the actual copying
+:#INCLUDE "GPB.INC.BL"
+:#INCLUDE "MEM.INC.BL"
+:
+:MEM.TARGET = 4096 : MEM.COUNT = 1000 : MEM.VALUE = 32
+:GOSUB MEM.FILL
+:IF MEM.OK = 0 THEN PRINT "REFUSED"
 .
-.  and, like it, a #SYMFILE in your program. See that file's header.
+.The KERNAL's memory_copy and memory_fill. The verbs are MEM.BLOCKCOPY and
+.MEM.BLOCKFILL, and the two routines share MEM.TARGET, MEM.COUNT and MEM.OK.
 .
-.  Usage:
-:      STASH.BANK = 8 : STASH.FILE$ = "PANEL.BIN"
-:      STASH.X = 10 : STASH.Y = 4 : STASH.W = 30 : STASH.H = 8
-:      GOSUB STASH.FILE.SAVE
-:      ...
-:      GOSUB STASH.FILE.LOAD
+.MEM.COUNT is 1 to 65535. Anything outside that is refused and MEM.OK comes
+.back 0, never truncated. A longer block goes a chunk at a time; a chunk size
+.above $4000 cannot be a #DEFINE, which is signed. STASHVRAMGC.INC.BL (SEC
+.4.19) is the worked example.
 .
-:   in   STASH.FILE$    the name
-:        STASH.DEV      the device. 0 means 8, the usual drive
-:        STASH.BANK     the bank to stage through
-:        and, for SAVE, the geometry STASH.SAVE wants
+.Regions may overlap with the target below the source.
 .
-=A SEPARATE FILE FROM STASH.INC.BL ON PURPOSE
+.WARNING: both ends are low RAM below $9F00, or a $9F00-$9FFF I/O port. No
+.bank survives the call, so $A000-$BFFF cannot be reached. Move a banked
+.block a window at a time.
 .
-.  uncalled code stays in unless the compile removes it, and these three are
-.  127 bytes. A dialog that stashes to a bank and puts it back never goes
-.  near a disk and should not pay for one.
+.An address in $9F00-$9FFF is used without being stepped. Point a VERA data
+.port at the start of a run and pass $9F23 or $9F24 to move a whole block in
+.one call. STASHVRAM.INC.BL (SEC 4.18) does that by hand.
 .
-=THE FILE IS SELF-DESCRIBING BECAUSE THE STASH IS
-.
-.  the four header bytes go out with the cells, so loading one back needs
-.  nothing but the name. That is the flaw dotBASIC admits to in its own
-.  .CUT/.PASTE, which "requires correctly re-describing the width and height
-.  of each cut".
-.
-.  BSAVE's end address is EXCLUSIVE, so this writes the header and the cells
-.  and no padding. The length is w h 2 + 4, which BASIC works out for itself
-.  -- which is why no GP.END keyword was ever spent on telling BSAVE where a
-.  stash ended.
-.
-.  The STASH.FILE. names belong to this file; the rest of STASH. is
-.  STASH.INC.BL's.
+.Either routine brings the GP block in, 1,536 bytes, because GP.CALL lives
+.there.
 .
 =SEE ALSO
 .
->108|STASH.INC.BL -- save a text rectangle, and put it back.
+>101|4.19 STASHVRAMGC.INC.BL -- close the holes in a STASHVRAM store
+>100|4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM
+>106|4.23 MEM.INC.BL -- a block copied, a block filled

@@ -1,68 +1,121 @@
-@3. Command reference (2)
-.        4.17
+@3. Command reference
+.
+=3. COMMAND REFERENCE
+.
+.38 keywords, encoded $CE7F down to $CE50 and allocated downward. Ten of the
+.forty-eight slots are holes and stay holes: the byte values are the ABI and
+.are never renumbered.
+.
+=At a glance -- where each part comes from
+.
+.Three implementations, and what each costs:
+.
+.  - ASM -- a keyword run by machine code in the runtime. Costs runtime
+.    bytes, and one GP keyword anywhere in a program pays for the whole
+.    1,024-byte block. Documented in SEC 3.
+.  - BASIC -- a .INC.BL module of ordinary BASL, called with GOSUB. Costs
+.    nothing unless #INCLUDEd, and then only its own p-code. Documented in
+.    SEC 4.
+.  - COMPOSITE -- a keyword with no machine code of its own; the compiler
+.    expands it into keywords that already exist. Costs the runtime nothing.
+.    Documented in SEC 3 with the ASM keywords.
+.
+.  Loops
+.      ASM
+.      GP.DO GP.LOOP GP.EXITDO
+.
+.  Multi-way branch
+.      ASM
+.      GP.SELECT GP.CASE GP.OTHER GP.ENDSEL
+.
+.  Block IF
+.      ASM
+.      GP.IF GP.ELSEIF GP.ELSE GP.ENDIF -- see SEC 3.8
+.
+.  Machine code
+.      ASM
+.      GP.CALL GP.A GP.X GP.Y GP.C
+.
+.  Inline assembly
+.      COMPOSITE
+.      GP.ASM GP.ENDASM -- free, and leaves the block out, see SEC 3.9
+.
+.  Strings
+.      ASM
+.      GP.INSTR GP.STRPTR GP.COMP
+.
+.  Strings
+.      COMPOSITE
+.      GP.CONTAINS GP.ISEMPTY -- free, see SEC 3.4
+.
+.  Addresses
+.      COMPOSITE
+.      GP.HIBYTE GP.LOBYTE -- free, see SEC 3.3.1
+.
+.  Arrays
+.      ASM
+.      GP.ARRPTR
+.
+.  Banked text
+.      ASM
+.      GP.BANKEDSTR GP.ENDBANKEDSTR GP.BSTR - GP.BSTRCOUNT is COMPOSITE --
+.        see SEC 3.10
+.
+.  Routine calls
+.      COMPOSITE
+.      GP.DEFPROC GP.SUB -- free, and leaves the block out, see SEC 3.11
+.
+.  Routine calls
+.      ASM
+.      GP.FN -- the same call as a value, and it brings the GP block in
+.
+.  Screen
+.      ASM
+.      GP.BOX GP.FILL GP.PRINTAT
+.
+.  Screen
+.      COMPOSITE
+.      GP.CHAR -- free, one cell in GP.PRINTAT's shape running GP.FILL's
+.        handler
+.
+.  Colour roles
+.      BASIC
+.      THEME.INC.BL -- THEME.SELECT, THEME.CLR() - SEC 4.1
+.
+.  String helpers
+.      BASIC+ASM
+.      STRINGS.INC.BL -- PADR PADL PADC SPLIT REPLACE SPLICE PET2SCR TRIM
+.        LTRIM RTRIM - SEC 4.2
+.
+.  Screen etiquette, panels
+.      BASIC
+.      APPSYS.INC.BL -- STARTUP RESTORE PANEL.SAVE/LOAD/PUT ISEMU - SEC 4.3
+.
+.  Entry fields
+.      BASIC
+.      LINEINPUT.INC.BL -- LINEINPUT.GET, LINEINPUT.ASK - SEC 4.4
+.
+.  Bitmaps
+.      BASIC
+.      BMX.INC.BL -- BMX.SHOW, BMX.RESTORE - SEC 4.5
+.
+.  Menus
+.      BASIC
+.      MENU.INC.BL -- MENU.BEGIN ITEM ITEMX SELECTED DRAWBAR, MENUTO.VERT
+.        MENUTO.BAR - SEC 4.6
+.
+.  Menus
+.      BASIC
+.      MENUPULL.INC.BL -- MENUTO.PULLDOWN, a dropdown under a bar item - SEC
+.        4.9
 .
 .  Dialogs
 .      BASIC
-.      CHECK.INC.BL -- CHECK.ADD, a check box, [X] or [ ] - SEC 4.21
+.      GUI.INC.BL -- GUI.SAY GUI.YN GUI.MENU GUI.INPUT GUI.OPEN GUI.CLOSE -
+.        SEC 4.11
 .
-.  Code in a bank
-.      ASM
-.      GP.BANKED GP.ENDBANKED -- p-code at $A000, out of the low-memory
-.        budget, see SEC 3.12
-.
-.  Bank ownership
+.  Dialogs
 .      BASIC
-.      BANKMGR.INC.BL -- INIT CLAIM GET.FREE.BANK RELEASE COUNT - SEC 4.13
+.      GUI-DIALOGS.INC.BL -- every dialog as a one-line verb - SEC 4.12
 .
-.  Key-value store
-.      BASIC
-.      KV.INC.BL -- INIT GET PUT DEL FIND AT WIPE SAVE LOAD, strings in one
-.        RAM bank - SEC 4.20
-.
-.  Keyboard
-.      BASIC
-.      KB.INC.BL -- KB.CLEARKB - SEC 4.14
-.
-.  The drive
-.      BASIC
-.      FILEIO.INC.BL -- STATUS EXISTS SIZE DELETE RENAME COPY MKDIR CHDIR
-.        SAVEARRAY LOADARRAY - SEC 4.15
-.
-.  The drive
-.      BASIC
-.      FILEDIR.INC.BL -- FILE.DIR.INIT OPEN NEXT, into a bank or low RAM -
-.        SEC 4.16
-.
-.  Screen -- stash
-.      BASIC
-.      STASHVRAM.INC.BL -- SV.SAVE SV.RESTORE SV.PUT SV.GET, kept in VRAM -
-.        SEC 4.18
-.
-.  Screen -- stash
-.      BASIC
-.      STASHVRAMGC.INC.BL -- SV.COMPACT - SEC 4.19
-.
-.The rule is in SEC 1: assembly for tight loops and bulk data moves, BASIC
-.for everything else, and a composite for anything that is only a spelling of
-.keywords already present. A menu waits on a human, so MENUVERT is BASIC; as
-.a keyword it would cost every GP program 462 bytes whether or not it used a
-.menu.
-.
-.The keywords in detail. Square brackets mean optional. Optionals cannot be
-.skipped over: GP.BOX X,Y,W,H,,7 is a syntax error -- write out the default
-.you are passing through.
-.
-=SEE ALSO
-.
->63|4. Module reference -- the BASL library
->42|3.8 Block IF
->43|3.9 Inline assembly
->32|3.4 Strings
->31|3.3.1 GP.HIBYTE / GP.LOBYTE -- split an address into two bytes
->50|3.10 Text in a bank
->51|3.11 Calling a routine in one statement
->65|4.1 THEME.INC.BL -- named colour roles
->66|4.2 STRINGS.INC.BL -- string helpers
->75|4.3 APPSYS.INC.BL -- start politely, leave it as you found it
->76|4.4 LINEINPUT.INC.BL -- a positioned entry field
->77|4.5 BMX.INC.BL -- a BMX bitmap into VERA
+.  Dialogs

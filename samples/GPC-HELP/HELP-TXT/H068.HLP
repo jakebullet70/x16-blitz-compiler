@@ -1,96 +1,37 @@
-@3. The modules
+@STASHFILE.INC.BL -- a saved text rectangle, through a file.
 .
-=3. THE MODULES
+=STASHFILE.INC.BL
 .
-.Each table is in (set before the GOSUB), out (read after it), and internal
-.(do not read, do not write, do not rely on).
+.  a saved text rectangle, through a file.
 .
-=THEME.INC.BL -- named colour roles
+=MODULE HEADER
 .
-.Routines, arguments and examples: SEC 4.1.
+:      STASH.FILE.SAVE   a rectangle of the screen, out to a file
+:      STASH.FILE.LOAD   a saved file, back where it came from
+:      STASH.FILE.PUT    a saved file, pasted somewhere else
 .
-.  in
-.      THEME.ID -- 0 x16, 1 dark, 2 light, 3 gray, 4 custom, read by
-.        THEME.SELECT
-.      THEME.ATTR -- a packed attribute, for THEME.SET and THEME.HI
+.  Requires, and does not #INCLUDE for you:
+:      GPB.INC.BL      GP.ASM
+:      STASH.INC.BL    which does the copying, and wants a #SYMFILE
 .
-.  out
-.      THEME.CLR(role) -- the colour array, DIMmed to THEME.SLOTS
-.      THEME.INV -- the inverse attribute, from THEME.HI
+.  Usage:
+:      STASH.BANK = 8 : STASH.FILE$ = "PANEL.BIN"
+:      STASH.X = 10 : STASH.Y = 4 : STASH.W = 30 : STASH.H = 8
+:      GOSUB STASH.FILE.SAVE
+:      ...
+:      GOSUB STASH.FILE.LOAD
 .
-.  internal
-.      THEME.READY
+:   in   STASH.FILE$    the name
+:        STASH.DEV      the device. 0 means 8
+:        STASH.BANK     the bank to stage through
+:        and, for SAVE, the geometry STASH.SAVE wants
 .
-.  constants
-.      THEME.PAGE THEME.TEXT THEME.TITLE THEME.BORDER THEME.HILITE
-.        THEME.DIMMED THEME.WARN THEME.FOCUS THEME.SLOTS THEME.COUNT
+.  The four header bytes go out with the cells, so loading one back needs
+.  nothing but the name.
 .
-.To use it: set THEME.ID, GOSUB THEME.SELECT, then index THEME.CLR() with a
-.role wherever a drawing routine wants an attribute. SEC 4.1 is the module's
-.own entry, with the five themes and the other four routines.
+.  BSAVE's end address is EXCLUSIVE, so this writes the header and the cells
+.  and no padding. The length is w h 2 + 4.
 .
-:THEME.ID = 1 : GOSUB THEME.SELECT
-:GP.PRINTAT 2, 2, "READY", THEME.CLR(THEME.TEXT)
+=SEE ALSO
 .
-.THEME.CLR is the array this module DIMs. Do not DIM it yourself -- the
-.module owns it, and DIMming an array GPC has already dimensioned is an
-.error.
-.
-.THEME.FOCUS is the eighth role and the newest: the attribute a focused
-.control wears while GUI.FORM has the keyboard. THEME.SLOTS is 8 because of
-.it, and THEME.COUNT stays 5 -- the first is how many roles there are, the
-.second how many themes.
-.
-=APPSYS.INC.BL -- start politely, leave it as you found it
-.
-.Routines, arguments and examples: SEC 4.3.
-.
-.  in
-.      APPSYS.FILE$ APPSYS.BANK APPSYS.X APPSYS.Y APPSYS.W APPSYS.H
-.        APPSYS.DEV -- the panel routines
-.
-.  out
-.      APPSYS.MODE APPSYS.COLS APPSYS.ROWS APPSYS.COLOUR -- set by
-.        APPSYS.STARTUP
-.      APPSYS.IS.EMULATOR -- set by APPSYS.ISEMU
-.
-.  internal
-.      APPSYS.LAST
-.
-.  constants
-.      APPSYS.SCRMODE APPSYS.COLREG APPSYS.SETCHR APPSYS.CHRREG APPSYS.EMUSIG
-.
-.Lay the screen out from APPSYS.COLS and APPSYS.ROWS. Do not assume 80x60 --
-.the X16 boots there but SCREEN 0 is 40x30, and someone who prefers larger
-.text is running one.
-.
-=STRINGS.INC.BL -- string helpers
-.
-.Routines, arguments and examples: SEC 4.2.
-.
-.  in
-.      STR.STR$ -- the string, in and out
-.      STR.WIDTH -- field width, the pad routines
-.      STR.DELIM$ STR.MAX -- SPLIT (MAX 0 means 10)
-.      STR.FIND$ STR.REPL$ -- REPLACE
-.      STR.PET -- a PETSCII code, PET2SCR
-.      STR.AT STR.CUT STR.SUB$ -- SPLICE, and AT/CUT are CLAMPED in place
-.      STR.PTR -- GP.STRPTR of the string, the three trims
-.
-.  out
-.      STR.STR$ -- padded, or replaced, in place
-.      STR.N -- how many fields SPLIT found, always >= 1
-.      STR.FIELD$(1..N) -- the fields themselves
-.      STR.SCR -- the screen code from PET2SCR
-.      STR.STR$ -- spliced, when it was SPLICE that was called
-.
-.  internal
-.      STR.GAP STR.HALF STR.REST$ STR.AT STR.LIM STR.OUT$
-.      STR.ADDR% STR.OP% STR.KEEP% -- the {VAR} slots the trim blob reads
-.
-.STR.FIELD$ is the one array the library does not DIM. Left alone, GPC's
-.implicit DIM gives 0..10. For more, DIM it before the first call and set
-.STR.MAX to match -- DIMming an array GPC has already auto-dimensioned is an
-.error, so it is one or the other. This is the opposite of THEME.CLR, which
-.the module owns outright; the two are worth keeping straight.
-.
+>112|STASH.INC.BL -- save a text rectangle, and put it back.

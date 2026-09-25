@@ -1,16 +1,42 @@
-@4.20 KV.INC.BL -- keys and values in one RAM bank (2)
-:+8        the value's length, 0-119
-:+9..      the value
-:slot 0    "*KVSTORE", 2, the version (1), the slot count (64)
+@4.19 STASHVRAMGC.INC.BL -- close the holes in a STASHVRAM store
 .
-.KV.EXP.BL, in samples/GPB-MODS-TESTING/GPC-BASIC/, calls every routine.
+=4.19 STASHVRAMGC.INC.BL -- CLOSE THE HOLES IN A STASHVRAM STORE
 .
-=EXAMPLE PROGRAM
+=DESCRIPTION
 .
-.  KV.EXP.BL -- runnable, in the GPC-BASIC folder
+.  SV.COMPACT
+.      IN: --
+.      OUT: SV.MOVED SV.OK
+.
+:#INCLUDE "STASHVRAM.INC.BL"
+:#INCLUDE "STASHVRAMGC.INC.BL"
+:
+:GOSUB SV.COMPACT
+:IF SV.MOVED = 0 THEN <it was already tight>
+.
+.Its own file, so a compactor nobody calls costs nothing. Unless the compile
+.removes dead code (SEC 7), it would otherwise be compiled into every program
+.that includes the store. #INCLUDE this one only if something in the program
+.calls it, and never call it automatically.
+.
+.It is not a garbage collector. Liveness is known from the handle table
+.rather than discovered, so there is no mark phase and nothing traces
+.anything: the live blocks are read off in page order, each is slid down to
+.the low-water mark, and the table is rewritten as it goes.
+.
+.Handles survive it. A block's page number changes; the handle that names it
+.does not. Anything holding a raw VRAM address across a call here is holding
+.a stale one -- but nothing outside the table has one, which is the whole
+.reason the store is addressed by handle.
+.
+.SV.MOVED is how many blocks actually moved, 0 if it was already tight --
+.which is what LIFO release leaves behind.
+.
+.The slide is downward, so a block's destination is always below its source.
+.That the overlap is safe at the hardware is measured, not assumed.
 .
 =SEE ALSO
 .
->56|3.12 Code in a bank
->93|4.13 BANKMGR.INC.BL -- who owns which RAM bank
->100|4.20 KV.INC.BL -- keys and values in one RAM bank
+>166|7. Memory, and what the compiler tells you
+>101|4.19 STASHVRAMGC.INC.BL -- close the holes in a STASHVRAM store
+>100|4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM

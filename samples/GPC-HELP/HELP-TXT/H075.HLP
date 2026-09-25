@@ -1,47 +1,80 @@
-@3. The modules (8)
-=STRCASE.INC.BL -- case, in place
+@3. The modules (3)
+=FILEIO.INC.BL -- the drive: status, files, directories
 .
-.Routines, arguments and examples: SEC 4.8.
+.Routines, arguments and examples: SEC 4.15.
+.
+.Needs a #SYMFILE -- FILE.TOPET is a GP.ASM blob.
 .
 .  in
-.      STRCASE.PTR -- GP.STRPTR of the string
-.      STRCASE.MODE -- STRCASE.UPPER or STRCASE.LOWER
+.      FILE.NAME$ -- the file every routine acts on
+.      FILE.NEW$ -- the second name, RENAME and COPY
+.      FILE.DEVICE -- the drive; 0 means 8
+.      FILE.ISO -- non-zero converts names to PETSCII on the way out
+.      FILE.ROWS -- rows to write, SAVEARRAY
+.      FILE.MAX.ROWS -- rows that will fit, LOADARRAY; 0 means 10
+.      FILE.LINE$() -- the rows; the caller owns the DIM
 .
 .  out
-.      the string itself, rewritten in place
-.
-.  verbs
-.      STR.UCASE STR.LCASE -- a string in, a cased copy back, through
-.        STRCASE.S$
+.      FILE.ERR FILE.MSG$ FILE.TRK FILE.SEC -- the command channel
+.      FILE.OK -- FILE.EXISTS
+.      FILE.ROWS -- rows read, LOADARRAY
+.      FILE.PATH$ -- FILE.CURDIR
 .
 .  internal
-.      STRCASE.ADDR% STRCASE.OP% STRCASE.S$
+.      FILE.CMDSTR$ FILE.OUT$ FILE.RAW$ FILE.ROW$ FILE.ST FILE.KEEP FILE.I
+.        FILE.PETP%
 .
 .  constants
-.      STRCASE.UPPER STRCASE.LOWER
+.      FILE.OKMAX FILE.NOTFOUND FILE.EXISTSERR FILE.PROTECTED FILE.CHAN
 .
-.STR.UCASE and STR.LCASE are the two STR. names this file owns. The rest of
-.STR. is STRINGS.INC.BL's, and the two verbs are named for the module they
-.are to move into.
+.This module is the missing DS and DS$. FILE.ERR is DS and FILE.MSG$ is DS$.
+.ST is not a disk status -- it is the KERNAL's serial bus status and cannot
+.report FILE NOT FOUND.
 .
-.#SYMFILE again. Do not write #AUTONUM in a program that includes this -- it
-.sets the STEP, and only the default 1 survives.
+.FILE.ROWS is both an input and an output, the way KV.SLOT is. FILE.LINE$()
+.is the caller's DIM, like GUI.LIST.ITEM$ and unlike THEME.CLR.
 .
-=EXAMPLE PROGRAM
+=FILEDIR.INC.BL -- a directory, into a bank or into low RAM
 .
-.  FORM.EXP.BL -- runnable, in the GPC-BASIC folder
+.Routines, arguments and examples: SEC 4.16.
 .
-=SEE ALSO
+.Needs FILEIO.INC.BL, and a #SYMFILE -- it is two GP.ASM blobs.
 .
->65|4.1 THEME.INC.BL -- named colour roles
->75|4.3 APPSYS.INC.BL -- start politely, leave it as you found it
->66|4.2 STRINGS.INC.BL -- string helpers
->88|4.10 STRUSING.INC.BL -- a number to a template
->94|4.14 KB.INC.BL -- the keyboard buffer, emptied
->76|4.4 LINEINPUT.INC.BL -- a positioned entry field
->77|4.5 BMX.INC.BL -- a BMX bitmap into VERA
->95|4.15 FILEIO.INC.BL -- the drive: status, files, directories
->96|4.16 FILEDIR.INC.BL -- a directory, into a bank or into low RAM
->98|4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM
->100|4.20 KV.INC.BL -- keys and values in one RAM bank
->78|4.6 MENUVERT.INC.BL -- a vertical menu
+.It executes no BANK statement, which is what lets it live in a GP.BANKED
+.region: the two blobs take the data bank at entry and put the caller's back
+.at every exit, so no BASIC line here ever runs with a foreign bank selected.
+.Both blobs write $00, so both are GP.ASM LOW and run from low memory when
+.the module is in a region. FILE.DIR.BNK% carries the bank number to the
+.assembly -- {FILE.DIR.BANK} would read a float's mantissa, and FILE.DIR.WAS%
+.is the blobs' save slot.
+.
+.  in
+.      FILE.DIR.BANK -- the bank to read into, or 0 for low RAM
+.      FILE.DIR.PTR FILE.DIR.CAP -- the low-RAM buffer, when BANK is 0
+.      FILE.DIR.PATTERN$ -- a name pattern, or empty
+.      FILE.DIR.ONLY -- FILE.DIR.ALL, .FILES or .DIRS
+.
+.  out
+.      FILE.DIR.GOT -- bytes read
+.      FILE.DIR.FULL -- the buffer filled before the listing ended
+.      FILE.DIR.MORE -- -1 while NEXT produced an entry
+.      FILE.NAME$ FILE.BLOCKS FILE.TYPE$ -- the entry itself
+.
+.  internal
+.      FILE.DIR.AT FILE.DIR.ASK$ FILE.DIR.ADDR% FILE.DIR.ROOM% FILE.DIR.OFF%
+.        FILE.DIR.BYTES% FILE.DIR.CNT% FILE.DIR.BLK% FILE.DIR.OK%
+.        FILE.DIR.SLOW% FILE.DIR.LFN% FILE.DIR.NAMEA% FILE.DIR.TYPEA%
+.        FILE.DIR.WAS% FILE.DIR.BNK%
+.
+.  constants
+.      FILE.DIR.ALL FILE.DIR.FILES FILE.DIR.DIRS FILE.DIR.NAMEMAX
+.        FILE.DIR.BANKROOM FILE.DIR.BANKBASE
+.
+.FILE.DIR.INIT must run once before anything else: it sizes FILE.NAME$ and
+.FILE.TYPE$ for the assembly to write into, and creates every {VAR} slot. Do
+.not assign FILE.NAME$ or FILE.TYPE$ afterwards -- an assignment reallocates
+.and the block the assembly holds goes stale.
+.
+.FILE.NAME$ is shared with FILEIO on purpose: the name a picker chose is the
+.name FILE.EXISTS and FILE.DELETE want.
+.

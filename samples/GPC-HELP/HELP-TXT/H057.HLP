@@ -1,42 +1,52 @@
-@4.19 STASHVRAMGC.INC.BL -- close the holes in a STASHVRAM store
+@4.17 COMBO.INC.BL -- a drop-down list that folds into one row
 .
-=4.19 STASHVRAMGC.INC.BL -- CLOSE THE HOLES IN A STASHVRAM STORE
+=4.17 COMBO.INC.BL -- A DROP-DOWN LIST THAT FOLDS INTO ONE ROW
 .
 =DESCRIPTION
 .
-.  SV.COMPACT
-.      IN: --
-.      OUT: SV.MOVED SV.OK
+.  COMBO.ADD
+.      IN: COMBO.X COMBO.Y COMBO.W COMBO.COUNT COMBO.SEL COMBO.BANK, over
+.        COMBO.ITEM$()
+.      OUT: COMBO.SEL
 .
-:#INCLUDE "STASHVRAM.INC.BL"
-:#INCLUDE "STASHVRAMGC.INC.BL"
-:
-:GOSUB SV.COMPACT
-:IF SV.MOVED = 0 THEN <it was already tight>
+:COMBO.ITEM$(1) = " TEXAS"
+:COMBO.ITEM$(2) = " UTAH"
+:COMBO.X = GUI.INNER.LEFT : COMBO.Y = GUI.INNER.TOP
+:COMBO.W = 16 : COMBO.COUNT = 2 : COMBO.SEL = 1
+:GOSUB COMBO.ADD
+:REM ... run the form ... the answer is in COMBO.SEL
 .
-.Its own file, so a compactor nobody calls costs nothing. Unless the compile
-.removes dead code (SEC 7), it would otherwise be compiled into every program
-.that includes the store. #INCLUDE this one only if something in the program
-.calls it, and never call it automatically.
+.Only COMBO.ADD is called by an application. COMBO.DRAW, COMBO.KEY and
+.COMBO.OPEN are reached by GUI.FORM, which dispatches a GUI.CT.COMBO control
+.to them by name. The call goes between GUI.OPEN and GUI.FORM.RUN.
 .
-.It is not a garbage collector. Liveness is known from the handle table
-.rather than discovered, so there is no mark phase and nothing traces
-.anything: the live blocks are read off in page order, each is slid down to
-.the low-water mark, and the table is rewritten as it goes.
+.COMBO.W is the width in cells, brackets included; 5 is the floor and
+.anything less is raised to it. COMBO.BANK is where the dropdown saves the
+.cells it covers, and 0 takes GUI.BANK -- which is what the dialog around it
+.is already using. The caller owns the DIM of COMBO.ITEM$().
 .
-.Handles survive it. A block's page number changes; the handle that names it
-.does not. Anything holding a raw VRAM address across a call here is holding
-.a stale one -- but nothing outside the table has one, which is the whole
-.reason the store is addressed by handle.
+.One combo to a dialog, since there is one COMBO.ITEM$(). The dropdown is the
+.popup slot of MENU.INC.BL (SEC 4.6), loaded from COMBO.ITEM$() each time it
+.opens, so whatever the caller last built in that slot is gone after. An item
+.is a menu row: & marks a hot key and "-" is a separator. The MENU.* colours
+.and flags it sets are put back.
 .
-.SV.MOVED is how many blocks actually moved, 0 if it was already tight --
-.which is what LIFO release leaves behind.
+.A long list belongs in GUI.LISTBOX (SEC 4.12). The dropdown shows every item
+.at once, 32 at most, and does not scroll.
 .
-.The slide is downward, so a block's destination is always below its source.
-.That the overlap is safe at the hardware is measured, not assumed.
+.The dropdown is framed like the dialog behind it. With GUI.GLYPH non-zero it
+.draws from GUI.EDGE.H, GUI.EDGE.V, GUI.CORNER.TL, .TR, .BL and .BR, the same
+.six a dialog frames with, so a re-ordered charset gets its own frame here
+.too. With GUI.GLYPH = 0 the frame is GP.BOX style 1.
+.
+.It is required by GUI.INC.BL, which names COMBO.DRAW and COMBO.KEY. BASLOAD
+.resolves every label in a file, so a program that includes the GUI and
+.leaves this one out stops with LABEL NOT FOUND whether it ever draws a combo
+.or not. It needs MENU.INC.BL, and what that requires.
 .
 =SEE ALSO
 .
->165|7. Memory, and what the compiler tells you
->99|4.19 STASHVRAMGC.INC.BL -- close the holes in a STASHVRAM store
->98|4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM
+>79|4.6 MENU.INC.BL -- menus built a row at a time
+>92|4.12 GUI-DIALOGS.INC.BL -- every dialog as a verb
+>99|4.17 COMBO.INC.BL -- a drop-down list that folds into one row
+>90|4.11 GUI.INC.BL -- the box that puts the screen back, and the form in 

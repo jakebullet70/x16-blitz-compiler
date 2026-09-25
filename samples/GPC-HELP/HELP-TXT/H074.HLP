@@ -1,112 +1,121 @@
-@3. The modules (7)
-=GUI2.INC.BL -- a listbox, single or multi select
+@3. The modules (2)
+=STRUSING.INC.BL -- a number to a template
 .
-.Routines, arguments and examples: SEC 4.12.
-.
-.  in
-.      GUI.LISTBOX.COUNT -- how many items. 0 or less returns cancelled
-.      MENUVERT.ITEM$() -- the items, 1..COUNT, and the caller owns the DIM
-.      GUI.LISTBOX.ROWS -- rows visible at once. 0 takes 10, then cut to
-.        COUNT and to the screen
-.      GUI.LISTBOX.MULTI -- 0 chooses one row, 1 marks a set with SPACE
-.      GUI.LISTBOX.MARKS$ -- multi only, in as well as out: COUNT characters,
-.        "1" marked. Any other length, "" included, starts with none
-.      GUI.LISTBOX.SEL -- the item to start on. 0 starts at 1
-.      plus everything GUI.OPEN reads
-.
-.  out
-.      GUI.LISTBOX.SEL -- the item under the highlight, or 0 if cancelled
-.      GUI.LISTBOX.MARKS$ -- multi only: which are marked
-.      GUI.LISTBOX.MARKED -- multi only: how many
-.      GUI.KEY -- 13 accepted, 27 cancelled
-.
-.  internal
-.      GUI.LISTBOX.I GUI.LISTBOX.MARKOFF GUI.LISTBOX.TEXTW
-.
-.In multi-select GUI.LISTBOX.SEL is not the answer -- it is where the cursor
-.was left. The marks are the answer.
-.
-.The scrolling list is not in this module. It is GUI.CT.LIST, one of
-.GUI.FORM's three control types, and lives in GUI.INC.BL beside the field.
-.GUI2.INC.BL is the dialog around it: measure, open, hand the control its
-.geometry, add a button row, run the form, answer. That is why the internals
-.here are three variables and not thirty -- the GUI.LIST.* set does the work.
-.
-=STASH.INC.BL -- save a text rectangle, and put it back
+.Routines, arguments and examples: SEC 4.10.
 .
 .  in
-.      STASH.BANK -- the RAM bank to keep the cells in, 1..255, and it is
-.        yours: this writes the whole of it
-.      STASH.X STASH.Y STASH.W STASH.H -- the rectangle, in cells, for
-.        STASH.SAVE
-.      STASH.MOVE -- non-zero pastes to STASH.X/STASH.Y instead of where it
-.        came from
+.      STR.USING.NUM -- the value, both routines
+.      STR.USING.MASK$ -- the template, STR.USING
+.      STR.USING.DP -- decimal places, STR.USING.FIX
 .
 .  out
-.      STASH.OK -- -1 if it fitted and was saved, 0 if not
+.      STR.USING.STR$ -- the result: a field from STR.USING, digits from
+.        STR.USING.FIX
+.      STR.USING.OVR -- -1 when the value scaled past 1e9 and the digits are
+.        unusable
+.      STR.USING.SGN -- -1 when the ROUNDED value is negative
 .
 .  internal
-.      STASH.AT STASH.BASE STASH.BYTES STASH.HI STASH.MAPW STASH.MODE
-.        STASH.ROW STASH.STRIDE
-.      STASH.DEST% STASH.NBYTES% STASH.VADDR% STASH.VCTRL% STASH.WAS% -- the
-.        {VAR} slots the blobs read
+.      STR.USING.INT$ STR.USING.FRC$ STR.USING.SIGN$ STR.USING.OUT$
+.        STR.USING.C$
+.      STR.USING.IW STR.USING.ZW STR.USING.Z STR.USING.W STR.USING.F
+.      STR.USING.GRP STR.USING.PT STR.USING.I STR.USING.V
+.
+.STR.USING.DP is an output of STR.USING and an input to STR.USING.FIX. The
+.mask carries the decimal count, so STR.USING overwrites whatever was there.
+.A program alternating the two routines must set STR.USING.DP again before
+.every FIX.
+.
+.STR.USING.INT$ and STR.USING.FRC$ survive a call and are the two halves of
+.the digits, without sign, point or field. They are listed internal because
+.their width is the routine's business, not the caller's -- read
+.STR.USING.STR$.
+.
+.The prefix is STR.USING., a sub-prefix of STRINGS.INC.BL's STR., on the same
+.footing as FILE.DIR. inside FILE.. Nothing here is written by STRINGS.INC.BL
+.and nothing there is written by this module, so either can be included
+.alone.
+.
+=KB.INC.BL -- the keyboard buffer, emptied
+.
+.Routines, arguments and examples: SEC 4.14.
+.
+.  out
+.      --
+.
+.  internal
+.      KB.K$
+.
+.One routine, KB.CLEARKB, and one variable it drains into. Nothing else is in
+.the prefix.
+.
+=LINEINPUT.INC.BL -- a positioned entry field
+.
+.Routines, arguments and examples: SEC 4.4.
+.
+.  in
+.      LINEINPUT.X LINEINPUT.Y -- top left of the field
+.      LINEINPUT.LEN -- how many characters fit
+.      LINEINPUT.ATTR -- packed attribute
+.      LINEINPUT.TEXT$ -- the starting value
+.      LINEINPUT.MASK -- non-zero shows asterisks
+.      LINEINPUT.ALLOW$ -- the only characters accepted
+.      LINEINPUT.DENY$ -- characters refused
+.      LINEINPUT.LABEL$ -- LINEINPUT.ASK only
+.
+.  out
+.      LINEINPUT.TEXT$ -- what was typed
+.      LINEINPUT.KEY -- the key that ended it
+.
+.  internal
+.      LINEINPUT.SHOW$ LINEINPUT.WAS$ LINEINPUT.K$ LINEINPUT.CELL$
+.        LINEINPUT.CODE LINEINPUT.CX LINEINPUT.CA LINEINPUT.INV LINEINPUT.LIT
+.        LINEINPUT.TICK LINEINPUT.DONE LINEINPUT.FILLED LINEINPUT.HOME
+.        LINEINPUT.BAR
 .
 .  constants
-.      STASH.LCONFIG STASH.LMAPBASE STASH.WINDOW STASH.HEADER STASH.MAXBYTES
+.      LINEINPUT.RETURN LINEINPUT.DELETE LINEINPUT.ESCAPE LINEINPUT.STOP
+.        LINEINPUT.DOWN LINEINPUT.UP LINEINPUT.TAB LINEINPUT.SPACE
+.        LINEINPUT.STAR LINEINPUT.BLINK
 .
-.STASH.RESTORE needs only the bank. Four header bytes -- w, h, x, y -- go in
-.first, so the rectangle describes itself and cannot be put back at the wrong
-.size.
+.LINEINPUT.SHOW$ is listed internal but is the one exception worth knowing:
+.it holds what the field displayed, which is what you want if you are
+.repainting a masked field yourself. FORM.EXP.BL uses it for exactly that.
 .
-.A bank is 8,192 bytes and a cell is two, so 4,094 cells fit: 63x63, larger
-.than any dialog and not a whole 80x60 screen. Too big is refused before the
-.first write with STASH.OK = 0, rather than running on into the next bank.
+=BMX.INC.BL -- a BMX bitmap into VERA
 .
-.It needs a #SYMFILE in your program, because it reads its arguments through
-.{VAR} names. It restores the caller's RAM bank on the way out -- it did not
-.always, and a caller that worked around that can stop.
-.
-.STASH.SLOT and STASH.NEXT are not in this copy. GP-BASIC.md SEC 3.6
-.describes them -- a byte offset into the bank, and the offset just past what
-.was written, so one bank holds a stack of rectangles instead of one a level.
-.They are in samples/GPB-MODS-TESTING/GPC-BASIC/STASH.INC.BL and have not
-.reached the root library yet. Until they do, one rectangle a bank.
-.
-=STASHFILE.INC.BL -- a saved text rectangle, through a file
-.
-.STASH.FILE.SAVE, STASH.FILE.LOAD and STASH.FILE.PUT, and no variables of its
-.own -- it sets STASH.* and calls through. The prefix exists to keep the
-.three routine names apart from the rest of STASH., not to hold state. Kept a
-.separate #INCLUDE: unless the compile removes dead code, the disk half is
-.127 bytes a program that never writes one would still carry.
-.
-=SORT.INC.BL -- shell sort a string array
-.
-.Routines, arguments and examples: SEC 4.7.
+.Routines, arguments and examples: SEC 4.5.
 .
 .  in
-.      SORT.PTR -- GP.ARRPTR of the array, element zero, the 3-byte header
-.        already skipped. A BASL subroutine cannot be passed an array, so the
-.        caller takes its address and this sorts through that
-.      SORT.DESCEND -- non-zero, largest first
-.      SORT.NOCASE -- non-zero folds case while comparing
+.      BMX.FILE$
 .
 .  out
-.      SORT.OK -- -1 if it sorted, 0 if it refused
-.      SORT.COUNT -- elements found in the array header
+.      BMX.ERROR$ -- empty means it worked
+.      BMX.WIDTH BMX.HEIGHT BMX.DEPTH BMX.VERSION BMX.PALUSED BMX.PALFIRST
+.        BMX.DATAOFF BMX.PACKED -- the header, readable after BMX.OPEN
+.
+.  in, optional
+.      BMX.STASH -- where BMX.PAINT keeps the machine's palette; VRAM $13000
+.        by default, -1 to keep nothing
 .
 .  internal
-.      SORT.TYPE -- the type byte it read back
-.      SORT.BASE% SORT.CHR% SORT.CNT% SORT.DESC% SORT.FOLD% SORT.GAP% SORT.I%
-.        SORT.J% SORT.LL% SORT.LR% SORT.RN% SORT.TMP% -- every one a {VAR}
-.        slot
+.      BMX.PTR BMX.HEADER$ BMX.SCRATCH BMX.SCRATCH$ BMX.PALBASE BMX.ADDR
+.        BMX.LO BMX.HI BMX.BANK BMX.REST BMX.COUNT BMX.CHUNK BMX.GOT BMX.STEP
+.        BMX.SKIP BMX.ROW BMX.ROWS BMX.X0 BMX.Y0 BMX.BAD BMX.KEPT BMX.SRC
+.        BMX.DST
 .
-.Note SORT.COUNT is an output, read out of the array header, not a size you
-.hand in -- and SORT.PTR is GP.ARRPTR, not GP.STRPTR like the rest of the
-.library's pointer arguments. Both are easy to write the other way round.
+.  constants
+.      BMXK.MACPTR BMXK.CHKIN BMXK.CLRCHN BMXK.MEMCOPY BMXK.VCTRL BMXK.VLO
+.        BMXK.VMID BMXK.VHI BMXK.PORTLO BMXK.PORTLO.B BMXK.PORTHI BMXK.LFN
 .
-.Also needs a #SYMFILE. 255 elements, so DIM A$(254) is the largest; beyond
-.that SORT.OK is 0 rather than a wrong answer. String arrays only. It moves
-.2-byte pointers rather than string data, so a swap is cheap and the array's
-.own storage never moves.
+.BMX.PTR doubles as the "have I initialised" flag -- it is zero until
+.BMX.INIT has run. Zeroing it yourself would leak a string block and
+.re-allocate.
+.
+.BMX.STASH is the one variable here a caller may want to set, and it has to
+.be set before the first BMX.OPEN -- BMX.INIT runs then, and fills in the
+.default only if you have not. That is why -1 rather than 0 switches the
+.stash off: 0 already means "never set". BMX.KEPT is the once-per-run guard
+.that makes a slideshow restore the machine's palette rather than the
+.previous picture's.
 .

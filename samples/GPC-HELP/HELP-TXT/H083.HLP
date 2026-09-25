@@ -1,22 +1,25 @@
-@7. Memory, and what the compiler tells you (3)
-=Staying inside it
+@6. Two more naming rules that are not about collisions
 .
-.  - Quote LOW FREE when you change anything. It is one line of the report
-.    and it is the only early warning; PROGRAM TOO BIG arrives once it is
-.    already too late.
-.  - Size a DIM to what is used, not to a round number. The cost is paid on
-.    the first line of the program, forever.
-.  - Put bulk in a RAM bank. A bank is 8,192 bytes that cost the workspace
-.    nothing. Anything held from start to finish and read a row at a time --
-.    a file's worth of text, a table, a screen -- is better in a bank with an
-.    offset table at the front, read back with PEEK under BANK. See SEC 4.5
-.    and STASH.INC.BL for the pattern.
-.  - A big temporary cannot be built and then freed. Freeing is not a thing
-.    that happens on demand: build it in a bank, or in pieces.
+=6. TWO MORE NAMING RULES THAT ARE NOT ABOUT COLLISIONS
 .
-=SEE ALSO
+.#DEFINE takes an INT16 (BASLOAD.MD:313). A constant above 65535 is ERROR:
+.INVALID PARAMETER, not a warning -- which is why BMX.PALBASE (VRAM $1FA00,
+.129536) is an ordinary variable and not a #DEFINE. Every VRAM address past
+.$FFFF has the same problem.
 .
->56|3.12 Code in a bank
->50|3.10 Text in a bank
->77|4.5 BMX.INC.BL -- a BMX bitmap into VERA
->108|STASH.INC.BL -- save a text rectangle, and put it back.
+.A dotted name whose tail is a reserved word is fine. MENU.COUNT, THEME.CLR,
+.LINEINPUT.LEN and LINEINPUT.RETURN all contain keywords and all work,
+.because BASLOAD matches the whole identifier. An undotted one does not: POS,
+.MB, ST, LEN and CHAR cannot be variables at all. This is the main reason the
+.library is dotted throughout.
+.
+.RETURNS joined that list on 08/09/26 -- it is GP.DEFPROC's result clause and
+.has a token of its own, so a bare RETURNS is no longer a name. RETURN is
+.untouched, and so is anything dotted.
+.
+.One rule applies only outside BASL: BASLOAD gives 64 significant characters,
+.the built-in BASIC gives two. Write the same code as a hand-typed .bas for
+.the PC-side converter and THEME.CLR and THEME.COUNT become the same
+.variable. That is a silent wrong answer -- it cost two test cycles during
+.tier 6, both times looking exactly like a compiler bug. Inside BASL you are
+.safe; in a raw .bas, give every variable a distinct first two characters.

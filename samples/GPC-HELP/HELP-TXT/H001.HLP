@@ -50,8 +50,8 @@
 .
 =The library
 .
-.GPC-BASIC/ holds 19 .INC.BL modules and 25 .EXP.BL examples: menus bar and
-.vertical, panels, themes, entry fields, check boxes, combo boxes, in-place
+.GPC-BASIC/ holds 26 .INC.BL modules and 29 .EXP.BL examples: menus, bars and
+.dropdowns, panels, themes, entry fields, check boxes, combo boxes, in-place
 .case, trim and splice, PRINT USING, shell sort, a screen rectangle to a RAM
 .bank or a file, BMX images into VERA.
 .
@@ -78,8 +78,8 @@
 =SEE ALSO
 .
 >7|2. Using it
->56|3.12 Code in a bank
->86|4.8 STRCASE.INC.BL -- case, in place
->108|STASH.INC.BL -- save a text rectangle, and put it back.
->85|4.7 SORT.INC.BL -- shell sort a string array
->66|4.2 STRINGS.INC.BL -- string helpers
+>57|3.12 Code in a bank
+>87|4.8 STRCASE.INC.BL -- case, in place
+>112|STASH.INC.BL -- save a text rectangle, and put it back.
+>86|4.7 SORT.INC.BL -- shell sort a string array
+>67|4.2 STRINGS.INC.BL -- string helpers

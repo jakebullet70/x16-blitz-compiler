@@ -1,86 +1,15 @@
-@3. The modules (4)
-=STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM
+@1. The prefixes that are taken (2)
+=SEE ALSO
 .
-.Routines, arguments and examples: SEC 4.18.
-.
-.Needs GPB.INC.BL, and no #SYMFILE -- there is no GP.ASM in it. The cells
-.never leave VRAM: one data port reads, the other writes, and memory_copy
-.moves between them without stepping either.
-.
-.It executes no BANK, so it can live in a GP.BANKED region -- measured,
-.work/stashvram/SVB.BASL. That is the difference from STASH.INC.BL, which
-.cannot.
-.
-.  in
-.      SV.BASE SV.TOP -- the VRAM window in bytes. Default $04000/$1AFFF
-.      SV.MAX -- how many handles. The caller DIMs SV.PAGE% and SV.PAGES% to
-.        it
-.      SV.X SV.Y SV.W SV.H -- the rectangle, for SV.SAVE
-.      SV.MOVE -- non-zero restores at SV.X SV.Y rather than where it came
-.        from
-.      SV.ADDR SV.LEN -- low RAM address and count, for SV.PUT and SV.GET
-.      SV.HND -- the handle, for RESTORE, GET and FREE
-.
-.  out
-.      SV.HND -- 1..SV.MAX, or 0 if it did not fit
-.      SV.OK -- -1 done, 0 refused
-.      SV.ERROR$ -- why, when something is refused
-.      SV.MOVED -- SV.COMPACT only: how many blocks moved
-.
-.  arrays
-.      SV.PAGE%() SV.PAGES%() -- the handle table, DIMmed by the caller
-.
-.  internal
-.      SV.READY SV.NEXT SV.BASEPG SV.TOPPG SV.I SV.PG SV.NP SV.N SV.BYTES
-.        SV.MAPW SV.MAPBASE SV.STRIDE SV.ROW SV.CELL SV.SRC SV.DST SV.VA
-.        SV.ADR SV.BNK SV.REST SV.MID SV.LO SV.MODE SV.RX SV.RY
-.      SV.COMPACT adds SV.PICK SV.BEST SV.J SV.TO SV.GCS SV.GCD SV.LEFT SV.CH
-.
-.  constants
-.      SV.VLO SV.VMID SV.VHI SV.DATA SV.VCTRL SV.LCONFIG SV.LMAPBASE
-.        SV.PORTLO SV.PORTLO.B SV.PORTHI SV.MEMCOPY SV.UP SV.HEADER
-.        SVGC.CHUNK
-.
-.SV.INIT must run once before anything else, and the two arrays must be
-.DIMmed before it.
-.
-.Blocks are whole 256-byte pages, which is what lets a handle's address live
-.in an ordinary %: a page number reaches 511 where a VRAM address is 17 bits
-.and would not.
-.
-.WARNING: BMX.STASH defaults to $13000, inside the default window. A program
-.using both must move one of them. There is one allocator and no collision
-.check.
-.
-=KV.INC.BL -- keys and values in one RAM bank
-.
-.Routines, arguments and examples: SEC 4.20.
-.
-.Plain BASL: no GP.* keyword and no GP.ASM, so it needs neither GPB.INC.BL
-.nor a #SYMFILE.
-.
-.  in
-.      KV.KEY$ -- the key, for FIND GET PUT DEL
-.      KV.VALUE$ -- the value, for PUT
-.      KV.SLOT -- the slot, for AT
-.      KV.FNAME$ -- the file, for SAVE and LOAD
-.      KV.HOMEBANK -- the bank every routine selects on its way out. The
-.        first KV.INIT sets 1
-.
-.  out
-.      KV.OK -- -1 done, 0 refused
-.      KV.SLOT -- the slot FIND, GET and PUT found, 0 if none
-.      KV.VALUE$ -- GET and AT
-.      KV.KEY$ -- AT, without its padding
-.
-.  internal
-.      KV.READY KV.CODE%() KV.HIT KV.ADDR KV.INDEX KV.PADDED$ KV.LENGTH
-.        KV.BYTE KV.MAGIC$ KV.ERR KV.MSG$ KV.TRACK KV.SECTOR
-.
-.  constants
-.      KV.BANK KV.BASE KV.TOP KV.SLOTS KV.SIZE KV.MAXLEN KV.VERSION KV.DEFS
-.
-.KV.SLOT is both an input and an output, the way FILE.ROWS is. KV.AT writes
-.KV.KEY$, so a loop over the slots keeps its own key in a variable of its
-.own.
-.
+>7|2. Using it
+>67|4.2 STRINGS.INC.BL -- string helpers
+>89|4.10 STRUSING.INC.BL -- a number to a template
+>66|4.1 THEME.INC.BL -- named colour roles
+>76|4.3 APPSYS.INC.BL -- start politely, leave it as you found it
+>77|4.4 LINEINPUT.INC.BL -- a positioned entry field
+>96|4.14 KB.INC.BL -- the keyboard buffer, emptied
+>79|4.6 MENU.INC.BL -- menus built a row at a time
+>88|4.9 MENUPULL.INC.BL -- a dropdown under a bar item
+>90|4.11 GUI.INC.BL -- the box that puts the screen back, and the form in 
+>92|4.12 GUI-DIALOGS.INC.BL -- every dialog as a verb
+>112|STASH.INC.BL -- save a text rectangle, and put it back.

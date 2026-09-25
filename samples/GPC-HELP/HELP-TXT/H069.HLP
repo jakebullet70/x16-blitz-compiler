@@ -1,121 +1,107 @@
-@3. The modules (2)
-=STRUSING.INC.BL -- a number to a template
+@5. Variables
 .
-.Routines, arguments and examples: SEC 4.10.
+=5. VARIABLES
 .
-.  in
-.      STR.USING.NUM -- the value, both routines
-.      STR.USING.MASK$ -- the template, STR.USING
-.      STR.USING.DP -- decimal places, STR.USING.FIX
+.BASL has one flat namespace. There are no locals, no scoping and no
+.parameters. Every variable in every #INCLUDEd module is visible to your
+.program and the reverse, and nothing warns you: a collision is a wrong
+.answer, not an error.
 .
-.  out
-.      STR.USING.STR$ -- the result: a field from STR.USING, digits from
-.        STR.USING.FIX
-.      STR.USING.OVR -- -1 when the value scaled past 1e9 and the digits are
-.        unusable
-.      STR.USING.SGN -- -1 when the ROUNDED value is negative
+.The convention is one dotted prefix per module, and nothing writes outside
+.its own prefix.
 .
-.  internal
-.      STR.USING.INT$ STR.USING.FRC$ STR.USING.SIGN$ STR.USING.OUT$
-.        STR.USING.C$
-.      STR.USING.IW STR.USING.ZW STR.USING.Z STR.USING.W STR.USING.F
-.      STR.USING.GRP STR.USING.PT STR.USING.I STR.USING.V
+=Prefixes already taken
 .
-.STR.USING.DP is an output of STR.USING and an input to STR.USING.FIX. The
-.mask carries the decimal count, so STR.USING overwrites whatever was there.
-.A program alternating the two routines must set STR.USING.DP again before
-.every FIX.
+.  GP.
+.      OWNER: keywords, not variables -- see below
 .
-.STR.USING.INT$ and STR.USING.FRC$ survive a call and are the two halves of
-.the digits, without sign, point or field. They are listed internal because
-.their width is the routine's business, not the caller's -- read
-.STR.USING.STR$.
+.  STR.
+.      OWNER: STRINGS.INC.BL
 .
-.The prefix is STR.USING., a sub-prefix of STRINGS.INC.BL's STR., on the same
-.footing as FILE.DIR. inside FILE.. Nothing here is written by STRINGS.INC.BL
-.and nothing there is written by this module, so either can be included
-.alone.
+.  THEME.
+.      OWNER: THEME.INC.BL
 .
-=KB.INC.BL -- the keyboard buffer, emptied
+.  APPSYS.
+.      OWNER: APPSYS.INC.BL
 .
-.Routines, arguments and examples: SEC 4.14.
+.  LINEINPUT.
+.      OWNER: LINEINPUT.INC.BL
 .
-.  out
-.      --
+.  MENU.
+.      OWNER: MENU.INC.BL, and MENUPULL.INC.BL's variables
 .
-.  internal
-.      KB.K$
+.  MENUTO.
+.      OWNER: the runners in MENU.INC.BL and MENUPULL.INC.BL
 .
-.One routine, KB.CLEARKB, and one variable it drains into. Nothing else is in
-.the prefix.
+.  MENUPULL.
+.      OWNER: MENUPULL.INC.BL's labels
 .
-=LINEINPUT.INC.BL -- a positioned entry field
+.  GUI.
+.      OWNER: GUI.INC.BL
 .
-.Routines, arguments and examples: SEC 4.4.
+.  GUI.LISTBOX.
+.      OWNER: GUI-DIALOGS.INC.BL, kept apart from the rest of GUI.
 .
-.  in
-.      LINEINPUT.X LINEINPUT.Y -- top left of the field
-.      LINEINPUT.LEN -- how many characters fit
-.      LINEINPUT.ATTR -- packed attribute
-.      LINEINPUT.TEXT$ -- the starting value
-.      LINEINPUT.MASK -- non-zero shows asterisks
-.      LINEINPUT.ALLOW$ -- the only characters accepted
-.      LINEINPUT.DENY$ -- characters refused
-.      LINEINPUT.LABEL$ -- LINEINPUT.ASK only
+.  DLG.
+.      OWNER: GUI-DIALOGS.INC.BL, the dialog verbs' arguments and internals
 .
-.  out
-.      LINEINPUT.TEXT$ -- what was typed
-.      LINEINPUT.KEY -- the key that ended it
+.  STASH. / STASH.FILE.
+.      OWNER: STASH.INC.BL / STASHFILE.INC.BL
 .
-.  internal
-.      LINEINPUT.SHOW$ LINEINPUT.WAS$ LINEINPUT.K$ LINEINPUT.CELL$
-.        LINEINPUT.CODE LINEINPUT.CX LINEINPUT.CA LINEINPUT.INV LINEINPUT.LIT
-.        LINEINPUT.TICK LINEINPUT.DONE LINEINPUT.FILLED LINEINPUT.HOME
-.        LINEINPUT.BAR
+.  SORT.
+.      OWNER: SORT.INC.BL
 .
-.  constants
-.      LINEINPUT.RETURN LINEINPUT.DELETE LINEINPUT.ESCAPE LINEINPUT.STOP
-.        LINEINPUT.DOWN LINEINPUT.UP LINEINPUT.TAB LINEINPUT.SPACE
-.        LINEINPUT.STAR LINEINPUT.BLINK
+.  STRCASE.
+.      OWNER: STRCASE.INC.BL
 .
-.LINEINPUT.SHOW$ is listed internal but is the one exception worth knowing:
-.it holds what the field displayed, which is what you want if you are
-.repainting a masked field yourself. FORM.EXP.BL uses it for exactly that.
+.  BMX. / BMXK.
+.      OWNER: BMX.INC.BL (variables / its KERNAL constants)
 .
-=BMX.INC.BL -- a BMX bitmap into VERA
+.  KV.
+.      OWNER: KV.INC.BL
 .
-.Routines, arguments and examples: SEC 4.5.
+.  MATH.
+.      OWNER: MATH.INC.BL
 .
-.  in
-.      BMX.FILE$
+.  MEM.
+.      OWNER: MEM.INC.BL, its two KERNAL constants included
 .
-.  out
-.      BMX.ERROR$ -- empty means it worked
-.      BMX.WIDTH BMX.HEIGHT BMX.DEPTH BMX.VERSION BMX.PALUSED BMX.PALFIRST
-.        BMX.DATAOFF BMX.PACKED -- the header, readable after BMX.OPEN
+.Use any other prefix for your own program: GAME., MAP., AIRLIFT.. A prefix
+.costs nothing at runtime -- BASLOAD crunches every identifier to a short
+.BASIC variable, so a long readable name and a two-letter one compile to the
+.same thing.
 .
-.  in, optional
-.      BMX.STASH -- where BMX.PAINT keeps the machine's palette; VRAM $13000
-.        by default, -1 to keep nothing
+.Do not reuse a taken prefix for a name the module has not defined.
+.THEME.MINE is free today and is one library update from not being.
 .
-.  internal
-.      BMX.PTR BMX.HEADER$ BMX.SCRATCH BMX.SCRATCH$ BMX.PALBASE BMX.ADDR
-.        BMX.LO BMX.HI BMX.BANK BMX.REST BMX.COUNT BMX.CHUNK BMX.GOT BMX.STEP
-.        BMX.SKIP BMX.ROW BMX.ROWS BMX.X0 BMX.Y0 BMX.BAD BMX.KEPT BMX.SRC
-.        BMX.DST
+=GP.* is keywords, not variables
 .
-.  constants
-.      BMXK.MACPTR BMXK.CHKIN BMXK.CLRCHN BMXK.MEMCOPY BMXK.VCTRL BMXK.VLO
-.        BMXK.VMID BMXK.VHI BMXK.PORTLO BMXK.PORTLO.B BMXK.PORTHI BMXK.LFN
+.GPB.INC.BL defines no variables. It is 27 keyword declarations and nothing
+.else.
 .
-.BMX.PTR doubles as the "have I initialised" flag -- it is zero until
-.BMX.INIT has run. Zeroing it yourself would leak a string block and
-.re-allocate.
+:GP.A = 5 : REM SYNTAX ERROR -- GP.A is a keyword
+:X = GP.A : REM correct
 .
-.BMX.STASH is the one variable here a caller may want to set, and it has to
-.be set before the first BMX.OPEN -- BMX.INIT runs then, and fills in the
-.default only if you have not. That is why -1 rather than 0 switches the
-.stash off: 0 already means "never set". BMX.KEPT is the once-per-run guard
-.that makes a slideshow restore the machine's palette rather than the
-.previous picture's.
+.The value words are GP.A GP.X GP.Y GP.C, the registers after GP.CALL, and
+.that is all of them. They are keywords rather than variables because nothing
+.in the runtime can write a BASIC variable by name, so a command that returns
+.a value must return it through a keyword. X16's own ST, MX and MY work the
+.same way.
 .
+.The complete per-module in / out / internal register is GP-BASIC.GLOBALS.md,
+.with a script in SEC 6 of that file for re-checking it after a change.
+.
+=SEE ALSO
+.
+>159|6. The traps, collected
+>67|4.2 STRINGS.INC.BL -- string helpers
+>66|4.1 THEME.INC.BL -- named colour roles
+>76|4.3 APPSYS.INC.BL -- start politely, leave it as you found it
+>77|4.4 LINEINPUT.INC.BL -- a positioned entry field
+>79|4.6 MENU.INC.BL -- menus built a row at a time
+>88|4.9 MENUPULL.INC.BL -- a dropdown under a bar item
+>90|4.11 GUI.INC.BL -- the box that puts the screen back, and the form in 
+>92|4.12 GUI-DIALOGS.INC.BL -- every dialog as a verb
+>112|STASH.INC.BL -- save a text rectangle, and put it back.
+>116|STASHFILE.INC.BL -- a saved text rectangle, through a file.
+>86|4.7 SORT.INC.BL -- shell sort a string array

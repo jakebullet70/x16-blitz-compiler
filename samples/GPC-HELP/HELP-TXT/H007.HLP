@@ -33,18 +33,35 @@
 .  LINEINPUT.INC.BL
 .      a positioned, length-limited entry field
 .
-.  MENUVERT.INC.BL
-.      a vertical menu
+.  MENU.INC.BL
+.      menus built a row at a time: a popup and a bar, run with MENUTO.VERT
+.        and MENUTO.BAR. Needs BANKMGR.INC.BL and a SHARED compile
 .
-.  MENUBAR.INC.BL
-.      a horizontal menu bar
+.  MENU.INC.BANKED.BL
+.      the menu row store, one SPC line per row the MENU.*.MAX sizes in
+.        MENU.INC.BL count. #INCLUDE it straight before MENU.INC.BL
+.
+.  MENUPULL.INC.BL
+.      a dropdown under a bar item, MENUTO.PULLDOWN. Needs STASH.INC.BL
 .
 .  GUI.INC.BL
-.      four dialogs -- ask, say, type, choose -- in a box that puts the
-.        screen back
+.      the box that puts the screen back, and the form and list controls
+.        inside it
 .
-.  GUI2.INC.BL
-.      a listbox, single or multi select
+.  GUI-DIALOGS.INC.BL
+.      every dialog as a verb: MSGBOX, ASKYN, INPUTBOX, PICKMENU, LISTBOX,
+.        the LIST. verbs and FORM.. #INCLUDE it after GUI, COMBO and CHECK
+.
+.  COMBO.INC.BL
+.      a drop-down list that folds into one row, a GUI.FORM control
+.
+.  CHECK.INC.BL
+.      a check box, a GUI.FORM control
+.
+.  FILEPICK.INC.BL
+.      a popup file picker, PICKBANKS / PICKFILE / PICKSCAN: reads the drive
+.        into a RAM bank, filters by suffix, answers with a name. Needs
+.        GUI.INC.BL, GUI-DIALOGS.INC.BL, FILEIO.INC.BL and FILEDIR.INC.BL
 .
 .  STRINGS.INC.BL
 .      the string helpers: BASIC where BASIC is enough, assembly where it is
@@ -62,23 +79,34 @@
 .  BMX.INC.BL
 .      load a BMX bitmap into VERA
 .
+.  BANKMGR.INC.BL
+.      which RAM bank belongs to whom: claim, allocate, release
+.
+.  KB.INC.BL
+.      empty the keyboard buffer
+.
+.  FILEIO.INC.BL
+.      the drive: status, exists, delete, rename, copy, directories, a string
+.        array to a file and back
+.
+.  FILEDIR.INC.BL
+.      read a directory, into a RAM bank or into low RAM
+.
+.  DOS.INC.BL
+.      a smaller alternative to FILEIO.INC.BL: DOSX sends a command to the
+.        drive and returns the error, DOS.EXISTS tests for a file. Include
+.        one of the two, not both
+.
 .  KV.INC.BL
 .      strings by key in one RAM bank, saved and loaded as one file. No
 .        GP.ASM, so no #SYMFILE
 .
+.  MATH.INC.BL
+.      the smaller and the larger of two numbers, as a GOSUB or as a verb
+.
+.  MEM.INC.BL
+.      a block copied and a block filled, through the KERNAL. Low RAM and the
+.        I/O page only
+.
 .What each one costs in bytes is in the command reference, under At a glance.
 .
-=SEE ALSO
-.
->65|4.1 THEME.INC.BL -- named colour roles
->75|4.3 APPSYS.INC.BL -- start politely, leave it as you found it
->108|STASH.INC.BL -- save a text rectangle, and put it back.
->116|STASHFILE.INC.BL -- a saved text rectangle, through a file.
->98|4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM
->99|4.19 STASHVRAMGC.INC.BL -- close the holes in a STASHVRAM store
->76|4.4 LINEINPUT.INC.BL -- a positioned entry field
->78|4.6 MENUVERT.INC.BL -- a vertical menu
->87|4.9 MENUBAR.INC.BL -- a horizontal menu
->89|4.11 GUI.INC.BL -- four dialogs, in a box that puts the screen back
->92|4.12 GUI2.INC.BL -- a listbox, single or multi select
->66|4.2 STRINGS.INC.BL -- string helpers

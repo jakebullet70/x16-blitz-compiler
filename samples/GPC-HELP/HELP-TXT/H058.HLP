@@ -1,121 +1,75 @@
-@4.20 KV.INC.BL -- keys and values in one RAM bank
+@4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM
 .
-=4.20 KV.INC.BL -- KEYS AND VALUES IN ONE RAM BANK
+=4.18 STASHVRAM.INC.BL -- RECTANGLES AND BLOBS, KEPT IN VRAM
 .
 =DESCRIPTION
 .
-.  KV.INIT
+.  SV.INIT
+.      IN: SV.BASE SV.TOP SV.MAX
+.      OUT: SV.OK
+.
+.  SV.SAVE
+.      IN: SV.X SV.Y SV.W SV.H
+.      OUT: SV.HND SV.OK
+.
+.  SV.RESTORE
+.      IN: SV.HND SV.MOVE SV.X SV.Y
+.      OUT: SV.OK
+.
+.  SV.PUT
+.      IN: SV.ADDR SV.LEN
+.      OUT: SV.HND SV.OK
+.
+.  SV.GET
+.      IN: SV.HND SV.ADDR
+.      OUT: SV.OK
+.
+.  SV.FREE
+.      IN: SV.HND
+.      OUT: SV.OK
+.
+.  SV.RESET
 .      IN: --
-.      OUT: KV.OK
+.      OUT: SV.OK
 .
-.  KV.FIND
-.      IN: KV.KEY$
-.      OUT: KV.SLOT
-.
-.  KV.GET
-.      IN: KV.KEY$
-.      OUT: KV.VALUE$ KV.SLOT KV.OK
-.
-.  KV.AT
-.      IN: KV.SLOT
-.      OUT: KV.KEY$ KV.VALUE$ KV.OK
-.
-.  KV.PUT
-.      IN: KV.KEY$ KV.VALUE$
-.      OUT: KV.SLOT KV.OK
-.
-.  KV.DEL
-.      IN: KV.KEY$
-.      OUT: KV.OK
-.
-.  KV.WIPE
-.      IN: --
-.      OUT: KV.OK
-.
-.  KV.SAVE
-.      IN: KV.FNAME$
-.      OUT: --
-.
-.  KV.LOAD
-.      IN: KV.FNAME$
-.      OUT: KV.OK
-.
-.  KV.PUTNUM KV.GETNUM
-.      IN: --
-.      OUT: KV.OK, always 0
-.
-:#INCLUDE "KV.INC.BL"
+:#INCLUDE "STASHVRAM.INC.BL"
 :
-:GOSUB KV.INIT
-:KV.KEY$ = "COLOR"
-:KV.VALUE$ = "RED"
-:GOSUB KV.PUT
-:KV.KEY$ = "COLOR"
-:GOSUB KV.GET
-:IF KV.OK THEN PRINT KV.VALUE$
-:KV.FNAME$ = "SETTINGS.KV"
-:GOSUB KV.SAVE
+:SV.MAX = 16 : DIM SV.PAGE%(16), SV.PAGES%(16)
+:GOSUB SV.INIT
+:SV.X = 10 : SV.Y = 5 : SV.W = 40 : SV.H = 12 : GOSUB SV.SAVE
+:IF SV.HND = 0 THEN <it did not fit>
+:REM ... draw over it ...
+:GOSUB SV.RESTORE
 .
-.Strings stored by key in RAM bank 40. KV.INIT runs before any other routine.
-.Every routine is a plain GOSUB, and KV.OK is -1 for success and 0 for
-.failure.
+.No GP.ASM, and so no #SYMFILE. The cells never leave VRAM: one data port
+.reads, the other writes, and the KERNAL's memory_copy moves between them
+.without stepping either. That is what STASH.INC.BL cannot do, and the reason
+.to reach for this one. It also executes no BANK, so unlike STASH it may live
+.inside a GP.BANKED region.
 .
-.Plain BASL. No GP.* keyword and no GP.ASM, so it needs neither GPB.INC.BL
-.nor a #SYMFILE, and the same source tokenises for stock BASIC.
+.SV.BASE and SV.TOP are the VRAM window in bytes, rounded in to whole
+.256-byte pages, and default to $04000 and $1AFFF. The caller DIMs the two
+.arrays to SV.MAX. SV.MOVE works as STASH.MOVE does: SV.RESTORE puts the
+.rectangle back where it came from when 0, at SV.X SV.Y when not. SV.HND is 1
+.to SV.MAX, or 0 if it did not fit. SV.ERROR$ says why when something is
+.refused, and is "" otherwise.
 .
-.KV.INIT formats the bank only when slot 0 holds no header. A bank that
-.already holds a store is kept, keys and all. A header with another version
-.or slot count is left alone, and KV.OK is 0. KV.WIPE formats the bank
-.whatever it holds.
+.Allocation is a bump pointer on 256-byte pages, released LIFO. Panels nest
+.and close in reverse and a log is append-only, so a hole only appears if a
+.caller frees out of order -- and then STASHVRAMGC.INC.BL (SEC 4.19) closes
+.it. Pages rather than bytes are what let a handle's address live in an
+.ordinary %: a page number reaches 511 where a 17-bit VRAM address would not.
 .
-.Keys are A-Z, 0-9 and ., cut to 8 characters. The module checks none of
-.this. A key compares byte for byte, and KV.AT reads a key back up to its
-.first space.
+.There is one allocator and it is this one. SV.BASE and SV.TOP are the
+.caller's contract, checked only against the layer 1 map and the charset.
+.BMX.STASH defaults to $13000, inside the default window -- a program using
+.both must move one of them.
 .
-.KV.PUT refuses an empty key. It rewrites the slot of a key that exists and
-.takes the first free slot for one that does not. When all 63 slots are in
-.use, KV.OK and KV.SLOT are 0.
+.A screen-mode change re-uploads the charset and can re-lay the map. Held
+.handles do not survive it; call SV.RESET after one.
 .
-.Values hold up to 119 characters, and KV.PUT cuts a longer one. An empty
-.value is stored and reads back as "". A missing key gives KV.OK = 0, KV.SLOT
-.= 0 and KV.VALUE$ = "".
+=SEE ALSO
 .
-.KV.FIND sets KV.SLOT and nothing else. Slots never move, so a program can
-.keep a slot number for the rest of the run and read it with KV.AT, which
-.does not scan. A delete frees the slot. KV.AT on every slot lists the store:
-.
-:FOR SLOT.NUMBER = 1 TO 63
-:    KV.SLOT = SLOT.NUMBER
-:    GOSUB KV.AT
-:    IF KV.OK THEN PRINT KV.KEY$; " = "; KV.VALUE$
-:NEXT SLOT.NUMBER
-.
-.KV.PUTNUM and KV.GETNUM are stubs. Each sets KV.OK = 0 and returns. Store a
-.number as text: STR$(N) with KV.PUT, and VAL(KV.VALUE$) after KV.GET.
-.
-.It selects a bank. Every routine selects bank 40 and ends with BANK
-.KV.HOMEBANK. The first KV.INIT sets KV.HOMEBANK to 1, the bank selected at
-.startup, and a program that keeps another bank selected sets it after
-.KV.INIT. A call from a GP.BANKED region needs nothing: it is a banked call,
-.and its RETURN selects the region's bank again (SEC 3.12). The module cannot
-.go inside a region, because the compiler refuses BANK there.
-.
-.A program that uses BANKMGR (SEC 4.13) claims the bank after BANKMGR.INIT
-.and before the first GET.FREE.BANK:
-.
-:BANKMGR.SET.BANK = KV.BANK
-:GOSUB BANKMGR.CLAIM
-.
-.KV.SAVE writes the whole bank, all 8,192 bytes, to KV.FNAME$ on device 8,
-.and replaces a file of that name. A disk error stops the program.
-.
-.KV.LOAD returns KV.OK = 0 for a missing file and leaves the bank alone. It
-.also returns 0 for a file that loads but holds no matching header, and then
-.the bank already holds that file: run KV.WIPE before the next KV.PUT. It
-.opens logical files 14 and 15 to test for the file and closes both, so
-.neither may be open when it is called.
-.
-.The layout, for a program that reads the bank without this module:
-.
-:slot n = $A000 + n*128, n = 0-63
-:+0..+7    the key, padded with spaces. $00 at +0 is a free slot
+>101|4.19 STASHVRAMGC.INC.BL -- close the holes in a STASHVRAM store
+>100|4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM
+>112|STASH.INC.BL -- save a text rectangle, and put it back.

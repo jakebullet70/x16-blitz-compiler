@@ -1,80 +1,118 @@
-@3. The modules (3)
-=FILEIO.INC.BL -- the drive: status, files, directories
+@1. The prefixes that are taken
 .
-.Routines, arguments and examples: SEC 4.15.
+=1. THE PREFIXES THAT ARE TAKEN
 .
-.Needs a #SYMFILE -- FILE.TOPET is a GP.ASM blob.
+.  GP.
+.      OWNER: GPB.INC.BL
+.      WHAT IT IS: keywords, not variables -- see SEC 2, this one is
+.        different
 .
-.  in
-.      FILE.NAME$ -- the file every routine acts on
-.      FILE.NEW$ -- the second name, RENAME and COPY
-.      FILE.DEVICE -- the drive; 0 means 8
-.      FILE.ISO -- non-zero converts names to PETSCII on the way out
-.      FILE.ROWS -- rows to write, SAVEARRAY
-.      FILE.MAX.ROWS -- rows that will fit, LOADARRAY; 0 means 10
-.      FILE.LINE$() -- the rows; the caller owns the DIM
+.  STR.
+.      OWNER: STRINGS.INC.BL
+.      WHAT IT IS: string helpers
 .
-.  out
-.      FILE.ERR FILE.MSG$ FILE.TRK FILE.SEC -- the command channel
-.      FILE.OK -- FILE.EXISTS
-.      FILE.ROWS -- rows read, LOADARRAY
-.      FILE.PATH$ -- FILE.CURDIR
+.  STR.USING.
+.      OWNER: STRUSING.INC.BL
+.      WHAT IT IS: a number to a template, kept apart from the rest of STR.
 .
-.  internal
-.      FILE.CMDSTR$ FILE.OUT$ FILE.RAW$ FILE.ROW$ FILE.ST FILE.KEEP FILE.I
-.        FILE.PETP%
+.  THEME.
+.      OWNER: THEME.INC.BL
+.      WHAT IT IS: colour roles
 .
-.  constants
-.      FILE.OKMAX FILE.NOTFOUND FILE.EXISTSERR FILE.PROTECTED FILE.CHAN
+.  APPSYS.
+.      OWNER: APPSYS.INC.BL
+.      WHAT IT IS: screen save/restore, panels to disk
 .
-.This module is the missing DS and DS$. FILE.ERR is DS and FILE.MSG$ is DS$.
-.ST is not a disk status -- it is the KERNAL's serial bus status and cannot
-.report FILE NOT FOUND.
+.  LINEINPUT.
+.      OWNER: LINEINPUT.INC.BL
+.      WHAT IT IS: entry fields
 .
-.FILE.ROWS is both an input and an output, the way MENUVERT.SEL is.
-.FILE.LINE$() is the caller's DIM, like MENUVERT.ITEM$ and unlike THEME.CLR.
+.  KB.
+.      OWNER: KB.INC.BL
+.      WHAT IT IS: the keyboard drain
 .
-=FILEDIR.INC.BL -- a directory, into a bank or into low RAM
+.  MENU.
+.      OWNER: MENU.INC.BL
+.      WHAT IT IS: menus: the row store, the popup and the bar.
+.        MENUPULL.INC.BL's variables too
 .
-.Routines, arguments and examples: SEC 4.16.
+.  MENUTO.
+.      OWNER: MENU.INC.BL MENUPULL.INC.BL
+.      WHAT IT IS: the runners, called with GP.FN
 .
-.Needs FILEIO.INC.BL, and a #SYMFILE -- it is two GP.ASM blobs.
+.  MENUPULL.
+.      OWNER: MENUPULL.INC.BL
+.      WHAT IT IS: a dropdown under a bar item: labels and one constant
 .
-.It executes no BANK statement, which is what lets it live in a GP.BANKED
-.region: the two blobs take the data bank at entry and put the caller's back
-.at every exit, so no BASIC line here ever runs with a foreign bank selected.
-.Both blobs write $00, so both are GP.ASM LOW and run from low memory when
-.the module is in a region. FILE.DIR.BNK% carries the bank number to the
-.assembly -- {FILE.DIR.BANK} would read a float's mantissa, and FILE.DIR.WAS%
-.is the blobs' save slot.
+.  GUI.
+.      OWNER: GUI.INC.BL
+.      WHAT IT IS: the box the dialogs sit in, and the form and controls
+.        inside it
 .
-.  in
-.      FILE.DIR.BANK -- the bank to read into, or 0 for low RAM
-.      FILE.DIR.PTR FILE.DIR.CAP -- the low-RAM buffer, when BANK is 0
-.      FILE.DIR.PATTERN$ -- a name pattern, or empty
-.      FILE.DIR.ONLY -- FILE.DIR.ALL, .FILES or .DIRS
+.  GUI.LISTBOX.
+.      OWNER: GUI-DIALOGS.INC.BL
+.      WHAT IT IS: the listbox dialog's answer, kept apart from the rest of
+.        GUI.
 .
-.  out
-.      FILE.DIR.GOT -- bytes read
-.      FILE.DIR.FULL -- the buffer filled before the listing ended
-.      FILE.DIR.MORE -- -1 while NEXT produced an entry
-.      FILE.NAME$ FILE.BLOCKS FILE.TYPE$ -- the entry itself
+.  DLG.
+.      OWNER: GUI-DIALOGS.INC.BL
+.      WHAT IT IS: the dialog verbs: their arguments, and their internals
 .
-.  internal
-.      FILE.DIR.AT FILE.DIR.ASK$ FILE.DIR.ADDR% FILE.DIR.ROOM% FILE.DIR.OFF%
-.        FILE.DIR.BYTES% FILE.DIR.CNT% FILE.DIR.BLK% FILE.DIR.OK%
-.        FILE.DIR.SLOW% FILE.DIR.LFN% FILE.DIR.NAMEA% FILE.DIR.TYPEA%
-.        FILE.DIR.WAS% FILE.DIR.BNK%
+.  STASH.
+.      OWNER: STASH.INC.BL
+.      WHAT IT IS: a text rectangle into a RAM bank, and back
 .
-.  constants
-.      FILE.DIR.ALL FILE.DIR.FILES FILE.DIR.DIRS FILE.DIR.NAMEMAX
-.        FILE.DIR.BANKROOM FILE.DIR.BANKBASE
+.  STASH.FILE.
+.      OWNER: STASHFILE.INC.BL
+.      WHAT IT IS: the same rectangle through a file, kept apart from the
+.        rest of STASH.
 .
-.FILE.DIR.INIT must run once before anything else: it sizes FILE.NAME$ and
-.FILE.TYPE$ for the assembly to write into, and creates every {VAR} slot. Do
-.not assign FILE.NAME$ or FILE.TYPE$ afterwards -- an assignment reallocates
-.and the block the assembly holds goes stale.
+.  SORT.
+.      OWNER: SORT.INC.BL
+.      WHAT IT IS: shell sort a string array in place
 .
-.FILE.NAME$ is shared with FILEIO on purpose: the name a picker chose is the
-.name FILE.EXISTS and FILE.DELETE want.
+.  STRCASE.
+.      OWNER: STRCASE.INC.BL
+.      WHAT IT IS: case, rewriting a string in place
+.
+.  BMX.
+.      OWNER: BMX.INC.BL
+.      WHAT IT IS: BMX bitmap loading
+.
+.  BMXK.
+.      OWNER: BMX.INC.BL
+.      WHAT IT IS: its KERNAL/VERA constants, kept apart from its variables
+.
+.  FILE.
+.      OWNER: FILEIO.INC.BL
+.      WHAT IT IS: the drive: status, exists, delete, rename, directories
+.
+.  FILE.DIR.
+.      OWNER: FILEDIR.INC.BL
+.      WHAT IT IS: reading a directory, kept apart from the rest of FILE.
+.
+.  SV.
+.      OWNER: STASHVRAM.INC.BL
+.      WHAT IT IS: the VRAM store. SVGC. is STASHVRAMGC.INC.BL's one constant
+.
+.  KV.
+.      OWNER: KV.INC.BL
+.      WHAT IT IS: keys and values in one RAM bank
+.
+.  MATH.
+.      OWNER: MATH.INC.BL
+.      WHAT IT IS: the smaller and the larger of two numbers
+.
+.  MEM.
+.      OWNER: MEM.INC.BL
+.      WHAT IT IS: a block copied, a block filled, and the two KERNAL
+.        constants
+.
+.Pick anything else for your own program. AIRLIFT., GAME., MAP. -- a prefix
+.costs nothing at runtime because BASLOAD crunches every identifier down to a
+.short BASIC variable, so a long readable name and a two-letter one compile
+.to exactly the same thing.
+.
+.Do not reuse a taken prefix for a name the module has not defined.
+.THEME.MINE looks free today; it is one library update away from not being.
 .

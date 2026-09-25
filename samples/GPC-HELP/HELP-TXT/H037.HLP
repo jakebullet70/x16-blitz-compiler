@@ -1,116 +1,107 @@
-@4.2 STRINGS.INC.BL -- string helpers
+@4.1 THEME.INC.BL -- named colour roles
 .
-=4.2 STRINGS.INC.BL -- STRING HELPERS
+=4.1 THEME.INC.BL -- NAMED COLOUR ROLES
 .
 =WHAT IT COSTS
 .
-.  ASM: GP.INSTR GP.STRPTR GP.COMP
-.    ASM -- machine code in the GP runtime block. One GP keyword pays for the
-.    whole block.
-.  COMPOSITE: GP.CONTAINS GP.ISEMPTY
-.    COMPOSITE -- no machine code. The compiler expands it into keywords that
-.    already exist. Runtime cost is zero.
+.    BASIC -- ordinary BASL in a .INC.BL, called with GOSUB. Free unless you
+.    #INCLUDE it.
 .
 =DESCRIPTION
 .
-.  STR.PADR
-.      IN: STR.STR$ STR.WIDTH
-.      OUT: STR.STR$ left-justified
+.  THEME.SELECT
+.      IN: THEME.ID%
+.      OUT: fills THEME.CLR()
 .
-.  STR.PADL
-.      IN: same
-.      OUT: right-justified
+.  THEME.NEXT
+.      IN: THEME.ID%
+.      OUT: the following theme, loaded
 .
-.  STR.PADC
-.      IN: same
-.      OUT: centred (odd gap goes right)
+.  THEME.RESET
+.      IN: THEME.ID%
+.      OUT: the selected theme's shipped values, reloaded
 .
-.  STR.SPLIT
-.      IN: STR.STR$ STR.DELIM$ STR.MAX
-.      OUT: STR.N, STR.FIELD$(1..N)
+.  THEME.SET
+.      IN: THEME.ATTR%
+.      OUT: issues COLOR -- makes it the colour PRINT uses
 .
-.  STR.REPLACE
-.      IN: STR.STR$ STR.FIND$ STR.REPL$
-.      OUT: STR.STR$, every occurrence replaced
+.  THEME.HI
+.      IN: THEME.ATTR%
+.      OUT: THEME.INV%, the inverse attribute
 .
-.  STR.PET2SCR
-.      IN: STR.PET
-.      OUT: STR.SCR
+.Five themes, THEME.COUNT of them:
 .
-.  STR.SPLICE
-.      IN: STR.STR$ STR.AT STR.CUT STR.SUB$
-.      OUT: STR.STR$, edited at that position
+.  0
+.      X16
+.      blue page, white text, cyan headings. The default
 .
-.  STR.TRIM
-.      IN: STR.PTR
-.      OUT: (the string itself), spaces off both ends
+.  1
+.      DARK
+.      black page, light grey text
 .
-.  STR.LTRIM
-.      IN: same
-.      OUT: spaces off the leading end
+.  2
+.      LIGHT
+.      white page, black text
 .
-.  STR.RTRIM
-.      IN: same
-.      OUT: spaces off the trailing end
+.  3
+.      GRAY
+.      dark grey page, light blue frames. From the XFMGR file manager
 .
-.The module needs a #SYMFILE, and so does every program that includes it,
-.before the #INCLUDEs and named after the source PRG. The three trims are
-.GP.ASM and reach BASIC's variables through {VAR}; without a symbol file the
-.compile stops with {} NEEDS #SYMFILE.
+.  4
+.      CUSTOM
+.      whatever THEME.CLR() already holds
 .
-=How a routine takes its string
+.THEME.NEXT moves to the following one and wraps, which is what a program
+.binds to a key. A cached attribute does not follow it: work out anything
+.derived from THEME.CLR(), a reversed bar included, after every load.
 .
-.The pads, SPLIT, REPLACE and SPLICE take the text by value in STR.STR$ and
-.hand the result back in it. The three trims take an ADDRESS in STR.PTR, from
-.GP.STRPTR (SEC 3.4.5), and rewrite the block in place.
+.CUSTOM loads nothing. Selecting it leaves THEME.CLR() as it stands, so a
+.program that lets the user change colours carries those changes into CUSTOM
+.rather than discarding them. The one exception is a cold start -- CUSTOM
+.selected before any other theme has been loaded -- where there is nothing to
+.keep and it takes X16's values. THEME.RESET goes back to those.
 .
-.WARNING: never pass a literal to a trim. GP.STRPTR("hello") is an address
-.inside the p-code.
+.samples/color-test edits the roles against a mock of the GUI and prints the
+.THEME.CLR() lines to paste back in here. It carries its own GPC-BASIC folder
+.and is still at nine roles, so it offers THEME.FOCUS and THEME.BAR but not
+.THEME.SHADOW.
 .
-=The pads
+.Roles, for indexing THEME.CLR(): THEME.PAGE THEME.TEXT THEME.TITLE
+.THEME.BORDER THEME.HILITE THEME.DIMMED THEME.WARN THEME.FOCUS THEME.BAR
+.THEME.SHADOW, and THEME.SLOTS = 10.
 .
-.STR.WIDTH is the target width. A string already at or past it is returned
-.unchanged: the pads never truncate. Use STR.RTRIM to shorten.
+.THEME.FOCUS is the eighth: what a focused control wears while GUI.FORM has
+.the keyboard (SEC 4.11). It is a separate role from THEME.HILITE because a
+.dialog shows both at once -- the highlighted row of a list, and the control
+.the TAB key has landed on. THEME.BAR is the ninth, the band a menu bar or
+.status line sits on, and THEME.SHADOW the tenth and newest, the colour a
+.drop shadow is filled with.
 .
-=STR.SPLIT
+.The module's own scalars are int16: THEME.ID%, THEME.ATTR% and THEME.INV%.
+.THEME.CLR() is not -- it stays an untyped array, and it is DIMmed to
+.THEME.SLOTS - 1, which is the last role and no element beyond it.
 .
-.Reads STR.STR$ and does not modify it. STR.MAX of 0 means 10. Empty fields
-.are kept, so "A,,C" is three fields and "A," is two. An empty string gives
-.one empty field, never zero. Reaching the limit is not an error: the last
-.field takes the unsplit remainder, delimiters included.
+.Usage is THEME.ID%, one GOSUB THEME.SELECT, then THEME.CLR(role) wherever an
+.attribute is wanted:
 .
-.STR.FIELD$ is the one array the library does not DIM. Left alone, GPC's
-.implicit DIM gives 0..10. For more, DIM it before the first call and set
-.STR.MAX to match. DIMming an array GPC has already auto-dimensioned is an
-.error, so it is one or the other.
+:THEME.ID% = 1 : GOSUB THEME.SELECT
+:GP.BOX 4,2,30,8, 2, THEME.CLR(THEME.BORDER)
+:GP.PRINTAT 6,3, "TITLE", THEME.CLR(THEME.TITLE)
 .
-=STR.REPLACE
+.The values are packed attributes, background * 16 + foreground, which is
+.what GP.BOX, GP.FILL and GP.PRINTAT take. For COLOR, which takes the halves
+.separately, use THEME.SET.
 .
-.Swaps every occurrence of STR.FIND$ for STR.REPL$ in STR.STR$. The
-.replacement may be shorter, longer, or "" to delete. It is case sensitive:
-.GP.INSTR (SEC 3.4.1) compares raw bytes. A replacement that contains the
-.search text terminates -- "A" to "AA" doubles the As. An empty STR.FIND$
-.leaves the string unchanged.
+.#DEFINE substitutes at translation time, so THEME.CLR(THEME.TITLE) compiles
+.to THEME.CLR(2). The readable name costs no variable and no lookup.
 .
-=STR.SPLICE
+.THEME.CLR is DIMmed by the module. Do not DIM it in your own program.
 .
-.Replaces STR.CUT characters at STR.AT with STR.SUB$, so one routine inserts,
-.overwrites and deletes: STR.CUT of 0 inserts, LEN(STR.SUB$) overwrites, an
-.empty STR.SUB$ deletes. STR.AT is 1-based. Past the end appends, below 1
-.clamps to 1, and a cut running past the end takes the rest of the string.
-.STR.AT and STR.CUT are clamped in place, so read them back after the call.
+.Formatting a NUMBER into a column is STRUSING.INC.BL (SEC 4.10), a separate
+.module: it needs no #SYMFILE and neither module depends on the other.
 .
-=STR.PET2SCR
+=SEE ALSO
 .
-.Converts the PETSCII code in STR.PET to the screen code the tile map holds,
-.in STR.SCR, for TILE, TDATA and VPOKE. GP.PRINTAT and GP.FILL do this
-.conversion themselves.
-.
-=Limitation
-.
-.The pads, REPLACE and SPLICE are not length checked. A longer replacement
-.can push the result past 255 characters.
-.
-.Examples: SPLITT.EXP.BL, STRINGS.EXP.BL. Regression test: STRTST.EXP.BL,
-.thirty-three cases.
-.
+>90|4.11 GUI.INC.BL -- the box that puts the screen back, and the form in 
+>89|4.10 STRUSING.INC.BL -- a number to a template
+>66|4.1 THEME.INC.BL -- named colour roles

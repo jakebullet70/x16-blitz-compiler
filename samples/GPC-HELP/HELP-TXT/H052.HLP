@@ -1,34 +1,52 @@
-@4.14 KB.INC.BL -- the keyboard buffer, emptied
+@4.12 GUI-DIALOGS.INC.BL -- every dialog as a verb (2)
+=A list built a step at a time, out of an array or out of a bank
 .
-=4.14 KB.INC.BL -- THE KEYBOARD BUFFER, EMPTIED
+.  LIST.BEGIN title$, rows
+.      OUT: a list box declared, not yet drawn
 .
-=WHAT IT COSTS
+.  LIST.ARRAY count
+.      IN: GUI.LIST.ITEM$()
+.      OUT: its rows come from the array
 .
-.    BASIC -- ordinary BASL in a .INC.BL, called with GOSUB. Free unless you
-.    #INCLUDE it.
+.  LIST.BANK bank, first, last
+.      IN: a RAM bank in the GP.BSTR image layout
+.      OUT: its rows come from the bank
 .
-=DESCRIPTION
+.  LISTTO.RUN
+.      OUT: the row, or 0 cancelled
 .
-.  KB.CLEARKB
-.      IN: --
-.      OUT: --
+.  LIST.ITEM n
+.      OUT: row n as text
 .
-:#INCLUDE "KB.INC.BL"
-:
-:GOSUB KB.CLEARKB
-:GOSUB GUI.YN
+.  LIST.SORT bank, first, last
+.      OUT: that bank's rows in order, in place
 .
-.Call it before opening a dialog, and after a keystroke that redraws. A
-.dialog opened with a key still queued reads it, answers itself and closes; a
-.held arrow repeats faster than a page can be drawn and scrolls on after the
-.key is let go.
+:GP.SUB LIST.BEGIN, " OPEN FILE ", 12
+:GP.SUB LIST.BANK, MY.BANK%, 0, N - 1
+:SEL = GP.FN(LISTTO.RUN)
+:IF SEL > 0 THEN F$ = GP.FN(LIST.ITEM, SEL)
 .
-.GUI.INC.BL carries a private copy, GUI.CLEARKB, from when code inside a
-.GP.BANKED region could not call another bank. Fix one and fix the other.
-.There are only the two, and a second #INCLUDE of this file cannot supply the
-.copy -- the #IFNDEF guard makes it produce nothing.
+.A bank list never comes into low memory. The bank holds the GP.BSTR image
+.layout -- a 16-bit count at $A000, an offset a row at $A002, then the
+.records -- and GUI.LIST.FETCH reads one row at a time, as it is drawn. That
+.is how FILEPICK (SEC 4.20) shows a directory of any length in a program with
+.no room for it. LIST.SORT moves the two-byte offsets and not the records, so
+.a pointer into one stays good afterwards; it reaches the bank through
+.STASH.SELECT, which is what lets the whole module sit inside a GP.BANKED
+.region.
+.
+.Example: GUI.EXP.BL.
+.
+=EXAMPLE PROGRAM
+.
+.  GUI.EXP.BL -- runnable, in the GPC-BASIC folder
 .
 =SEE ALSO
 .
->94|4.14 KB.INC.BL -- the keyboard buffer, emptied
->89|4.11 GUI.INC.BL -- four dialogs, in a box that puts the screen back
+>41|3.7 Screen -- drawing
+>79|4.6 MENU.INC.BL -- menus built a row at a time
+>102|4.20 KV.INC.BL -- keys and values in one RAM bank
+>92|4.12 GUI-DIALOGS.INC.BL -- every dialog as a verb
+>90|4.11 GUI.INC.BL -- the box that puts the screen back, and the form in 
+>99|4.17 COMBO.INC.BL -- a drop-down list that folds into one row
+>104|4.21 CHECK.INC.BL -- a check box, [X] or [ ]

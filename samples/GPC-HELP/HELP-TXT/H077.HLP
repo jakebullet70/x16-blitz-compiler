@@ -1,26 +1,99 @@
-@5. TRUE IS -1
+@3. The modules (5)
+=MENU.INC.BL -- menus built a row at a time
 .
-=5. TRUE IS -1
+.Routines, arguments and examples: SEC 4.6.
 .
-.Every flag the library hands back is -1 for true and 0 for false, and
-.anything written against it should be too. GUI.OK GUI.ANSWER GUI.STASHED
-.STASH.OK SORT.OK MENUVERT.HOTHIT FILE.OK BANKMGR.OK APPSYS.IS.EMULATOR --
-.all of them.
+.  verbs
+.      MENU.BEGIN MENU.ITEM MENU.ITEMX MENU.SELECTED MENU.DRAWBAR, called
+.        with GP.SUB
+.      MENUTO.VERT MENUTO.BAR, called with GP.FN
 .
-.That is what a comparison in this compiler evaluates to, so a flag and a
-.test read the same way, and it is the value NOT wants: NOT is -x-1, so NOT
-.-1 is 0 while NOT 1 is -2, which is still true. IF itself tests non-zero, so
-.IF FLAG THEN works either way and IF FLAG = 1 THEN is the spelling that
-.breaks.
+.  in
+.      MENU.ATTR -- the rows, packed attribute
+.      MENU.HIATTR -- the highlighted row; 0 inverts MENU.ATTR
+.      MENU.HOTATTR -- the hot key letter; 0 leaves it untinted
+.      MENU.DISATTR -- a disabled row; 0 is MENU.ATTR
+.      MENU.SEPATTR -- separators and the frame; 0 is MENU.ATTR
+.      MENU.SEPCHR -- the separator glyph; 0 is MENU.LINE
+.      MENU.FLAGS -- the popup's flags
+.      MENU.BARFLAGS -- the bar's flags
+.      MENU.GAP -- cells between bar items
+.      MENU.HINTX MENU.HINTY MENU.HINTW MENU.HINTATTR -- the hint field;
+.        MENU.HINTW 0 is off
+.      MENU.MARKED -- the bar item MENU.DRAWBAR lights
 .
-:IF GUI.OK THEN <accepted> : REM yes
-:IF NOT GUI.OK THEN <cancelled> : REM yes
-:IF GUI.OK = 0 THEN <cancelled> : REM yes
-:IF GUI.OK = 1 THEN <accepted> : REM NO -- it is -1
+.  out
+.      MENU.EXITKEY -- the key that ended the run
+.      MENU.BARNUM -- the bar's row count
+.      MENU.SELX MENU.SELW -- the chosen bar item's column and width
+.      MENU.MARKED -- the bar item left lit
+.      MENU.OK -- 0 if bank MENU.TEXTBANK was already claimed
 .
-.A flag the CALLER sets is read as non-zero, so LINEINPUT.MASK = 1 and
-.STASH.MOVE = 1 still work. Write -1 in new code all the same.
+.  formals
+.      MENU.SLOT MENU.SEL MENU.ROWTEXT$ MENU.ROWHINT$ MENU.ROWON MENU.RUNROW
+.        MENU.RUNCOL MENU.STYLE MENU.CHOSEN
 .
-.Printing one needs STR$ whole. The MID$(STR$(N), 2) idiom strips the leading
-.space STR$ puts on a positive number; -1 has no leading space, so that idiom
-.eats the minus and prints 1.
+.  arrays
+.      MENU.FLAG$() MENU.HOTKEY$() MENU.HOTCOL$() -- DIMmed by the module on
+.        the first MENU.BEGIN
+.
+.  banked groups
+.      MENU.TEXTS MENU.HINTS, in MENU.INC.BANKED.BL
+.
+.  internal
+.      MENU.ATCOL MENU.ATROW MENU.BARX MENU.BARY MENU.BASE MENU.BOXH
+.        MENU.BOXW MENU.CAP MENU.CODE MENU.COUNT MENU.CUR MENU.DONE
+.        MENU.DRAWN MENU.DRAWX MENU.DRAWY MENU.EACH MENU.EXITBIT MENU.FRAME
+.        MENU.GLYPH MENU.HAVE MENU.HILITE MENU.HINTAT MENU.HOTAT MENU.HOTCH$
+.        MENU.HOTHIT MENU.INKEY$ MENU.LEFTW MENU.MOVE MENU.PADHELD
+.        MENU.PADNEW MENU.PADNOW MENU.PADRAW MENU.PAINT MENU.READY MENU.ROW
+.        MENU.ROWFLAG$ MENU.ROWIS$ MENU.ROWW MENU.RUNBASE MENU.RUNFLAGS
+.        MENU.RUNSLOT MENU.SCAN MENU.SHOW$ MENU.SKIPS MENU.SPAN MENU.STEP
+.        MENU.TEXTW MENU.TINTAT MENU.USE MENU.WANT MENU.WAS MENU.WIDE
+.
+.  constants
+.      MENU.TEXTBANK MENU.BAR MENU.POPUP MENU.BAR.MAX MENU.POPUP.MAX MENU.ON
+.        MENU.OFF
+.      MENU.SOLID MENU.THIN MENU.ROUND MENU.THICK MENU.NOBOX
+.      MENU.MUSTSEL MENU.KEEPMARK MENU.NOWRAP MENU.GAMEPAD MENU.DOWNEXIT
+.        MENU.UPEXIT MENU.KEYEXIT MENU.HINTMID
+.      MENU.DOWN MENU.UP MENU.LEFT MENU.RIGHT MENU.ENTER MENU.ESC MENU.STOP
+.        MENU.LINE
+.      MENU.PORT MENU.PAD.UP MENU.PAD.DOWN MENU.PAD.LEFT MENU.PAD.RIGHT
+.        MENU.PAD.B MENU.PAD.START
+.
+.The formals are the verbs' arguments. GP.DEFPROC formals are ordinary shared
+.variables (SEC 3.11), so a formal holds the last value passed until the next
+.call.
+.
+.GUI.INC.BL sets MENU.RUNSLOT, reads MENU.READY, MENU.COUNT and MENU.WIDE,
+.and calls MENU.MEASURE. A program of your own should not.
+.
+=MENUPULL.INC.BL -- a dropdown under a bar item
+.
+.Routines, arguments and examples: SEC 4.9. Its variables use the MENU.
+.prefix; MENUPULL. is its labels and one constant.
+.
+.  verbs
+.      MENUTO.PULLDOWN, called with GP.FN
+.
+.  in
+.      MENU.STASHBANK -- the bank the covered cells go to; 0 takes one from
+.        BANKMGR on the first call
+.
+.  out
+.      MENU.NEXTBAR -- the bar item LEFT or RIGHT walks to, or 0
+.      MENU.EXITKEY MENU.BARNUM MENU.SELX MENU.SELW MENU.MARKED, as for
+.        MENU.INC.BL
+.
+.  formals
+.      MENU.PULLAT MENU.STYLE MENU.CHOSEN
+.
+.  internal
+.      MENU.COLS MENU.EDGE MENU.LEFTOF MENU.RIGHTOF MENU.STASHED, and
+.        STASH.BANK STASH.SLOT STASH.MOVE STASH.X STASH.Y STASH.W STASH.H,
+.        which it sets
+.
+.  constants
+.      MENUPULL.SCRMODE
+.

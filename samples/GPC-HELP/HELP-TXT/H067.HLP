@@ -1,18 +1,78 @@
-@2. GP.* is keywords, not variables -- and the difference bites
+@STASH.INC.BL -- save a text rectangle, and put it back.
 .
-=2. GP.* IS KEYWORDS, NOT VARIABLES -- AND THE DIFFERENCE BITES
+=STASH.INC.BL
 .
-.GPB.INC.BL defines no variables. It is 31 keyword declarations and nothing
-.else. Everything spelled GP.something is a BASIC keyword, so:
+.  save a text rectangle, and put it back.
 .
-:GP.A = 5          <- SYNTAX ERROR. GP.A is a keyword; you cannot assign to i
-:X = GP.A          <- correct. It reads the accumulator after the last GP.CAL
+=MODULE HEADER
 .
-.The value words are GP.A, GP.X, GP.Y and GP.C -- the registers after
-.GP.CALL, and now the whole list of them. They are keywords rather than
-.variables because nothing in the runtime can write a BASIC variable by name,
-.so a command that returns a value has to hand it back through a keyword.
-.X16's own ST, MX and MY exist for the same reason.
+:      STASH.SAVE      copy a rectangle of the screen into a RAM bank
+:      STASH.RESTORE   copy it back, where it was or somewhere else
 .
-.The full keyword list lives in GPC-BASIC/GPB.INC.BL.
+.  The same rectangle through a FILE is STASHFILE.INC.BL, built on this.
 .
+.  The program needs a #SYMFILE, before the includes and named after the
+.  source PRG. The assembly reaches BASIC's variables through {VAR} and
+.  BASLOAD crunches every name first; without one the compile stops with "{}
+.  NEEDS #SYMFILE".
+.
+:      #SAVEAS "@:MYPROG.PRG"
+:      #SYMFILE "@:MYPROG.SYM"
+:      #INCLUDE "GPB.INC.BL"
+:      #INCLUDE "STASH.INC.BL"
+.
+.  Usage:
+:      STASH.BANK = 8
+:      STASH.X = 10 : STASH.Y = 4 : STASH.W = 30 : STASH.H = 8
+:      GOSUB STASH.SAVE
+:      ... draw over it ...
+:      GOSUB STASH.RESTORE
+.
+:   in   STASH.BANK     the RAM bank to keep the cells in. 1..255, and
+:                       it is yours: this writes the whole of it
+:        STASH.X  STASH.Y     top left, in CELLS
+:        STASH.W  STASH.H     size, in cells
+.
+:        STASH.SLOT     byte offset into the bank. Default 0, which is what
+:                       every caller that never heard of it holds
+.
+:   out  STASH.OK       -1 if it fitted and was saved, 0 if not
+:        STASH.NEXT     the offset just past what was written
+.
+.  RESTORE needs only the bank: four header bytes go in first -- w, h, x, y
+.  -- so the rectangle describes itself. STASH.MOVE = 1 with STASH.X /
+.  STASH.Y pastes it somewhere else instead.
+.
+.  A bank is 8,192 bytes and a cell is two, so 4,094 cells fit -- 63x63, and
+.  NOT a whole 80x60 screen. Too big is refused before the first write, with
+.  STASH.OK = 0.
+.
+=MORE THAN ONE RECTANGLE IN A BANK
+.
+.  Feed STASH.NEXT back in as the next STASH.SLOT and the bank holds a stack
+.  of them, which is what nested dialogs want -- one bank for the lot rather
+.  than one bank a level. That is a bump allocator in two variables, and
+.  release is LIFO by remembering the offset. STASHVRAM.INC.BL allocates the
+.  same way.
+.
+=RESTORE READS THE SLOT IT IS GIVEN
+.
+.  Nothing checks that two saves do not overlap and nothing records which is
+.  which: the header describes a rectangle's SIZE, not its identity, so
+.  restoring the wrong offset restores whatever is there. The offsets are the
+.  caller's to keep straight, the same way the bank number already is.
+.
+.  A row's address is worked out in BASIC, once a row, and the row is copied
+.  in assembly. That keeps the assembly free of any pointer needing zero
+.  page: a blob runs with the interpreter live, so codePtr, zTemp0, NSStatus
+.  and the mantissas must survive it. The destination goes into the OPERAND
+.  of the store instead.
+.
+.  #REM 1 is load bearing: without it BASLOAD strips the body and the block
+.  reaches the compiler empty, refused as "block mismatch". #REM 0 restores
+.  the default.
+.
+=SEE ALSO
+.
+>116|STASHFILE.INC.BL -- a saved text rectangle, through a file.
+>100|4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM

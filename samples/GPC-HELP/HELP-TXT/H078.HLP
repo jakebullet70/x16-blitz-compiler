@@ -1,25 +1,90 @@
-@6. Two more naming rules that are not about collisions
+@3. The modules (6)
+=GUI.INC.BL -- four dialogs, in a box that puts the screen back
 .
-=6. TWO MORE NAMING RULES THAT ARE NOT ABOUT COLLISIONS
+.Routines, arguments and examples: SEC 4.11.
 .
-.#DEFINE takes an INT16 (BASLOAD.MD:313). A constant above 65535 is ERROR:
-.INVALID PARAMETER, not a warning -- which is why BMX.PALBASE (VRAM $1FA00,
-.129536) is an ordinary variable and not a #DEFINE. Every VRAM address past
-.$FFFF has the same problem.
+.  in
+.      GUI.MSG$ GUI.MSG2$ GUI.MSG3$ -- up to three message lines. "" for
+.        none, and no gap left behind
+.      GUI.TITLE$ -- a name in the top edge
+.      GUI.BANK -- a spare RAM bank for the covered cells. 0 does not save
+.      GUI.STYLE -- GP.BOX style 0..3
+.      GUI.PANEL.IN GUI.BORDER.IN -- attributes. 0 takes THEME.TEXT and
+.        THEME.BORDER
+.      GUI.GLYPH -- non-zero frames from GUI.EDGE.H GUI.EDGE.V GUI.CORNER.TL
+.        .TR .BL .BR
+.      GUI.PLACE GUI.X GUI.Y GUI.ROW.OFFSET -- where the box goes
+.      GUI.SHADOW GUI.SHADOW.ATTR -- the drop shadow
+.      GUI.BTN.ONE$ GUI.BTN.TWO$ -- the button labels, & marking the
+.        accelerator
+.      GUI.DEFAULT -- which button is the default. 2 is the second, anything
+.        else the first
+.      GUI.FLAGS -- GUI.MENU, over the popup slot of MENU.INC.BL
+.      GUI.LEN GUI.TEXT$ GUI.MASK -- GUI.INPUT
+.      GUI.BODY.ROWS GUI.BODY.WIDTH -- GUI.OPEN, when you call it yourself
 .
-.A dotted name whose tail is a reserved word is fine. MENUVERT.COUNT,
-.THEME.CLR, LINEINPUT.LEN and LINEINPUT.RETURN all contain keywords and all
-.work, because BASLOAD matches the whole identifier. An undotted one does
-.not: POS, MB, ST, LEN and CHAR cannot be variables at all. This is the main
-.reason the library is dotted throughout.
+.  out
+.      GUI.KEY -- the key that ended it, whichever call
+.      GUI.ANSWER -- GUI.YN
+.      GUI.OK -- GUI.INPUT: -1 accepted, 0 cancelled
+.      GUI.TEXT$ -- what was typed
+.      GUI.SEL -- the row chosen, or 0
+.      GUI.STASHED -- -1 if the covered cells were saved
+.      GUI.LEFT GUI.TOP GUI.WIDTH GUI.HEIGHT -- where the box went
+.      GUI.INNER.LEFT GUI.INNER.TOP GUI.INNER.WIDTH -- the usable area, from
+.        GUI.OPEN
+.      GUI.PANEL GUI.BORDER -- the attributes it settled on
 .
-.RETURNS joined that list on 08/09/26 -- it is GP.DEFPROC's result clause and
-.has a token of its own, so a bare RETURNS is no longer a name. RETURN is
-.untouched, and so is anything dotted.
+.  internal
+.      GUI.ADD.W GUI.BOTTOM GUI.BOX.STYLE GUI.CLR.K$ GUI.FIELD.LEFT
+.        GUI.GAP.ROWS GUI.GLYPH$ GUI.HEAD.ROWS GUI.INDEX GUI.MOVE.BY
+.        GUI.MOVE.TRIES GUI.MOVE.WAS GUI.OKCANCEL GUI.PAINT.N GUI.PRESSED$
+.        GUI.RIGHT GUI.SAVE.W GUI.SAVE.H GUI.SCAN GUI.SCREEN.COLS
+.        GUI.SCREEN.ROWS GUI.SH.BW GUI.SH.W GUI.SH.H GUI.STEP.TYPE
+.        GUI.TITLE.LEFT GUI.WAS$
+.      the button row: GUI.BTN.AMP .AT .ATTR .DEF .FOCUSED .HEAD$ .HI .KEY
+.        .KEY.ONE .KEY.TWO .LC .MARK$ .OF .RIGHT .TAIL$ .TEXT$ .TOTAL .UC
+.        .W.ONE .W.TWO .WIDE .X .Y
+.      the form: GUI.CTRL.TYPE% .X% .Y% .W% .FLAGS% .KEY% GUI.CTRL.TEXT$
+.        GUI.CTRL.N GUI.FOCUS GUI.FORM.DIMMED .DONE .HIT .KEY .NAV
+.      the list control: GUI.LIST.ATTR .COUNT .DIGITS .EACH .EDGE$ .HI .I
+.        .MARKED .MARKP .MARKY .NOTE$ .NOTE.LEFT .NOTEW .NUM$ .ROW .ROWS .SEL
+.        .W .WAS .WAS.SCROLL .X .Y
 .
-.One rule applies only outside BASL: BASLOAD gives 64 significant characters,
-.the built-in BASIC gives two. Write the same code as a hand-typed .bas for
-.the PC-side converter and THEME.CLR and THEME.COUNT become the same
-.variable. That is a silent wrong answer -- it cost two test cycles during
-.tier 6, both times looking exactly like a compiler bug. Inside BASL you are
-.safe; in a raw .bas, give every variable a distinct first two characters.
+.  constants
+.      GUI.SCRMODE GUI.LINEBOX GUI.MAXCELLS GUI.PADX GUI.PADY GUI.ESCAPE
+.        GUI.STOP GUI.RETURN GUI.SPACE GUI.BTN.GAP GUI.FORM.MAX
+.      GUI.CT.BUTTON GUI.CT.FIELD GUI.CT.LIST -- what a control is
+.      GUI.CF.DEFAULT GUI.CF.NOFOCUS -- what is true of it
+.      GUI.NAV.STAY .NEXT .PREV .PRESS .DEFAULT .CANCEL -- the six verdicts
+.      GUI.K.TAB GUI.K.SHTAB GUI.K.DOWN GUI.K.UP GUI.K.RIGHT GUI.K.LEFT
+.
+.GUI.DEFAULT and the focus are two different things. The default button is
+.the one RETURN presses from anywhere and the one drawn <<LIKE THIS>>; the
+.focus is where TAB has got to, and it is drawn in THEME.FOCUS. GUI.INPUT
+.opens with the default on OK and the focus in the field, so neither is the
+.other's shorthand.
+.
+.GUI.BTN.DEF is not GUI.DEFAULT. It is internal -- which button
+.GUI.BUTTON.ROW is painting the double brackets on as it draws -- and setting
+.it does nothing, because the row recomputes it from GUI.DEFAULT every time
+.it paints. The near-miss is worth knowing about; the rest of GUI.BTN.* is
+.scratch for one button's text, width and accelerator and is rewritten twice
+.a row.
+.
+.GUI.HINT$ is gone, and it is the one interface the CUA work took away. The
+.dimmed line naming two keys became a real button row, and "the first Y and
+.the first N in the line are lit" has nothing to light when the row is two
+.buttons. Set GUI.BTN.ONE$ and GUI.BTN.TWO$ instead.
+.
+.The typing dialog and its string swapped names. It was GUI.TEXT returning
+.GUI.INPUT$; it is GUI.INPUT returning GUI.TEXT$. BASLOAD will not have a
+.label and a variable of one name and the $ does not separate them, so
+.GUI.INPUT the routine forbids GUI.INPUT$ the variable. A program written
+.against the older library compiles clean and reads the wrong one back --
+.this is the one rename here that fails silently.
+.
+.GUI.CTRL.* are the seven parallel arrays that are the control block: one
+.element a control, up to GUI.FORM.MAX. GUI.INC.BL DIMs them. Do not DIM them
+.yourself.
+.

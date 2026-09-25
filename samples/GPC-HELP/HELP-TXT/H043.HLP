@@ -1,115 +1,114 @@
-@4.6 MENUVERT.INC.BL -- a vertical menu (2)
-.  1
-.      must select -- ESC does not cancel
+@4.6 MENU.INC.BL -- menus built a row at a time
 .
-.  2
-.      keep mark -- leave the chosen row highlighted on the way out
+=4.6 MENU.INC.BL -- MENUS BUILT A ROW AT A TIME
 .
-.  4
-.      no wrap -- stop at the ends instead of wrapping round
+=WHAT IT COSTS
 .
-.  8
-.      gamepad -- drive it from the SNES pad in port 1 as well as the
-.        keyboard
+.    BASIC -- ordinary BASL in a .INC.BL, called with GOSUB. Free unless you
+.    #INCLUDE it.
 .
-.  64
-.      key exit -- end on a key the menu has no use for, instead of
-.        swallowing it
+=DESCRIPTION
 .
-.  128
-.      hint mid -- centre each hint in its field. Does nothing unless
-.        MENUVERT.HINTW is set
+.  GP.SUB MENU.BEGIN, slot
+.      IN: MENU.BAR or MENU.POPUP
+.      OUT: the slot emptied; the rows that follow go into it
 .
-.The constants MENUVERT.MUSTSEL, .KEEPMARK, .NOWRAP, .GAMEPAD, .KEYEXIT and
-..HINTMID are defined; add those rather than the numbers.
+.  GP.SUB MENU.ITEM, text$
+.      IN: the row's text
+.      OUT: a row appended, with no hint, enabled
 .
-.With KEYEXIT, a key the menu ignores -- LEFT and RIGHT -- ends it with
-.MENUVERT.KEY set and MENUVERT.SEL untouched. MENUBAR.DOWNEXIT (SEC 4.9) is
-.the same mechanism on the other axis; the two let a bar and its dropdown
-.drive each other.
+.  GP.SUB MENU.ITEMX, text$, hint$, on
+.      IN: the text, the hint, and on, tested <> 0
+.      OUT: a row appended
 .
-.A hotkey chooses its row rather than moving to it. MENUVERT.HOT$ is one
-.character per row in order, matched without case. It may be shorter than
-.MENUVERT.COUNT, in which case the later rows have no hotkey.
+.  GP.SUB MENU.SELECTED, n
+.      IN: the row the next run opens on
+.      OUT: --
 .
-.MENUVERT.HOTATTR paints the hotkey letter in a second attribute. The letter
-.is located in the row's own text -- the first case-insensitive match for
-.that row's MENUVERT.HOT$ character -- so nothing extra is passed in and "
-.START" with hotkey S needs no markup. A row whose text does not contain its
-.hotkey is left untinted rather than reported; the hotkey still works. Only
-.rows in the normal attribute are tinted: on the selected row the highlight
-.carries the meaning.
+.  R = GP.FN(MENU.HOTROW, slot, key)
+.      IN: a slot and a key code
+.      OUT: R, the first live row with that hot key, matched without case, or
+.        0
 .
-=Separators
+.  N = GP.FN(MENUTO.VERT, row, col, style)
+.      IN: the popup slot, and the inputs below
+.      OUT: N, 1 to the row count, or 0 for ESC. MENU.EXITKEY
 .
-.A row whose text is one hyphen draws as a line across the menu's width. The
-.highlight never lands on it and a hotkey cannot choose it; UP and DOWN step
-.over it in the direction they were already going. The row still counts, so
-.MENUVERT.SEL and MENUVERT.HOT$ keep one entry a row and the separator's
-.MENUVERT.HOT$ entry is a placeholder. The test is for the hyphen alone, so a
-.caller that builds rows with a leading space must leave it off this one.
+.  N = GP.FN(MENUTO.BAR, row, col, style)
+.      IN: the bar slot, MENU.GAP MENU.BARFLAGS
+.      OUT: N MENU.EXITKEY MENU.BARNUM MENU.SELX MENU.SELW MENU.MARKED
 .
-.MENUVERT.SEPCHR names the glyph and MENUVERT.SEPATTR the attribute.
+.  GP.SUB MENU.DRAWBAR, row, col, style
+.      IN: the bar slot, MENU.MARKED
+.      OUT: the bar on screen, not run, with MENU.MARKED lit
 .
-=Disabled rows
+:#INCLUDE "GPB.INC.BL"
+:#INCLUDE "BANKMGR.INC.BL"
+:#INCLUDE "MENU.INC.BANKED.BL"
+:#INCLUDE "MENU.INC.BL"
+:
+:GOSUB BANKMGR.INIT
+:MENU.ATTR = 6 * 16 + 1
+:MENU.HOTATTR = 6 * 16 + 7
+:MENU.DISATTR = 6 * 16 + 12
+:GP.SUB MENU.BEGIN, MENU.POPUP
+:GP.SUB MENU.ITEMX, "&ADD RECORD", "APPEND A BLANK RECORD", MENU.ON
+:GP.SUB MENU.ITEMX, "&DEL RECORD", "", MENU.OFF
+:GP.SUB MENU.ITEM, "-"
+:GP.SUB MENU.ITEM, "&QUIT"
+:N = GP.FN(MENUTO.VERT, 4, 10, MENU.ROUND)
+:IF N = 0 THEN <cancelled>
 .
-.MENUVERT.DIS$ is one character a row, and "1" disables that row: the cursor
-.steps over it, a hotkey will not choose it, and it draws in
-.MENUVERT.DISATTR.
+.Requires GPB.INC.BL and BANKMGR.INC.BL, with BANKMGR.INIT run before the
+.first MENU.BEGIN, and a SHARED compile. #INCLUDE "MENU.INC.BANKED.BL"
+.straight before MENU.INC.BL. Its groups are banked, so the program gets a
+.NAME.OVL beside its .PRG. Ship both.
 .
-:MENUVERT.DIS$ = "0010" : REM row 3 is off
-:MENUVERT.DISATTR = THEME.CLR(THEME.DIMMED)
-:GOSUB MENUVERT.RUN
+.A menu is built into a slot, then run from it. There are two slots, so the
+.bar survives while its dropdown is built:
 .
-.The mask is read once and cleared. MENUVERT.RUN and MENUVERT.DRAW both take
-.it and set MENUVERT.DIS$ = "", so a menu that never sets it cannot inherit
-.the last one's mask.
+.  MENU.BAR
+.      ROWS: 16
 .
-=Hints
+.  MENU.POPUP
+.      ROWS: 32
 .
-.With MENUVERT.HINTW non-zero, the row's MENUVERT.HINT$() line is printed in
-.the field at MENUVERT.HINTX MENUVERT.HINTY, MENUVERT.HINTW cells wide, in
-.MENUVERT.HINTATTR. The field is cleared to that attribute first. Flag 128
-.centres the text in the field.
+.A row past the slot's size is dropped, and so is a row added before any
+.MENU.BEGIN. The sizes are MENU.BAR.MAX, MENU.POPUP.MAX, MENU.POOL.MAX and
+.MENU.POOLBASE, declared in MENU.INC.BL. A group in MENU.INC.BANKED.BL holds
+.one SPC line per row it counts, so raising a define means adding lines to
+.the group to match. A define that does not match its lines silently loses
+.rows off the end of a menu. MENU.POOLBASE is MENU.BAR.MAX + MENU.POPUP.MAX.
 .
-.A hint is drawn only when the highlight moves, not when the menu opens, so
-.whatever the status line already says survives until the user starts moving.
+.The text and hints are kept in bank MENU.TEXTBANK, which the first
+.MENU.BEGIN claims from BANKMGR (SEC 4.13). It is 62 unless the program
+.writes #DEFINE MENU.TEXTBANK n before the #INCLUDE. If another owner has
+.claimed that bank, MENU.OK is 0 and every row is dropped. Text is cut to 30
+.characters and a hint to 50. MENU.FLAG$(), MENU.HOTKEY$() and MENU.HOTCOL$()
+.are the module's own arrays, DIMmed on the first MENU.BEGIN. Do not DIM
+.them.
 .
-.The caller owns this DIM as well. With MENUVERT.HINTW at 0 the array is
-.never read, so a menu without hints needs no array at all.
+.MENU.SELECTED sets the row the next run opens on. The next MENU.BEGIN or run
+.clears it, and without it a run opens on row 1.
 .
-=The caller owns the DIM
+.MENU.HOTROW looks a key up the way a run does. Use it on a key a
+.MENU.KEYEXIT run handed back, to open the bar item with that letter, or for
+.an ALT+letter the program reads itself.
 .
-.A module cannot be passed an array in BASIC, so it names one; DIMming it
-.inside the module would fix a bound and then fail for a caller who wanted
-.more rows. Leave MENUVERT.ITEM$ undimensioned and GPC's implicit DIM gives
-.0..10, a ten-row menu. DIM it yourself for more. Do not do both.
+=Rows
 .
-=The gamepad flag
+.& marks the hot key: "SAVE &AS" is stored as SAVE AS with hot key A at
+.column 6. Only the first & counts, && is a literal &, and a trailing & stays
+.in the text. A hot key is matched without case, the first live row with it
+.wins, and it chooses the row at once.
 .
-.With flag 8, up and down move the highlight and B or Start chooses. Cancel
-.is keyboard-only.
+.A row whose text is one hyphen, "-", is a separator. It draws as a line of
+.MENU.SEPCHR, still counts as a row, and the cursor steps over it.
 .
-.It reads port 1, the physical pad. Port 0 is the keyboard presented as a
-.joystick and is not read.
+.MENU.ITEMX with on 0 adds a disabled row. The cursor steps over it, its hot
+.key and RETURN are refused, and it draws in MENU.DISATTR.
 .
-.One step per press, with no auto-repeat: the pad is edge-triggered, so
-.holding a direction moves once, and a button still held from whatever opened
-.the menu is not read as a fresh press.
+.A caller keeping its rows in GP.BANKEDSTR groups (SEC 3.10) can put the
+.enable mask at index 0 of the hint group, "1" for on and "0" for off a row,
+.and pass VAL(MID$(GP.BSTR(HH, 0), I, 1)) as on.
 .
-.With no pad connected the flag changes nothing. In the emulator a real pad
-.needs -joy1.
-.
-.Examples: MENUDEMO.EXP.BL on its own, MENU.EXP.BL inside a whole small
-.application, and MENUTST.EXP.BL for the 21-case regression test.
-.
-=EXAMPLE PROGRAM
-.
-.  MENUDEMO.EXP.BL -- runnable, in the GPC-BASIC folder
-.  MENU.EXP.BL -- runnable, in the GPC-BASIC folder
-.  MENUTST.EXP.BL -- runnable, in the GPC-BASIC folder
-.
-=SEE ALSO
-.
->87|4.9 MENUBAR.INC.BL -- a horizontal menu
->78|4.6 MENUVERT.INC.BL -- a vertical menu

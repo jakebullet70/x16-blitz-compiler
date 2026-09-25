@@ -1,88 +1,58 @@
-@4.4 LINEINPUT.INC.BL -- a positioned entry field
+@4.3 APPSYS.INC.BL -- start politely, leave it as you found it
 .
-=4.4 LINEINPUT.INC.BL -- A POSITIONED ENTRY FIELD
+=4.3 APPSYS.INC.BL -- START POLITELY, LEAVE IT AS YOU FOUND IT
 .
 =DESCRIPTION
 .
-.  LINEINPUT.GET
-.      IN: LINEINPUT.X .Y .LEN .ATTR .TEXT$ .MASK .ALLOW$ .DENY$
-.      OUT: LINEINPUT.TEXT$ LINEINPUT.KEY
+.  APPSYS.STARTUP
+.      IN: --
+.      OUT: APPSYS.MODE APPSYS.COLS APPSYS.ROWS APPSYS.COLOUR
 .
-.  LINEINPUT.ASK
-.      IN: the same plus LINEINPUT.LABEL$
-.      OUT: the same; LINEINPUT.X restored
+.  APPSYS.RESTORE
+.      IN: those
+.      OUT: screen mode and colour put back
 .
-:LINEINPUT.X = 10 : LINEINPUT.Y = 6
-:LINEINPUT.LEN = 20
-:LINEINPUT.ATTR = THEME.CLR(THEME.TEXT)
-:LINEINPUT.TEXT$ = ""
-:GOSUB LINEINPUT.GET
-:IF LINEINPUT.KEY = 27 THEN GOTO CANCELLED
+.  APPSYS.ISEMU
+.      IN: --
+.      OUT: APPSYS.IS.EMULATOR -- -1 under x16emu, 0 otherwise
 .
-.INPUT and LINPUT cannot be used on a drawn screen: both take the bottom of
-.the screen, scroll it, echo in the current colour, and accept any length. A
-.LINEINPUT field stays at the given position, in the given colour, and stops
-.at the given width.
+:A screen rectangle through a file is `STASH.FILE.SAVE` / `.LOAD` / `.PUT` in
+:
+:GOSUB APPSYS.STARTUP
+:REM ... the application, laid out with APPSYS.COLS / APPSYS.ROWS ...
+:GOSUB APPSYS.RESTORE : END
 .
-.LINEINPUT.KEY is the key that ended the field, which is what makes a
-.multi-field form possible:
+.Call STARTUP before any SCREEN or COLOR of your own. It records the state as
+.it finds it, so anything changed beforehand is what gets restored.
 .
-.  13
-.      RETURN -- finished
+.Lay out from APPSYS.COLS / APPSYS.ROWS rather than assuming 80x60. The X16
+.boots 80x60, but SCREEN 0 is 40x30 and a user who prefers larger text is
+.running one.
 .
-.  27 / 3
-.      ESC / STOP -- cancelled, and LINEINPUT.TEXT$ is put back to what it
-.        was
+.APPSYS.DEV defaults to 8. The panel routines are implemented in
+.STASHFILE.INC.BL. A panel file is self-describing -- it carries the stash's
+.4-byte header -- so loading one needs only its name.
 .
-.  17 / 145 / 9
-.      cursor down / up / TAB -- left the field, text kept
+.APPSYS.ISEMU answers the question a timing loop has to ask. $9FBE and $9FBF
+.are the last of the emulator's own I/O registers and read as "1" and "6"
+.under x16emu, with the debugger on or off; the routine is those two PEEKs
+.and a comparison.
 .
-.A form is therefore a loop over fields rather than a sequence of prompts,
-.and the user can return to an earlier field without restarting.
+:GOSUB APPSYS.ISEMU
+:IF APPSYS.IS.EMULATOR THEN PRINT "EMULATED"
+:IF NOT APPSYS.IS.EMULATOR THEN PRINT "NOT x16emu"
 .
-.LINEINPUT.MASK non-zero displays asterisks while holding the real string.
-.The field does not scroll: when it is full, further characters are refused
-.and the cursor inverts the last character rather than sitting past the end.
-.The cursor blinks off TI rather than a delay loop; a delay loop would
-.swallow keys pressed during it.
+.The flag is -1, not 1, so NOT works on it: NOT is -x-1 here, so NOT -1 is 0
+.while NOT 1 is -2 -- still true. -1 is also what a comparison hands back, so
+.the flag reads like one. IF itself tests non-zero, so either value would
+.have worked with the plain form.
 .
-.LINEINPUT.ALLOW$ and LINEINPUT.DENY$ restrict what may be typed. Both are
-.empty by default, and the field then takes any printable character, as it
-.always has. ALLOW$ lists the characters accepted and DENY$ the ones refused;
-.a caller that sets both gets ALLOW$, and DENY$ is not consulted. A refused
-.key changes nothing -- not the text, and not the caret.
-.
-.They compare raw bytes, so a set of LETTERS depends on the charset: PETSCII
-.shifted letters arrive as $C1-$DA and ISO ones as $41-$5A, and an ALLOW$
-.written for one silently refuses every capital in the other. Digits are
-.48-57 in both. Use ALLOW$ for a closed set short enough to write out, DENY$
-.for everything-except:
-.
-.  Digits only
-.      SPELLING: ALLOW$ = "0123456789"
-.
-.  Number with sign and point
-.      SPELLING: ALLOW$ = "0123456789.-"
-.
-.  Yes or no
-.      SPELLING: ALLOW$ = "YyNn"
-.
-.  Letters, no digits
-.      SPELLING: DENY$ = "0123456789"
-.
-.  Filename, no punctuation
-.      SPELLING: DENY$ = ",:=*?"
-.
-.Both are sticky, like every other input in the library, so a form sets them
-.on the way into each field rather than once at the top.
-.
-.Example: FORM.EXP.BL -- three fields, one masked and one digits-only, in a
-.themed panel.
-.
-=EXAMPLE PROGRAM
-.
-.  FORM.EXP.BL -- runnable, in the GPC-BASIC folder
+.It answers for x16emu and nothing else. A 0 means "not x16emu" -- a real
+.machine, or another emulator that does not carry those registers. And
+.$9FA0-$9FBF is expansion card I/O on the real machine, so a card at I/O5
+.could in principle answer "16" as well: a 1 is strong, a 0 is certain.
 .
 =SEE ALSO
 .
->76|4.4 LINEINPUT.INC.BL -- a positioned entry field
+>76|4.3 APPSYS.INC.BL -- start politely, leave it as you found it
+>116|STASHFILE.INC.BL -- a saved text rectangle, through a file.
