@@ -70,7 +70,7 @@ reading as the concise spec.
 
 ## The three measured constraints
 
-Reproduce any of these with `work/ovltest/` (see **Test rig** at the bottom).
+Reproduce any of these with `scratch/ovltest/` (see **Test rig** at the bottom).
 
 ### 1. The workspace is zeroed before the first BASIC statement
 
@@ -220,7 +220,7 @@ prize (most of 18 KB of p-code, against ~900 bytes of text).
 ## Regression suite — this already exists, use it
 
 `source/unit-tests/banktest3.py` is the `GP.BANKED` suite: ~30 programs in
-`work/banktest3/`, compiled and run, marked-versus-control output comparison,
+`scratch/banktest3/`, compiled and run, marked-versus-control output comparison,
 rejection tests, overlay-content checks, and a truncated-overlay test
 (`BNKOVL` must stop with `?OVL`). Run it after **every** stage:
 
@@ -282,7 +282,7 @@ because `WriteObjectCode` refuses to leave less than 4 KB of workspace.
 
 ## Test rig
 
-`work/ovltest/` — built for the investigation, kept for re-verification.
+`scratch/ovltest/` — built for the investigation, kept for re-verification.
 Nothing in the repo proper was modified.
 
 | file | does |
@@ -291,7 +291,7 @@ Nothing in the repo proper was modified.
 | `ovlblob.py` | appends a known pattern to an object; `--over` deliberately overruns `$9F00` |
 | `runovla.py` | runs a `.PRG` headless and prints its output; extra args pass to the emulator, e.g. `-randram` |
 
-    $T = "work\ovltest"
+    $T = "scratch\ovltest"
     & $PY source\gpc\build_basl.py --drive $T OVLA.BASL OVLA.SRC.PRG
     & $PY source\gpc\compile_shared.py --drive $T --embedded OVLA.SRC.PRG OVLA.PRG OVLA.MAP
     & $PY $T\ovlblob.py $T\OVLA.PRG 16384

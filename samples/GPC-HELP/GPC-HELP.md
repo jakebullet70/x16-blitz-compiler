@@ -394,7 +394,7 @@ an unlimited directive namespace, so every future compiler directive is a GPC-si
 ##### Where the old ceiling still binds
 
 **Anything that types `BASLOAD "X"` at the BASIC prompt uses the ROM, and still stops at 38,655
-bytes.** That is the interactive path and the dev harnesses in `work/`. Only the build drives the
+bytes.** That is the interactive path and the dev harnesses in `scratch/`. Only the build drives the
 fork.
 
 ---
@@ -3817,7 +3817,7 @@ Needs `GPB.INC.BL`, and **no `#SYMFILE`** — there is no `GP.ASM` in it. The ce
 VRAM: one data port reads, the other writes, and `memory_copy` moves between them without
 stepping either.
 
-**It executes no `BANK`**, so it can live in a `GP.BANKED` region — measured, `work/stashvram/SVB.BASL`.
+**It executes no `BANK`**, so it can live in a `GP.BANKED` region — measured, `scratch/stashvram/SVB.BASL`.
 That is the difference from `STASH.INC.BL`, which cannot.
 
 | | |

@@ -186,13 +186,6 @@ drive/*.BASL
 #   drive/samples/ below, not a source.
 drive/HELP-TXT/
 
-# demo/ is build output for menu-demo.bat and bmx-demo.bat: compiled objects
-# plus BMX images copied out of samples/. Every byte of it is regenerable and
-# the images are already tracked in samples/BMXVIEWER/SAMPLES, so tracking it
-# would put half a megabyte of duplicates in the repo. The two .bat files at
-# the root ARE tracked, and say how to rebuild what they run.
-demo/
-
 # drive/MD5 is the Commodore BASIC MD5 program, tracked: it is the fixture for the
 # md5 regression test (source/unit-tests/md5), which compiles it, runs it BOTH compiled
 # and interpreted, and fails if the two digests differ. The object, the map and the
@@ -277,24 +270,6 @@ source/application/rtimage.gen.asm
 source/*/build/rtimage.prg
 source/*/build/rtimage.lbl
 
-# The per-feature emulator drives -- work/help, work/lineinput, work/rename, work/fileio.
-# Each is a complete -fsroot: its own GPC.BIN, runtimes, library module copies and build.py, so a
-# feature can be built and run WITHOUT contending for drive/, which is the one drive every other
-# harness writes to. That is the whole reason they exist and why the module copies inside them are
-# deliberate duplicates rather than drift to be reconciled.
-#
-# Regenerable, 1.2 MB, and full of binaries. NOT regenerable, and living only on this disk: the
-# three build.py harnesses and the test sources TODO.md cites by name -- work/lineinput/EMUTST.BASL
-# (the two-byte GETKEY probe), work/lineinput/KBTST.BASL (the undrained kbdbuf_put case),
-# work/rename/LINTST.BASL and work/lineinput/LINTST2.BASL (the same six cases banked and unbanked).
-/work/
-
-# tmp-test/ is another throwaway emulator drive, made to build SVARS.BASL away from
-# drive/: its own GPC.BIN, BASLOAD-GPC.BIN, runtimes and a handful of T*.BASL probes.
-# Same class as /work above -- regenerable, all binaries, and one "git add -A" from being
-# committed.
-tmp-test/
-
 # GPB.HELP is compiled SHARED and help-demo.bat mounts samples/GPC-HELP as its drive, so
 # samplesbuild.py copies the current GPB/GPC.RT.nnn.BIN in beside the object -- the bootstrap
 # looks for it at the drive root. Build output, build-numbered, cleared and re-copied on every
@@ -304,11 +279,15 @@ samples/GPC-HELP/GPC.RT.*.BIN
 samples/GPC-HELP/GP1.RT.*.BIN
 samples/GPC-HELP/GPC.RC.*.BIN
 
-# release/ is TRACKED so the drop folder exists in a fresh clone, but its two products
-# are not. release/TMP/ is the staging tree -- the release unpacked, wiped and rebuilt by
-# "release.sh stage" -- and it also holds XFMGR and XT, which are the developer's own
-# tools and never go in the zip. The zip itself matches the gpc-release-*.zip rule below.
-release/TMP/
+# scratch/ holds every throwaway folder, regenerable and full of binaries:
+#   scratch/<name>/   per-test emulator drives, one per harness, so a test never contends
+#                     for drive/. The build.py harnesses and probe sources in them are not
+#                     regenerable and live only on this disk.
+#   scratch/demo/     build output for bmx-demo.bat: C.BMXVIEW.PRG plus copied BMX images.
+#   scratch/release/  the release staging tree, wiped and rebuilt by "release.sh stage". It
+#                     also holds XFMGR and XT, which never go in the zip.
+# release/ itself is tracked so the drop folder exists in a fresh clone.
+/scratch/
 
 # OASIS/ is not part of this repository and never goes in git.
 OASIS/

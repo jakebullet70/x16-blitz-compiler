@@ -133,7 +133,7 @@ an unlimited directive namespace, so every future compiler directive is a GPC-si
 ### Where the old ceiling still binds
 
 **Anything that types `BASLOAD "X"` at the BASIC prompt uses the ROM, and still stops at 38,655
-bytes.** That is the interactive path and the dev harnesses in `work/`. Only the build drives the
+bytes.** That is the interactive path and the dev harnesses in `scratch/`. Only the build drives the
 fork.
 
 ---

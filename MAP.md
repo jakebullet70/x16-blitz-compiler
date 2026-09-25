@@ -17,6 +17,7 @@ current with every stage.
 | `fixes/` | Regression programs, one folder per fixed bug. |
 | `docs/` | `BUILDING.md`, the plans in `blitz/`, X16 notes in `x16/`, reference PDFs in `reference/`, and the memory notes in `memory/`. |
 | `release/` | The release drop folder. |
+| `scratch/` | Not in git. Throwaway test drives, `demo/` for `bmx-demo.bat`, and `release/`, the release staging tree. |
 | `demo-c64/` | The original C64 Blitz disk images. |
 
 Root files: `README.md` (overview), `TODO.md` (the running work list, large; grep it), `CLAUDE.md`,

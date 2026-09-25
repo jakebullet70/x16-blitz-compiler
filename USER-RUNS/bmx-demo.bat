@@ -10,22 +10,22 @@ rem      XMASCARD   CANDLE   CAT1   BEARDGUY   TREE7   ROBOSPIDER
 rem
 rem  Source: GPC-BASIC\BMXVIEW.EXP.BL, on GPC-BASIC\BMX.INC.BL
 rem
-rem  demo\ is BUILD OUTPUT and is not in git. To make it:
+rem  scratch\demo\ is BUILD OUTPUT and is not in git. To make it:
 rem    1. copy GPB.INC.BL, APPSYS.INC.BL, BMX.INC.BL and BMXVIEW.EXP.BL
 rem       from GPC-BASIC\ into drive\
 rem    2. python source\gpc\build_basl.py BMXVIEW.EXP.BL BMXVIEW.PRG
 rem    3. compile drive\BMXVIEW.PRG with GPC.BIN, and put the object
-rem       in demo\ as C.BMXVIEW.PRG
-rem    4. copy any .BMX files you want into demo\ -- samples\BMXVIEWER\SAMPLES
+rem       in scratch\demo\ as C.BMXVIEW.PRG
+rem    4. copy any .BMX files you want into scratch\demo\ -- samples\BMXVIEWER\SAMPLES
 rem       has eight, one for each header shape the viewer has to handle
 rem ---------------------------------------------------------------------------
 setlocal
 for %%I in ("%~dp0..") do set "ROOT=%%~fI\"
-set "DEMO=%ROOT%demo"
+set "DEMO=%ROOT%scratch\demo"
 
 if not exist "%DEMO%\C.BMXVIEW.PRG" (
 	echo.
-	echo   demo\C.BMXVIEW.PRG is not built yet.
+	echo   scratch\demo\C.BMXVIEW.PRG is not built yet.
 	echo   See the notes at the top of this file for the four steps.
 	echo.
 	exit /b 1

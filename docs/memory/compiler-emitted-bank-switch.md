@@ -59,7 +59,7 @@ the caller's bank back. No `BANK` statement and no shim is needed.
 ## Tests
 
 The harness is `bgosubtest.py` in the session scratchpad, **not in the repo**; the programs are in
-`work/bgosub/`.
+`scratch/bgosub/`.
 
 - `BGA.BASL` has no `BANK` statement. It covers GOSUB region 5 to region 6 and back, region to low
   memory and back, region 6 to low memory to region 5, and GP.SUB, GP.FN and FN into region 5 from
@@ -73,7 +73,7 @@ The harness is `bgosubtest.py` in the session scratchpad, **not in the repo**; t
   only the PRG grows, one byte a low-memory call into a region: GPBMODS off +75 B (CODE 43,520 to
   43,776), on +58 B, RGL +3, RGN +4, GUIFRMT +29. The shim calls account for most of it. GPBMODS'
   dead-code count goes from 1,583 to 1,600 bytes saved, and the 17 B difference is exactly the
-  off/on gap. The references in `work/gpctest/ref` are stale for these programs until
+  off/on gap. The references in `scratch/gpctest/ref` are stale for these programs until
   `gpctest.py ref` is run again.
 
 **BASLOAD trap found on the way:** `FNT(1)` tokenises as the array `FNT`, not as `FN T`, and the
@@ -128,13 +128,13 @@ compile succeeds and prints 0. Write `DEF FN T(X)` and `FN T(1)` with the space.
 
 - `gpctest.py ref` run with the current `GPC.BIN`: every program stored, PASS in 86 s.
 - **gpctest's inputs are frozen.** `dcref.snapshot` copies `drive/NAME.SRC.PRG` into
-  `work/dcref/inputs` only when the copy is missing, so gpctest's GPBMODS is the 2026-09-12 source,
+  `scratch/dcref/inputs` only when the copy is missing, so gpctest's GPBMODS is the 2026-09-12 source,
   shims and all (77,062 B against 73,953 now). That is why its dead-code count stayed 1,600 B and
   its FREE stayed 8,192 through step 4. Delete an input to refresh it.
 - **Inputs refreshed.** GPBMODS's input is `drive/GPBMODS.SRC.PRG` and `.SYM` from the step 4
-  build. GUIFRMT was tokenised and compiled in `work/guifrmt`, a drive holding the merged
+  build. GUIFRMT was tokenised and compiled in `scratch/guifrmt`, a drive holding the merged
   `GUIFRMT.BASL`, the library working copy flattened, the current `GPC.BIN` and the runtime files.
-  The pre-merge inputs are kept in `work/dcref/inputs-premerge/`. `gpctest.py ref --only
+  The pre-merge inputs are kept in `scratch/dcref/inputs-premerge/`. `gpctest.py ref --only
   GUIFRMT,GPBMODS` rebuilt their references in 32 s, then `gpctest.py full` passed in 147 s:
   - GPBMODS: CODE 41,984 FREE 9,728, object 11,619 B; dead code 202 lines, 1,413 B.
   - GUIFRMT: CODE 12,748 FREE 18,176, object 3,538 B (was 4,098), B04 7,938, B09 770, B10 718;
@@ -146,7 +146,7 @@ compile succeeds and prints 0. Write `DEF FN T(X)` and `FN T(1)` with the space.
   same tokenised program.
 - The current GPBMODS (`drive/GPBMODS.PRG`, 11,619 B): workspace `$4000`..`$6600`, 9,728 B;
   `.varspace` 3,292. §4.20, H056 and the readme carry it.
-- `banktest3.py`: `T` is `work/banktest3`, `build_basl.py` gets `--drive`, the current `GPC.BIN`
+- `banktest3.py`: `T` is `scratch/banktest3`, `build_basl.py` gets `--drive`, the current `GPC.BIN`
   and runtime files are copied onto the drive first, and BANKY left the reject list for a run check
   that wants Q1, Q2, Q3. Run after the fix: ALL PASS.
 - §3.12 said `BANK`, `BLOAD` and `BSAVE` are refused in a region. `gpbank.asm` refuses `BANK`
@@ -192,7 +192,7 @@ What the guard changed in the tests:
 
 - `banktest3.py`: `BANKH` moved from a pair with `BANKI` to the refusals, with `BNKGA`
   (`IF .. GOTO`), `BNKGB` (`ON .. GOTO`), `BNKGE` (`IF .. THEN <line>`) and `BGD` (copied from
-  `work/bgosub/`). The new pair `BNKGC`/`BNKGD` keeps a GOTO and an `IF .. GOTO` inside a region, and
+  `scratch/bgosub/`). The new pair `BNKGC`/`BNKGD` keeps a GOTO and an `IF .. GOTO` inside a region, and
   a GOTO out of a region to a low-memory `RETURN`, running. `BGA`/`BGB` and `BGC` moved in from
   the scratch `.bgosub` harness, so `banktest3` alone covers item 4.
 - `banktest3.py`'s `emu()` now also stops on a compiler error after the `OUT:` line. Before, a
@@ -205,7 +205,7 @@ Results with the guard build (`GPC.BIN` MD5 `2647c404`): `gpctest.py full` PASS 
   `GP.ENDBANKED`, so it lands in low memory past the region.
 - `drive/RGM.BASL` no longer tokenised at all (`DUPLICATE SYMBOL IN APPSYS.INC.BL:54`: its
   `LIB.*BANK.INC.BL` shims clash with the merged modules). It is rebuilt in GPBMODS's five-region
-  merged shape. The three old sources and inputs are in `work/dcref/inputs-preguard/`, and the
+  merged shape. The three old sources and inputs are in `scratch/dcref/inputs-preguard/`, and the
   new references were built with the previous compiler, `acf427f1`.
 
 Related: [[gp-banked-call-out-loses-the-bank]], [[gpc-core-page-cushion-below-gpbase]],

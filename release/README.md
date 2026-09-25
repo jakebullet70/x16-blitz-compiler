@@ -15,9 +15,9 @@ are git-ignored. The folder itself is tracked so a fresh clone has it.
 `release.bat`, which puts make and 64tass on PATH first.
 
 ```
-./release.sh          build everything, stage release/TMP, then zip it
-./release.sh stage    stage release/TMP from the current build -- no rebuild, no zip
-./release.sh zip      zip release/TMP exactly as it stands -- no rebuild, no restage
+./release.sh          build everything, stage scratch/release, then zip it
+./release.sh stage    stage scratch/release from the current build -- no rebuild, no zip
+./release.sh zip      zip scratch/release exactly as it stands -- no rebuild, no restage
 ```
 
 Staging and packaging are separate on purpose. Stage the tree, look at it, correct it,

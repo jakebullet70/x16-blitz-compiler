@@ -586,7 +586,7 @@ A second fixture with one library module and a small master is worth making, so 
 - The SHARED p-code ceiling is RTBASE, 22,016 bytes. `C.GPC.ERR.PRG` is 9,144 bytes, so 12,872
   bytes are left. The library runs from banked regions and its 28,433 byte `C.GPC.ERR.OVL` has to
   be beside the `.PRG` at run time.
-- `release/TMP` currently holds no `*.RT.124.BIN`. Both PRGs staged there are SHARED and cannot
+- `scratch/release` currently holds no `*.RT.124.BIN`. Both PRGs staged there are SHARED and cannot
   start without the runtime beside them. Unrelated to this work, but it will bite anyone testing a
   staged build.
 - The directives come before the `#INCLUDE`s in `GPC.ERR.BASL`, and that is not style. `STRCASE`

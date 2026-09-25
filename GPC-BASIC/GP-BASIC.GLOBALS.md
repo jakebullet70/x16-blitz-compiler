@@ -257,7 +257,7 @@ Needs `GPB.INC.BL`, and **no `#SYMFILE`** — there is no `GP.ASM` in it. The ce
 VRAM: one data port reads, the other writes, and `memory_copy` moves between them without
 stepping either.
 
-**It executes no `BANK`**, so it can live in a `GP.BANKED` region — measured, `work/stashvram/SVB.BASL`.
+**It executes no `BANK`**, so it can live in a `GP.BANKED` region — measured, `scratch/stashvram/SVB.BASL`.
 That is the difference from `STASH.INC.BL`, which cannot.
 
 | | |

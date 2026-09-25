@@ -121,7 +121,7 @@ the `@ <line>` suffix the harness matches on.
 not exist on this machine. Every tokenise failed as a result, so the suite could
 not run at all. It now uses `sys.executable`.
 
-`work/banktest3/BNKBIG.BASL` is new — a generated program with 100 one-page
+`scratch/banktest3/BNKBIG.BASL` is new — a generated program with 100 one-page
 regions in banks 2 to 101. Its overlay is 101 pages against roughly 84 available,
 so it is comfortably over. It is the program the acceptance test will use. It is
 not yet wired into `banktest3.py`; see below.
@@ -174,4 +174,4 @@ Nothing from this step is committed.
 LOAD")` to `BAD`, compiled EMBEDDED, in the same change that lifts the refusal.
 The main loop calls `compile_one(n)` with its default of SHARED; `compile_one`
 already takes a `mode` argument, so the call site changes, not the function.
-`work/banktest3/BNKBIG.BASL` is already in place and tokenises clean.
+`scratch/banktest3/BNKBIG.BASL` is already in place and tokenises clean.

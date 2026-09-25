@@ -42,7 +42,7 @@ Recompiling GPBMODS gives a byte-identical PRG and OVL, so the object file under
 memory overwrite can. Only instrumentation confined to `errorhandler.asm`, late in the image,
 preserves the repro.
 
-The repro harness is `work/oomprobe/` -- the PRG, the OVL, the three `.RT.123.BIN`, driver text
+The repro harness is `scratch/oomprobe/` -- the PRG, the OVL, the three `.RT.123.BIN`, driver text
 files and `probeh.py`, which runs x16emu warped with 2048K and stops on `DONEB`.
 
 **Second pass, 2026-09-17.** A clean build (GPB.RT 11909) reproduces. Earlier "no repro" readings

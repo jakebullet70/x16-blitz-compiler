@@ -57,12 +57,12 @@ PROGRAMS = [
          install=None, data=[]),
 
     #   The GP.BASIC viewer, whose master is in the library rather than in a sample folder.
-    #   EMBEDDED: bmx-demo.bat mounts demo\, which carries no runtime and never has.
+    #   EMBEDDED: bmx-demo.bat mounts scratch\demo\, which carries no runtime and never has.
     dict(name="BMXVIEW",
          src=("GPC-BASIC", "BMXVIEW.EXP.BL"),
          lib="GPC-BASIC",
          extras=[], shared=False,
-         install=("demo", "C.BMXVIEW.PRG"), data=["bmx"]),
+         install=("scratch/demo", "C.BMXVIEW.PRG"), data=["bmx"]),
 
     #   SHARED, and built in the sample folder: its #INCLUDEs name GPC-BASIC/ and the
     #   runtime and GPC.BIN are already beside it.  install=None leaves the object on

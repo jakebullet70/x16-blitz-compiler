@@ -9,19 +9,19 @@
 #   tokenised with the ROM's BASLOAD, or a program generated or written byte by byte below. The
 #   keep-marker tests are .BASL: tokenise.zip turns the END in REM GP.ENDKEEP into a token.
 #   A NAME.SYM beside the source goes in as its symbol file. Each is
-#   compiled with GPC.INPUT line 5 set, in a drive of its own under work/dctest/. The compile
+#   compiled with GPC.INPUT line 5 set, in a drive of its own under scratch/dctest/. The compile
 #   writes the removed-line list D.NAME, and the OK line is followed by
 #   DEAD CODE: <lines> LINES REMOVED, <bytes> BYTES SAVED.
 #
-#   The runtime images come from work/dcref/inputs/, the fixed copy dcref.py keeps.
+#   The runtime images come from scratch/dcref/inputs/, the fixed copy dcref.py keeps.
 #   dcstrip.py builds the same programs through make_source for the identity test.
 #
 import os, re, shutil, subprocess, sys, time, glob
 
 ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
 TESTS = os.path.join(ROOT, "source", "unit-tests", "deadcode-tests")
-WORK = os.path.join(ROOT, "work", "dctest")
-INPUTS = os.path.join(ROOT, "work", "dcref", "inputs")
+WORK = os.path.join(ROOT, "scratch", "dctest")
+INPUTS = os.path.join(ROOT, "scratch", "dcref", "inputs")
 EMUDIR = os.path.join(ROOT, "bin", "x16emu")
 EMU = os.path.join(EMUDIR, "x16emu.exe")
 ROM = os.path.join(EMUDIR, "rom.bin")

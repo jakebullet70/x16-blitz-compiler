@@ -6,7 +6,7 @@ metadata:
   type: reference
 ---
 
-**Measured 2026-09-07 with `GP.ARRPTR` on adjacent arrays** (`work/stashvram/ARRSZ.BASL`):
+**Measured 2026-09-07 with `GP.ARRPTR` on adjacent arrays** (`scratch/stashvram/ARRSZ.BASL`):
 
 | declaration | bytes an element | 10 elements + header |
 |---|---:|---:|
@@ -41,7 +41,7 @@ agent's file, not edited.
 **Where this bites generally:** any `GP.ARRPTR` buffer handed to assembly or to `memory_copy`.
 The stride is yours to add and the compiler will not check it, so a wrong element size is a silent
 overrun of the workspace, which is where every other variable lives. It cost a full debug cycle on
-`work/stashvram/SVGCT.BASL`, where a 600-byte write into a 522-byte array corrupted the array
+`scratch/stashvram/SVGCT.BASL`, where a 600-byte write into a 522-byte array corrupted the array
 holding the test's own expectations and the symptom was a length reading back as `1.14529721E+31`.
 
 See [[measure-before-changing-code]] and [[blitz-arrays-share-the-workspace]].

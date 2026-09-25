@@ -153,7 +153,7 @@ for `GPC.RT.120.BIN` and will not find it. That is the whole point of moving the
 nothing keeps running on the old runtime by accident.
 
 The stale `.BIN` files already staged around the tree go with it. `samplesbuild.py:158`
-clears older ones where it installs, but the copies under `work/*/`, `OASIS/tmp-test/` and
+clears older ones where it installs, but the copies under `scratch/*/`, `OASIS/tmp-test/` and
 `samples/GPC-HELP/` want checking by hand.
 
 Prose that names the old number reads stale afterwards. `help-demo.bat:42` and
@@ -187,7 +187,7 @@ are copied and fix the master.
 The `REM` in `GPC.BASL` is worth keeping in some form: it explains why there is no `,8` on
 the `LOAD`, which is a real trap. Only the "and variables survive" half is wrong.
 
-`release/TMP/SRC/GPC.BASL` is a build artefact under a gitignored directory. Leave it.
+`scratch/release/SRC/GPC.BASL` is a build artefact under a gitignored directory. Leave it.
 
 ## 7. The sample
 

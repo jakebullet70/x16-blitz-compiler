@@ -6,7 +6,7 @@ metadata:
   type: reference
 ---
 
-**Measured 2026-09-07, `work/stashvram/SVGATE.BASL`, 8/8 green.** These were the open questions
+**Measured 2026-09-07, `scratch/stashvram/SVGATE.BASL`, 8/8 green.** These were the open questions
 under `STASHVRAM.INC.BL`, and all four answers are yes.
 
 A VRAM-to-VRAM copy is r0 = `$9F23` (DATA0, source), r1 = `$9F24` (DATA1, target), r2 = count,

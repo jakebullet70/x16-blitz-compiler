@@ -26,7 +26,7 @@
 ## **
 ## **  The slide is downward, so a block's destination is always below its
 ## **  source. That the overlap is safe at the hardware is measured, not
-## **  assumed -- work/stashvram/SVGATE.BASL, G06B.
+## **  assumed -- scratch/stashvram/SVGATE.BASL, G06B.
 ## ***********************************************************************
 #IFNDEF SVGC.DEFS
 #DEFINE SVGC.DEFS 1

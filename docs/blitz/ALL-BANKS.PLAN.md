@@ -195,7 +195,7 @@ The asm steps wait for the user's agreement on their shape (the standing asm rul
     - The PRGs may differ only in the extension page.
     - Then regenerate with `dcref.py` and run the suite.
 
-    Done 2026-09-14. The old references went to `work/gpctest/ref-old/`, and `gpctest.py ref`
+    Done 2026-09-14. The old references went to `scratch/gpctest/ref-old/`, and `gpctest.py ref`
     regenerated `ref/` from dcref.py's set. All 34 compiles match: every `.Bnn` is byte for
     byte its `.0nn`, and the MAP, `D.NAME` and verdict are identical. The seven banked
     programs' PRGs differ in 160 to 166 bytes, all inside the extension page ($0900-$09FF);

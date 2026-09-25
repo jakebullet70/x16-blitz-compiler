@@ -5,13 +5,13 @@
 #       gpcprobe.py [NAME [INPUTS [DRIVE]]]
 #
 #   Compiles NAME, GPBMODS by default, SHARED with the option off, with
-#   source/application/GPC.BIN. The inputs come from INPUTS, work/dcref/inputs/ by default, and
-#   the compile runs in DRIVE, work/gpcprobe/NAME/ by default.
+#   source/application/GPC.BIN. The inputs come from INPUTS, scratch/dcref/inputs/ by default, and
+#   the compile runs in DRIVE, scratch/gpcprobe/NAME/ by default.
 #
 #   CMP.LOG is polled every 0.1 s. The probe records each growth of the file, the time each
 #   pass-1 progress dot first appears, and when PASS 1, PASS 2 and OK LOW CODE are seen.
 #   DRIVE/probe.json keeps the record for gpcspans.py. The last line compares the outputs with
-#   work/gpctest/ref/off/NAME/.
+#   scratch/gpctest/ref/off/NAME/.
 #
 #   Run no other emulator alongside it: the times are the point.
 #
@@ -22,7 +22,7 @@ import dcref
 NAME = sys.argv[1] if len(sys.argv) > 1 else "GPBMODS"
 gpc = os.path.join(dcref.ROOT, "source", "application", "GPC.BIN")
 inputs = os.path.abspath(sys.argv[2]) if len(sys.argv) > 2 else os.path.join(dcref.WORK, "inputs")
-drive = os.path.abspath(sys.argv[3]) if len(sys.argv) > 3 else os.path.join(dcref.ROOT, "work", "gpcprobe", NAME)
+drive = os.path.abspath(sys.argv[3]) if len(sys.argv) > 3 else os.path.join(dcref.ROOT, "scratch", "gpcprobe", NAME)
 shutil.rmtree(drive, ignore_errors=True)
 os.makedirs(drive)
 shutil.copy2(gpc, os.path.join(drive, "GPC.BIN"))

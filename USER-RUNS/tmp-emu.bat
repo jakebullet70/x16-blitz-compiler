@@ -1,6 +1,6 @@
 @echo off
 rem ---------------------------------------------------------------------------
-rem  tmp-emu.bat -- boot the emulator on the STAGED RELEASE, release\TMP.
+rem  tmp-emu.bat -- boot the emulator on the STAGED RELEASE, scratch\release.
 rem
 rem  This is how the release gets looked at before it is packaged: the drive the
 rem  emulator mounts is the release tree itself, so what runs here is exactly what
@@ -8,8 +8,8 @@ rem  a user extracts from the zip.
 rem
 rem  Stage it first, from Git Bash:
 rem
-rem      ./release.sh stage        stage release\TMP from the current build
-rem      ./release.sh zip          zip release\TMP once it looks right
+rem      ./release.sh stage        stage scratch\release from the current build
+rem      ./release.sh zip          zip scratch\release once it looks right
 rem
 rem  It boots to READY, not into a program, because there are several to try:
 rem
@@ -32,7 +32,7 @@ rem  leaves them out of the zip.
 rem ---------------------------------------------------------------------------
 setlocal
 for %%I in ("%~dp0..") do set "ROOT=%%~fI\"
-set "DRIVE=%ROOT%release\TMP"
+set "DRIVE=%ROOT%scratch\release"
 set "X16EMU=%ROOT%bin\x16emu\x16emu.exe"
 set "ROM=%ROOT%bin\x16emu\rom.bin"
 
@@ -46,14 +46,14 @@ if not exist "%ROM%" (
 )
 if not exist "%DRIVE%" (
 	echo.
-	echo   release\TMP does not exist -- nothing is staged.
+	echo   scratch\release does not exist -- nothing is staged.
 	echo   From Git Bash:   ./release.sh stage
 	echo.
 	exit /b 1
 )
 if not exist "%DRIVE%\GPC.BIN" (
 	echo.
-	echo   release\TMP has no GPC.BIN, so the staging is incomplete.
+	echo   scratch\release has no GPC.BIN, so the staging is incomplete.
 	echo   From Git Bash:   ./release.sh stage
 	echo.
 	exit /b 1

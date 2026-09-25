@@ -896,7 +896,7 @@ The handoff plan for the generic compiler option, rules and keep markers include
 outside it compiles to `.bgosub` (`$F5`), which selects the region's bank, and `RETURN` puts the
 caller's back. Step 1 is the runtime handler, `bankgosub.asm` in the GP block. Step 2 is the
 compiler: `GPBankScanLines`, `GPBankLineCall` and `GPBankAddressCall` in `gpbank.asm`, tested with
-the programs in `work/bgosub/`. Step 3 merged the library: the `X.BANK.INC.BL` twins and the
+the programs in `scratch/bgosub/`. Step 3 merged the library: the `X.BANK.INC.BL` twins and the
 `SHIM.*BANK.INC.BL` files are deleted from both library copies, each program `#DEFINE`s its own bank
 numbers, and `GPC-BASIC/BANKED-OR-NOT.md` and the help say how to bank a module.
 
@@ -917,7 +917,7 @@ How the three questions were settled:
 with 3,538 B (was 4,098). `gpctest.py`'s inputs for both are now the merged sources, their references
 are rebuilt, and `gpctest.py full` passes in 147 s: GPBMODS is CODE 41,984 FREE 9,728 with 202 dead
 lines (1,413 B), GUIFRMT CODE 12,748 FREE 18,176 with 129 (1,275 B), and both stripped identities
-hold. `BS.B.NUMS` and `GP-BASIC.md` §4.20 are remeasured. `banktest3.py` runs on `work/banktest3`
+hold. `BS.B.NUMS` and `GP-BASIC.md` §4.20 are remeasured. `banktest3.py` runs on `scratch/banktest3`
 and passes, BANKY included. **GOTO settled, 2026-09-14:** a `GOTO` into a region from outside it
 is refused in pass one by `GPBankGotoGuard`, from line numbers. It costs no runtime bytes, and
 `GPC.BIN` is 29,252 B. Falling into a region from the line above it, and `RESTORE` to a `DATA` line
@@ -1782,7 +1782,7 @@ and a 0 means "not x16emu", which is a real machine OR another emulator — and 
 is expansion card I/O on the real machine, a card at I/O5 could in principle answer `"16"` too.
 The header says a 1 is strong and a 0 is certain rather than pretending otherwise.
 
-`work/lineinput/EMUTST.BASL` is the check: it prints the two bytes beside the answer, so a 0 can
+`scratch/lineinput/EMUTST.BASL` is the check: it prints the two bytes beside the answer, so a 0 can
 be told from a wrong read. **Run it both ways**: point `APPSYS.EMUSIG` at a byte that does not
 read 49 and the not-an-emulator path is exercised on the emulator, which is the only way to test
 it here. That caught a crunched version whose `RETURN` had ended up on the `IF` line — true on
@@ -1832,10 +1832,10 @@ the keystroke path of every field in the tree that sets no filter, which is all 
 against an estimate of 30 here. Tokenised source grew 76 bytes, leaving 703 under BASLOAD's 38,655.
 No token, no runtime byte, nothing in `GPC.BIN`.
 
-**Six cases, twice.** `work/rename/LINTST.BASL` runs them against the banked working copy, calling
+**Six cases, twice.** `scratch/rename/LINTST.BASL` runs them against the banked working copy, calling
 `LINEINPUT.TYPED` directly with a code and a character — no field, no keyboard, no blink — and then
 once more live through `GUI.INPUT` with keys pushed by `kbdbuf_put`, because the filter runs per
-keystroke inside `SHIM.GUIBANK`. `work/lineinput/LINTST2.BASL` is the same six against the unbanked
+keystroke inside `SHIM.GUIBANK`. `scratch/lineinput/LINTST2.BASL` is the same six against the unbanked
 root library. No filter set leaves the field as it was; `ALLOW$` refuses without moving the caret;
 `DENY$` passes everything else; both set gives `ALLOW$`; a full field still refuses; and RETURN is
 still refused by the three older guards, which the filter never sees.
@@ -2322,7 +2322,7 @@ The module costs a program that includes it and never calls it about 24 bytes of
 nothing at all to a program that does not include it — which is the whole argument for a module
 of one routine over a routine in a module of eight.
 
-`work/lineinput/KBTST.BASL` is the test: a key pushed with `kbdbuf_put` and NOT drained comes
+`scratch/lineinput/KBTST.BASL` is the test: a key pushed with `kbdbuf_put` and NOT drained comes
 back from `GET` (the control, without which the rest proves nothing), three pushed and drained
 leave `GET` empty, and a drain of an already empty buffer returns rather than waiting.
 
@@ -3614,7 +3614,7 @@ in, default 0; `STASH.NEXT` out. The `GP.ASM` blobs did not change at all.
 `STASH.WALK`.** The internal is now `STASH.ORG` rather than `STASH.HEAD`, because `STASH.HEADER`
 exists and one name being a prefix of the other fails silently rather than loudly.
 
-Six assertions in `work/stashvram/SLOTT.BASL`. Two worth naming: a save with `STASH.SLOT` never
+Six assertions in `scratch/stashvram/SLOTT.BASL`. Two worth naming: a save with `STASH.SLOT` never
 mentioned behaves exactly as before, and a rectangle saved at offset 8000 round-trips — the
 signed-`%` case the entry below predicted, and it holds.
 
@@ -3666,10 +3666,10 @@ makes the waste worse.
 against a baseline with the same body. Rectangles and blobs both, a bump allocator on 256-byte
 pages, LIFO release, and the compactor in its own file. **No `GP.ASM`, so no `#SYMFILE`** — the
 thing `STASH` cannot fix. It executes no `BANK` either, so it runs inside a `GP.BANKED` region:
-tested, `work/stashvram/SVB.BASL`, 4/4.
+tested, `scratch/stashvram/SVB.BASL`, 4/4.
 
 **The risk this entry said to retire first was retired first, and everything passed** —
-`work/stashvram/SVGATE.BASL`, 8/8. See [[vram-to-vram-memory-copy-limits]]. The three that
+`scratch/stashvram/SVGATE.BASL`, 8/8. See [[vram-to-vram-memory-copy-limits]]. The three that
 mattered: VERA's auto-increment DOES carry into bit 16 (nothing in the tree had ever crossed
 `$10000` mid-transfer); 15,360 bytes in one call is exact, across that line, both directions; and
 an overlapping slide DOWNWARD is safe, which is what the compactor does.

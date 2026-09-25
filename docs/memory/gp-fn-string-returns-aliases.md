@@ -16,7 +16,7 @@ moves the temporary base below the caller's live temporaries, so the copy surviv
 **Cost:** 3 bytes of p-code per string `GP.FN` call site, 0 on numeric verbs, 0 runtime bytes.
 `GPC.BIN` 28,911 to 28,932 B.
 
-**Verified:** `work/gpfnalias/FNALIAS.BASL` compiled with the old and new `GPC.BIN`. The old
+**Verified:** `scratch/gpfnalias/FNALIAS.BASL` compiled with the old and new `GPC.BIN`. The old
 compiler printed `D1 TWO!TWO!` and `D2 -1`, the new one `D1 ONE!TWO!` and `D2 0`. The nested,
 assignment, numeric and `+ "-" +` cases printed the same with both. Object 519 to 546 B, nine call
 sites. `gpctest.py quick` PASS in 113 s: no program in the set changed, because GPBMODS's only

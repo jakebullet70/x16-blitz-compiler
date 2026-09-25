@@ -250,7 +250,7 @@ SV.GEOM:  SV.MAPW = 32 * 2 ^ INT((PEEK(SV.LCONFIG) AND 48) / 16)
 ## **  A rectangle that is the whole map width is contiguous in VRAM, so it
 ## **  goes in ONE call instead of SV.H of them: a full 80x60 screen is 15,360
 ## **  bytes at once. Measured legal at that size, across the 64K line, in
-## **  work/stashvram/SVGATE.BASL.
+## **  scratch/stashvram/SVGATE.BASL.
 ## ***********************************************************************
 
 SV.WALK:  SV.VA = SV.PAGE%(SV.HND) * 256 + SV.HEADER

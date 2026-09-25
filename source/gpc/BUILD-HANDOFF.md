@@ -95,7 +95,7 @@ which is already the drive its demo bat mounts), `data`.
 | GPBMODS | `samples/GPB-MODS-TESTING/GPBMODS.BASL` | SHARED | stays in `drive/` |
 | GPB.HELP | `samples/GPC-HELP/GPB.HELP.BASL` | SHARED | `samples/GPC-HELP/` + both runtimes |
 | COLORTST | `samples/color-test/COLORTST.BASL` | SHARED | stays in `drive/` |
-| BMXVIEW | `GPC-BASIC/BMXVIEW.EXP.BL` | EMBEDDED | `demo/C.BMXVIEW.PRG` + the BMX images |
+| BMXVIEW | `GPC-BASIC/BMXVIEW.EXP.BL` | EMBEDDED | `scratch/demo/C.BMXVIEW.PRG` + the BMX images |
 | EDITOR | `samples/edit/EDITOR.BASL` | EMBEDDED | `samples/edit/C.EDITOR.PRG` |
 
 **SHARED vs EMBEDDED is not a preference.** A SHARED object carries no runtime and asks
@@ -105,7 +105,7 @@ time and flips silently, so both files get copied. It is fetched with a **leadin
 — from a subdirectory the unslashed name is not found. EMBEDDED carries its own copy,
 about 12 K, and needs nothing on the drive.
 
-- BMXVIEW is EMBEDDED because `bmx-demo.bat` mounts `demo\`, which has never carried a
+- BMXVIEW is EMBEDDED because `bmx-demo.bat` mounts `scratch\demo\`, which has never carried a
   runtime.
 - EDITOR is EMBEDDED per step 2 of `samples/edit/readme.md`.
 - **The overlay** (`NAME.OVL`, one file holding every `GP.BANKED` region and `GP.BANKEDSTR`
@@ -257,7 +257,7 @@ stage fails, and keep the wrapper's own log (section 5).
 
 ## 9. Loose ends this build does not cover
 
-- **`demo/` does not exist.** Both `bmx-demo.bat` and `menu-demo.bat` mount it.
+- **`scratch/demo/` does not exist.** Both `bmx-demo.bat` and `menu-demo.bat` mount it.
   `samplesbuild.py` creates it and fills it with `C.BMXVIEW.PRG` and the BMX images once
   BMXVIEW builds, but **`C.MENU.PRG` has no build entry in any script**, so `menu-demo.bat`
   stays broken until one is added.

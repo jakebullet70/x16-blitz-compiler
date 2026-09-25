@@ -3,13 +3,13 @@
 #  release.sh -- build, stage and package a versioned release. POSIX; run from
 #  Git Bash. Invoked by USER-RUNSelease.bat, or directly.
 #
-#     release.sh          build everything, stage release/TMP, then zip it
-#     release.sh stage    stage release/TMP from the CURRENT build -- no rebuild,
-#                         no zip. WIPES release/TMP and fills it again.
-#     release.sh zip      zip release/TMP EXACTLY AS IT STANDS -- no rebuild, no
+#     release.sh          build everything, stage scratch/release, then zip it
+#     release.sh stage    stage scratch/release from the CURRENT build -- no rebuild,
+#                         no zip. WIPES scratch/release and fills it again.
+#     release.sh zip      zip scratch/release EXACTLY AS IT STANDS -- no rebuild, no
 #                         restage. Hand edits in TMP survive and go in the zip.
 #
-#  THE STAGING FOLDER IS THE POINT. release/TMP holds the release unpacked, in the
+#  THE STAGING FOLDER IS THE POINT. scratch/release holds the release unpacked, in the
 #  shape the zip will have, so the layout can be read and corrected before anything
 #  is packaged. Stage it, look at it, fix it, then zip from it. There is one build
 #  file -- this one -- and the layout is defined once, in LAYOUT below.
@@ -35,7 +35,7 @@
 #
 #  The zip lands in release/ -- the release drop folder, kept apart from the daily
 #  drive/ build cycle -- named gpc-release-<n>.zip. It is a git-ignored artifact, the
-#  way the old drive/blitz.zip was; release/TMP is git-ignored too, and release/ itself
+#  way the old drive/blitz.zip was; scratch/release is git-ignored too, and release/ itself
 #  is tracked so the folder exists in a fresh clone.
 # ***************************************************************************
 set -e
@@ -69,7 +69,7 @@ import os, shutil, struct, sys, zipfile
 
 root    = os.getcwd()
 drive = os.path.join(root, "drive")
-TMP     = os.path.join(root, "release", "TMP")
+TMP     = os.path.join(root, "scratch", "release")
 
 do_stage = os.environ.get("DO_STAGE") == "1"
 do_zip   = os.environ.get("DO_ZIP")   == "1"
@@ -104,7 +104,7 @@ from genrtimage import imageName, bankImageName     # noqa: E402
 #  THE LAYOUT -- what a release is, in one place
 # ===========================================================================
 #
-#  release/TMP/
+#  scratch/release/
 #     GPC.PRG GPC.BIN GPC/GP1.IMG.nnn.BIN  the compiler
 #     GPB/GPC/GP1.RT.nnn.BIN               both shared runtimes and their bank code
 #     GPC.ERR.PRG  GPC.HELP.PRG            the two companion programs
@@ -238,7 +238,7 @@ SAMPLES = [
     },
     {
         "dir":   "BMXVIEW",
-        "files": [("demo/C.BMXVIEW.PRG",                     "C.BMXVIEW.PRG"),
+        "files": [("scratch/demo/C.BMXVIEW.PRG",                     "C.BMXVIEW.PRG"),
                   ("GPC-BASIC/BMXVIEW.EXP.BL",               "BMXVIEW.EXP.BL")],
         "globs": [("samples/BMXVIEWER/SAMPLES", lambda n: n.upper().endswith(".BMX"))],
         "fake":  "C.BMXVIEW.PRG",
@@ -254,7 +254,7 @@ SAMPLES = [
 
 # THE DEVELOPER'S OWN FILES -- STAGED, NEVER SHIPPED.
 # XFMGR is the file manager the staged drive is navigated with, and XT is the 28-byte BASIC
-# shim that LOADs it ("/XFMGR/XFMGR.PRG"). tmp-emu.bat boots release/TMP and wants them there.
+# shim that LOADs it ("/XFMGR/XFMGR.PRG"). tmp-emu.bat boots scratch/release and wants them there.
 # The zip step SKIPS every path under these names -- see DEV_PREFIXES below, which is what
 # actually enforces it, so the rule cannot be lost by being remembered wrongly.
 DEV_ONLY = [
@@ -266,7 +266,7 @@ DEV_PREFIXES = ("XT", "XFMGR/")
 # MANIFEST.TXT is a record of the STAGING, not of the release: it names where every file
 # came from, and it lists the dev-only files that the zip does not contain. Shipping it
 # would hand a release user an index to things that are not in their download. It stays
-# in release/TMP and is left out of the zip along with the dev-only files.
+# in scratch/release and is left out of the zip along with the dev-only files.
 NOT_SHIPPED = DEV_PREFIXES + ("MANIFEST.TXT",)
 
 SRC_README = (
@@ -373,7 +373,7 @@ def put_tree(src_dir_rel, dst_dir_rel):
 
 if do_stage:
     if os.path.isdir(TMP):
-        print("release: wiping release/TMP")
+        print("release: wiping scratch/release")
         shutil.rmtree(TMP)
     os.makedirs(TMP)
 
@@ -455,7 +455,7 @@ if do_stage:
 
     # MANIFEST.TXT -- every file, and where it came from. It is the record that survives
     # someone opening the folder a week later with no memory of this run.
-    lines = ["GPC RELEASE STAGING -- release/TMP", "=" * 34, "",
+    lines = ["GPC RELEASE STAGING -- scratch/release", "=" * 34, "",
              "Every file in this tree, and where it came from. A source of (placeholder)",
              "is a BASIC stub, NOT a compiled program -- it prints its own name and ends.",
              "A file marked DEV ONLY is staged for local use and is NOT put in the zip.",
@@ -474,18 +474,18 @@ if do_stage:
         f.write("\r\n".join(lines) + "\r\n")
 
     total = sum(os.path.getsize(os.path.join(TMP, *d.split("/"))) for d, _ in staged)
-    print("release: staged %d files, %d bytes into release/TMP" % (len(staged) + 1, total))
+    print("release: staged %d files, %d bytes into scratch/release" % (len(staged) + 1, total))
     if placeholders:
         print("release: %d PLACEHOLDER(S): %s" % (len(placeholders), ", ".join(placeholders)))
     if missing:
         print("release: %d MISSING: %s" % (len(missing), ", ".join(missing)))
 
 # ===========================================================================
-#  ZIP -- release/TMP exactly as it stands, minus the developer's own files
+#  ZIP -- scratch/release exactly as it stands, minus the developer's own files
 # ===========================================================================
 if do_zip:
     if not os.path.isdir(TMP):
-        raise SystemExit("release: release/TMP does not exist -- run ./release.sh stage first")
+        raise SystemExit("release: scratch/release does not exist -- run ./release.sh stage first")
 
     out   = os.path.join(root, "release", "gpc-release-%s.zip" % version)
     names = []

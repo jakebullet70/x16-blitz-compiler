@@ -7,7 +7,7 @@
 import glob, os, re, shutil, subprocess, time, sys
 
 ROOT = r"C:\dev\CmdrX16\dos_tools\x16-blitz-compiler"
-T = os.path.join(ROOT, "work", "banktest3")
+T = os.path.join(ROOT, "scratch", "banktest3")
 E = os.path.join(ROOT, "bin", "x16emu")
 #   The interpreter running this, not a path off one machine: the hard-coded one went
 #   stale and the suite could not tokenise anything at all.

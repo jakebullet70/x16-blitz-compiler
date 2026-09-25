@@ -17,7 +17,7 @@
 #   The programs are dcref.py's set, compiled from its fixed inputs, and the deadcode-tests/
 #   programs dctest.py builds. DC6 and DC9-DC11 are not here: they stop on purpose.
 #
-#   Work: work/dcstrip/<tag>/, with in-on/ and in-off/ as the two input sets and on/ and off/
+#   Work: scratch/dcstrip/<tag>/, with in-on/ and in-off/ as the two input sets and on/ and off/
 #   as the two drives.
 #
 import os, re, shutil, sys, glob, filecmp, time
@@ -27,7 +27,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import dcref
 import dctest
 
-WORK = os.path.join(dcref.ROOT, "work", "dcstrip")
+WORK = os.path.join(dcref.ROOT, "scratch", "dcstrip")
 TESTS = ["DC1:E", "DC2:E", "DC3:E", "DC4", "DC5:E", "DC7", "DC8:E", "DC12:E"]
 
 

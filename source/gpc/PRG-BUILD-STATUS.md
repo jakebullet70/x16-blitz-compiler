@@ -109,10 +109,10 @@ source. It is not a placeholder and not this build's.
 | `gpbmods-demo.bat` | yes | its drive is `drive/`, and the object is current |
 | `color-demo.bat` | yes | same drive, same |
 | `help-demo.bat` | yes | on the EMBEDDED 08:08 object, not on this build's |
-| `bmx-demo.bat` | **no** | `demo/` does not exist |
-| `menu-demo.bat` | **no** | `demo/` does not exist, and nothing builds `C.MENU.PRG` |
+| `bmx-demo.bat` | **no** | `scratch/demo/` does not exist |
+| `menu-demo.bat` | **no** | `scratch/demo/` does not exist, and nothing builds `C.MENU.PRG` |
 
-`demo/` is build output and is not in git. `samplesbuild.py` creates it when BMXVIEW installs,
+`scratch/demo/` is build output and is not in git. `samplesbuild.py` creates it when BMXVIEW installs,
 so it appears the moment BMXVIEW builds. `C.MENU.PRG` does not: `MENU.EXP.BL` appears in no
 `.py`, no `.sh` and no makefile, so `menu-demo.bat` stays dead until a sixth entry is added to
 the program table.
@@ -142,7 +142,7 @@ Staged from the tree as it stands:
 | GPBMODS | the real 12,885-byte object and its eight overlays |
 | COLORTST | the real 3,039-byte object |
 | EDITOR | `samples/edit/C.EDITOR.PRG` — real, and from 3rd September |
-| BMXVIEW | **a placeholder** — `demo/C.BMXVIEW.PRG` does not exist |
+| BMXVIEW | **a placeholder** — `scratch/demo/C.BMXVIEW.PRG` does not exist |
 | GPB.HELP | the EMBEDDED 08:08 object, staged at the package root |
 
 The BMX images are globbed rather than listed, and 8 of the original 28 remain in

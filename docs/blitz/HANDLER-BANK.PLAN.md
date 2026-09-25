@@ -189,7 +189,7 @@ Sizes are from `source/runtime/build/code.lbl` at runtime 122.
     `drive/RGL.BASL` and `drive/RGN.BASL` select it and write nothing.
   - BNK64 in `source/unit-tests/banktest3.py` compiled regions in banks 1 to 64 and expected
     `TOO MANY GP.BANKED REGIONS` at the 64th. `ALL-BANKS.PLAN.md` step 11 retired it for BNK255,
-    which uses banks 2, 100, 254 and 255. Both sources are in the untracked `work/banktest3/`.
+    which uses banks 2, 100, 254 and 255. Both sources are in the untracked `scratch/banktest3/`.
     Apart from the BNK1 and BSTR1 refusals, no test uses bank 1.
   - The other samples use fixed banks 3 and up: the editor 4 and up, GPB.HELP 8 to 10, GUIFRMT 3, 4, 9
     and 10, PICKDEMO 4, 9 and 10, the spike 7 and `GUI.EXP.BL` 8.
