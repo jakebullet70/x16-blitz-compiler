@@ -11,6 +11,7 @@ again. See [memory-is-git-tracked](memory-is-git-tracked.md).
 - [Prose style is flat reference](prose-style-is-flat-reference.md) — five settled rules, `doc-style` owns them; [help topics are current behaviour only](help-topic-writing-rules.md); [HLP files carry hand edits](hlp-files-carry-hand-edits.md), so patch the render delta
 - [Write readable code, user crunches](write-readable-code-user-crunches.md) — one statement a line, an unexplained SRC edit is his crunch pass; [comments light](comments-light-code-should-flow.md), heavy REMs mean bad naming
 - [Ask before writing asm](ask-before-writing-asm.md) — standing order: agree GP.ASM or 64tass first
+- [Keep Claude's files off the root](keep-claude-files-off-the-root.md) — source/drive and source/scratch are Claude's; the root is the user's
 - [Commit to main directly](commit-to-main-directly.md) — solo repo, no branch; [never commit OASIS](never-commit-oasis.md), stage by name
 - [Compiler must not cap program size](compiler-must-not-cap-program-size.md) — a build-side wall is a bug; and [no backward compatibility](no-backward-compatibility-needed.md), replaced layers get ripped out
 - [Library working copy, then root](library-working-copy-then-root.md) — edit in GPC-BASIC-TOOLS-SRC/GPB-MODS-TESTING/GPC-BASIC/, drift runs BOTH ways; [test in GPBMODS first](test-in-gpbmods-before-spreading.md); [samples build in place](samples-build-in-place.md), never staged into source/drive/
