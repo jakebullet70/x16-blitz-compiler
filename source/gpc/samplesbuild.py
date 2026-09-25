@@ -47,10 +47,14 @@ PROGRAMS = [
          extras=[], shared=True, inplace=True,
          install=("samples/GPC-HELP", "GPB.HELP.PRG"), data=["runtimes"]),
 
+    #   EMBEDDED: the theme editor keeps its rows in scalars, so there is no
+    #   GP.BANKEDSTR and no SHARED. It builds in the sample folder, which is the
+    #   drive, and its modules are the GPC-BASIC copy sitting there.
     dict(name="COLORTST",
          src=("samples/color-test", "COLORTST.BASL"),
          lib="samples/color-test/GPC-BASIC",
-         extras=[], shared=True, install=None, data=[]),
+         extras=[], shared=False, inplace=True,
+         install=None, data=[]),
 
     #   The GP.BASIC viewer, whose master is in the library rather than in a sample folder.
     #   EMBEDDED: bmx-demo.bat mounts demo\, which carries no runtime and never has.
@@ -79,6 +83,18 @@ PROGRAMS = [
                  "ED-UNDO.BASL"],
          shared=False, inplace=True,
          install=None, data=[]),
+
+    #   SHARED, and built in the sample folder, which is the drive. The object is the
+    #   helper you run beside a crashed program, so it installs into the GPB.HELP folder
+    #   under the name that folder's documentation already gives it.
+    #
+    #   NO "runtimes": GPB.HELP owns them there and is built against an older one, and
+    #   that entry clears every .RT. file in the folder before it copies its own in.
+    dict(name="GPC.ERR",
+         src=("samples/GPC.ERR", "GPC.ERR.BASL"),
+         lib="samples/GPC.ERR/GPC-BASIC",
+         extras=[], shared=True, inplace=True,
+         install=("samples/GPC-HELP", "GPC.ERR.PRG"), data=[]),
 ]
 
 BMX_SRC = os.path.join(ROOT, "samples", "BMXVIEWER", "SAMPLES")

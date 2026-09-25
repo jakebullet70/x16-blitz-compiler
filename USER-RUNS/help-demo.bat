@@ -7,12 +7,13 @@ rem  EVERYTHING IT READS IS IN samples\GPC-HELP\HELP-TXT -- the index and the
 rem  topics alike -- opened through the CMD path syntax "//HELP-TXT/:NAME", which
 rem  is what CMDR-DOS documents and what a real SD card wants.
 rem
-rem  Source: samples\GPC-HELP\GPB.HELP.BASL on GPB, THEME, STASH, STRCASE, APPSYS,
-rem  KB, MENUVERT, LINEINPUT, GUI and COMBO, all shipped in
-rem  samples\GPC-HELP\GPC-BASIC\ beside the sample so a rebuild needs nothing
-rem  from GPC-BASIC\. The object is SHARED, so the GPB.RT and GP1.RT files of
-rem  its build have to sit beside the PRG on the drive. See samples\GPC-HELP\readme.md for the rebuild, and
-rem  for the measurements behind the three design decisions.
+rem  Source: samples\GPC-HELP\GPB.HELP.BASL on thirteen modules -- GPB, THEME,
+rem  STASH, STRCASE, APPSYS, BANKMGR, MENU.INC.BANKED, MENU, LINEINPUT, GUI,
+rem  COMBO, CHECK and GUI-DIALOGS -- all shipped in samples\GPC-HELP\GPC-BASIC\
+rem  beside the sample so a rebuild needs nothing from GPC-BASIC\. The object is
+rem  SHARED, so GPB.RT.nnn.BIN, GPC.RT.nnn.BIN, GP1.RT.nnn.BIN and GPB.HELP.OVL
+rem  have to sit beside the PRG on the drive. See samples\GPC-HELP\readme.md for
+rem  the rebuild, and for the measurements behind the design decisions.
 rem ---------------------------------------------------------------------------
 setlocal
 for %%I in ("%~dp0..") do set "ROOT=%%~fI\"

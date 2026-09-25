@@ -113,6 +113,7 @@ from genrtimage import imageName, bankImageName     # noqa: E402
 #     GPC-BASIC/      the GP.BASIC library, whole, with its manual
 #     GPC-BASLOAD/    the tokeniser, its documents and its source as one zip
 #     SRC/            the BASLOAD source of the two tools, plus a README
+#     GPC-ERROR/      GPC.ERR.BASL and the 22 modules it includes, ready to rebuild
 #     SAMPLES/<PROG>/ one folder per sample program
 #
 #  A sample in its own folder still resolves both of the things it loads. A region
@@ -181,8 +182,18 @@ ROOTFILES = [
 # build-plan docs (GP-BASIC.TIERS.md, GP-BASIC.PLAN.md) are deliberately NOT shipped: they are
 # the argument for how the library was built, not instructions for using it.
 TREES = [
-    ("samples/GPC-HELP/HELP-TXT", "HELP-TXT"),
-    ("GPC-BASIC",                 "GPC-BASIC"),
+    ("samples/GPC-HELP/HELP-TXT",   "HELP-TXT"),
+    ("GPC-BASIC",                   "GPC-BASIC"),
+    ("samples/GPC.ERR/GPC-BASIC",   "GPC-ERROR/GPC-BASIC"),
+]
+
+# GPC.ERR's source, whole and rebuildable. SRC/GPC.ERR.BASL is the same file on its own,
+# for reading. The #INCLUDE lines name GPC-BASIC/, so the modules have to sit in a folder
+# of that name beside the source, and they are the sample folder's copies rather than the
+# library masters: those are what the shipped object was built from.
+GPCERR_SRC = [
+    ("samples/GPC.ERR/GPC.ERR.BASL", "GPC-ERROR/GPC.ERR.BASL"),
+    ("samples/GPC.ERR/readme.md",    "GPC-ERROR/README.md"),
 ]
 
 # The tokeniser: the runnable pair, the ROM image for anyone flashing it in, and its two
@@ -234,7 +245,7 @@ SAMPLES = [
     },
     {
         "dir":   "COLORTST",
-        "files": [("testing/COLORTST.PRG",                   "COLORTST.PRG"),
+        "files": [("samples/color-test/COLORTST.PRG",        "COLORTST.PRG"),
                   ("samples/color-test/COLORTST.BASL",       "COLORTST.BASL")],
         "globs": [],
         "fake":  "COLORTST.PRG",
@@ -399,6 +410,10 @@ if do_stage:
         staged.append((BASLOAD_SRC_ZIP, BASLOAD_SRC_DIR + "/*"))
     else:
         missing.append(BASLOAD_SRC_DIR)
+
+    for src_rel, dst_rel in GPCERR_SRC:
+        if not put(src_rel, dst_rel):
+            missing.append(src_rel)
 
     for src_rel, name in SRCBASL:
         if not put(src_rel, "SRC/" + name):
