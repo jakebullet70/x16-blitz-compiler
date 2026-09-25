@@ -1,6 +1,6 @@
 ---
 name: gpc-editor-branch-and-gui-next
-description: "Where samples/edit stands on feature/editor-petscii as of 2026-08-31, and the GUI.INC.BL library that is the next piece of work"
+description: "Where GPC-BASIC-TOOLS-SRC/edit stands on feature/editor-petscii as of 2026-08-31, and the GUI.INC.BL library that is the next piece of work"
 metadata: 
   node_type: memory
   type: project
@@ -38,7 +38,7 @@ keyboard layout; the dropdown recoloured to the document's own attribute; and
 
 **The editor now works end to end** — thin-framed dropdowns, ALT+F/S/H **and** ESC-then-
 letter, dark panel with a blue highlight bar. `USER-RUNS\editor-demo.bat` runs it
-with `samples\edit` as the drive; `C.EDITOR.PRG` is checked in so a fresh clone needs no
+with `GPC-BASIC-TOOLS-SRC\edit` as the drive; `C.EDITOR.PRG` is checked in so a fresh clone needs no
 build. **File>Save overwrites the real `TEST.MD`** because that directory *is* the drive.
 
 **Self-check assertions to keep green** (`DEBUG.MODE = 1`, then look for `M4 OK`):
@@ -56,7 +56,7 @@ space owned, theme colours). Three entry points — `GUI.YN` (1-2 line question,
 `GUI.MENU` (a box around `MENUHELP`), `GUI.TEXT` (question plus one line of input via
 `INPHELP`) — plus `GUI.EXP.BL` demonstrating them.
 
-**It must not inherit the editor's quirks.** `samples/edit` re-orders the font, which is
+**It must not inherit the editor's quirks.** `GPC-BASIC-TOOLS-SRC/edit` re-orders the font, which is
 why only `GP.BOX` style 0 works *there*; a main-branch library draws on the stock charset
 where the line styles are fine — see [[gp-draw-under-a-reordered-font]].
 

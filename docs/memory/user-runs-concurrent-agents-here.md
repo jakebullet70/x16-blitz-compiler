@@ -11,7 +11,7 @@ The user regularly has **more than one agent working this repo simultaneously** 
 mid-task whether work can proceed in parallel (asked 2026-08-30, while another session was
 researching GP.ASM and writing to this same memory directory).
 
-**Why:** builds write into shared `drive/` and `release/` trees and renumber generated tables, and
+**Why:** builds write into shared `source/drive/` and `release/` trees and renumber generated tables, and
 two agents editing `GPC-BASIC/*.INC.BL` or `TODO.md` collide. Research questions do not need any of
 that.
 
@@ -21,18 +21,18 @@ instead of compiling probe programs. Say plainly which measurements that leaves 
 write, re-read the target (memory files and `MEMORY.md` included) so a concurrent append is not
 clobbered, and tell the user which files you dirtied so they can warn the other agent.
 
-**AND WHEN A BUILD IS ACTUALLY NEEDED, DO NOT BUILD IN `drive/`.** Found the hard way 06/09/26:
+**AND WHEN A BUILD IS ACTUALLY NEEDED, DO NOT BUILD IN `source/drive/`.** Found the hard way 06/09/26:
 `GPC.INPUT` is a four-line file naming the source, object and map, and every harness writes it
 immediately before launching the emulator that reads it. Another session rewrote it in that gap
 **twice** — once the compile built `GPC` and once `GPBMODS` instead of the program under test, and
 because the object file from a previous run was still on disk the *run* step then loaded a stale
 `.PRG` and crashed with **no output at all**. That reads exactly like a bug in the code being
-tested, and the tell is `cat drive/GPC.INPUT` naming somebody else's program.
+tested, and the tell is `cat source/drive/GPC.INPUT` naming somebody else's program.
 
 **How to apply:** copy `GPC.BIN`, `GPC.IMG.<ver>.BIN`, both `*.RT.<ver>.BIN`, `GPB.INC.BL` and the
 sources into a private directory and point `-fsroot` there. `source/unit-tests/devprobe.py` takes
 one in `GPCWORK` and tokenises itself rather than calling `source/gpc/build_basl.py`, which
-hardcodes `drive/` and is the other session's tool.
+hardcodes `source/drive/` and is the other session's tool.
 
 ## Committing into a file the other agent is also editing
 

@@ -1,10 +1,10 @@
 #
-#   helpbuild.py -- rebuild GPB.HELP alone, from the samples/GPC-HELP working copy.
+#   helpbuild.py -- rebuild GPB.HELP alone, from the GPC-BASIC-TOOLS-SRC/GPC-HELP working copy.
 #   Usage: helpbuild.py
 #
 #   A one-program shortcut into samplesbuild.py, which holds the table and does the work.
 #   The build is SHARED, so the object needs GPB.RT.nnn.BIN on the drive: samplesbuild.py
-#   copies the current runtimes into samples/GPC-HELP beside it, which is the drive
+#   copies the current runtimes into GPC-BASIC-TOOLS-SRC/GPC-HELP beside it, which is the drive
 #   help-demo.bat mounts.
 #
 #   THIS BUILDS THE PROGRAM, NOT THE CONTENT.  The topics, the index and the two Markdown
@@ -18,6 +18,6 @@ rc = subprocess.call([sys.executable, os.path.join(HERE, "samplesbuild.py"), "GP
 
 print()
 print("The topics and the index are NOT rebuilt by this script. To rebuild them:")
-print("    python samples/GPC-HELP/MKHELP.PY --md-only --out <scratch> --md-name CHECK.md")
-print("    python samples/GPC-HELP/MKHELP.PY")
+print("    python GPC-BASIC-TOOLS-SRC/GPC-HELP/MKHELP.PY --md-only --out <scratch> --md-name CHECK.md")
+print("    python GPC-BASIC-TOOLS-SRC/GPC-HELP/MKHELP.PY")
 raise SystemExit(rc)

@@ -1,14 +1,14 @@
 #
-#   xbasebuild.py -- rebuild XBASE headlessly from the samples/XBASE working copy.
+#   xbasebuild.py -- rebuild XBASE headlessly from the GPC-BASIC-TOOLS-SRC/XBASE working copy.
 #   Usage: xbasebuild.py XBASE
 #
 import os, shutil, subprocess, sys, time
 
 ROOT    = r"C:\dev\CmdrX16\dos_tools\x16-blitz-compiler"
-SAMPLE  = os.path.join(ROOT, "samples", "XBASE")
+SAMPLE  = os.path.join(ROOT, "GPC-BASIC-TOOLS-SRC", "XBASE")
 WORKLIB = os.path.join(SAMPLE, "GPC-BASIC")
 ROOTLIB = os.path.join(ROOT, "GPC-BASIC")
-TESTING = os.path.join(ROOT, "drive")
+TESTING = os.path.join(ROOT, "source", "drive")
 GPCDIR  = os.path.join(ROOT, "source", "gpc")
 
 # the XBASE working copy is upstream for every module it holds...

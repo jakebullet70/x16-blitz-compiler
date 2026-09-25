@@ -69,5 +69,5 @@ MY.LIBEND:
   menu store, a module the program does not include. Banking buys free low RAM at run time,
   which is a different problem and usually the one you have.
 
-`samples/GPB-MODS-TESTING/GPBMODS.BASL` banks the utilities, the file modules, `THEME`, the GUI,
+`GPC-BASIC-TOOLS-SRC/GPB-MODS-TESTING/GPBMODS.BASL` banks the utilities, the file modules, `THEME`, the GUI,
 the combo box and two of its own dropdown handlers, in six regions.

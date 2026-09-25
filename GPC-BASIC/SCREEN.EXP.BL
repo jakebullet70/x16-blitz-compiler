@@ -8,7 +8,7 @@
 ## **  STASH.INC.BL          save a rectangle and put it back -- a module
 ## **                        now, not the GP.STASH / GP.RESTR keywords
 ## **
-## **  Build:  copy GPC-BASIC/GPB.INC.BL and this file into drive/, then
+## **  Build:  copy GPC-BASIC/GPB.INC.BL and this file into source/drive/, then
 ## **            python source/gpc/build_basl.py SCREEN.EXP.BL SCREEN.PRG
 ## **          and compile SCREEN.PRG with GPC.BIN.
 ## **

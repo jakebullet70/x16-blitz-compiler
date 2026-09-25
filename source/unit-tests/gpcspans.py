@@ -12,7 +12,7 @@
 #   lines only.
 #
 #   The SYM's labels give every BASIC line a file and a source line. The sources are read from
-#   samples/GPB-MODS-TESTING/ and its GPC-BASIC/, so only GPBMODS and programs built from its
+#   GPC-BASIC-TOOLS-SRC/GPB-MODS-TESTING/ and its GPC-BASIC/, so only GPBMODS and programs built from its
 #   library map. The self-check line counts the label pairs whose walk lands on the next label.
 #
 #   Prints one row a span, then seconds per file, highest first, and writes DRIVE/spans.json.
@@ -22,7 +22,7 @@ from collections import defaultdict
 
 import dcref
 
-SAMPLE = os.path.join(dcref.ROOT, "samples", "GPB-MODS-TESTING")
+SAMPLE = os.path.join(dcref.ROOT, "GPC-BASIC-TOOLS-SRC", "GPB-MODS-TESTING")
 drive, sym = sys.argv[1], sys.argv[2]
 probe = json.load(open(os.path.join(drive, "probe.json")))
 name = probe["name"]

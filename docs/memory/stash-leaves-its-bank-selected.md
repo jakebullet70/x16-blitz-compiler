@@ -12,7 +12,7 @@ because BASIC cannot see the register -- `PEEK` selects and restores around ever
 
 The second reason it had to be fixed, and the one that forced it: banked p-code is FETCHED from
 `$A000`, so a `STASH` followed by a call into a `GP.BANKED` region fetched the next instruction out
-of the stash bank. A silent hang, nowhere near the STASH. `drive/BANKV.BASL` is that program --
+of the stash bank. A silent hang, nowhere near the STASH. `source/drive/BANKV.BASL` is that program --
 against the old module it prints `V2 BANK AFTER STASH 8` and stops. See
 [[gp-banked-region-relocation]].
 
@@ -24,7 +24,7 @@ between every character -- `#G#U#I#.#Y#N#` for `GUI.YN`. Those are the cell ATTR
 buffer holds char, attr, char, attr, and reading it as text alternates the two. It reads as a
 corrupt scroll, so the slide gets the blame; the slide is fine.
 
-**Found 04/09/26** in `drive/SCRLTST.BASL`, holding a help topic in bank 9 and sliding with a
+**Found 04/09/26** in `source/drive/SCRLTST.BASL`, holding a help topic in bank 9 and sliding with a
 STASH in bank 10. The fix is one line -- `BANK` your own bank at the top of the read routine, not
 once at startup.
 

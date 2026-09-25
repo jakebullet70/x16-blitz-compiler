@@ -4,14 +4,14 @@ rem  color-demo.bat -- run COLORTST, the colour scheme picker, in a VISIBLE wind
 rem  The drive is the sample folder. COLORTST.PRG is compiled EMBEDDED, so it
 rem  carries the runtime and needs no GPC.RT.nnn.BIN beside it.
 rem
-rem  Source: samples\color-test\COLORTST.BASL, on GPB, APPSYS and THEME, all three
-rem  in samples\color-test\GPC-BASIC\ beside it.
+rem  Source: GPC-BASIC-TOOLS-SRC\color-test\COLORTST.BASL, on GPB, APPSYS and THEME, all three
+rem  in GPC-BASIC-TOOLS-SRC\color-test\GPC-BASIC\ beside it.
 rem  To rebuild it, from the repository root:
 rem    python source\gpc\samplesbuild.py COLORTST
 rem ---------------------------------------------------------------------------
 setlocal
 for %%I in ("%~dp0..") do set "ROOT=%%~fI\"
-set "DRIVE=%ROOT%samples\color-test"
+set "DRIVE=%ROOT%GPC-BASIC-TOOLS-SRC\color-test"
 set "X16EMU=%ROOT%bin\x16emu\x16emu.exe"
 set "ROM=%ROOT%bin\x16emu\rom.bin"
 
@@ -25,7 +25,7 @@ if not exist "%ROM%" (
 )
 if not exist "%DRIVE%\COLORTST.PRG" (
 	echo.
-	echo   samples\color-test\COLORTST.PRG is not built.
+	echo   GPC-BASIC-TOOLS-SRC\color-test\COLORTST.PRG is not built.
 	echo   See the notes at the top of this file.
 	echo.
 	exit /b 1

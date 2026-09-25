@@ -9,17 +9,17 @@
 ## **  than after the display has been torn down to show it.
 ## **
 ## **  BMX is the X16's own bitmap format. The reference viewer is
-## **  samples/BMXVIEWER/BMXVIEWER.BAS, written for interpreted BASIC; the
+## **  GPC-BASIC-TOOLS-SRC/BMXVIEWER/BMXVIEWER.BAS, written for interpreted BASIC; the
 ## **  GP.BASIC version is shorter for two specific reasons, both of them in
 ## **  BMX.INC.BL: GP.STRPTR replaces POINTER() plus a PEEK of the CBM
 ## **  string descriptor, and GP.CALL replaces staging A/X/Y/C through
 ## **  $030C..$030F and SYSing.
 ## **
 ## **  Build:  copy GPB.INC.BL, APPSYS.INC.BL, BMX.INC.BL, STRCASE.INC.BL
-## **          and this file into drive/, then
+## **          and this file into source/drive/, then
 ## **            python source/gpc/build_basl.py BMXVIEW.EXP.BL BMXVIEW.SRC.PRG
 ## **          and compile BMXVIEW.SRC.PRG with GPC.BIN. Put some .BMX
-## **          files on the same drive -- samples/BMXVIEWER/SAMPLES has 30.
+## **          files on the same drive -- GPC-BASIC-TOOLS-SRC/BMXVIEWER/SAMPLES has 30.
 ## **
 ## ***********************************************************************
 ## STRCASE.INC.BL reaches BASIC's variables through {VAR}, so this program

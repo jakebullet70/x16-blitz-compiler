@@ -20,7 +20,7 @@ code into banks could ever have reached it.
 
 **Neither pass stores an object now.** Pass one only COUNTS -- it works out where every line,
 block and region lands and how long the whole thing is. Pass two writes the answer straight into
-OBJECT.PRG as it compiles. `samples/GPB-MODS-TESTING/GPBMODS.BASL` compiles: **OK CODE 19730 FREE
+OBJECT.PRG as it compiles. `GPC-BASIC-TOOLS-SRC/GPB-MODS-TESTING/GPBMODS.BASL` compiles: **OK CODE 19730 FREE
 5888**, against a compile-side wall that stood at 19,712.
 
 ## WHAT BOUNDS A PROGRAM NOW
@@ -110,7 +110,7 @@ where it is read:
   `PrepareObjectCode` + `WriteObjectCode` made six labels globals.
 - **`GPBankMakeOffset` corrupts X**, and `RegionSwitchWork` holds the region number there.
 - **An address recorded before the move must fall strictly INSIDE its section.** The block tables
-  store one SHORT of the answer and every reader adds it back. `drive/BANKZ.BASL` is that case.
+  store one SHORT of the answer and every reader adds it back. `source/drive/BANKZ.BASL` is that case.
 - **A `.def` helper MUST return carry clear**, or the generator silently drops every token after it.
 - **The alignment padding is $FF now.** Nothing writes or reads it, and there is no buffer left
   holding what the rotation used to leave there.
@@ -120,7 +120,7 @@ where it is read:
 **A stored reference set beats the internal checksum**: `chk.py ref` compiles thirteen programs
 and keeps the objects; `chk.py chk` compiles them again and diffs. Byte for byte identical through
 every step of 7, GPBMODS added to it afterwards. The bank suite (`banktest3.py`) is the behaviour
-test and `sweep.py` compiles everything in `drive/`.
+test and `sweep.py` compiles everything in `source/drive/`.
 
 **x16emu's `-echo` catches every CHROUT, and the object file is written through CHROUT**, so the
 p-code goes into the log too and "ERROR" turns up inside string literals. Stop on `READY.` AFTER
@@ -132,9 +132,9 @@ harness that anchors it to the start of a line reports a rejection that happened
 was 2.19x at step 5 and 2.08x at step 6, and step 7 took the last walk out of pass one. Pass one
 still parses everything and always will, so a little under 2x is the standing price.
 
-**Test programs added:** `drive/UNWIND.BASL` (GOTO out of one, two and three nested GP.DO
-blocks), `drive/BLOCKS.BASL` (every arm of a four-way IF chain and a SELECT) and
-`drive/BANKZ.BASL` (all three block kinds INSIDE a GP.BANKED region). Nothing covered any of it
+**Test programs added:** `source/drive/UNWIND.BASL` (GOTO out of one, two and three nested GP.DO
+blocks), `source/drive/BLOCKS.BASL` (every arm of a four-way IF chain and a SELECT) and
+`source/drive/BANKZ.BASL` (all three block kinds INSIDE a GP.BANKED region). Nothing covered any of it
 before.
 
 **Still open:** the `gp.if` / `gp.select` / `gp.case` / `gp.endsel` MARKER tokens are emitted into

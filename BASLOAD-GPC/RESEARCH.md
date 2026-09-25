@@ -4,7 +4,7 @@ Researched 6th September 2026. `README.md` is how to build what came out of this
 
 ## 1. The problem, and how it was found
 
-Adding `FILEIO.INC.BL` and `FILEDIR.INC.BL` to `samples/GPB-MODS-TESTING/GPBMODS.BASL` produced a
+Adding `FILEIO.INC.BL` and `FILEDIR.INC.BL` to `GPC-BASIC-TOOLS-SRC/GPB-MODS-TESTING/GPBMODS.BASL` produced a
 clean tokenise, then a compile that stopped with `UNKNOWN LINE NUMBER @ 2494` — a line number GPC
 was sent to and could not find.
 

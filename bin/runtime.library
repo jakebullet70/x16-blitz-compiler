@@ -1650,7 +1650,7 @@ _ClearLoop1:
 		;		the workspace (see application/source/compiler/object.asm). So the top quarter
 		;		was reserved for nothing -- and unreachable, because strings only ever grow down
 		;		from this ceiling and arrays only ever grow up towards it. Measured on
-		;		samples/FSIM16_V1: workspace $7900-$9F00, ceiling $9600, and the highest byte the
+		;		GPC-BASIC-TOOLS-SRC/FSIM16_V1: workspace $7900-$9F00, ceiling $9600, and the highest byte the
 		;		program ever touched was $95FA. 2,304 of its 9,728 bytes, for nothing.
 		;
 		;		The ceiling is exclusive, so taking it right to the top is safe: StringConcrete
@@ -1841,7 +1841,7 @@ _SCNoMinimum:
 		;		BEFORE TAKING THE CEILING DOWN, LOOK FOR A DEAD BLOCK. write_string flags a
 		;		block it outgrows (control bit 7), and until 02/09/26 nothing ever read that
 		;		flag, so every string that grew past its block leaked it for good. Measured on
-		;		samples/edit: startup alone left ~3.5K of corpses in a 5K workspace, and its
+		;		GPC-BASIC-TOOLS-SRC/edit: startup alone left ~3.5K of corpses in a 5K workspace, and its
 		;		self-check's "intermittent" OUT OF MEMORY was that leak wobbling a page either
 		;		side of the line. First fit, and the max length is KEPT -- a corpse is its size
 		;		however it is reborn. The blocks tile the heap exactly from stringHighMemory up
@@ -2845,7 +2845,7 @@ requiredFrame:
 ;
 ;		This used to subtract stringLowMemory, which was declared in data.inc, read here, and
 ;		WRITTEN NOWHERE -- so it was always zero and FRE returned the ADDRESS of the string
-;		ceiling rather than a count. On a compiled samples/FSIM16_V1 that is 40704 where the
+;		ceiling rather than a count. On a compiled GPC-BASIC-TOOLS-SRC/FSIM16_V1 that is 40704 where the
 ;		answer is about 5900. stringLowMemory has been deleted rather than maintained: it would
 ;		only have been a second copy of availableMemory, and two things that must agree is how
 ;		this codebase keeps hurting itself.
@@ -5847,7 +5847,7 @@ _PNLoop:
 		;
 		;		They are not interchangeable even on screen: $1D steps over a cell and leaves
 		;		what was there, $20 blanks it. Anything that redraws a field in place -- e.g.
-		;		samples/FSIM16_V1's HUD -- depends on the difference. And to a file, to CMD or
+		;		GPC-BASIC-TOOLS-SRC/FSIM16_V1's HUD -- depends on the difference. And to a file, to CMD or
 		;		to a printer, $1D is a control code where stock writes a space, which is how
 		;		that sample's FLIGHT.LOG came out different compiled than interpreted.
 		;

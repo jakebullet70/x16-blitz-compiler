@@ -257,7 +257,7 @@ Needs `GPB.INC.BL`, and **no `#SYMFILE`** — there is no `GP.ASM` in it. The ce
 VRAM: one data port reads, the other writes, and `memory_copy` moves between them without
 stepping either.
 
-**It executes no `BANK`**, so it can live in a `GP.BANKED` region — measured, `scratch/stashvram/SVB.BASL`.
+**It executes no `BANK`**, so it can live in a `GP.BANKED` region — measured, `source/scratch/stashvram/SVB.BASL`.
 That is the difference from `STASH.INC.BL`, which cannot.
 
 | | |
@@ -409,7 +409,7 @@ around that can stop.
 
 **`STASH.SLOT` and `STASH.NEXT` are not in this copy.** `GP-BASIC.md` §3.6 describes them — a byte
 offset into the bank, and the offset just past what was written, so one bank holds a stack of
-rectangles instead of one a level. They are in `samples/GPB-MODS-TESTING/GPC-BASIC/STASH.INC.BL`
+rectangles instead of one a level. They are in `GPC-BASIC-TOOLS-SRC/GPB-MODS-TESTING/GPC-BASIC/STASH.INC.BL`
 and have not reached the root library yet. Until they do, one rectangle a bank.
 
 ### `STASHFILE.INC.BL` — a saved text rectangle, through a file

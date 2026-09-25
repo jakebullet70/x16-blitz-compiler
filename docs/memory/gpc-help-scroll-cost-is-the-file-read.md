@@ -37,7 +37,7 @@ constantly, which is this -- and [[gp-drawing-targets-layer-1]].
 ## FIXED, 04/09/26 -- and what the fix ran into
 
 The topic now loads ONCE into bank 9 (`HELP.TBANK`) on entry and a scroll paints a row out of RAM.
-The VERA `memory_copy` slide stayed. Measured in `drive/SCRLTST.BASL`, jiffies a scroll step:
+The VERA `memory_copy` slide stayed. Measured in `source/drive/SCRLTST.BASL`, jiffies a scroll step:
 shipped 36.8, bank + STASH 12.6, bank + VERA slide ~2.6.
 
 **THE WORKSPACE HAS ABOUT A KILOBYTE IN IT, and that is the binding constraint on this program.**

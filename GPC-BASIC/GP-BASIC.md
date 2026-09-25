@@ -576,7 +576,7 @@ GP.BOX 50, 26, 4, 3, GP.STRPTR(ISO.GLYPH$) + 1, 1
 
 `GP.STRPTR` returns the address of the string block and the text starts at +1, so a string literal
 is the cheapest way to carry the eight bytes. This costs no runtime bytes; the pointer form already
-exists, and `samples/edit` uses the same mechanism to draw frames from a re-ordered font.
+exists, and `GPC-BASIC-TOOLS-SRC/edit` uses the same mechanism to draw frames from a re-ordered font.
 
 `ISO.EXP.BL` tests all of this, reading cells back with `VPEEK` rather than trusting the display.
 The ISO box corner, top edge and side read back as 43, 45 and 124.
@@ -1221,7 +1221,7 @@ machine has; a region asking for a bank that is not there stops with `?RAM`. A b
 program does carry the whole runtime rather than the smaller core, whether or not it calls a
 GP.BASIC keyword.
 
-`samples/GPB-MODS-TESTING/PICKDEMO.BASL` is a complete program in this shape, in 99 lines.
+`GPC-BASIC-TOOLS-SRC/GPB-MODS-TESTING/PICKDEMO.BASL` is a complete program in this shape, in 99 lines.
 
 Banking a module makes room in either build, and it used to make room in only one. An embedded
 object once carried its regions appended to the `.PRG`, so a byte moved into a region was still
@@ -1296,7 +1296,7 @@ the user change colours carries those changes into `CUSTOM` rather than discardi
 exception is a cold start — `CUSTOM` selected before any other theme has been loaded — where there
 is nothing to keep and it takes `X16`'s values. `THEME.RESET` goes back to those.
 
-`samples/color-test` edits the roles against a mock of the GUI and prints the `THEME.CLR()` lines
+`GPC-BASIC-TOOLS-SRC/color-test` edits the roles against a mock of the GUI and prints the `THEME.CLR()` lines
 to paste back in here. **It carries its own `GPC-BASIC` folder and is still at nine roles**, so it
 offers `THEME.FOCUS` and `THEME.BAR` but not `THEME.SHADOW`.
 
@@ -2535,7 +2535,7 @@ slot n = $A000 + n*128, n = 0-63
 slot 0    "*KVSTORE", 2, the version (1), the slot count (64)
 ```
 
-`KV.EXP.BL`, in `samples/GPB-MODS-TESTING/GPC-BASIC/`, calls every routine.
+`KV.EXP.BL`, in `GPC-BASIC-TOOLS-SRC/GPB-MODS-TESTING/GPC-BASIC/`, calls every routine.
 
 ---
 
@@ -2652,7 +2652,7 @@ Either routine brings the GP block in, 1,536 bytes, because `GP.CALL` lives ther
 
 ### 4.24 `GPBMODS` — the harness that drives every module
 
-`samples/GPB-MODS-TESTING/GPBMODS.BASL`. A menu bar of nine dropdowns whose rows reach nearly every
+`GPC-BASIC-TOOLS-SRC/GPB-MODS-TESTING/GPBMODS.BASL`. A menu bar of nine dropdowns whose rows reach nearly every
 public entry point in this section. It is the one program that holds all twenty-one modules at once, and
 the worked example of `GP.BANKED`, `GP.BANKEDSTR` and `BANKMGR` in one place.
 
@@ -2660,7 +2660,7 @@ the worked example of `GP.BANKED`, `GP.BANKEDSTR` and `BANKMGR` in one place.
 gpbmods-demo.bat
 ```
 
-The drive is `drive/`, not the sample folder. The object is compiled SHARED and loads
+The drive is `source/drive/`, not the sample folder. The object is compiled SHARED and loads
 `GPB.RT.nnn.BIN` from there.
 
 **No row is a stub.** A chosen row calls the library for real and shows what came back, on the panel

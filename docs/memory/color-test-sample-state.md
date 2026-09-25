@@ -1,12 +1,12 @@
 ---
 name: color-test-sample-state
-description: "Where samples/color-test stands after 2026-09-06, and the four loose ends left open when it was parked"
+description: "Where GPC-BASIC-TOOLS-SRC/color-test stands after 2026-09-06, and the four loose ends left open when it was parked"
 metadata:
   node_type: memory
   type: project
 ---
 
-**`samples/color-test` is built, verified and pushed** (`0a444c5`, plus the `TODO.md` entries a later
+**`GPC-BASIC-TOOLS-SRC/color-test` is built, verified and pushed** (`0a444c5`, plus the `TODO.md` entries a later
 sweep took). Parked 2026-09-06 with "we will get back soon". The readme carries the design rules --
 one colour a role, the HILITE bar convention, why the controls are never drawn in the scheme. This
 note is only the things that are written down nowhere else.

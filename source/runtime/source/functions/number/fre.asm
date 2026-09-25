@@ -26,7 +26,7 @@
 ;
 ;		This used to subtract stringLowMemory, which was declared in data.inc, read here, and
 ;		WRITTEN NOWHERE -- so it was always zero and FRE returned the ADDRESS of the string
-;		ceiling rather than a count. On a compiled samples/FSIM16_V1 that is 40704 where the
+;		ceiling rather than a count. On a compiled GPC-BASIC-TOOLS-SRC/FSIM16_V1 that is 40704 where the
 ;		answer is about 5900. stringLowMemory has been deleted rather than maintained: it would
 ;		only have been a second copy of availableMemory, and two things that must agree is how
 ;		this codebase keeps hurting itself.

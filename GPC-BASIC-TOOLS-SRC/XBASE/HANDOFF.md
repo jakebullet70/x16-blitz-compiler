@@ -1,0 +1,267 @@
+# Handoff -- resume GUI work in XBASE
+
+Written 2026-09-10, updated 2026-09-11 at the end of a session, to be pasted back
+after a `/clear`.
+Branch is **`gui-cua`**. Do not switch branches.
+
+## 0. Session 2026-09-11 -- read this first
+
+Everything below section 1 still stands. This is what changed since, and what is owed.
+
+### Owed to him, and unstarted
+
+Three things he asked for and has not got:
+
+1. A basic XBase build.
+2. XBase seen running in the emulator.
+3. **A `.bat` file that launches the emulator on `XBASE.PRG`**, so he can run it himself
+   whenever he likes without an agent. Emulator: `C:\8bitProgramming\x16emu\x16emu.exe`.
+   This one does not depend on the build and can be written now.
+
+### XBase HAS tokenised. The COMPILE is what fails.
+
+`source/drive/`, from 2026-09-10 22:45, holds `XBASE.SRC.PRG` (8,917 B) and `XBASE.SRC.SYM`
+(28,267 B), so BASLOAD ran. There is no `XBASE.PRG`. The raw `source/drive/GPCCOMP.LOG` ends:
+
+    UNKNOWN LINE NUMBER @ 618
+
+That is GPC refusing a branch whose target line does not exist, in the TOKENISED
+numbering, not `.BASL` numbering. Two candidates, and the log alone does not separate
+them:
+
+- a real GOTO/GOSUB to a label no module defines, or
+- BASLOAD's partial-output defect truncating the stream, which strands every branch into
+  the missing tail. 8,917 B is small for 587 lines plus 16 modules -- check that first.
+
+`xbasebuild.py` deletes the stale `.SRC.PRG` before every run, so a fresh run is honest.
+
+### A proposed edit he REJECTED -- do not retry unprompted
+
+Eleven labels in the XBase working copy carry a `.BODY` suffix the library's own
+front-door rule does not allow (only THEME, MENUVERT, MENUBAR, LINEINPUT, GUI and GUI2
+may carry `.BODY`):
+
+    APPSYS.INC.BL     49  APPSYS.STARTUP.BODY   55  APPSYS.RESTORE.BODY
+    BANKMGR.INC.BL    63  BANKMGR.INIT.BODY    104  BANKMGR.CLAIM.BODY
+                     118  BANKMGR.GET.FREE.BANK.BODY               157  BANKMGR.COUNT.BODY
+    STRINGS.INC.BL    59  STR.PADR.BODY   64  STR.PADL.BODY   72  STR.PADC.BODY
+                      95  STR.SPLIT.BODY 118  STR.REPLACE.BODY
+
+The strip was offered as `sed -i 's/^\([A-Za-z][A-Za-z0-9._]*\)\.BODY:/\1:/'` and he said
+no. It may bear on `@ 618` and it may not. **Ask before touching it.** If it is ever
+approved, `STRINGS.INC.BL:12` must NOT be reverted along with it -- the working copy reads
+`STR.WIDTH   the width padded TO`, root reads `field width`, and an unexplained edit to a
+SRC file is his crunch pass.
+
+### Node and the caveman CLI are installed
+
+- Node 24.21.0 LTS with npm 11.19.0 at `C:\8bitProgramming\nodejs`, from the official zip.
+  It IS on the user PATH, so a NEW shell finds `node`, `npm` and `npx`; a shell started
+  before that edit does not and must use full paths. `npm bin -g` was removed in npm 11 --
+  use `npm root -g`. A portable zip install puts globals in
+  `C:\8bitProgramming\nodejs\node_modules\` and the `.cmd` shims beside `node.exe`, NOT in
+  `%APPDATA%\npm`.
+- `@caveman-ai/cli` 1.3.3 is installed globally, with its six companion Go binaries
+  (~178 MB, all checksum verified) in `C:\Users\Admin\.caveman\bin\`.
+- `caveman claude` starts a NEW Claude Code wrapped by caveman's proxy. It wraps only the
+  process it starts; a session already running is untouched by it.
+
+### Two loose ends nobody has decided
+
+- `.agents/`, `.claude/skills/` and `skills-lock.json` are untracked and **not
+  gitignored**, so a `git add -A` sweeps 20 caveman skills into the repo. Ignore them or
+  track them? He has not said.
+- A Chocolatey `nodejs-lts` install exited abnormally mid-download, and Chocolatey printed
+  *"Please manually clean up anything that was not finished."* There may be debris under
+  `C:\ProgramData\chocolatey\lib\` or `lib-bad\`. Node came from the zip instead, so
+  nothing depends on it. Not cleaned up. Do not clean it without asking.
+
+### How he wants to be worked with
+
+He times you, and says so: *"u keep whirling away for 5 minutes what the hell is going
+on?"*, then *"3 minutes"*, then *"4 minutes"*. **A command he has pasted is a command to
+run, not a thing to research first.** Preliminary inspection ahead of an action he has
+explicitly asked for reads as stalling. Small legible steps means brief and fast, not more
+commentary.
+
+
+## 1. What we are doing now
+
+**XBASE is the new GUI tester.** GUI/CUA work moves out of GPB-MODS-TESTING and continues
+in `GPC-BASIC-TOOLS-SRC/XBASE/`. It is a temporary menu/bench for GUI work, not a finished product.
+
+**XBASE.PRG does not exist and has never been built. It needs work just to compile.**
+Treat the first build as unknown ground -- nobody has ever seen it tokenise, let alone
+compile. Expect missing symbols, bank pressure and include-order problems.
+
+## 2. Standing rules -- these override defaults
+
+- **Ask before writing asm.** No `GP.ASM` and no 64tass changes without agreeing it first.
+- **No ship language.** Never say ship/shipped/release about this repo. Say committed,
+  pushed, built, green. It is dev and test work.
+- **No unasked builds.** "Commit and push" does not include a build. Ask, then wait.
+- **No unasked help regeneration.** Do not run `GPC-BASIC-TOOLS-SRC/GPC-HELP/MKHELP.PY`. Quote:
+  *"stop updaing the help text, wait until the final design is done and bugs are fixed.
+  U can ask me if I want but wait for me to tell u."* You may ask. Then wait for a yes.
+- **Compile shared, not embedded.** `GPC.INPUT` must be FOUR lines: source, object,
+  mapfile, `SHARED`. Three lines is the embedded build and dies at the very end with
+  `NOT IMPLEMENTED @ <last line>`.
+- **Library working copy, then root.** Edit modules in the sample's own `GPC-BASIC/`,
+  copy to root only when they pass. Drift runs BOTH ways -- check before assuming.
+- **Never copy `GPB.INC.BL` from a sample folder.** Root is upstream for that ONE file,
+  the opposite of every other module. A stale copy silently un-keywords a feature: the
+  compile SUCCEEDS and the feature is simply absent.
+- **Write readable code, the user crunches.** One statement a line. An unexplained edit
+  to a SRC file is his crunch pass -- do not undo it, carry on.
+- **Comments light, code should flow.** Heavy REMs mean bad naming.
+- **Kill `x16emu` by PID only, never by image name.** An interactive session of his is
+  usually running and is not yours to kill. List with
+  `Get-CimInstance Win32_Process -Filter "Name='x16emu.exe'"`, kill only the `-warp` ones.
+- **Read the raw log, never a filtered summary.** Output that LOOKS missing is a harness
+  question first and a compiler question second.
+- **Compact after every step, not at the end.** Remind him; only he can run it.
+- **He runs concurrent agents here.** Re-read a file before writing it.
+- **Never read whole:** `TODO.md` (3,377 lines), `GPC-BASIC-TOOLS-SRC/GPB-MODS-TESTING/GPBMODS.BASL`
+  (3,453), `GPC-BASIC/GP-BASIC.md` (1,813), `GPC-BASIC/GP-BASIC.GLOBALS.md` (524).
+  Grep for a name, then `sed -n` a window.
+- Commit trailer: `Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>`.
+
+## 3. What was done this session
+
+**XBase got its own working copy of the library.** `GPC-BASIC-TOOLS-SRC/XBASE/GPC-BASIC/` went from
+4 modules to 16. Twelve were copied from `GPC-BASIC-TOOLS-SRC/GPB-MODS-TESTING/GPC-BASIC/`:
+
+    BANKMGR 8101      APPSYS 2499        KB 1201          STRINGS 10914
+    STASH 9240        SHIM.GUIBANK 5471   THEME 6220       MENUVERT 18646
+    MENUBAR 11080     LINEINPUT 12931    GUI 63702        GUI2 8587
+
+This was a deliberate choice among three options: XBase gets its OWN working copy, so it
+is self-contained and becomes the GUI bench, and GPB-MODS-TESTING freezes as the
+phase 1-5 record. Two copies of the GUI library now exist until GPB-MODS-TESTING retires.
+
+**`GPB.INC.BL` was deliberately NOT copied into `GPC-BASIC-TOOLS-SRC/XBASE/GPC-BASIC/`.** There is
+no local copy to go stale; the build script takes root's, which is the only correct path.
+
+**XBase's build header was wrong and is fixed.** It said `#SAVEAS "@:XBASE.PRG"` and
+`#SYMFILE "@:XBASE.SYM"`. `build_basl.py` does NOT rewrite `#SAVEAS`, so the tokenised
+output would have taken the compiled object's filename and GPC would then have stopped at
+`NO SYMBOL FILE FOR {}`. Both now use the `.SRC` pattern GPBMODS uses. `readme.md:176`
+was updated to match.
+
+**Build scripts now live in `source/gpc/`** (they were in a session temp dir that a new
+session will not reuse): `xbasebuild.py` and `modsbuild.py`. Both had a defect fixed --
+the overlay report printed any `<stem>.B0*` file it found, so a FAILED compile reported
+the previous build's overlays as if they were new output. They now print
+`<-- STALE, not from this build` and point at `GPCCOMP.LOG` when the object is missing.
+
+**The help files are KEPT.** 27 `GPC-BASIC-TOOLS-SRC/GPC-HELP/` files plus 2 new ones (H060, H061)
+were regenerated by `MKHELP.PY` before the veto. He decided: keep them. Do not revert,
+and do not regenerate again.
+
+## 4. XBASE facts worth knowing before you start
+
+- `XBASE.BASL` is 587 lines and `#INCLUDE`s `XBMENUS.BASL` inline at the bottom -- one
+  global symbol table, the same pattern as `ED-MENUS.BASL`.
+- The include model is FLAT. No module includes another; the top-level `.BASL` names them
+  all. So the include closure is exactly what `XBASE.BASL` lists.
+- One banked region today: `GP.BANKED SHIM.GUIBANK` at `XBASE.BASL:37`, with
+  `#DEFINE SHIM.GUIBANK 4` inside `SHIM.GUIBANK.INC.BL:80` -- same constant as GPBMODS.
+- `#DEFINE XB.GUIBANK 8` is a second, scratch bank. Both banks are CLAIMED from BANKMGR
+  at startup, not allocated, because `GP.BANKED` takes a compile-time constant.
+- `DBBANK.INC.BL` exists but is NOT included. Its own header says
+  *"SKELETON, AND NOT YET USABLE."* `DB.INC.BL` is included unbanked instead.
+- `GPC-BASIC-TOOLS-SRC/XBASE/PLAN.md` and `readme.md` are the design docs. Grep them, do not read whole.
+- Build it with: `python source/gpc/xbasebuild.py XBASE` -- **but ask first.**
+
+## 5. GPBMODS is parked mid-fix
+
+Its build was cancelled deliberately; we will get back to it. State:
+
+- Phase 5 of `GPC-BASIC-TOOLS-SRC/GPB-MODS-TESTING/GUI-CUA-PLAN.md` was committed UNBUILT (`3b4c90d`).
+  GPBMODS then failed to compile with
+  `GP.BANKEDSTR TEXT IN ONE BANK OVER 8K @ 1939`.
+- **`compile_shared.py` misreports that as a 420s timeout.** It only stops on `OK CODE`,
+  so a genuine compiler error waits out the full timeout and reads like a hang. The real
+  message is in the raw `source/drive/GPCCOMP.LOG`. Always read that file.
+- The `@ 1939` is a **BASIC line number, not a p-code address**. `_BFTooBig`
+  (`source/compiler/source/commands/gpbstrflush.asm:248`) calls `BStrNameSlotLine`
+  (`commands/gpbstrpool.asm:423`), which loads the slot's saved line into
+  `currentLineNumber`. It names the FIRST `GP.BANKEDSTR` that opened the overflowing
+  bank -- so the BANK NAME is written on the line the message points at. That is how the
+  programmer knows which bank to trim, and he considers that sufficient.
+  Note it is the TOKENISED program's numbering, not a `.BASL` line.
+- Cause: phase 5 added exactly one banked block, `BS.D.FOCUS` (429 bytes), to a bank
+  already holding 7,497 bytes across 407 strings.
+- **Fix already applied but NEVER VERIFIED:** `GPBMODS.BASL:1121` was changed from
+  `GP.BANKEDSTR GM.TEXTBANK BS.D.FOCUS` to `GP.BANKEDSTR GM.TEXTBANKB BS.D.FOCUS`.
+  `GM.TEXTBANK` is bank 5, `GM.TEXTBANKB` is bank 6 and had only 2,883 bytes used.
+- Last known good GPBMODS numbers to compare against: object **14,652**, overlays
+  `.B04` 8,194 / `.B05` 7,938 / `.B06` 3,330 / `.B07` 4,098 / `.B08` 1,538.
+- GUIFRMT IS green and unaffected: `GUIFRMT.PRG` **3,690**, `.B04` 8,035,
+  `.SRC.PRG` 18,333 -- byte-identical to last known good.
+- Bank 4 (`SHIM.GUIBANK`) is at 8,033 bytes of a real 8,188 ceiling. **155 bytes free.**
+  Any new GUI code lives under that.
+
+## 6. There is no phase 6
+
+`GUI-CUA-PLAN.md` section 7's phase list **stops at item 5**. No phase 6 has ever been
+written. His instruction was *"finish 5 where it is at, move to XBase and review 6
+together"* -- so **phase 6 is to be DEFINED and reviewed WITH HIM, never started alone.**
+
+Raw material for it, from section 9 "What this does not do":
+
+- No ALT accelerators (see section 5).
+- No mouse -- nothing in the library reads one today.
+- No multi-field forms as a public feature. The control block makes them possible, but a
+  `GUI.FORM` callers fill in themselves is a separate decision with its own doc cost.
+- No change to `GUI.OPEN` / `GUI.CLOSE` / `GUI.SIZE` / the shadow. The box is not wrong.
+
+Plus these accumulated loose ends: Shift+TAB needs a human at a real keyboard to verify;
+the 155-byte bank 4 ceiling; root-sync drift on `KB.INC.BL`, STRCASE, SHIM.UTILBANK,
+`STASH.SLOT` and `STASH.NEXT`; and possibly splitting GPBMODS.BASL's 3,453 lines.
+
+Phase 5 is NOT yet marked DONE in the plan -- that edit was staged and never run,
+because the build never went green.
+
+## 7. Uncommitted working tree
+
+Nothing has been committed or pushed. Modified (non-help): `docs/memory/MEMORY.md`,
+`docs/memory/no-ship-language-this-is-dev.md`, `GPC-BASIC-TOOLS-SRC/GPB-MODS-TESTING/GPBMODS.BASL`,
+`GPC-BASIC-TOOLS-SRC/XBASE/XBASE.BASL`, `GPC-BASIC-TOOLS-SRC/XBASE/readme.md`. Plus 27 modified
+`GPC-BASIC-TOOLS-SRC/GPC-HELP/` files (KEEP). Untracked: the 12 new `GPC-BASIC-TOOLS-SRC/XBASE/GPC-BASIC/`
+modules, `source/gpc/modsbuild.py`, `source/gpc/xbasebuild.py`,
+`docs/memory/gui-cua-phase5-state.md`, 2 new `.HLP` files, and 8 scratch files in
+`source/drive/` that are junk (`BLD.BAS`, `*.PNG`, `*.GIF`, `balls.bas`, `hello.bas`,
+`test.bas`, `tokenise.zip`).
+
+Added 2026-09-11 and still untracked: `.agents/`, `.claude/skills/`, `skills-lock.json` --
+the caveman skills, see section 0. They are NOT gitignored.
+
+## 8. Build recipe essentials
+
+- Three emulator runs, ~70s total when stopped at the right place. Always
+  `SDL_VIDEODRIVER=dummy`, always `-echo`, always kill by PID.
+- Tokenise: stop on the **SECOND** `READY.`
+- Compile: stop on **`OK CODE`** and nothing looser -- GPC echoes its whole error-message
+  table right after the banner, so any error-word pattern fires on a GOOD build.
+- **`build_basl.py` does not see an edited `#INCLUDE`.** It compares only the `.BASL`
+  against the `.SRC.PRG` and prints `skip -- up to date`. Delete the `.SRC.PRG` whenever
+  a module changed. Both build scripts already do this.
+- `#SYMFILE` is named after the SOURCE PRG, not the program, and must come BEFORE the
+  `#INCLUDE`s.
+- BASLOAD quirks: `#IFNDEF` does not nest; `#DEFINE`/`#IFNDEF` names may not contain
+  digits; labels and variables collide; `#AUTONUM` breaks STRCASE.
+- On Windows a backgrounded `x16emu` cannot be killed from bash -- drive it from a Python
+  wrapper holding the real handle.
+- Do not pipe a backgrounded build through `tail`; it hides all output until the end.
+
+## 9. Suggested first moves
+
+1. **Write the `.bat` emulator launcher.** It is owed, it needs no build, and it is
+   independent of everything else here.
+2. Re-run `python source/gpc/xbasebuild.py XBASE` -- **ask him first** -- and settle
+   `UNKNOWN LINE NUMBER @ 618` from the raw `source/drive/GPCCOMP.LOG`, never the wrapper's
+   verdict. Check the new `.SRC.PRG` size first, for a truncated tokenise.
+3. Get XBase compiling and running as the GUI bench.
+4. Only then, together, define and review phase 6.
+5. GPBMODS's bank-5 fix still needs one verifying build, whenever he wants it.

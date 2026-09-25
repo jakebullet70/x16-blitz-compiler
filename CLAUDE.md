@@ -5,7 +5,7 @@
 | file | lines | cost of a full read |
 |---|---|---|
 | `TODO.md` | 3,377 | ~55k tokens |
-| `samples/GPB-MODS-TESTING/GPBMODS.BASL` | 3,453 | ~30k |
+| `GPC-BASIC-TOOLS-SRC/GPB-MODS-TESTING/GPBMODS.BASL` | 3,453 | ~30k |
 | `GPC-BASIC/GP-BASIC.md` | 1,813 | ~21k |
 | `GPC-BASIC/GP-BASIC.GLOBALS.md` | 524 | ~9k |
 
@@ -14,8 +14,8 @@ read costs its size many times over.
 
 Find the place first, then read only around it:
 
-    grep -n "GMX.D.FOCUS" samples/GPB-MODS-TESTING/GPBMODS.BASL
-    sed -n '1140,1200p' samples/GPB-MODS-TESTING/GPBMODS.BASL
+    grep -n "GMX.D.FOCUS" GPC-BASIC-TOOLS-SRC/GPB-MODS-TESTING/GPBMODS.BASL
+    sed -n '1140,1200p' GPC-BASIC-TOOLS-SRC/GPB-MODS-TESTING/GPBMODS.BASL
 
 GPBMODS has 99 top-level labels and both markdown files have numbered sections, so
 the thing you want always has a name to grep for. The same applies to the

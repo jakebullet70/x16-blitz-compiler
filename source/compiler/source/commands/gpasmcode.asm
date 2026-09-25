@@ -70,7 +70,7 @@
 ;		THEY WERE 96 / 16 / 32 UNTIL SORT.INC.BL, which is the first real routine written in
 ;		GP.ASM rather than a straight-line renderer: 25 labels and 31 references to them, so
 ;		it failed to assemble with OUT OF MEMORY at the label table. Sixteen labels was never
-;		a considered figure -- it was enough for the two loops in samples/edit and no more.
+;		a considered figure -- it was enough for the two loops in GPC-BASIC-TOOLS-SRC/edit and no more.
 ;
 ;		THE 416 BYTES THEY COST COME OFF THE POOL, which is the total inline assembly one
 ;		program may hold: 7,456 bytes -> 7,040. That is the right trade. The pool has never

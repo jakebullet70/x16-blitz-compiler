@@ -3,20 +3,20 @@
 #  release.sh -- build, stage and package a versioned release. POSIX; run from
 #  Git Bash. Invoked by USER-RUNSelease.bat, or directly.
 #
-#     release.sh          build everything, stage scratch/release, then zip it
-#     release.sh stage    stage scratch/release from the CURRENT build -- no rebuild,
-#                         no zip. WIPES scratch/release and fills it again.
-#     release.sh zip      zip scratch/release EXACTLY AS IT STANDS -- no rebuild, no
+#     release.sh          build everything, stage release/TMP, then zip it
+#     release.sh stage    stage release/TMP from the CURRENT build -- no rebuild,
+#                         no zip. WIPES release/TMP and fills it again.
+#     release.sh zip      zip release/TMP EXACTLY AS IT STANDS -- no rebuild, no
 #                         restage. Hand edits in TMP survive and go in the zip.
 #
-#  THE STAGING FOLDER IS THE POINT. scratch/release holds the release unpacked, in the
+#  THE STAGING FOLDER IS THE POINT. release/TMP holds the release unpacked, in the
 #  shape the zip will have, so the layout can be read and corrected before anything
 #  is packaged. Stage it, look at it, fix it, then zip from it. There is one build
 #  file -- this one -- and the layout is defined once, in LAYOUT below.
 #
 #  The full build runs:
 #     make libs                        the libraries + the compiler engine GPC.BIN
-#     make release                     stage the engine + samples into drive/
+#     make release                     stage the engine + samples into source/drive/
 #     make -C source/runtime gpc-rt    both shared runtimes and their bank code, GPB/GPC/GP1.RT.nnn.BIN
 #     make -C source/gpc release       GPC.PRG + GPC.ERR (tokenised, then compiled)
 #     source/gpc/samplesbuild.py       the five sample programs, each tokenised
@@ -34,8 +34,8 @@
 #  staged tree names every placeholder, and the zip step warns about any it ships.
 #
 #  The zip lands in release/ -- the release drop folder, kept apart from the daily
-#  drive/ build cycle -- named gpc-release-<n>.zip. It is a git-ignored artifact, the
-#  way the old drive/blitz.zip was; scratch/release is git-ignored too, and release/ itself
+#  source/drive/ build cycle -- named gpc-release-<n>.zip. It is a git-ignored artifact, the
+#  way the old source/drive/blitz.zip was; release/TMP is git-ignored too, and release/ itself
 #  is tracked so the folder exists in a fresh clone.
 # ***************************************************************************
 set -e
@@ -68,15 +68,15 @@ DO_STAGE=$DO_STAGE DO_ZIP=$DO_ZIP python - <<'PY'
 import os, shutil, struct, sys, zipfile
 
 root    = os.getcwd()
-drive = os.path.join(root, "drive")
-TMP     = os.path.join(root, "scratch", "release")
+drive = os.path.join(root, "source", "drive")
+TMP     = os.path.join(root, "release", "TMP")
 
 do_stage = os.environ.get("DO_STAGE") == "1"
 do_zip   = os.environ.get("DO_ZIP")   == "1"
 
 # The PRODUCT VERSION lives in ONE place: source/application/buildnum.txt, e.g. "1.0.0". It is
 # what GPC.BIN prints (as V1.0.0) and what names the zip, and it is edited by hand when a
-# release is cut -- nothing bumps it. It used to be VERSION$ in drive/GPC.BASL, which tracked
+# release is cut -- nothing bumps it. It used to be VERSION$ in source/drive/GPC.BASL, which tracked
 # the front end instead and so never moved when the compiler changed.
 #
 # The zip is named from the WHOLE version (gpc-release-1.0.0.zip), not from its last component.
@@ -104,7 +104,7 @@ from genrtimage import imageName, bankImageName     # noqa: E402
 #  THE LAYOUT -- what a release is, in one place
 # ===========================================================================
 #
-#  scratch/release/
+#  release/TMP/
 #     GPC.PRG GPC.BIN GPC/GP1.IMG.nnn.BIN  the compiler
 #     GPB/GPC/GP1.RT.nnn.BIN               both shared runtimes and their bank code
 #     GPC.ERR.PRG  GPC.HELP.PRG            the two companion programs
@@ -128,7 +128,7 @@ from genrtimage import imageName, bankImageName     # noqa: E402
 #  //HELP-TXT/:NAME (GPB.HELP.BASL:218), so the name is not ours to choose here.
 #
 #  GPC.INPUT (the control-file template) is deliberately NOT shipped: GPC.PRG drives the
-#  compile interactively, and the file is per-user state (git-ignored in drive/).
+#  compile interactively, and the file is per-user state (git-ignored in source/drive/).
 
 # The root. GPC.PRG and GPC.HELP.PRG are both compiled SHARED, so they want
 # GPB.RT.nnn.BIN beside them -- which is this same root, two lines up.
@@ -145,7 +145,7 @@ from genrtimage import imageName, bankImageName     # noqa: E402
 #   GP1.IMG.nnn.BIN the bank code built with that image, which a self-contained object carries
 #                   after its p-code and copies to bank 1 as it starts. It jumps into the
 #                   image at fixed addresses, so the two install together from one link.
-#   GPC.ERR.PRG     the error-address-to-line helper. Built in samples/GPC.ERR/, which is
+#   GPC.ERR.PRG     the error-address-to-line helper. Built in GPC-BASIC-TOOLS-SRC/GPC.ERR/, which is
 #                   its own emulator drive, and compiled SHARED, so it wants the same
 #                   runtime beside it as any other compiled program. The tokenised source
 #                   is NOT shipped -- it is compile input, and could not be run in any case.
@@ -157,22 +157,22 @@ from genrtimage import imageName, bankImageName     # noqa: E402
 #                   ships with. The program never opens itself by name, so the rename
 #                   is safe, and it still finds HELP-TXT/GPB.HELP.IDX beside it.
 ROOTFILES = [
-    ("drive/GPC.PRG",                     "GPC.PRG"),
-    ("drive/GPC.BIN",                     "GPC.BIN"),
-    ("drive/" + imageName(),              imageName()),
-    ("drive/" + bankImageName(),          bankImageName()),
-    ("drive/" + rt_filename(),            rt_filename()),
-    ("drive/" + rc_filename(),            rc_filename()),
-    ("drive/" + bank_filename(),          bank_filename()),
-    ("samples/GPC.ERR/GPC.ERR.PRG",         "GPC.ERR.PRG"),
-    ("samples/GPC.ERR/GPC.ERR.OVL",         "GPC.ERR.OVL"),
-    ("samples/GPC-HELP/GPB.HELP.PRG",       "GPC.HELP.PRG"),
+    ("source/drive/GPC.PRG",                     "GPC.PRG"),
+    ("source/drive/GPC.BIN",                     "GPC.BIN"),
+    ("source/drive/" + imageName(),              imageName()),
+    ("source/drive/" + bankImageName(),          bankImageName()),
+    ("source/drive/" + rt_filename(),            rt_filename()),
+    ("source/drive/" + rc_filename(),            rc_filename()),
+    ("source/drive/" + bank_filename(),          bank_filename()),
+    ("GPC-BASIC-TOOLS-SRC/GPC.ERR/GPC.ERR.PRG",         "GPC.ERR.PRG"),
+    ("GPC-BASIC-TOOLS-SRC/GPC.ERR/GPC.ERR.OVL",         "GPC.ERR.OVL"),
+    ("GPC-BASIC-TOOLS-SRC/GPC-HELP/GPB.HELP.PRG",       "GPC.HELP.PRG"),
     ("README.md",                           "README.md"),
     ("LICENSE",                             "LICENSE"),
 ]
 
-# The GP.BASIC library ships whole, straight from the repo master rather than from drive/ --
-# drive/ holds only the staged copies of whatever was last built there, and they are
+# The GP.BASIC library ships whole, straight from the repo master rather than from source/drive/ --
+# source/drive/ holds only the staged copies of whatever was last built there, and they are
 # git-ignored precisely so they cannot be mistaken for the masters.
 #
 # Its two reference docs LIVE in GPC-BASIC/ rather than in a docs folder of their own, so the
@@ -182,9 +182,9 @@ ROOTFILES = [
 # build-plan docs (GP-BASIC.TIERS.md, GP-BASIC.PLAN.md) are deliberately NOT shipped: they are
 # the argument for how the library was built, not instructions for using it.
 TREES = [
-    ("samples/GPC-HELP/HELP-TXT",   "HELP-TXT"),
+    ("GPC-BASIC-TOOLS-SRC/GPC-HELP/HELP-TXT",   "HELP-TXT"),
     ("GPC-BASIC",                   "GPC-BASIC"),
-    ("samples/GPC.ERR/GPC-BASIC",   "GPC-ERROR/GPC-BASIC"),
+    ("GPC-BASIC-TOOLS-SRC/GPC.ERR/GPC-BASIC",   "GPC-ERROR/GPC-BASIC"),
 ]
 
 # GPC.ERR's source, whole and rebuildable. SRC/GPC.ERR.BASL is the same file on its own,
@@ -192,8 +192,8 @@ TREES = [
 # of that name beside the source, and they are the sample folder's copies rather than the
 # library masters: those are what the shipped object was built from.
 GPCERR_SRC = [
-    ("samples/GPC.ERR/GPC.ERR.BASL", "GPC-ERROR/GPC.ERR.BASL"),
-    ("samples/GPC.ERR/readme.md",    "GPC-ERROR/README.md"),
+    ("GPC-BASIC-TOOLS-SRC/GPC.ERR/GPC.ERR.BASL", "GPC-ERROR/GPC.ERR.BASL"),
+    ("GPC-BASIC-TOOLS-SRC/GPC.ERR/readme.md",    "GPC-ERROR/README.md"),
 ]
 
 # The tokeniser: the runnable pair, the ROM image for anyone flashing it in, and its two
@@ -212,8 +212,8 @@ BASLOAD_SRC_ZIP = "GPC-BASLOAD/BASLOAD-SRC.ZIP"
 
 # The BASLOAD source of the two tools. Reference only. SRC/README.TXT says so, and gives
 # the two steps that rebuild either one.
-SRCBASL = [("drive/GPC.BASL",                     "GPC.BASL"),
-           ("samples/GPC.ERR/GPC.ERR.BASL",         "GPC.ERR.BASL")]
+SRCBASL = [("source/drive/GPC.BASL",                     "GPC.BASL"),
+           ("GPC-BASIC-TOOLS-SRC/GPC.ERR/GPC.ERR.BASL",         "GPC.ERR.BASL")]
 
 # One folder per sample. "fake" names the one file worth stubbing when it is not there --
 # the program itself. The globs cannot be listed by name because their count follows the
@@ -221,32 +221,32 @@ SRCBASL = [("drive/GPC.BASL",                     "GPC.BASL"),
 SAMPLES = [
     {
         "dir":   "GPBMODS",
-        "files": [("drive/GPBMODS.PRG",                    "GPBMODS.PRG"),
-                  ("samples/GPB-MODS-TESTING/GPBMODS.BASL",  "GPBMODS.BASL")],
-        "globs": [("drive", lambda n: n.startswith("GPBMODS.") and len(n) == 11 and n[8:].isdigit())],
+        "files": [("source/drive/GPBMODS.PRG",                    "GPBMODS.PRG"),
+                  ("GPC-BASIC-TOOLS-SRC/GPB-MODS-TESTING/GPBMODS.BASL",  "GPBMODS.BASL")],
+        "globs": [("source/drive", lambda n: n.startswith("GPBMODS.") and len(n) == 11 and n[8:].isdigit())],
         "fake":  "GPBMODS.PRG",
     },
     {
         "dir":   "EDITOR",
-        "files": [("samples/edit/C.EDITOR.PRG",            "C.EDITOR.PRG"),
-                  ("samples/edit/EDITOR.BASL",             "EDITOR.BASL"),
-                  ("samples/edit/ED-MENUS.BASL",           "ED-MENUS.BASL"),
-                  ("samples/edit/ED-STORE.BASL",           "ED-STORE.BASL"),
-                  ("samples/edit/TEST.MD",                 "TEST.MD")],
+        "files": [("GPC-BASIC-TOOLS-SRC/edit/C.EDITOR.PRG",            "C.EDITOR.PRG"),
+                  ("GPC-BASIC-TOOLS-SRC/edit/EDITOR.BASL",             "EDITOR.BASL"),
+                  ("GPC-BASIC-TOOLS-SRC/edit/ED-MENUS.BASL",           "ED-MENUS.BASL"),
+                  ("GPC-BASIC-TOOLS-SRC/edit/ED-STORE.BASL",           "ED-STORE.BASL"),
+                  ("GPC-BASIC-TOOLS-SRC/edit/TEST.MD",                 "TEST.MD")],
         "globs": [],
         "fake":  "C.EDITOR.PRG",
     },
     {
         "dir":   "BMXVIEW",
-        "files": [("scratch/demo/C.BMXVIEW.PRG",                     "C.BMXVIEW.PRG"),
+        "files": [("source/scratch/demo/C.BMXVIEW.PRG",                     "C.BMXVIEW.PRG"),
                   ("GPC-BASIC/BMXVIEW.EXP.BL",               "BMXVIEW.EXP.BL")],
-        "globs": [("samples/BMXVIEWER/SAMPLES", lambda n: n.upper().endswith(".BMX"))],
+        "globs": [("GPC-BASIC-TOOLS-SRC/BMXVIEWER/SAMPLES", lambda n: n.upper().endswith(".BMX"))],
         "fake":  "C.BMXVIEW.PRG",
     },
     {
         "dir":   "COLORTST",
-        "files": [("samples/color-test/COLORTST.PRG",        "COLORTST.PRG"),
-                  ("samples/color-test/COLORTST.BASL",       "COLORTST.BASL")],
+        "files": [("GPC-BASIC-TOOLS-SRC/color-test/COLORTST.PRG",        "COLORTST.PRG"),
+                  ("GPC-BASIC-TOOLS-SRC/color-test/COLORTST.BASL",       "COLORTST.BASL")],
         "globs": [],
         "fake":  "COLORTST.PRG",
     },
@@ -254,19 +254,19 @@ SAMPLES = [
 
 # THE DEVELOPER'S OWN FILES -- STAGED, NEVER SHIPPED.
 # XFMGR is the file manager the staged drive is navigated with, and XT is the 28-byte BASIC
-# shim that LOADs it ("/XFMGR/XFMGR.PRG"). tmp-emu.bat boots scratch/release and wants them there.
+# shim that LOADs it ("/XFMGR/XFMGR.PRG"). tmp-emu.bat boots release/TMP and wants them there.
 # The zip step SKIPS every path under these names -- see DEV_PREFIXES below, which is what
 # actually enforces it, so the rule cannot be lost by being remembered wrongly.
 DEV_ONLY = [
-    ("drive/XT",    "XT"),         # a file
-    ("drive/XFMGR", "XFMGR"),      # a folder, staged whole
+    ("source/drive/XT",    "XT"),         # a file
+    ("source/drive/XFMGR", "XFMGR"),      # a folder, staged whole
 ]
 DEV_PREFIXES = ("XT", "XFMGR/")
 
 # MANIFEST.TXT is a record of the STAGING, not of the release: it names where every file
 # came from, and it lists the dev-only files that the zip does not contain. Shipping it
 # would hand a release user an index to things that are not in their download. It stays
-# in scratch/release and is left out of the zip along with the dev-only files.
+# in release/TMP and is left out of the zip along with the dev-only files.
 NOT_SHIPPED = DEV_PREFIXES + ("MANIFEST.TXT",)
 
 SRC_README = (
@@ -373,7 +373,7 @@ def put_tree(src_dir_rel, dst_dir_rel):
 
 if do_stage:
     if os.path.isdir(TMP):
-        print("release: wiping scratch/release")
+        print("release: wiping release/TMP")
         shutil.rmtree(TMP)
     os.makedirs(TMP)
 
@@ -455,7 +455,7 @@ if do_stage:
 
     # MANIFEST.TXT -- every file, and where it came from. It is the record that survives
     # someone opening the folder a week later with no memory of this run.
-    lines = ["GPC RELEASE STAGING -- scratch/release", "=" * 34, "",
+    lines = ["GPC RELEASE STAGING -- release/TMP", "=" * 34, "",
              "Every file in this tree, and where it came from. A source of (placeholder)",
              "is a BASIC stub, NOT a compiled program -- it prints its own name and ends.",
              "A file marked DEV ONLY is staged for local use and is NOT put in the zip.",
@@ -474,18 +474,18 @@ if do_stage:
         f.write("\r\n".join(lines) + "\r\n")
 
     total = sum(os.path.getsize(os.path.join(TMP, *d.split("/"))) for d, _ in staged)
-    print("release: staged %d files, %d bytes into scratch/release" % (len(staged) + 1, total))
+    print("release: staged %d files, %d bytes into release/TMP" % (len(staged) + 1, total))
     if placeholders:
         print("release: %d PLACEHOLDER(S): %s" % (len(placeholders), ", ".join(placeholders)))
     if missing:
         print("release: %d MISSING: %s" % (len(missing), ", ".join(missing)))
 
 # ===========================================================================
-#  ZIP -- scratch/release exactly as it stands, minus the developer's own files
+#  ZIP -- release/TMP exactly as it stands, minus the developer's own files
 # ===========================================================================
 if do_zip:
     if not os.path.isdir(TMP):
-        raise SystemExit("release: scratch/release does not exist -- run ./release.sh stage first")
+        raise SystemExit("release: release/TMP does not exist -- run ./release.sh stage first")
 
     out   = os.path.join(root, "release", "gpc-release-%s.zip" % version)
     names = []

@@ -143,7 +143,7 @@ to say is omitted, not filled. Where the brief says one or two examples, an entr
 
 ### Do not edit `.HLP`
 
-`HELP-TXT/*.HLP` and `GPB.HELP.IDX` are **generated**. `samples/GPC-HELP/MKHELP.PY` builds them,
+`HELP-TXT/*.HLP` and `GPB.HELP.IDX` are **generated**. `GPC-BASIC-TOOLS-SRC/GPC-HELP/MKHELP.PY` builds them,
 and reads nothing but:
 
 | Source | Becomes |
@@ -153,7 +153,7 @@ and reads nothing but:
 | `GPC-BASIC/GP-BASIC.FILES.md` | what is in the box |
 | `GPC-BASIC/*.INC.BL` banner headers | the per-module pages |
 
-Write in the markdown, then run `python samples/GPC-HELP/MKHELP.PY`. A `.HLP` you edited by hand is
+Write in the markdown, then run `python GPC-BASIC-TOOLS-SRC/GPC-HELP/MKHELP.PY`. A `.HLP` you edited by hand is
 gone at the next build.
 
 Markdown maps to the index: `##` is a category, `###` a topic, `####` a section inside a topic.
@@ -274,9 +274,9 @@ The concept page shrinks in return. §3.4 went from 118 lines to 47, and no entr
   things worse.
 - **Never touch `REM`s inside a `#REM 1` region.** They may be `GP.ASM` source, and deleting one
   changes the program.
-- **`GUI.INC.BL` exists in two copies** — `GPC-BASIC/` and `samples/edit/GPC-BASIC/`. They must
+- **`GUI.INC.BL` exists in two copies** — `GPC-BASIC/` and `GPC-BASIC-TOOLS-SRC/edit/GPC-BASIC/`. They must
   stay identical.
-- **Rebuild the help** after touching `GP-BASIC.md`: `python samples/GPC-HELP/MKHELP.PY`, then
+- **Rebuild the help** after touching `GP-BASIC.md`: `python GPC-BASIC-TOOLS-SRC/GPC-HELP/MKHELP.PY`, then
   check the topic renders inside 80 columns.
 - **Do not change code to suit a comment.** If the code needs changing, say so and hand it to
   `basl-author`.

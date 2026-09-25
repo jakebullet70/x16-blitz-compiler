@@ -21,9 +21,9 @@ the disk. See [[basload-streams-to-a-file]].
 ## Where the old ceiling still binds
 
 Anything that types `BASLOAD "X"` at the BASIC prompt, which is **the interactive path and every
-other emulator harness in this tree**: `scratch/help/build.py`, `scratch/lineinput/build.py`,
-`scratch/rename/build.py`, `source/unit-tests/devprobe.py`. They are dev scratch and were left alone.
-If one of them ever hits the wall, point it at `drive/BASLOAD-GPC.BIN` and copy the driver out of
+other emulator harness in this tree**: `source/scratch/help/build.py`, `source/scratch/lineinput/build.py`,
+`source/scratch/rename/build.py`, `source/unit-tests/devprobe.py`. They are dev scratch and were left alone.
+If one of them ever hits the wall, point it at `source/drive/BASLOAD-GPC.BIN` and copy the driver out of
 `source/gpc/build_basl.py`.
 
 ## Sizes worth keeping
@@ -33,14 +33,14 @@ in, which is why `FILEIO` + `FILEDIR` (~7,200) and a FILES panel (~8,000) could 
 
 **GPBMODS CROSSED IT on 2026-09-07** and came back under, which is the useful part. Moving the
 three trims into `STRINGS.INC.BL` **with an assembly `STR.SPLICE` beside them** took it to 39,794
-and `scratch/rename/build.py` died on `ERROR: BASIC RAM FULL`; rewriting `STR.SPLICE` in BASIC brought
+and `source/scratch/rename/build.py` died on `ERROR: BASIC RAM FULL`; rewriting `STR.SPLICE` in BASIC brought
 it to 38,226, and trimming the prose of `STRINGS` and `STRCASE` to **37,197 -- 1,458 bytes under,
 and 675 below where GPBMODS started**. Comment lines are worth as much here as code: `##` prose
 does not survive tokenising, but the `REM`-carried assembly and the sheer line count do. The mechanism to remember: **`GP.ASM` rides in `REM` statements,
 so a blob costs tokenised bytes even though `##` prose costs none** -- trimming comments to make
 room does nothing, and adding a blob to a widely-included module is what moves this number.
 
-`scratch/rename/build2.py` is `build.py` with the streaming driver lifted out of
+`source/scratch/rename/build2.py` is `build.py` with the streaming driver lifted out of
 `source/gpc/build_basl.py`. **Copy `build2.py`, not `build.py`, into any new work dir that compiles
 GPBMODS or anything its size** -- the margin is 1,458 bytes. Rule of
 thumb from two real builds: **~17.5 tokenised bytes per non-comment source line** (GPBMODS 16.9,

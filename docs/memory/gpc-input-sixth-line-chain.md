@@ -9,7 +9,7 @@ metadata:
 on 2026-09-16.** No asm has been written; this is the agreed design, waiting on a
 scoping pass and a go-ahead under [[ask-before-writing-asm]].
 
-**The block it solves.** `GG.COMPILE` in `samples/GPC-GUI-HELPER/GPC.GUI.BASL`
+**The block it solves.** `GG.COMPILE` in `GPC-BASIC-TOOLS-SRC/GPC-GUI-HELPER/GPC.GUI.BASL`
 ends `LOAD "GPC.BIN" : END` and never returns. GPC.BIN compiles one file and stops
 at READY. GPC.INPUT is five lines -- source PRG, output PRG, map, `SHARED` or
 blank, dead-list name -- and none of them says where to go next, so a loop over

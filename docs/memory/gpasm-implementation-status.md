@@ -91,8 +91,8 @@ allows it, but what byte it arrives as through PETSCII was never measured, and g
 quietly swallow some other character into a name.
 
 **First real user, and the numbers are much better than the research predicted.**
-`samples/edit/` renders with two `GP.ASM` blocks. Measured with both versions in one program
-(`samples/edit/EDBENCH.BASL`, real speed, loop floor subtracted, cells VPEEK'd back and blanked
+`GPC-BASIC-TOOLS-SRC/edit/` renders with two `GP.ASM` blocks. Measured with both versions in one program
+(`GPC-BASIC-TOOLS-SRC/edit/EDBENCH.BASL`, real speed, loop floor subtracted, cells VPEEK'd back and blanked
 between variants), jiffies per 1000 renders of an 80-cell row: text row **2320 -> 18.8** (123x,
 ~31 cycles/cell), chrome field **2538 -> 23.3** (109x). That is past prog8's real MSEDIT loop (67)
 and within 1.4x of the hand-assembled raw-write floor (13). **The p-code got SMALLER** — 7190 ->
@@ -117,7 +117,7 @@ run-loop-profile.py` uses the size-settle approach and has the same latent bug.
 `ASM_MAX_LABELS` 16 -> **32**, `ASM_MAX_LOCALS` 32 -> **64**, `ASM_MAX_FIXUPS` 96 -> **128**. Those
 are the *architectural* maxima and cannot go higher without widening an index — every subscript is
 count, count*2, count*4 or count*8 held in X, so labels cap at 31 stored, locals at 63, fixups at
-127. Sixteen labels was never a considered figure; it was enough for `samples/edit`'s two
+127. Sixteen labels was never a considered figure; it was enough for `GPC-BASIC-TOOLS-SRC/edit`'s two
 straight-line renderers and no more, and `SORT.INC.BL` — 25 labels, 31 references — failed to
 assemble with `OUT OF MEMORY` on the first try. **The 416 bytes came off the blob pool: total inline
 assembly per program is 7,040 now, not 8,064.** That is the right trade; the pool has never been
@@ -133,7 +133,7 @@ self-patching idiom.
 the compiler then reports a secondary `?STRING TOO LONG ERROR`, which is fallout, not the cause.
 Assign it once, textually above the block (an init routine is the natural home).
 
-Two more from the same day, both in `samples/edit/STORE.BASL` and `EDITOR.BASL`: a
+Two more from the same day, both in `GPC-BASIC-TOOLS-SRC/edit/STORE.BASL` and `EDITOR.BASL`: a
 count-down loop (`LDY {LEN%}` ... `DEY` / `BNE`) leaves offset 0 -- a Blitz string's length byte --
 untouched for free, and MUST be guarded against a zero length in BASIC before the `GOSUB`, or `DEY`
 wraps and rewrites 255 bytes of somebody else's heap. Copy-and-translate in ONE pass (read, fold,

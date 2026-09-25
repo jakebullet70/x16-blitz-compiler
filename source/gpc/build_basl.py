@@ -2,7 +2,7 @@
 # ************************************************************************************************
 #
 #		Name:		build_basl.py
-#		Purpose:	Tokenise drive/GPC.BASL to drive/GPC.SRC.PRG by running BASLOAD
+#		Purpose:	Tokenise source/drive/GPC.BASL to source/drive/GPC.SRC.PRG by running BASLOAD
 #				headless. GPC.SRC.PRG is then COMPILED into GPC.PRG -- see the Makefile.
 #				With args "BASL PRG" it instead tokenises that one extra tool the same way
 #				(no source mirror) -- used to freshen GPC.ERR.PRG on a release.
@@ -26,11 +26,11 @@
 #		it, so the driver below writes that message to a sentinel file and this script reads it.
 #		The sentinel is also how we know the run finished -- see tokenise().
 #
-#		DIRECTION: the MASTER copy is drive/GPC.BASL -- that is where the front end is edited
-#		and interactively BASLOAD-tested (drive/ is the emulator's drive). This build tokenises
+#		DIRECTION: the MASTER copy is source/drive/GPC.BASL -- that is where the front end is edited
+#		and interactively BASLOAD-tested (source/drive/ is the emulator's drive). This build tokenises
 #		it IN PLACE and, on success, mirrors it back into the source tree (source/gpc/GPC.BASL)
 #		so the committed copy always matches what was last built. On a fresh checkout with no
-#		drive/GPC.BASL, the committed mirror is used to seed it.
+#		source/drive/GPC.BASL, the committed mirror is used to seed it.
 #
 #		BUILD NUMBER: none here. It belongs to the ENGINE now -- source/application/buildnum.txt,
 #		bumped by source/application/scripts/bumpbuild.py on every engine build and printed by
@@ -39,7 +39,7 @@
 #		when the front end was rebuilt and stood still when the compiler changed.
 #
 #		EXTRA TOOLS: run  build_basl.py GPC.ERR.BASL GPC.ERR.PRG  to tokenise a companion tool the
-#		same headless way. These live only in drive/ (no source/ mirror), so this mode just
+#		same headless way. These live only in source/drive/ (no source/ mirror), so this mode just
 #		tokenises -- no mirror. It skips when the source is absent, and when the PRG is already up
 #		to date, which is now an optimisation rather than a necessity: the ROM build wrote two
 #		nondeterministic bytes past the program's end marker, so re-tokenising an unchanged source
@@ -57,13 +57,13 @@ import os, sys, time, subprocess
 
 HERE    = os.path.dirname(os.path.abspath(__file__))
 ROOT    = os.path.abspath(os.path.join(HERE, "..", ".."))
-TESTING = os.path.join(ROOT, "drive")
+TESTING = os.path.join(ROOT, "source", "drive")
 EMU     = os.path.join(ROOT, "bin", "x16emu", "x16emu.exe")
 ROM     = os.path.join(ROOT, "bin", "x16emu", "rom.bin")
 
 MASTER = os.path.join(TESTING, "GPC.BASL")  # the master you edit + interactively BASLOAD-test
 MIRROR = os.path.join(HERE, "GPC.BASL")     # committed mirror in the source tree, kept in sync
-BASL   = "GPC.BASL"                          # its name on the emulator drive (= drive/)
+BASL   = "GPC.BASL"                          # its name on the emulator drive (= source/drive/)
 PRG    = "GPC.SRC.PRG"                       # #SAVEAS "@:GPC.SRC.PRG" writes this
 SYM    = "GPC.SRC.SYM"                       # #SYMFILE "@:GPC.SRC.SYM" writes this
 DRIVER = "GPCBLD.BAS"                        # scratch: the BASIC driver we "type" at the prompt
@@ -71,12 +71,12 @@ LOG    = "GPCBLD.LOG"                        # scratch: the emulator echo log
 DONE   = "BASLDONE"                          # scratch: the driver writes BASLOAD's message here
 
 #	The streaming tokeniser. BASLOAD-GPC/build/ is the dev copy, rebuilt by BASLOAD-GPC/build.py;
-#	drive/ carries the shipped one beside GPC.BIN, so a fresh checkout with no cc65 still builds.
+#	source/drive/ carries the shipped one beside GPC.BIN, so a fresh checkout with no cc65 still builds.
 #	The dev copy wins when it exists, which is what keeps an edit to the fork from being ignored.
 #
 #	TWO FILES, not one. BASLOAD-GPC.BIN is the engine and the only thing this script calls -- it pokes
 #	the name and SYSes, the same as any other caller. BASLOAD-GPC.PRG is the FRONT END, which does
-#	that from a prompt instead; nothing here needs it, but drive/ is the emulator's drive and the
+#	that from a prompt instead; nothing here needs it, but source/drive/ is the emulator's drive and the
 #	release directory, so the tool a person runs belongs next to the one the build runs.
 BASLOAD_FILES = ("BASLOAD-GPC.BIN", "BASLOAD-GPC.PRG")
 BASLOAD_BUILT = os.path.join(ROOT, "BASLOAD-GPC", "build", "BASLOAD-GPC.BIN")
@@ -141,7 +141,7 @@ def die(msg):
 #   Reading a file rather than the echo log is deliberate. The log carries the #SYMFILE dump --
 #   the user's own symbol names, which could contain anything -- and wraps at 80 columns, which
 #   would split a long message across lines. BASLOAD's nineteen return codes are listed in
-#   drive/MSEDIT/BASLOAD.MD.
+#   source/drive/MSEDIT/BASLOAD.MD.
 #
 def read_response(path):
     """BASLOAD's result message from the sentinel, or "" if the run never got that far."""
@@ -165,16 +165,16 @@ def stage_basload():
         if built != drive:
             with open(dst, "wb") as f:
                 f.write(built)
-            print("  build_basl: staged BASLOAD-GPC/build/%s -> drive/ (%d bytes)"
+            print("  build_basl: staged BASLOAD-GPC/build/%s -> source/drive/ (%d bytes)"
                   % (name, len(built)))
     if not os.path.exists(BASLOAD_DRIVE):
-        die("no BASLOAD-GPC.BIN in drive/ or BASLOAD-GPC/build/ -- run:\n"
+        die("no BASLOAD-GPC.BIN in source/drive/ or BASLOAD-GPC/build/ -- run:\n"
             "               python BASLOAD-GPC/build.py prg")
 
 
 def tokenise(basl_name, prg_name, also_clean=()):
     """Boot the emulator headless, load BASLOAD-GPC.BIN and SYS it at <basl_name>, so the source's own
-    #SAVEAS writes drive/<prg_name>. Returns the tokenised PRG's bytes; dies on failure.
+    #SAVEAS writes source/drive/<prg_name>. Returns the tokenised PRG's bytes; dies on failure.
     also_clean lists extra outputs (e.g. a #SYMFILE) to remove up front so a stale one can't fake
     success."""
     stage_basload()
@@ -254,10 +254,10 @@ def build_front_end():
     see source/application/scripts/bumpbuild.py."""
     if not os.path.exists(MASTER):
         if not os.path.exists(MIRROR):
-            die("no GPC.BASL in drive/ or source/gpc/ -- nothing to build")
+            die("no GPC.BASL in source/drive/ or source/gpc/ -- nothing to build")
         with open(MIRROR, "rb") as a, open(MASTER, "wb") as b:
             b.write(a.read())
-        print("  build_basl: seeded drive/GPC.BASL from source/gpc/GPC.BASL")
+        print("  build_basl: seeded source/drive/GPC.BASL from source/gpc/GPC.BASL")
 
     data = tokenise(BASL, PRG, also_clean=(SYM,))
 
@@ -270,35 +270,35 @@ def build_front_end():
         with open(MIRROR, "wb") as b:
             b.write(master_bytes)
 
-    print("  build_basl: OK -- drive/%s (%d bytes, loads $0801) tokenised from drive/GPC.BASL"
+    print("  build_basl: OK -- source/drive/%s (%d bytes, loads $0801) tokenised from source/drive/GPC.BASL"
           % (PRG, len(data)))
     if mirrored:
-        print("             mirrored drive/GPC.BASL -> source/gpc/GPC.BASL")
+        print("             mirrored source/drive/GPC.BASL -> source/gpc/GPC.BASL")
 
 
 def build_tool(basl_name, prg_name):
-    """Tokenise a companion tool (e.g. GPC.ERR.BASL -> GPC.ERR.PRG) that lives only in drive/.
+    """Tokenise a companion tool (e.g. GPC.ERR.BASL -> GPC.ERR.PRG) that lives only in source/drive/.
     No version bump, no source mirror. "If needed": skip when the source is absent, or when the
     PRG is already at least as new as its source -- an emulator boot saved, nothing more, now that
     the streaming build's output is byte for byte identical run to run."""
     basl = os.path.join(TESTING, basl_name)
     prg  = os.path.join(TESTING, prg_name)
     if not os.path.exists(basl):
-        print("  build_basl: skip -- no drive/%s (nothing to tokenise for %s)" % (basl_name, prg_name))
+        print("  build_basl: skip -- no source/drive/%s (nothing to tokenise for %s)" % (basl_name, prg_name))
         return
     if os.path.exists(prg) and os.path.getmtime(prg) >= os.path.getmtime(basl):
-        print("  build_basl: skip -- drive/%s is up to date (source no newer)" % prg_name)
+        print("  build_basl: skip -- source/drive/%s is up to date (source no newer)" % prg_name)
         return
     sym = os.path.splitext(prg_name)[0] + ".SYM"    # a #SYMFILE, if any, sits beside the PRG
     data = tokenise(basl_name, prg_name, also_clean=(sym,))
-    print("  build_basl: OK -- drive/%s (%d bytes, loads $0801) tokenised from drive/%s"
+    print("  build_basl: OK -- source/drive/%s (%d bytes, loads $0801) tokenised from source/drive/%s"
           % (prg_name, len(data), basl_name))
 
 
 def main():
     global TESTING, BASLOAD_DRIVE
     args = sys.argv[1:]
-    #   --drive DIR tokenises where a sample lives rather than in drive/. Its #INCLUDEs name
+    #   --drive DIR tokenises where a sample lives rather than in source/drive/. Its #INCLUDEs name
     #   the module folder beside it, so nothing is staged first.
     if len(args) >= 2 and args[0] == "--drive":
         TESTING = os.path.abspath(args[1])

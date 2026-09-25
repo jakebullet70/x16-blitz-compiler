@@ -11,7 +11,7 @@
 import os, re, subprocess, time, sys
 
 ROOT = r"C:\dev\CmdrX16\dos_tools\x16-blitz-compiler"
-T = os.path.join(ROOT, "drive")
+T = os.path.join(ROOT, "source", "drive")
 E = os.path.join(ROOT, "bin", "x16emu")
 PY = r"C:\Users\Admin\AppData\Local\Programs\Python\Python313\python.exe"
 #   GPC's OWN error vocabulary, read out of the generator's output so it cannot drift.
@@ -74,7 +74,7 @@ def tokenise(name):
 def compile_one(name, mode="SHARED"):
     #   SHARED, not embedded: GP.BANKED only works there. The bootstrap is what moves the
     #   region into the bank, and an embedded program has no bootstrap -- gpbank.asm
-    #   refuses a region rather than guessing. GPC/GPB/GP1.RT.nnn.BIN are in drive/.
+    #   refuses a region rather than guessing. GPC/GPB/GP1.RT.nnn.BIN are in source/drive/.
     open(os.path.join(T, "GPC.INPUT"), "w", newline="\n").write(
         "%s.SRC.PRG\n%s.PRG\n%s.MAP\n%s\n" % (name, name, name, mode))
     p = os.path.join(T, name + ".PRG")

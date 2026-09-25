@@ -37,7 +37,7 @@
 ## **  The first run of this file used GP.SORT itself as the oracle, keyword against
 ## **  module, and every case matched before the keyword was deleted.
 ## **
-## **  Build:  copy GPB.INC.BL, SORT.INC.BL and this file into drive/,
+## **  Build:  copy GPB.INC.BL, SORT.INC.BL and this file into source/drive/,
 ## **          then
 ## **            python source/gpc/build_basl.py SORT.EXP.BL SORT.PRG
 ## **          and compile SORT.PRG with GPC.BIN.

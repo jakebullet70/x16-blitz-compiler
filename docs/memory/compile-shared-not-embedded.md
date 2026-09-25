@@ -16,7 +16,7 @@ only figure a change moves. It also needs a versioned `GPB.RT.nnn.BIN` on the dr
 more thing to have deleted.
 
 **How to apply:** `python source/gpc/compile_shared.py SRC.PRG OUT.PRG` with no `--embedded`.
-Ask before building embedded, including for the checked-in `samples/GPC-HELP/HELP.PRG` — that one
+Ask before building embedded, including for the checked-in `GPC-BASIC-TOOLS-SRC/GPC-HELP/HELP.PRG` — that one
 is embedded today and the readme says why, so switching it is a decision, not a default.
 A shared object needs `GPC.RT.nnn.BIN` beside it at run time.
 

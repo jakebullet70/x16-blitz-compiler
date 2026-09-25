@@ -13,7 +13,7 @@ this one says how to work on it.
 
 ## Shape
 
-`samples/cruncher/CRUNCHER.BASL`, ~735 lines, is the engine. **Labels are `CX.*`, variables `CR.*`**
+`GPC-BASIC-TOOLS-SRC/cruncher/CRUNCHER.BASL`, ~735 lines, is the engine. **Labels are `CX.*`, variables `CR.*`**
 — BASLOAD files both in one symbol table and a label spelling a variable is `DUPLICATE SYMBOL`
 ([[basload-label-and-variable-collide]]). Keep the split; it removes the question entirely.
 
@@ -62,11 +62,11 @@ never correctness.
 ## Build and test cycle
 
 `python` and `make` are off-PATH ([[build-toolchain-location]]); Python 3.13 is at
-`C:\Users\Admin\AppData\Local\Programs\Python\Python313`. Stage into `drive/` first — BASLOAD
-resolves `#INCLUDE` off the drive and `build_basl.py` uses `drive/` as `-fsroot`:
+`C:\Users\Admin\AppData\Local\Programs\Python\Python313`. Stage into `source/drive/` first — BASLOAD
+resolves `#INCLUDE` off the drive and `build_basl.py` uses `source/drive/` as `-fsroot`:
 
 ```
-cp samples/cruncher/{CRUNCH,CRUNCHER}.BASL samples/cruncher/GPC-BASIC/*.INC.BL drive/
+cp GPC-BASIC-TOOLS-SRC/cruncher/{CRUNCH,CRUNCHER}.BASL GPC-BASIC-TOOLS-SRC/cruncher/GPC-BASIC/*.INC.BL source/drive/
 python source/gpc/build_basl.py CRUNCHER.BASL CRUNCHER.SRC.PRG
 python source/gpc/compile_shared.py [--embedded] CRUNCHER.SRC.PRG CRUNCH.BIN
 ```
@@ -90,7 +90,7 @@ commit it:
   then diffs both. **It must normalise `GP.IF` blocks to `IF c THEN body` in BOTH files** or every
   `COLLAPSE` reads as a mismatch. Editor: 1,317 statements, 96 THEN clauses.
 - **`runprg.py`** — run a PRG headless: `SDL_VIDEODRIVER=dummy`, `-warp -echo -prg NAME -run`,
-  cwd `drive/`, poll the log for a stop string, kill by PID.
+  cwd `source/drive/`, poll the log for a stop string, kill by PID.
 
 **`-echo` dumps an LF file's whole contents in one blob** because LF is not a PETSCII newline —
 grep the summary lines, do not read the log whole.

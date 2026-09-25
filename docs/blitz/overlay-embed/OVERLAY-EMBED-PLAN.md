@@ -9,7 +9,7 @@ findings.
 EMBEDDED build by carrying the overlay inside the single `.PRG`. SHARED keeps
 its separate `NAME.OVL` and does not change.
 
-**Why it matters:** `samples/edit` must ship as one file, which today means no
+**Why it matters:** `GPC-BASIC-TOOLS-SRC/edit` must ship as one file, which today means no
 regions, which means all 18 KB of its p-code sits in low RAM. The editor has
 about 2.8 KB of p-code growth left before `PROGRAM TOO BIG`.
 
@@ -26,7 +26,7 @@ that print long transcripts. It will eat context fast.
 - The stage headings carry a `COMPACT HERE` marker. Honour them.
 - **Never read whole:** `TODO.md` (3,377 lines), `GPC-BASIC/GP-BASIC.md`
   (1,813), `GPC-BASIC/GP-BASIC.GLOBALS.md` (524),
-  `samples/GPB-MODS-TESTING/GPBMODS.BASL` (3,453), and the `_library.asm` files
+  `GPC-BASIC-TOOLS-SRC/GPB-MODS-TESTING/GPBMODS.BASL` (3,453), and the `_library.asm` files
   under `source/`. Grep for the name, then read ±40 lines. `CLAUDE.md` has the
   full table.
 - Build runs print hundreds of lines. Keep the last ~20 and the numbers that
@@ -70,7 +70,7 @@ reading as the concise spec.
 
 ## The three measured constraints
 
-Reproduce any of these with `scratch/ovltest/` (see **Test rig** at the bottom).
+Reproduce any of these with `source/scratch/ovltest/` (see **Test rig** at the bottom).
 
 ### 1. The workspace is zeroed before the first BASIC statement
 
@@ -220,7 +220,7 @@ prize (most of 18 KB of p-code, against ~900 bytes of text).
 ## Regression suite — this already exists, use it
 
 `source/unit-tests/banktest3.py` is the `GP.BANKED` suite: ~30 programs in
-`scratch/banktest3/`, compiled and run, marked-versus-control output comparison,
+`source/scratch/banktest3/`, compiled and run, marked-versus-control output comparison,
 rejection tests, overlay-content checks, and a truncated-overlay test
 (`BNKOVL` must stop with `?OVL`). Run it after **every** stage:
 
@@ -282,7 +282,7 @@ because `WriteObjectCode` refuses to leave less than 4 KB of workspace.
 
 ## Test rig
 
-`scratch/ovltest/` — built for the investigation, kept for re-verification.
+`source/scratch/ovltest/` — built for the investigation, kept for re-verification.
 Nothing in the repo proper was modified.
 
 | file | does |
@@ -291,7 +291,7 @@ Nothing in the repo proper was modified.
 | `ovlblob.py` | appends a known pattern to an object; `--over` deliberately overruns `$9F00` |
 | `runovla.py` | runs a `.PRG` headless and prints its output; extra args pass to the emulator, e.g. `-randram` |
 
-    $T = "scratch\ovltest"
+    $T = "source\scratch\ovltest"
     & $PY source\gpc\build_basl.py --drive $T OVLA.BASL OVLA.SRC.PRG
     & $PY source\gpc\compile_shared.py --drive $T --embedded OVLA.SRC.PRG OVLA.PRG OVLA.MAP
     & $PY $T\ovlblob.py $T\OVLA.PRG 16384
@@ -316,6 +316,6 @@ before Stage 5 changes the behaviour of any program that compiles today.
 - `python` resolves to the Microsoft Store alias stub. Use
   `C:\Program Files (x86)\Python314-32\python.exe`.
 - `git` is not on PATH. Use `C:\Program Files\Git\cmd\git.exe`.
-- Uncommitted before this work started: `samples/edit/*` and
+- Uncommitted before this work started: `GPC-BASIC-TOOLS-SRC/edit/*` and
   `source/gpc/compile_shared.py` (an opt-in `--strip` flag for dead-code
   removal). `main` was 1 commit ahead of `origin/main`.

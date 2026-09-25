@@ -7,7 +7,7 @@
 #       gpctest.py full   [--gpc FILE] [--only A,B]
 #
 #   ref compiles dcref.py's set with the option off and on, and keeps the results in
-#   scratch/gpctest/ref/off/<tag>/ and scratch/gpctest/ref/on/<tag>/. Run it with the compiler from
+#   source/scratch/gpctest/ref/off/<tag>/ and source/scratch/gpctest/ref/on/<tag>/. Run it with the compiler from
 #   before the change.
 #
 #   quick and full compile the set again and check each compile:
@@ -27,8 +27,8 @@
 #   Every compile shares one pool of WORKERS emulators, slowest first. Run nothing else that
 #   starts an emulator alongside it.
 #
-#   Drives: scratch/gpctest/off/<tag>/, on/<tag>/ and stripped/<tag>/, with the stripped source
-#   in in-stripped/<tag>/. The DC tests keep scratch/dctest/ and scratch/dcstrip/.
+#   Drives: source/scratch/gpctest/off/<tag>/, on/<tag>/ and stripped/<tag>/, with the stripped source
+#   in in-stripped/<tag>/. The DC tests keep source/scratch/dctest/ and source/scratch/dcstrip/.
 #
 import os, sys, time, glob, shutil, filecmp, traceback
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -38,7 +38,7 @@ import dcref
 import dcstrip
 import dctest
 
-WORK = os.path.join(dcref.ROOT, "scratch", "gpctest")
+WORK = os.path.join(dcref.ROOT, "source", "scratch", "gpctest")
 REF = os.path.join(WORK, "ref")
 WORKERS = 7
 

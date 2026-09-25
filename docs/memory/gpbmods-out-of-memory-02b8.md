@@ -8,7 +8,7 @@ metadata:
 GPBMODS built with the uncommitted compiler raises `OUT OF MEMORY @ $02B8` at startup, on
 2026-09-17. The evidence points at the runtime, not at code generation.
 
-**What fails.** The statement is `GOSUB APPSYS.STARTUP`, `samples/GPB-MODS-TESTING/GPBMODS.BASL`
+**What fails.** The statement is `GOSUB APPSYS.STARTUP`, `GPC-BASIC-TOOLS-SRC/GPB-MODS-TESTING/GPBMODS.BASL`
 line 204, BASIC line 2057, p-code `F5 B3 9A 07`. It is the program's first GOSUB, straight after
 eight DIM statements. A ring recorder in `StackOpenFrame`/`StackCloseFrame` left its index at a
 value the recorder cannot write, so no frame operation ran before this one: this is the first
@@ -42,7 +42,7 @@ Recompiling GPBMODS gives a byte-identical PRG and OVL, so the object file under
 memory overwrite can. Only instrumentation confined to `errorhandler.asm`, late in the image,
 preserves the repro.
 
-The repro harness is `scratch/oomprobe/` -- the PRG, the OVL, the three `.RT.123.BIN`, driver text
+The repro harness is `source/scratch/oomprobe/` -- the PRG, the OVL, the three `.RT.123.BIN`, driver text
 files and `probeh.py`, which runs x16emu warped with 2048K and stops on `DONEB`.
 
 **Second pass, 2026-09-17.** A clean build (GPB.RT 11909) reproduces. Earlier "no repro" readings

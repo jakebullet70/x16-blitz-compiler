@@ -68,14 +68,14 @@ compiler reads. GPC never sees a label.
 
 **The X16 ships BASLOAD in ROM, and this project does not use that one.** `BASLOAD-GPC.BIN` is the
 same program built from the same upstream source as an ordinary PRG, with a handful of changes in
-`BASLOAD-GPC/src/`. The build drives that one and stages it into `drive/` beside `GPC.BIN`.
+`BASLOAD-GPC/src/`. The build drives that one and stages it into `source/drive/` beside `GPC.BIN`.
 
 ### Why
 
 **The ROM version built the tokenised program in BASIC RAM**, so 38,655 bytes was the ceiling on a
 `.BASL` *plus every `#INCLUDE` it pulls in*. Two-pass compilation had just moved GPC's own size
 wall; this one was then the next thing in front of it, and
-`samples/GPB-MODS-TESTING/GPBMODS.BASL` came within 783 bytes of it.
+`GPC-BASIC-TOOLS-SRC/GPB-MODS-TESTING/GPBMODS.BASL` came within 783 bytes of it.
 
 It also failed badly. Over the ceiling it printed `SAVING` and wrote a short PRG *before* reporting
 `ERROR: BASIC RAM FULL`, so the file existed, was not empty, and loaded at `$0801`. GPC then died a
@@ -133,7 +133,7 @@ an unlimited directive namespace, so every future compiler directive is a GPC-si
 ### Where the old ceiling still binds
 
 **Anything that types `BASLOAD "X"` at the BASIC prompt uses the ROM, and still stops at 38,655
-bytes.** That is the interactive path and the dev harnesses in `scratch/`. Only the build drives the
+bytes.** That is the interactive path and the dev harnesses in `source/scratch/`. Only the build drives the
 fork.
 
 ---

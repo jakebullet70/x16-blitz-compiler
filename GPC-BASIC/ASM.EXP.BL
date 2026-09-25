@@ -12,7 +12,7 @@
 ## **  reserve, nothing to keep in step with a comment saying what the
 ## **  numbers used to mean.
 ## **
-## **  Build:  copy GPC-BASIC/GPB.INC.BL and this file into drive/, then
+## **  Build:  copy GPC-BASIC/GPB.INC.BL and this file into source/drive/, then
 ## **            python source/gpc/build_basl.py ASM.EXP.BL ASM.PRG
 ## **          and compile ASM.PRG with GPC.BIN.
 ## **

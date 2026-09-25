@@ -56,7 +56,7 @@ STRMarkLine:
 		;
 		;		THIS USED TO TEST AGAINST variableListEnd. Both tables lived in one 8K bank and
 		;		grew towards each other, so the real limit was the SUM of the two -- and
-		;		samples/edit had reached 7,981 of 8,192 with 1,461 lines and 356 variables.
+		;		GPC-BASIC-TOOLS-SRC/edit had reached 7,981 of 8,192 with 1,461 lines and 356 variables.
 		;		Fifty-two more lines and this test fired PROGRAM TOO BIG with a THIRD of the
 		;		object budget unused. One bank each (x16_storage.inc) made the limit this table's
 		;		own window, 2,048 lines; a second bank under it makes that 4,096.

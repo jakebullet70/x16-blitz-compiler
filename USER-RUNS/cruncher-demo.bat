@@ -18,22 +18,22 @@ rem  trap the engine has to survive: a colon inside a string, THEN inside a stri
 rem  and inside an identifier, a real IF..THEN, a label, DATA, and three GP.IF
 rem  blocks of which only some may be collapsed. Read DEMO.CRU afterwards.
 rem
-rem  NOTE THAT THE DRIVE IS samples\cruncher, so DEMO.CRU lands in the repo beside
-rem  the source. git clean -f samples/cruncher/DEMO.CRU tidies up.
+rem  NOTE THAT THE DRIVE IS GPC-BASIC-TOOLS-SRC\cruncher, so DEMO.CRU lands in the repo beside
+rem  the source. git clean -f GPC-BASIC-TOOLS-SRC/cruncher/DEMO.CRU tidies up.
 rem
 rem  TO CRUNCH THE EDITOR instead: copy CRUNCH.PRG and CRUNCH.BIN into
-rem  samples\edit, point this script's DRIVE at that directory, and answer
+rem  GPC-BASIC-TOOLS-SRC\edit, point this script's DRIVE at that directory, and answer
 rem  EDITOR.BASL. Measured there: 449 joins and one collapse, object 26,411 ->
 rem  26,189, and the editor's own self-check output byte-identical afterwards.
 rem
-rem  Source: samples\cruncher\CRUNCH.BASL (front end) + CRUNCHER.BASL (engine),
-rem  on GPB and STRCASE, both shipped in samples\cruncher\GPC-BASIC\ beside the
+rem  Source: GPC-BASIC-TOOLS-SRC\cruncher\CRUNCH.BASL (front end) + CRUNCHER.BASL (engine),
+rem  on GPB and STRCASE, both shipped in GPC-BASIC-TOOLS-SRC\cruncher\GPC-BASIC\ beside the
 rem  sample so a rebuild needs nothing from GPC-BASIC\. Both objects are EMBEDDED
-rem  and checked in. See samples\cruncher\readme.md for the rebuild.
+rem  and checked in. See GPC-BASIC-TOOLS-SRC\cruncher\readme.md for the rebuild.
 rem ---------------------------------------------------------------------------
 setlocal
 for %%I in ("%~dp0..") do set "ROOT=%%~fI\"
-set "DRIVE=%ROOT%samples\cruncher"
+set "DRIVE=%ROOT%GPC-BASIC-TOOLS-SRC\cruncher"
 set "X16EMU=%ROOT%bin\x16emu\x16emu.exe"
 set "ROM=%ROOT%bin\x16emu\rom.bin"
 
@@ -47,15 +47,15 @@ if not exist "%ROM%" (
 )
 if not exist "%DRIVE%\CRUNCH.PRG" (
 	echo.
-	echo   samples\cruncher\CRUNCH.PRG is not built.
-	echo   See the rebuild section of samples\cruncher\readme.md.
+	echo   GPC-BASIC-TOOLS-SRC\cruncher\CRUNCH.PRG is not built.
+	echo   See the rebuild section of GPC-BASIC-TOOLS-SRC\cruncher\readme.md.
 	echo.
 	exit /b 1
 )
 if not exist "%DRIVE%\CRUNCH.BIN" (
 	echo.
-	echo   samples\cruncher\CRUNCH.BIN is not built -- the front end has
-	echo   nothing to hand off to. See samples\cruncher\readme.md.
+	echo   GPC-BASIC-TOOLS-SRC\cruncher\CRUNCH.BIN is not built -- the front end has
+	echo   nothing to hand off to. See GPC-BASIC-TOOLS-SRC\cruncher\readme.md.
 	echo.
 	exit /b 1
 )

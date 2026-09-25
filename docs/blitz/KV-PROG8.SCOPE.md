@@ -9,7 +9,7 @@ X16 but nothing about this repository.
 is in use. The job is a Prog8 implementation that reads and writes **the same bytes in the same
 bank**, so that a Blitz-compiled program and a Prog8 program can hand state to each other.
 
-The motivating case: `GPC.GUI` (Blitz, `samples/GPC-GUI-HELPER/`) wants to launch an external
+The motivating case: `GPC.GUI` (Blitz, `GPC-BASIC-TOOLS-SRC/GPC-GUI-HELPER/`) wants to launch an external
 program and get information back. Nothing returns on the X16 — a `LOAD` from a running program
 replaces low RAM and hands the machine to the ROM — but **banked RAM survives that transition**, so
 a shared bank is the mailbox. See `docs/memory/load-chain-clears-memory.md`: a chained program
@@ -20,8 +20,8 @@ clears its variables and string heap on entry, and nothing clears banks.
 | file | what it is |
 |---|---|
 | `GPC-BASIC/KV.INC.BL` | the reference implementation, 247 lines of BASL. **This is the specification.** |
-| `samples/GPB-MODS-TESTING/GPC-BASIC/KV.INC.BL` | the working copy that gets edited first |
-| `samples/GPB-MODS-TESTING/GPC-BASIC/KV.EXP.BL` | the exercise/test program, 350 lines |
+| `GPC-BASIC-TOOLS-SRC/GPB-MODS-TESTING/GPC-BASIC/KV.INC.BL` | the working copy that gets edited first |
+| `GPC-BASIC-TOOLS-SRC/GPB-MODS-TESTING/GPC-BASIC/KV.EXP.BL` | the exercise/test program, 350 lines |
 | `docs/blitz/KV-STORE.PLAN.md` | the design record. Section 5 is an earlier, shorter sketch of this job; section 1.2 explains the bank choice |
 
 Read `GPC-BASIC/KV.INC.BL` in full before writing anything. It is short, and its header comment is
@@ -142,7 +142,7 @@ Four ways out, none chosen. **Put these to the user before you write the bank-se
    it.
 
 There is a second unknown in the same area. The external program in the motivating case is `XFMGR`,
-a Prog8 application (`samples/GPC-GUI-HELPER/XFMGR/`) that ships `ZSMKIT.BIN` and five `.OVL`
+a Prog8 application (`GPC-BASIC-TOOLS-SRC/GPC-GUI-HELPER/XFMGR/`) that ships `ZSMKIT.BIN` and five `.OVL`
 overlays. Which banks it claims is not known here and its source is not in this repository. Whatever
 bank is chosen has to be checked against it.
 
@@ -198,13 +198,13 @@ load stopped, so the bank is selected again before the header is checked.
   the one this project has been using.
 - A local copy of the Prog8 library sources is at `docs/attic/prog8/cx16/` for reading. It is a
   reference copy, not the build path.
-- Place the module at `samples/KV-STORE/kvstore.p8` with a test program beside it. Samples in this
+- Place the module at `GPC-BASIC-TOOLS-SRC/KV-STORE/kvstore.p8` with a test program beside it. Samples in this
   repository build in place — see `docs/memory/samples-build-in-place.md` — and are never staged
-  into `drive/`.
+  into `source/drive/`.
 
 ## 8. Tests
 
-Mirror the BASL exercise program, `samples/GPB-MODS-TESTING/GPC-BASIC/KV.EXP.BL`, which already
+Mirror the BASL exercise program, `GPC-BASIC-TOOLS-SRC/GPB-MODS-TESTING/GPC-BASIC/KV.EXP.BL`, which already
 covers: init, put, get, rewrite, a 120-character value clamped to 119, delete then find, 63 puts and
 a refused 64th, an empty key refused, an empty value read back, save, wipe, load, get, a second
 `KV.INIT` keeping the store, a foreign version refused, a key cut to 8, `KV.AT` on a used slot, a

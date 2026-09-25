@@ -37,7 +37,7 @@ every int and string at 6 bytes is what pushes GPBMODS to 4,322. Sizing correctl
 near 2,900, under the wall with no source change at all.
 
 It also invalidates the byte columns in [[int16-conversion-planned]] and in
-`samples/GPB-MODS-TESTING/INT16-HANDOFF.md`: `source/gpc/int16scan.py` models `%` as 2 bytes, which
+`GPC-BASIC-TOOLS-SRC/GPB-MODS-TESTING/INT16-HANDOFF.md`: `source/gpc/int16scan.py` models `%` as 2 bytes, which
 is what the code intends but not what it does. The conversion is still worth doing -- it just pays
 nothing until this is fixed.
 

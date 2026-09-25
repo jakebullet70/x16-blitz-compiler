@@ -25,7 +25,7 @@ turns an empty string into `CHR$(0)` — a one-byte string that looks empty in a
 and is not. Guard it: `IF LEN(IN$) = 0 THEN RETURN` before the loop.
 
 **Found 2026-08-31, and only because a byte-for-byte comparison ran.** `DOC.TOPETSCII`
-in `samples/edit/STORE.BASL` wrote every blank line of a document as a stray `$00`;
+in `GPC-BASIC-TOOLS-SRC/edit/STORE.BASL` wrote every blank line of a document as a stray `$00`;
 the file was 13 bytes long for 13 blank lines and looked completely normal on screen and
 in a text editor. Nothing short of comparing the saved file against the original would
 have caught it — the self-check did not, because it never saves.

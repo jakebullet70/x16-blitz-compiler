@@ -2,11 +2,11 @@
 setlocal
 
 rem ---------------------------------------------------------------------------
-rem  Launch x16emu with the drive/ directory as its drive, so LOAD "GPC.PRG"
+rem  Launch x16emu with the source/drive/ directory as its drive, so LOAD "GPC.PRG"
 rem  and the rest just work. This .bat lives in USER-RUNS, under the project root; the programs
-rem  live in drive/ (the shipping release), and the emulator in bin/x16emu/.
+rem  live in source/drive/ (the shipping release), and the emulator in bin/x16emu/.
 rem
-rem      x16emu.bat                boot to BASIC in drive/
+rem      x16emu.bat                boot to BASIC in source/drive/
 rem      x16emu.bat GPC.PRG        load the compiler and RUN it
 rem      x16emu.bat OBJECT.PRG     run a compiled program
 rem
@@ -20,7 +20,7 @@ rem ---------------------------------------------------------------------------
 
 for %%I in ("%~dp0..") do set "ROOT=%%~fI\"
 set "ROOT=%ROOT:~0,-1%"
-set "DRIVE=%ROOT%\drive"
+set "DRIVE=%ROOT%source\drive"
 set "X16EMU=%ROOT%\bin\x16emu\x16emu.exe"
 set "ROM=%ROOT%\bin\x16emu\rom.bin"
 

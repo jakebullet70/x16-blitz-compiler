@@ -14,7 +14,7 @@ So a change to anything under **`source/compiler/source/**`** — every command 
 timestamp, and **does not contain the change**.
 
 **Use `make libs` from the repo root.** It runs `make -C source`, which rebuilds every library
-including `compiler.library`, then the application, and copies `GPC.BIN` to `drive/` as well.
+including `compiler.library`, then the application, and copies `GPC.BIN` to `source/drive/` as well.
 
 ## What it looks like when it bites
 
@@ -37,6 +37,6 @@ question first and a code question second.
 application make *does* pick it up. `gpbank.asm` lives in `source/compiler/source/commands/` and does
 not. A change touching both partly lands, which is worse than not landing at all.
 
-Related: [[baseline-compiler-is-the-application-copy]] (the neighbouring trap — `drive/GPC.BIN`
+Related: [[baseline-compiler-is-the-application-copy]] (the neighbouring trap — `source/drive/GPC.BIN`
 lagging `source/application/GPC.BIN`), [[build-toolchain-location]], [[headless-basl-build-recipe]],
 [[measure-before-changing-code]].

@@ -3,7 +3,7 @@
 Everything here is a plain command you type yourself. No AI, no IDE, no hidden steps.
 
 Three tools, three commands, about a minute. If you only want to *use* the compiler, you don't need
-any of this — grab the contents of `drive/` and read the [README](../README.md).
+any of this — grab the contents of `source/drive/` and read the [README](../README.md).
 
 ---
 
@@ -69,7 +69,7 @@ PYTHON = /usr/local/bin/python3.12
 
 ```sh
 ./release.sh                    # full build, then package release/gpc-release-<n>.zip
-./release.sh zip                # package the CURRENT drive/ build without rebuilding
+./release.sh zip                # package the CURRENT source/drive/ build without rebuilding
 ```
 
 **Use this to cut a release.** Doing the steps by hand is easy to get half-right: the trap is
@@ -81,25 +81,25 @@ the steps in the order that avoids it, and refuses to package if any required fi
 ### The steps, if you want them one at a time
 
 ```sh
-make libs                       # the five bin/*.library files + drive/GPC.BIN (engine)
+make libs                       # the five bin/*.library files + source/drive/GPC.BIN (engine)
                                 # NB: this BUMPS source/application/buildnum.txt
-make release                    # stage the engine, GPC.INPUT and the samples into drive/
-make -C source/runtime gpc-rt   # the shared runtime, drive/GPC.RT.<build>.BIN
-make -C source/gpc release      # GPC.PRG in drive/, GPC.ERR in samples/GPC.ERR/: both
+make release                    # stage the engine, GPC.INPUT and the samples into source/drive/
+make -C source/runtime gpc-rt   # the shared runtime, source/drive/GPC.RT.<build>.BIN
+make -C source/gpc release      # GPC.PRG in source/drive/, GPC.ERR in GPC-BASIC-TOOLS-SRC/GPC.ERR/: both
                                 # tokenised, then compiled SHARED. Builds gpc-rt itself,
                                 # so the line above is optional
 ```
 
-`drive/` **is** the build: it is what you copy to an SD card or point the emulator at. The zip
+`source/drive/` **is** the build: it is what you copy to an SD card or point the emulator at. The zip
 `release.sh` writes is smaller: the files needed to run, the two `.BASL` sources under `SRC/`,
-and the docs. Three of the shipped files come from `samples/` instead, because they build in
-their own folders: `GPC.ERR.PRG`, `GPC.ERR.OVL` and the help program. The rest of `samples/`
+and the docs. Three of the shipped files come from `GPC-BASIC-TOOLS-SRC/` instead, because they build in
+their own folders: `GPC.ERR.PRG`, `GPC.ERR.OVL` and the help program. The rest of `GPC-BASIC-TOOLS-SRC/`
 and the scratch files stay behind.
 
 Two of those targets need the **emulator** rather than the assembler, and the front end needs it
 **twice**: `GPC.BASL` is written in GP.BASIC, so x16emu boots once for BASLOAD to tokenise it into
 `GPC.SRC.PRG` and again for `GPC.BIN` to compile that into `GPC.PRG`. `GPC.ERR` takes the same
-two steps on a different drive: it tokenises and compiles in `samples/GPC.ERR/`, which holds its
+two steps on a different drive: it tokenises and compiles in `GPC-BASIC-TOOLS-SRC/GPC.ERR/`, which holds its
 own `GPC-BASIC/` modules, `GPC.BIN` and runtimes. Neither needs Java or prog8.
 
 `GPC.SRC.PRG` is compile-only — nothing in BASIC sits behind the GP tokens, so the ROM can neither
@@ -107,13 +107,13 @@ own `GPC-BASIC/` modules, `GPC.BIN` and runtimes. Neither needs Java or prog8.
 `GPB.RT.<n>.BIN` (the runtime **with** the GP handlers) beside it or it prints `?RTB` and the build number, such as `?RTB126`, and stops.
 
 `make -C source/gpc` on its own builds `GPC.PRG` and the runtime it needs. The `release` target
-also builds `GPC.ERR` in `samples/GPC.ERR/`, where the compile writes `GPC.ERR.OVL` beside the
+also builds `GPC.ERR` in `GPC-BASIC-TOOLS-SRC/GPC.ERR/`, where the compile writes `GPC.ERR.OVL` beside the
 object. The helper does not run without that overlay.
 
 Then try it:
 
 ```sh
-USER-RUNSemu.bat GPC.PRG    # Windows; the launcher points the emulator at drive/
+USER-RUNSemu.bat GPC.PRG    # Windows; the launcher points the emulator at source/drive/
 ```
 
 ### What lands where
@@ -121,11 +121,11 @@ USER-RUNSemu.bat GPC.PRG    # Windows; the launcher points the emulator at driv
 | Artifact | Built by | Notes |
 |---|---|---|
 | `bin/*.library` | `make libs` | assembler libraries, not distributables |
-| `drive/GPC.BIN` | `make libs` | the compiler engine; reads `GPC.INPUT` |
-| `drive/GPC.IMG.<n>.BIN` | `make libs` | the runtime the engine streams into every self-contained object — **it cannot compile without this** |
-| `drive/GPC.SRC.PRG` | `make -C source/gpc` | BASLOAD's output — compiler **input**, cannot be run |
-| `drive/GPC.PRG` | `make -C source/gpc` | the front end you actually launch, compiled from the above |
-| `drive/GPC.RT.<n>.BIN` | `make -C source/runtime gpc-rt` | shared runtime, SHARED mode only |
+| `source/drive/GPC.BIN` | `make libs` | the compiler engine; reads `GPC.INPUT` |
+| `source/drive/GPC.IMG.<n>.BIN` | `make libs` | the runtime the engine streams into every self-contained object — **it cannot compile without this** |
+| `source/drive/GPC.SRC.PRG` | `make -C source/gpc` | BASLOAD's output — compiler **input**, cannot be run |
+| `source/drive/GPC.PRG` | `make -C source/gpc` | the front end you actually launch, compiled from the above |
+| `source/drive/GPC.RT.<n>.BIN` | `make -C source/runtime gpc-rt` | shared runtime, SHARED mode only |
 
 The engine build number in `source/application/buildnum.txt` **auto-increments on every
 `make libs`**. That is expected; it is a daily-work counter, not a release version, and it is what

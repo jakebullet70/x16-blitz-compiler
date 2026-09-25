@@ -6,7 +6,7 @@ metadata:
   type: project
 ---
 
-Found 2026-09-05 building `samples/color-test`. A save routine reached from inside the program's
+Found 2026-09-05 building `GPC-BASIC-TOOLS-SRC/color-test`. A save routine reached from inside the program's
 `GP.DO` key loop **writes its file completely and correctly**, then the program stops with
 
     INPUT/OUTPUT ERROR @ $005B

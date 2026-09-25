@@ -26,7 +26,7 @@ is silent and arrives far from the cause.
 startup block, and each is checked -- `IF BANKMGR.OK = 0 THEN` a message, because a claim can only
 fail if two owners named the same number, which is a bug worth naming rather than surviving.
 
-**Status 2026-09-08:** the two programs in `samples/GPB-MODS-TESTING/` already do this -- GPBMODS
+**Status 2026-09-08:** the two programs in `GPC-BASIC-TOOLS-SRC/GPB-MODS-TESTING/` already do this -- GPBMODS
 and GPBFILES both claim `SHIM.GUIBANK` and `GM.TEXTBANK`. The rule is written up in the
 `GP.BANKEDSTR` section of `GPC-BASIC/GP-BASIC.md`. **It is the OTHER programs that still have to
 be checked**, as each is converted to the new runtime: anything that gains a banked region or

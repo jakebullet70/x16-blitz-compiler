@@ -199,7 +199,7 @@ the figure into a `.varspace` operand, opcode `$E7`, at PRG offset 513:
 
 ```
 python source/gpc/samplesbuild.py GPBMODS
-python -c "b=open('drive/GPBMODS.PRG','rb').read(); print(b[513], b[514] | b[515]<<8)"
+python -c "b=open('source/drive/GPBMODS.PRG','rb').read(); print(b[513], b[514] | b[515]<<8)"
 ```
 
 The first number must be `231` (`$E7`, confirming the operand is where it is expected). The
@@ -238,7 +238,7 @@ variable's value appearing in another, which a clean compile will not reveal.
 
 ## 7. What to update when it is done
 
-- `source/gpc/int16scan.py` and `samples/GPB-MODS-TESTING/INT16-HANDOFF.md` model `%` as two
+- `source/gpc/int16scan.py` and `GPC-BASIC-TOOLS-SRC/GPB-MODS-TESTING/INT16-HANDOFF.md` model `%` as two
   bytes. That becomes true for the first time, so their byte columns start meaning something.
 - The memory note `every-scalar-allocated-six-bytes.md` — mark it fixed with the measured
   before and after figures.

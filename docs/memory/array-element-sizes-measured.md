@@ -6,7 +6,7 @@ metadata:
   type: reference
 ---
 
-**Measured 2026-09-07 with `GP.ARRPTR` on adjacent arrays** (`scratch/stashvram/ARRSZ.BASL`):
+**Measured 2026-09-07 with `GP.ARRPTR` on adjacent arrays** (`source/scratch/stashvram/ARRSZ.BASL`):
 
 | declaration | bytes an element | 10 elements + header |
 |---|---:|---:|
@@ -35,13 +35,13 @@ it has**, and the read runs up to 1,364 bytes off the end into whatever the work
 Latent rather than fired: the test directories were short enough never to reach 682 bytes. Fixed in
 the header 2026-09-07 to `DIM FD.BUF%(1022)` / `1023 * 2`.
 
-`drive/FILEDIRT.BASL` still sets `FILE.DIR.CAP = 2046` against `DIM FD.BUF%(340)` — another
+`source/drive/FILEDIRT.BASL` still sets `FILE.DIR.CAP = 2046` against `DIM FD.BUF%(340)` — another
 agent's file, not edited.
 
 **Where this bites generally:** any `GP.ARRPTR` buffer handed to assembly or to `memory_copy`.
 The stride is yours to add and the compiler will not check it, so a wrong element size is a silent
 overrun of the workspace, which is where every other variable lives. It cost a full debug cycle on
-`scratch/stashvram/SVGCT.BASL`, where a 600-byte write into a 522-byte array corrupted the array
+`source/scratch/stashvram/SVGCT.BASL`, where a 600-byte write into a 522-byte array corrupted the array
 holding the test's own expectations and the symptom was a length reading back as `1.14529721E+31`.
 
 See [[measure-before-changing-code]] and [[blitz-arrays-share-the-workspace]].

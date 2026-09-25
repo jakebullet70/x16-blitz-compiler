@@ -17,7 +17,7 @@ is in how FILEDIR pulls the listing in.
 LISTS and DIR work is finished. Do not start it mid-task.
 
 Where to start when it is time:
-- `samples/GPB-MODS-TESTING/GPC-BASIC/FILEDIR.INC.BL` -- the read loop behind
+- `GPC-BASIC-TOOLS-SRC/GPB-MODS-TESTING/GPC-BASIC/FILEDIR.INC.BL` -- the read loop behind
   `FILE.DIR.OPEN` / `FILE.DIR.NEXT`, which `FILEPICK.SCAN` drives once a file.
 - The precedent is already measured: [[gpc-editor-loader-linput-and-blob]] found
   LINPUT# **10.5x** over a GET# byte loop, and [[binput-caps-at-255-bytes]] notes

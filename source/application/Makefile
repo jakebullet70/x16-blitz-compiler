@@ -106,8 +106,8 @@ release:  build
 	#		runtime beside it); HELP-TXT holds the index and the topics, and the viewer
 	#		opens both as //HELP-TXT/:NAME -- so the folder has to arrive as a folder.
 	#
-	$(CCOPY) $(ROOTDIR)samples$(S)GPC-HELP$(S)GPB.HELP.PRG $(RELEASEDIR)
-	$(CCOPY) -r $(ROOTDIR)samples$(S)GPC-HELP$(S)HELP-TXT $(RELEASEDIR)
+	$(CCOPY) $(ROOTDIR)GPC-BASIC-TOOLS-SRC$(S)GPC-HELP$(S)GPB.HELP.PRG $(RELEASEDIR)
+	$(CCOPY) -r $(ROOTDIR)GPC-BASIC-TOOLS-SRC$(S)GPC-HELP$(S)HELP-TXT $(RELEASEDIR)
 	#
 	#		There is deliberately no CHANGES.txt here. The original author's was deleted ("Del
 	#		old files from previous build") and git history is the changelog -- copying one in
@@ -116,8 +116,8 @@ release:  build
 	#
 	#		No archive is bundled. blitz.zip -- a git-tracked binary rebuilt on every release --
 	#		has been dropped: nothing in the tree ever consumed it, and its "*" glob swept
-	#		whatever else lived in drive/ (e.g. the XFMGR launcher) into the download. The
-	#		release is simply the contents of drive/.
+	#		whatever else lived in source/drive/ (e.g. the XFMGR launcher) into the download. The
+	#		release is simply the contents of source/drive/.
 	
 run: build	
 	$(CDEL) OBJECT.PRG

@@ -42,24 +42,24 @@ the index of what comes next; this file is the state of the tree and how to work
 - **Before that:** the `GP.FN` string fix (`c55831e`), and `GP.ASM` reading the symbol file once a
   compile into RAM banks 13 and 14 (`798cfa7`, GPBMODS 317 s to 19.8 s). A slow GPBMODS or RGM
   compile now has a new cause; do not re-profile the symbol lookup first.
-- **GPC.BIN copies:** `source/application/` and `drive/` hold the current build, 30,345 B, MD5
-  `bf14df40…`. `samples/GPC-HELP/` still holds the guard build, 29,252 B, MD5 `2647c404…`. The runtime files built with it on 13 September (`GPC.RT.122.BIN`,
-  `GPB.RT.122.BIN` and `GPC.IMG.122.BIN`) are in `drive/` and `samples/GPC-HELP/`.
-  `samples/GPC-HELP/GPB.HELP.PRG` has not been rebuilt since. The copies under `scratch/release/` and
-  `scratch/` are older, and both places are ignored.
+- **GPC.BIN copies:** `source/application/` and `source/drive/` hold the current build, 30,345 B, MD5
+  `bf14df40…`. `GPC-BASIC-TOOLS-SRC/GPC-HELP/` still holds the guard build, 29,252 B, MD5 `2647c404…`. The runtime files built with it on 13 September (`GPC.RT.122.BIN`,
+  `GPB.RT.122.BIN` and `GPC.IMG.122.BIN`) are in `source/drive/` and `GPC-BASIC-TOOLS-SRC/GPC-HELP/`.
+  `GPC-BASIC-TOOLS-SRC/GPC-HELP/GPB.HELP.PRG` has not been rebuilt since. The copies under `release/TMP/` and
+  `source/scratch/` are older, and both places are ignored.
 - **Test references:** `gpctest.py full` passed on 14 September with the banked `GP.ASM` build in
   152 s, all 34 references matching. The two `#SYMFILE` messages changed after it, text only.
   `banktest3.py` last passed, ALL PASS in 190 s, on the GOTO guard build.
-  The GPBMODS and GUIFRMT inputs in `scratch/dcref/inputs/` are the merged sources, and their
+  The GPBMODS and GUIFRMT inputs in `source/scratch/dcref/inputs/` are the merged sources, and their
   references were rebuilt with `acf427f1…`. The pre-merge inputs are kept in
-  `scratch/dcref/inputs-premerge/`. The RGL, RGN and RGM inputs were refreshed for the guard and their
-  references rebuilt with `acf427f1…`; the previous ones are in `scratch/dcref/inputs-preguard/`. The
+  `source/scratch/dcref/inputs-premerge/`. The RGL, RGN and RGM inputs were refreshed for the guard and their
+  references rebuilt with `acf427f1…`; the previous ones are in `source/scratch/dcref/inputs-preguard/`. The
   other references are older and still hold. The GPBF, GPBH, GPBJ, GPBK, GPBL, GPBR, RGX and XBASE
-  files in `scratch/dcref/inputs/` are pre-merge leftovers and not in `dcref.PROGRAMS`.
-- **GUIFRMT** includes bare module names, so it builds in `scratch/guifrmt/`, a drive holding the
+  files in `source/scratch/dcref/inputs/` are pre-merge leftovers and not in `dcref.PROGRAMS`.
+- **GUIFRMT** includes bare module names, so it builds in `source/scratch/guifrmt/`, a drive holding the
   flattened library.
 - **CHAINTST and CHAINTST-E left the test set** when runtime 121 removed the variable carry across a
-  LOAD chain. The `CHAINTST*` and `XBASE` directories under `scratch/gpctest/ref/` are unused.
+  LOAD chain. The `CHAINTST*` and `XBASE` directories under `source/scratch/gpctest/ref/` are unused.
 
 ## 2. Open compiler items
 
@@ -89,7 +89,7 @@ Toolchain is off-PATH. In the Bash tool:
 |---|---|---|
 | anything under `source/application/source/` | `make -C source/application build` | `source/application/GPC.BIN` |
 | `source/compiler/` (compiler.library) | `make libs` at the root, then the application build | `bin/compiler.library` |
-| the runtime, `source/runtime/` or `source/gp-runtime/` | `make -C source/runtime gpc-rt` as well as `make libs` | `drive/GPB.RT.nnn.BIN` and `drive/GPC.RT.nnn.BIN` |
+| the runtime, `source/runtime/` or `source/gp-runtime/` | `make -C source/runtime gpc-rt` as well as `make libs` | `source/drive/GPB.RT.nnn.BIN` and `source/drive/GPC.RT.nnn.BIN` |
 
 - The application build does **not** rebuild `compiler.library`. `make libs` does not install the
   runtime.
@@ -108,7 +108,7 @@ The runner is `source/unit-tests/gpctest.py`. The plan and the measured times ar
     gpctest.py full   [--gpc FILE] [--only A,B]
 
 - The set is `dcref.PROGRAMS`, 17 programs, plus the dead-code tests DC1–DC12.
-- `ref` compiles every program with the option off and on, into `scratch/gpctest/ref/`. Run it with
+- `ref` compiles every program with the option off and on, into `source/scratch/gpctest/ref/`. Run it with
   the compiler from before the change. The current references are good for the current build.
 - `quick` and `full` check each compile against the references: the object, map, every `.Bnn` and
   the OK line; the removed-line list `D.NAME`; and the stripped-source identity (the option-on
@@ -125,23 +125,23 @@ The runner is `source/unit-tests/gpctest.py`. The plan and the measured times ar
   file. Only programs built from the GPB-MODS-TESTING library map.
 - `GPC.INPUT` has five lines: source PRG, object, map, `SHARED` or blank, and the removed-line
   file name or blank. A four-line engine stops at line four.
-- Each compile runs in its own drive under `scratch/`. `drive/` is shared with other sessions.
+- Each compile runs in its own drive under `source/scratch/`. `source/drive/` is shared with other sessions.
 - The banner is the finish line, not the file size (`docs/memory/compile-shared-timeout-fakes-success.md`).
 - Samples build in place: `build_basl.py --drive DIR` and `compile_shared.py --drive DIR`.
-  Do not stage a sample into `drive/`.
-- `dcref.snapshot()` copies `drive/NAME.SRC.PRG` and `.SYM` into `scratch/dcref/inputs/` only when
+  Do not stage a sample into `source/drive/`.
+- `dcref.snapshot()` copies `source/drive/NAME.SRC.PRG` and `.SYM` into `source/scratch/dcref/inputs/` only when
   they are missing, so an input stays frozen. After a program changes, replace its two input files
   by hand and run `gpctest.py ref --only NAME`.
 - **Banked regions:** `source/unit-tests/banktest3.py` runs each marked program against its unmarked
-  control on `scratch/banktest3` and compares the output, `BANKY` included. The `.bgosub` harness was a
-  scratchpad script and is not in the repo; its programs `BGA` to `BGD` are in `scratch/bgosub/`.
+  control on `source/scratch/banktest3` and compares the output, `BANKY` included. The `.bgosub` harness was a
+  scratchpad script and is not in the repo; its programs `BGA` to `BGD` are in `source/scratch/bgosub/`.
   The GOTO refusals are in `banktest3.py`: `BANKH` (GOTO), `BNKGA` (`IF .. GOTO`), `BNKGB`
   (`ON .. GOTO`), `BNKGE` (`IF .. THEN <line>`) and `BGD` (region to region), with the pair
   `BNKGC`/`BNKGD` for a GOTO inside a region and out of one. `BANKI` is no longer used. `BGA`/`BGB`
-  and `BGC` are copied in from `scratch/bgosub/`, so `banktest3` alone covers the banked calls. A
+  and `BGC` are copied in from `source/scratch/bgosub/`, so `banktest3` alone covers the banked calls. A
   refused compile ends its emulator run on the error line; it used to wait out the 90 s timeout.
 - `build_basl.py --drive DIR BASL PRG` and `compile_shared.py --drive DIR SRC OBJ MAP` build in the
-  given drive. `build_basl.py`'s log still prints `drive/`.
+  given drive. `build_basl.py`'s log still prints `source/drive/`.
 
 ## 5. Removed lines as source file and line — worked out, not in the repo
 
@@ -248,8 +248,8 @@ the short variable names, so use it only as a fallback.
 - Kill `x16emu` by PID only, and only an emulator you started.
 - **Grep before reading these, never read them whole:** `TODO.md`, `GPBMODS.BASL`,
   `GP-BASIC.md`, `GP-BASIC.GLOBALS.md` and the `_library.asm` files.
-- **Samples build in place.** Never stage a sample's sources or modules into `drive/`.
-- **Library modules are edited in `samples/GPB-MODS-TESTING/GPC-BASIC/` first**, then copied whole
+- **Samples build in place.** Never stage a sample's sources or modules into `source/drive/`.
+- **Library modules are edited in `GPC-BASIC-TOOLS-SRC/GPB-MODS-TESTING/GPC-BASIC/` first**, then copied whole
   to root `GPC-BASIC/`.
 - **No work on XBASE.** It will be dropped.
 - **Compact after every step.**

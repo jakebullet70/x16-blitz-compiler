@@ -29,7 +29,7 @@ whole page, and **every embedded program grows 256 bytes**, with no warning and 
 
 **SHARED is a different layout** (`make -C source/runtime gpc-rt`). The GP block runs from
 `$6F00` to `$7700`, and the core from `$7700` up to the `$9F00` guard. On 2026-09-15 the core had
-**379 B** free (`drive/GPB.RT.123.BIN` ends at `$9D85`) and the GP block **633 B** (the zero run
+**379 B** free (`source/drive/GPB.RT.123.BIN` ends at `$9D85`) and the GP block **633 B** (the zero run
 before the `GB24` magic at `$76FC`). Build 122 had 542 B and 633 B. The tests compile SHARED only,
 so no test notices an embedded page move.
 

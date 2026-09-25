@@ -7,7 +7,7 @@
 #       int16scan.py --check [PROGRAM ...]      a name used both plain and with %; exit 1 if new
 #       int16scan.py --spread PROGRAM           where each module's candidate names appear
 #
-#   The variable list is BASLOAD's: drive/<PROGRAM>.SRC.SYM from the last build. The SYM
+#   The variable list is BASLOAD's: source/drive/<PROGRAM>.SRC.SYM from the last build. The SYM
 #   drops % and $, so each name is typed from the sources the SYM names. A table is as
 #   current as that build.
 #
@@ -43,15 +43,15 @@ import os, re, sys, collections
 ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
 
 PROGRAMS = [
-    dict(name="GPBMODS",  sym="drive/GPBMODS.SRC.SYM",  prg="drive/GPBMODS.PRG",
-         src=["samples/GPB-MODS-TESTING", "samples/GPB-MODS-TESTING/GPC-BASIC"]),
-    dict(name="XBASE",    sym="drive/XBASE.SRC.SYM",    prg="drive/XBASE.PRG",
-         src=["samples/XBASE", "samples/XBASE/GPC-BASIC"]),
-    dict(name="GPB.HELP", sym="drive/GPB.HELP.SRC.SYM", prg="drive/GPB.HELP.PRG",
-         src=["samples/GPC-HELP", "samples/GPC-HELP/GPC-BASIC"]),
-#   EDIT builds in place, so its SYM and object stay in the sample folder rather than drive/.
-    dict(name="EDIT",     sym="samples/edit/EDIT.SRC.SYM",  prg="samples/edit/EDIT.PRG",
-         src=["samples/edit", "samples/edit/GPC-BASIC"]),
+    dict(name="GPBMODS",  sym="source/drive/GPBMODS.SRC.SYM",  prg="source/drive/GPBMODS.PRG",
+         src=["GPC-BASIC-TOOLS-SRC/GPB-MODS-TESTING", "GPC-BASIC-TOOLS-SRC/GPB-MODS-TESTING/GPC-BASIC"]),
+    dict(name="XBASE",    sym="source/drive/XBASE.SRC.SYM",    prg="source/drive/XBASE.PRG",
+         src=["GPC-BASIC-TOOLS-SRC/XBASE", "GPC-BASIC-TOOLS-SRC/XBASE/GPC-BASIC"]),
+    dict(name="GPB.HELP", sym="source/drive/GPB.HELP.SRC.SYM", prg="source/drive/GPB.HELP.PRG",
+         src=["GPC-BASIC-TOOLS-SRC/GPC-HELP", "GPC-BASIC-TOOLS-SRC/GPC-HELP/GPC-BASIC"]),
+#   EDIT builds in place, so its SYM and object stay in the sample folder rather than source/drive/.
+    dict(name="EDIT",     sym="GPC-BASIC-TOOLS-SRC/edit/EDIT.SRC.SYM",  prg="GPC-BASIC-TOOLS-SRC/edit/EDIT.PRG",
+         src=["GPC-BASIC-TOOLS-SRC/edit", "GPC-BASIC-TOOLS-SRC/edit/GPC-BASIC"]),
 ]
 
 #   Plain and % on one name before any conversion. FILEDIR's blob writes FILE.DIR.SLOW% and
@@ -59,8 +59,8 @@ PROGRAMS = [
 KNOWN_PAIRS = {"FILE.DIR.SLOW"}
 
 #   --spread reads these. Generated files are left out: they follow their masters.
-EDIT_ROOTS = ["GPC-BASIC", "samples/GPB-MODS-TESTING", "samples/GPC-HELP", "samples/XBASE",
-              "samples/edit", "samples/color-test", "samples/cruncher", "docs"]
+EDIT_ROOTS = ["GPC-BASIC", "GPC-BASIC-TOOLS-SRC/GPB-MODS-TESTING", "GPC-BASIC-TOOLS-SRC/GPC-HELP", "GPC-BASIC-TOOLS-SRC/XBASE",
+              "GPC-BASIC-TOOLS-SRC/edit", "GPC-BASIC-TOOLS-SRC/color-test", "GPC-BASIC-TOOLS-SRC/cruncher", "docs"]
 SKIP_DIRS = {"HELP-TXT", "memory", "attic", "spike"}
 SKIP_FILES = {"GPC-HELP.md", "GPC-HELP.WIN.md", "GPC-HELP-TESTING.md"}
 

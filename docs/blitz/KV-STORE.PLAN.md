@@ -180,8 +180,8 @@ Probes, before the module:
 
 ## 6. Tests
 
-T1 and T3 are `KV.EXP.BL`, beside `KV.INC.BL` in `samples/GPB-MODS-TESTING/GPC-BASIC/`. The other
-programs live in `samples/KV-STORE/`. All build in place, and every program ends with `END`.
+T1 and T3 are `KV.EXP.BL`, beside `KV.INC.BL` in `GPC-BASIC-TOOLS-SRC/GPB-MODS-TESTING/GPC-BASIC/`. The other
+programs live in `GPC-BASIC-TOOLS-SRC/KV-STORE/`. All build in place, and every program ends with `END`.
 
 | test | build | checks |
 |---|---|---|
@@ -195,7 +195,7 @@ programs live in `samples/KV-STORE/`. All build in place, and every program ends
 ## 7. Steps
 
 1. Review section 1.
-2. Write `KV.INC.BL` in `samples/GPB-MODS-TESTING/GPC-BASIC/`.
+2. Write `KV.INC.BL` in `GPC-BASIC-TOOLS-SRC/GPB-MODS-TESTING/GPC-BASIC/`.
 3. T1 and T3.
 4. T2 and T4.
 5. T5 and T6.

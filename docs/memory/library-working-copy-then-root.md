@@ -1,6 +1,6 @@
 ---
 name: library-working-copy-then-root
-description: Edit GPC-BASIC modules in samples/GPB-MODS-TESTING/GPC-BASIC/ and copy to root only when they pass — never edit the root copy directly
+description: Edit GPC-BASIC modules in GPC-BASIC-TOOLS-SRC/GPB-MODS-TESTING/GPC-BASIC/ and copy to root only when they pass — never edit the root copy directly
 metadata: 
   node_type: memory
   type: feedback
@@ -8,14 +8,14 @@ metadata:
   modified: 2026-09-08T00:00:00.000Z
 ---
 
-**A `GPC-BASIC` module is edited in `samples/GPB-MODS-TESTING/GPC-BASIC/`, proved there, and copied
+**A `GPC-BASIC` module is edited in `GPC-BASIC-TOOLS-SRC/GPB-MODS-TESTING/GPC-BASIC/`, proved there, and copied
 whole to root `GPC-BASIC/` only when it passes.** Never edit the root copy directly, and never merge
 by hand — copy the whole file.
 
-**Why:** root `GPC-BASIC/` is the release copy that `samples/GPC-HELP` and `samples/edit` build
-against. Drift between copies is already real and unmarked (`samples/edit/GPC-BASIC/GUI.INC.BL` is
+**Why:** root `GPC-BASIC/` is the release copy that `GPC-BASIC-TOOLS-SRC/GPC-HELP` and `GPC-BASIC-TOOLS-SRC/edit` build
+against. Drift between copies is already real and unmarked (`GPC-BASIC-TOOLS-SRC/edit/GPC-BASIC/GUI.INC.BL` is
 23,339 bytes against the root's 25,663), which is the reason the direction is written down at all —
-`samples/GPB-MODS-TESTING/PLAN.md` §1.
+`GPC-BASIC-TOOLS-SRC/GPB-MODS-TESTING/PLAN.md` §1.
 
 **How to apply:** when a fix touches a shipped module, make it in the GPB-MODS-TESTING copy and test
 it there. Do NOT ask whether to put it in the root instead, and do not take "recompiling is not an
@@ -24,7 +24,7 @@ breaking dependent samples matters (it does not: sole user, see
 [[no-backward-compatibility-needed]]), not about where the edit happens.
 
 **THE DRIFT RUNS BOTH WAYS, so "take the mods copy" is not a safe shortcut.** Diffed on 2026-09-08
-while wiring `samples/XBASE` to the banked library. `STRINGS` and `APPSYS` are identical and `KB`
+while wiring `GPC-BASIC-TOOLS-SRC/XBASE` to the banked library. `STRINGS` and `APPSYS` are identical and `KB`
 differs only in comments, but `STASH` is **newer in GPB-MODS-TESTING** (it grew a slot allocator,
 `STASH.SLOT` / `STASH.ORG` / `STASH.NEXT`, defaulting to slot 0 so old callers are unaffected) while
 `GPB.INC.BL` is **newer in root** — root is the only copy carrying the `#TOKEN` lines for

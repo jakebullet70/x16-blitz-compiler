@@ -10,7 +10,7 @@ and the choice is about how often it scrolls, not about speed alone.
 
 **1. STASH, moved.** `STASH.RESTORE` with `STASH.MOVE = 1` pastes the saved rectangle somewhere
 else, so save rows N+1..M and restore at N. Zero new code, and **anything outside the rectangle
-does not move** — which is how `samples/GPC-HELP` keeps its title and status bars still while the
+does not move** — which is how `GPC-BASIC-TOOLS-SRC/GPC-HELP` keeps its title and status bars still while the
 text slides. Two passes through banked RAM, so twice the traffic of (2), but the bytes move in
 assembly. A bank is 8,192 B and a cell is 2, and `STASH` refuses `W > 128`. Use a bank nothing else
 owns: `GUI.BANK` holds the cells under an open dialog.
@@ -25,7 +25,7 @@ rather than assuming the mode.
 **3. Hardware `VSCROLL`, masked.** Moves a whole LAYER, never a rectangle — but **attribute 0 is
 transparent in text mode**, so layer 1 with fg and bg both 0 is a hole onto layer 0. Put the
 scrolling content on layer 0 and mask the rest with layer 1. Two register writes and one newly
-exposed row: the only genuinely free option, and what `samples/edit` does (`ED.LAYERS`,
+exposed row: the only genuinely free option, and what `GPC-BASIC-TOOLS-SRC/edit` does (`ED.LAYERS`,
 `ED.HW.SCROLL.DOWN`). Costs you layer 0 program-wide, and the content must be laid out at map
 coordinates, so it pays for one big pane and not several small ones.
 

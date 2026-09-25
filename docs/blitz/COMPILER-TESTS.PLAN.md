@@ -20,7 +20,7 @@ compile varies by up to 40% between runs.
 | RGX, GPBJ, GPBH, GPBK, GPBL, GPBF, GPBR | 3,335 | 1,334 (RGX, GPBF, GPBR) | 300 (RGX) |
 | DC1–DC12 | — | — | 199 |
 
-Sources: `scratch/dcref-chk-off6.log`, `scratch/dcref-chk-dead4.log`, `scratch/dcstrip6.log`.
+Sources: `source/scratch/dcref-chk-off6.log`, `source/scratch/dcref-chk-dead4.log`, `source/scratch/dcstrip6.log`.
 
 - GPBJ, GPBH, GPBK, GPBL, GPBF and GPBR are `GPBMODS.BASL` cut off at 2,085 to 3,425 lines. RGM
   and RGX are GPBMODS's library with a stub main. All eight write the same B04–B08 overlay sizes.
@@ -31,7 +31,7 @@ Sources: `scratch/dcref-chk-off6.log`, `scratch/dcref-chk-dead4.log`, `scratch/d
 ## 2. The test set
 
 - `dcref.PROGRAMS` loses RGX, GPBJ, GPBH, GPBK, GPBL, GPBF, GPBR, XBASE, CHAINTST and CHAINTST-E.
-  Their sources in `drive/` and their inputs in `scratch/dcref/inputs/` stay on disk.
+  Their sources in `source/drive/` and their inputs in `source/scratch/dcref/inputs/` stay on disk.
 - CHAINTST tested the variable carry across a LOAD chain, which runtime 121 removed.
 - `dcstrip.SLOW` and `--all` are deleted. All four of their programs are gone.
 - 17 programs remain, plus DC1–DC12.
@@ -57,7 +57,7 @@ Measured on 13 September with `GPC.BIN` of 28,563 bytes, 7 workers, every check 
   of full's. Without it full is about 3,700 emulator-seconds; the wall does not move, because
   GPBMODS's one job sets it.
 - CHAINTST and CHAINTST-E left after these runs, so quick is now 50 jobs and full 54.
-- Logs: `scratch/gpctest-ref.log`, `scratch/gpctest-full.log`, `scratch/gpctest-quick.log`.
+- Logs: `source/scratch/gpctest-ref.log`, `source/scratch/gpctest-full.log`, `source/scratch/gpctest-quick.log`.
 
 ## 3. Three compiles a program
 
@@ -84,16 +84,16 @@ that calls `dcstrip.one`. A DC program compiles twice with the option on, once f
     gpctest.py quick  [--gpc FILE] [--only A,B]
     gpctest.py full   [--gpc FILE] [--only A,B]
 
-- `ref` runs compiles 1 and 2 for all 17 programs and writes `scratch/gpctest/ref/off/<tag>/` and
-  `scratch/gpctest/ref/on/<tag>/`. Run it with the compiler from before the change. The first use of
+- `ref` runs compiles 1 and 2 for all 17 programs and writes `source/scratch/gpctest/ref/off/<tag>/` and
+  `source/scratch/gpctest/ref/on/<tag>/`. Run it with the compiler from before the change. The first use of
   `quick` or `full` needs one `ref` run.
 - Every compile in a run shares one `ThreadPoolExecutor` of 7 workers.
 - Jobs go in slowest first: GPBMODS, RGM, GPB.HELP, GUIFRMT, then the rest, a program's on
   job before its off job, and the DC tests last.
 - Output is one line per check as it finishes, then `PASS` or `N FAILED` and the wall time. The
   exit code is 0 on `PASS`.
-- Drives: `scratch/gpctest/off/<tag>/`, `on/<tag>/` and `stripped/<tag>/`, with the stripped source in
-  `in-stripped/<tag>/`. DC tests keep `scratch/dctest/` and `scratch/dcstrip/`.
+- Drives: `source/scratch/gpctest/off/<tag>/`, `on/<tag>/` and `stripped/<tag>/`, with the stripped source in
+  `in-stripped/<tag>/`. DC tests keep `source/scratch/dctest/` and `source/scratch/dcstrip/`.
 - It imports `split`, `tag`, `outputs`, `snapshot` and `compile_one` from `dcref`; `strip`,
   `identity` and `one` from `dcstrip`; and `EXPECT` and `check` from `dctest`. `identity` is the
   comparison split out of `dcstrip.one`. The three scripts keep their command lines.
@@ -122,7 +122,7 @@ go to M3.
 for each pass, and seconds per include file, highest first.
 
 **M3. Fallback: bisect.** Split RGM's `#INCLUDE` list in halves. Tokenise and compile each half in
-its own `scratch/` drive. Output: seconds per module.
+its own `source/scratch/` drive. Output: seconds per module.
 
 **M4. Report.** List the slow files and line ranges, which pass the time falls in, and what those
 lines hold: `GP.ASM` blocks, `GP.BANKEDSTR` groups, label count, `$CE` tokens. Stop there.
@@ -174,7 +174,7 @@ Blocks that fall in one span share one row.
 
 Scripts: `source/unit-tests/gpcprobe.py` for M1 and `source/unit-tests/gpcspans.py` for M2.
 
-Logs: `scratch/gpcprobe-m1.log`, `scratch/gpcprobe-m2.log`, `scratch/gpcprobe/GPBMODS/probe.json`.
+Logs: `source/scratch/gpcprobe-m1.log`, `source/scratch/gpcprobe-m2.log`, `source/scratch/gpcprobe/GPBMODS/probe.json`.
 
 ### Fix, 13 September
 
@@ -196,8 +196,8 @@ names take 8,656 of the 16,384 bytes. `GPC.BIN` is 28,911 bytes, 348 more.
   full-tier check passes. The full tier had 60 jobs before and 58 after, since XBASE left it.
 - The fallback was forced with GPBMODS's symbol file padded to 87,220 bytes by 400 extra names.
   That compile takes 336 s (pass 1 173 s, pass 2 163 s) and its output is identical to `ref/off`.
-- Logs: `scratch/gpcfast/probe-fast.log`, `scratch/gpcfast/probe-big.log`, `scratch/gpctest-quick-fast.log`,
-  `scratch/gpctest-full-fast.log`.
+- Logs: `source/scratch/gpcfast/probe-fast.log`, `source/scratch/gpcfast/probe-big.log`, `source/scratch/gpctest-quick-fast.log`,
+  `source/scratch/gpctest-full-fast.log`.
 
 ## 6. Order of work
 

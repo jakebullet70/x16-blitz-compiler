@@ -19,7 +19,7 @@ hops, zero failures. The runtime came out 43 bytes smaller and `StorageEnd` fell
 - **Nothing else carries.** `ClearMemory` runs on every entry, so variables, the string heap and
   `stringHighMemory` all start fresh -- the same as a fresh `RUN` and the same as the interpreter.
   The `"GPCL"` signature `Command_LOAD` armed at `loadChainSig`, and the `StartRuntime` branch that
-  skipped the clear, are gone. `samples/shared-vars` demonstrated the old behaviour.
+  skipped the clear, are gone. `GPC-BASIC-TOOLS-SRC/shared-vars` demonstrated the old behaviour.
 - **Pass state through a disk file.** That is also the only mechanism a mixed interpreted/compiled
   chain can use; see `docs/oasis/FULL-SOURCE.PLAN.md`.
 

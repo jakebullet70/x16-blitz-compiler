@@ -18,7 +18,7 @@
 ## **  pass if the unwind breaks, and 800+ leaks against a 4K stack is
 ## **  OUT OF MEMORY. Getting to the end is the proof.
 ## **
-## **  Build:  copy GPC-BASIC/GPB.INC.BL and this file into drive/, then
+## **  Build:  copy GPC-BASIC/GPB.INC.BL and this file into source/drive/, then
 ## **            python source/gpc/build_basl.py UNWIND.EXP.BL UNWIND.PRG
 ## **          and compile UNWIND.PRG with GPC.BIN.
 ## **

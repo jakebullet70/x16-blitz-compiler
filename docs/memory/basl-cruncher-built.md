@@ -1,6 +1,6 @@
 ---
 name: basl-cruncher-built
-description: "samples/cruncher BUILT 2026-09-03 - what it does, the 255-lines-255-bytes result, and the five options refused by name"
+description: "GPC-BASIC-TOOLS-SRC/cruncher BUILT 2026-09-03 - what it does, the 255-lines-255-bytes result, and the five options refused by name"
 metadata: 
   node_type: memory
   type: project
@@ -8,7 +8,7 @@ metadata:
   modified: 2026-09-03T15:58:48.947Z
 ---
 
-**`samples/cruncher/` — BUILT 2026-09-03.** `CRUNCH.PRG` (front end) writes `CRUNCH.INPUT` and
+**`GPC-BASIC-TOOLS-SRC/cruncher/` — BUILT 2026-09-03.** `CRUNCH.PRG` (front end) writes `CRUNCH.INPUT` and
 chain-loads `CRUNCH.BIN` (engine), the GPC shape. Both GP.BASIC compiled by GPC, **EMBEDDED** so
 the folder stands alone without a versioned `GPB.RT.nnn.BIN`. X16-native, **not** the host-side
 Python `TODO.md` asked for.

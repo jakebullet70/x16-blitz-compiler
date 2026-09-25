@@ -17,7 +17,7 @@ endif
 all: shared
 
 #
-#		Run the test. It needs drive/GPC.BIN (make libs) and drive/GPC.RT.nnn.BIN
+#		Run the test. It needs source/drive/GPC.BIN (make libs) and source/drive/GPC.RT.nnn.BIN
 #		(make -C source/runtime gpc-rt) -- "make build" makes both, in that order, which
 #		matters: nnn is the engine build number. Or use "make rebuild" to build then test.
 #

@@ -8,7 +8,7 @@ metadata:
   modified: 2026-09-05T14:37:51.632Z
 ---
 
-**GPC p-code executes from a RAM bank.** Proven on x16emu R49 with `samples/GPB-MODS-TESTING/spike/SPIKE.BASL`,
+**GPC p-code executes from a RAM bank.** Proven on x16emu R49 with `GPC-BASIC-TOOLS-SRC/GPB-MODS-TESTING/spike/SPIKE.BASL`,
 which changes nothing: no ABI change, no runtime change, no compiler change, two `GP.ASM` blobs and
 a copy loop.
 
@@ -40,7 +40,7 @@ byte in the GOSUB frame is therefore about re-entering a banked routine, not abo
 
 **The stack offset is the fragile part** and is why this is a spike and not a shipped mechanism. It
 depends on `CommandSYS`'s exact prologue. The shipped version wants a real opcode instead -- see
-`TODO.md`, *How much of the GUI library fits in a bank?*, and `samples/GPB-MODS-TESTING/PLAN.md` §6.
+`TODO.md`, *How much of the GUI library fits in a bank?*, and `GPC-BASIC-TOOLS-SRC/GPB-MODS-TESTING/PLAN.md` §6.
 
 Gate cleared beforehand: [[kernal-preserves-ram-bank]]. Related: [[gpasm-blob-may-use-ztemp]],
 [[gpasm-implementation-status]], [[gpc-return-unwinds-frames]].

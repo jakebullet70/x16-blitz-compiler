@@ -194,7 +194,7 @@ compiled binary. Same reasoning retires `LIST` `NEW` `RUN` `CONT` `CLR` from the
 ## `POINTER` / `STRPTR` — CLOSED, not undecided
 
 Both hand back the address of a BASIC variable or string, and Blitz lays variables out its own way at
-compile time. `drive/POINTER.PRG` makes the mismatch concrete: it treats the result as a CBM
+compile time. `source/drive/POINTER.PRG` makes the mismatch concrete: it treats the result as a CBM
 `[len, ptr-lo, ptr-hi]` descriptor and walks it, and Blitz stores `[MaxLen][Control][ActLen][Data]` —
 a different shape — so that walk reads garbage whatever address is returned. **There is no address
 Blitz can hand back that makes an existing descriptor-walking program behave.**
@@ -211,19 +211,19 @@ here.
 
 ## Library renames — DONE in the GPB-MODS-TESTING working copy, 06/09/26
 
-Both renames are in `samples/GPB-MODS-TESTING/`, tokenised, compiled and run. **The rest of the tree
-still says the old names**: root `GPC-BASIC/`, `samples/editor`, `samples/GPC-HELP`,
-`samples/color-test`, `GP-BASIC.md` and `GP-BASIC.GLOBALS.md`, the `HELP-TXT` entries GPB.HELP reads,
+Both renames are in `GPC-BASIC-TOOLS-SRC/GPB-MODS-TESTING/`, tokenised, compiled and run. **The rest of the tree
+still says the old names**: root `GPC-BASIC/`, `GPC-BASIC-TOOLS-SRC/editor`, `GPC-BASIC-TOOLS-SRC/GPC-HELP`,
+`GPC-BASIC-TOOLS-SRC/color-test`, `GP-BASIC.md` and `GP-BASIC.GLOBALS.md`, the `HELP-TXT` entries GPB.HELP reads,
 three readmes and `color-demo.bat`. Copy the working copy over the root modules and sweep the callers
 in one pass; the two naming decisions below are already taken.
 
-**Proven by running it, not by reading it.** `drive/GPBTRN.BASL` builds the renamed modules the
+**Proven by running it, not by reading it.** `source/drive/GPBTRN.BASL` builds the renamed modules the
 way `GPBMODS` does — the library in bank 4 behind `SHIM.GUIBANK`'s shims — and pushes its keys through
 `kbdbuf_put`. `THEME.SELECT` fills the palette and `THEME.NEXT` still falls into it; `GUI.INPUT`
 comes back with `GUI.TEXT$` = `GPC` and `GUI.OK` 1 on RETURN, and puts `KEEP ME` back with
 `GUI.OK` 0 on ESC. **The rename costs no p-code**: `GPBMODS` compiles to the same `OK CODE 19730
 FREE 5888`. It costs 4 bytes of tokenised source, which leaves 779 under BASLOAD's 38,655.
-It needs the renamed modules copied into `drive/`, so run it after the sweep, not before.
+It needs the renamed modules copied into `source/drive/`, so run it after the sweep, not before.
 
 ### `GUI.TEXT` should be `GUI.INPUT` — DONE here, AND ITS STRING MOVED WITH IT
 
@@ -249,7 +249,7 @@ actually missing: **install a caller's array of seven packed attributes as the c
     ...
     GOSUB THEME.LOAD          ' copies it into THEME.CLR, sets THEME.ID to 4
 
-That closes the loop `samples/color-test` leaves open: it prints seven `THEME.CLR` assignment lines
+That closes the loop `GPC-BASIC-TOOLS-SRC/color-test` leaves open: it prints seven `THEME.CLR` assignment lines
 to paste back into this file by hand. With an array-taking `THEME.LOAD` a program can carry a scheme
 as data — and an array saves and loads like any other, which is the whole reason themes are data and
 not keywords.
@@ -259,7 +259,7 @@ not keywords.
 variant — so a blind swap renames them too and then the new `THEME.LOAD` collides with the family it
 just created. Rename the branches to `THEME.SELECT.*` in the same pass, which is what was done
 here. Counted 2026-09-06,
-excluding `TODO.md` and the `drive/` mirror: **72 bare `THEME.LOAD` references, 131 including the
+excluding `TODO.md` and the `source/drive/` mirror: **72 bare `THEME.LOAD` references, 131 including the
 label family**, across the library, six samples, `GP-BASIC.md` and `GP-BASIC.GLOBALS.md`.
 `SHIM.GUIBANK.INC.BL` carries a shim, as it does for `GUI.INPUT`.
 
@@ -375,11 +375,11 @@ moved to its own entry under Build / infrastructure.** It is test coverage, not 
    the `make` target in item 2 should do.
 
 **Until then: after retiring ANY keyword, grep the whole tree for it — `GPC-BASIC`, `samples`, AND
-`drive`.** **Re-checked 2026-09-02 and the tracked tree is CLEAN**: every remaining mention of a
-retired token in `drive/GPC.ERR.BASL`, `drive/GPB.INC.BL` and `drive/STRCASE.INC.BL` is inside
+`source/drive`.** **Re-checked 2026-09-02 and the tracked tree is CLEAN**: every remaining mention of a
+retired token in `source/drive/GPC.ERR.BASL`, `source/drive/GPB.INC.BL` and `source/drive/STRCASE.INC.BL` is inside
 a comment, not a statement -- `GPC.ERR.BASL` moved to `STRCASE.INC.BL` in `51bff2c`. The stale copies
-under `drive/samples/editor/GPC-BASIC/` are UNTRACKED build output (`make samples` wipes and
-re-copies that whole tree from `samples/`), so they are a local leftover, not a repo problem. Sweep
+under `source/drive/samples/editor/GPC-BASIC/` are UNTRACKED build output (`make samples` wipes and
+re-copies that whole tree from `GPC-BASIC-TOOLS-SRC/`), so they are a local leftover, not a repo problem. Sweep
 excluding comment lines or it reads as broken when it is not:
 
     grep -vE '^\s*(##|REM(\s|$))' <file> | grep -E 'GP\.(SORT|STASH|RESTR|UPPER|LOWER|L?TRIM)'
@@ -414,7 +414,7 @@ reports **image 13311 bytes, GPBase $3800, ObjectBase $3c00** both before and af
 they fell inside the existing slack. That is the measurement to repeat before the next GP-block
 addition; do not assume the slack is still there.
 
-**The caller sweep came out as predicted.** Every `GP.FILL` in `GPC-BASIC`, `samples` and `drive`
+**The caller sweep came out as predicted.** Every `GP.FILL` in `GPC-BASIC`, `samples` and `source/drive`
 fills a space — literal `32`, `ASC(" ")`, or one of `GUI.SPACE` / `LINEINPUT.SPACE` /
 `MENUVERT.SPACE`, and all three of those are `#DEFINE`d to 32. $20 is a fixed point of the offset
 table, so none of them can change behaviour. The only non-space fills are `SCREEN.EXP.BL` (160, 166),
@@ -456,7 +456,7 @@ every value stock rejects, GPC now rejects:
 | `70000 AND -1` | `?ILLEGAL QUANTITY` | `OUT OF RANGE` |
 | `-1 OR 32768` | `?ILLEGAL QUANTITY` | `OUT OF RANGE` |
 
-**Why no suite caught it, and why MD5 did not.** `drive/MD5` needs 32-bit bitwise ops and gets them
+**Why no suite caught it, and why MD5 did not.** `source/drive/MD5` needs 32-bit bitwise ops and gets them
 by splitting every value into 16-bit halves — `FNUW(FNSW(XH) AND FNSW(YH))` at line 3320 — so it
 never hands `AND` anything above 16 bits and never touched the broken path. That is worth remembering
 before assuming MD5's green tick covers the bitwise operators: it covers exactly the 16-bit case.
@@ -499,8 +499,8 @@ slower" was reasoned from the code and is also wrong; it is a wash either way:
 | body reads the index | 261 | 257 |
 | descending (never optimised) | 175 | 174 |
 
-And no program written for stock could contain one — a grep of every `.bas`/`.BASL` in `samples/`,
-`drive/` and `source/` found zero. Use `%` to shrink arrays (`DIM A%(n)` really is two bytes an
+And no program written for stock could contain one — a grep of every `.bas`/`.BASL` in `GPC-BASIC-TOOLS-SRC/`,
+`source/drive/` and `source/` found zero. Use `%` to shrink arrays (`DIM A%(n)` really is two bytes an
 element), not to speed up a loop.
 
 Verified against stock: `FOR I=1 TO N% STEP S%`, an `%` inside the body, `DIM A%()`, `STEP 0`, plain
@@ -896,7 +896,7 @@ The handoff plan for the generic compiler option, rules and keep markers include
 outside it compiles to `.bgosub` (`$F5`), which selects the region's bank, and `RETURN` puts the
 caller's back. Step 1 is the runtime handler, `bankgosub.asm` in the GP block. Step 2 is the
 compiler: `GPBankScanLines`, `GPBankLineCall` and `GPBankAddressCall` in `gpbank.asm`, tested with
-the programs in `scratch/bgosub/`. Step 3 merged the library: the `X.BANK.INC.BL` twins and the
+the programs in `source/scratch/bgosub/`. Step 3 merged the library: the `X.BANK.INC.BL` twins and the
 `SHIM.*BANK.INC.BL` files are deleted from both library copies, each program `#DEFINE`s its own bank
 numbers, and `GPC-BASIC/BANKED-OR-NOT.md` and the help say how to bank a module.
 
@@ -917,7 +917,7 @@ How the three questions were settled:
 with 3,538 B (was 4,098). `gpctest.py`'s inputs for both are now the merged sources, their references
 are rebuilt, and `gpctest.py full` passes in 147 s: GPBMODS is CODE 41,984 FREE 9,728 with 202 dead
 lines (1,413 B), GUIFRMT CODE 12,748 FREE 18,176 with 129 (1,275 B), and both stripped identities
-hold. `BS.B.NUMS` and `GP-BASIC.md` §4.20 are remeasured. `banktest3.py` runs on `scratch/banktest3`
+hold. `BS.B.NUMS` and `GP-BASIC.md` §4.20 are remeasured. `banktest3.py` runs on `source/scratch/banktest3`
 and passes, BANKY included. **GOTO settled, 2026-09-14:** a `GOTO` into a region from outside it
 is refused in pass one by `GPBankGotoGuard`, from line numbers. It costs no runtime bytes, and
 `GPC.BIN` is 29,252 B. Falling into a region from the line above it, and `RESTORE` to a `DATA` line
@@ -1157,7 +1157,7 @@ readability choice, not a size one.
 **The BMX loader is the last big BASL routine still doing per-byte work in BASIC**, and it is the
 one place left where that is measurable to a user: a bitmap is 320×240 at 8bpp, so the paint loop is
 counted in tens of thousands of iterations rather than the hundreds a menu or a dialog costs.
-Everything else that mattered has already moved — `samples/editor`'s two renderers went to `GP.ASM`
+Everything else that mattered has already moved — `GPC-BASIC-TOOLS-SRC/editor`'s two renderers went to `GP.ASM`
 and came back **123× and 109×** faster, and the p-code got *smaller* because the `FOR` loops removed
 were bigger than the assembly that replaced them.
 
@@ -1272,7 +1272,7 @@ directory on the same machine much faster, so the cost is in our read loop.
 
 Where to start:
 
-- `samples/GPB-MODS-TESTING/GPC-BASIC/FILEDIR.INC.BL` — the loop behind `FILE.DIR.OPEN` and
+- `GPC-BASIC-TOOLS-SRC/GPB-MODS-TESTING/GPC-BASIC/FILEDIR.INC.BL` — the loop behind `FILE.DIR.OPEN` and
   `FILE.DIR.NEXT`, which `FILEPICK.SCAN` drives once a file.
 - A per-byte read is the first suspect. The precedent is measured: the editor's loader found
   `LINPUT#` **10.5x** faster than a `GET#` byte loop, and `BINPUT#` is itself a `CHRIN` loop capped
@@ -1598,7 +1598,7 @@ in stock BASIC, GPC or Prog8. A program stores a value under a key, and the next
 `LOAD` chain reads it back. A save to disk makes the
 store outlive the session.
 
-**Written 2026-09-15.** `KV.INC.BL` is in `GPC-BASIC/` and `samples/GPB-MODS-TESTING/GPC-BASIC/`,
+**Written 2026-09-15.** `KV.INC.BL` is in `GPC-BASIC/` and `GPC-BASIC-TOOLS-SRC/GPB-MODS-TESTING/GPC-BASIC/`,
 and `GP-BASIC.md` §4.20 documents it. The plan is
 [`docs/blitz/KV-STORE.PLAN.md`](docs/blitz/KV-STORE.PLAN.md). Its test, `KV.EXP.BL`, has not run.
 The items under *Open* below are settled there: 64 slots of 128 bytes, bank 40, a `BSAVE` image
@@ -1758,7 +1758,7 @@ error:
   the saving is a variable-table entry each, which is small. Do the count first and decide whether
   seven of them is worth the shared-mutable-state risk, rather than assuming it is.
 
-Related: the GUI refactor in [`samples/GPB-MODS-TESTING/GUI-CUA-PLAN.md`](samples/GPB-MODS-TESTING/GUI-CUA-PLAN.md)
+Related: the GUI refactor in [`GPC-BASIC-TOOLS-SRC/GPB-MODS-TESTING/GUI-CUA-PLAN.md`](GPC-BASIC-TOOLS-SRC/GPB-MODS-TESTING/GUI-CUA-PLAN.md)
 touches five of these seven modules, so the two want to be sequenced — not done at once.
 
 
@@ -1782,7 +1782,7 @@ and a 0 means "not x16emu", which is a real machine OR another emulator — and 
 is expansion card I/O on the real machine, a card at I/O5 could in principle answer `"16"` too.
 The header says a 1 is strong and a 0 is certain rather than pretending otherwise.
 
-`scratch/lineinput/EMUTST.BASL` is the check: it prints the two bytes beside the answer, so a 0 can
+`source/scratch/lineinput/EMUTST.BASL` is the check: it prints the two bytes beside the answer, so a 0 can
 be told from a wrong read. **Run it both ways**: point `APPSYS.EMUSIG` at a byte that does not
 read 49 and the not-an-emulator path is exercised on the emulator, which is the only way to test
 it here. That caught a crunched version whose `RETURN` had ended up on the `IF` line — true on
@@ -1832,10 +1832,10 @@ the keystroke path of every field in the tree that sets no filter, which is all 
 against an estimate of 30 here. Tokenised source grew 76 bytes, leaving 703 under BASLOAD's 38,655.
 No token, no runtime byte, nothing in `GPC.BIN`.
 
-**Six cases, twice.** `scratch/rename/LINTST.BASL` runs them against the banked working copy, calling
+**Six cases, twice.** `source/scratch/rename/LINTST.BASL` runs them against the banked working copy, calling
 `LINEINPUT.TYPED` directly with a code and a character — no field, no keyboard, no blink — and then
 once more live through `GUI.INPUT` with keys pushed by `kbdbuf_put`, because the filter runs per
-keystroke inside `SHIM.GUIBANK`. `scratch/lineinput/LINTST2.BASL` is the same six against the unbanked
+keystroke inside `SHIM.GUIBANK`. `source/scratch/lineinput/LINTST2.BASL` is the same six against the unbanked
 root library. No filter set leaves the field as it was; `ALLOW$` refuses without moving the caret;
 `DENY$` passes everything else; both set gives `ALLOW$`; a full field still refuses; and RETURN is
 still refused by the three older guards, which the filter never sees.
@@ -2015,10 +2015,10 @@ row and greyed-out item wants exactly one of the two.
 
 ### `FILEIO.INC.BL` and `FILEDIR.INC.BL` — BUILT 06/09/26
 
-**Shipped** as `samples/GPB-MODS-TESTING/GPC-BASIC/FILEIO.INC.BL` (**833 bytes**) and
+**Shipped** as `GPC-BASIC-TOOLS-SRC/GPB-MODS-TESTING/GPC-BASIC/FILEIO.INC.BL` (**833 bytes**) and
 `FILEDIR.INC.BL` (**435 more**, and it BANKS — see below). The 900/878 written here before were
-guesses; both are measured from the map now. 33 assertions green headlessly — `drive/FILEIOT.BASL` and
-`drive/FILEDIRT.BASL`. Not yet promoted to the root `GPC-BASIC/`, and not yet wired into
+guesses; both are measured from the map now. 33 assertions green headlessly — `source/drive/FILEIOT.BASL` and
+`source/drive/FILEDIRT.BASL`. Not yet promoted to the root `GPC-BASIC/`, and not yet wired into
 `GPBMODS`'s DATA panel.
 
 In: `FILE.STATUS` `EXISTS` `DELETE` `RENAME` `COPY` `MKDIR` `CHDIR` `UP` `GETPATH` `SAVEARRAY`
@@ -2218,7 +2218,7 @@ system token for `TRAP` with its operand, and a handful of runtime bytes on the 
 
 `GUI.YN`, `GUI.MENU` and `GUI.TEXT` all ASK something. There was no way to just **say** something
 and wait for an acknowledgement, which is the commonest dialog an application has: "wrote 34 lines
-to EXAMPLE.BL", "not found", "this topic has no code to export". `samples/GPC-HELP` wanted one
+to EXAMPLE.BL", "not found", "this topic has no code to export". `GPC-BASIC-TOOLS-SRC/GPC-HELP` wanted one
 three times and faked it with a one-item `GUI.MENU` whose only row was `   OK   `, which worked and
 read like the workaround it was — and dragged `MENUVERT` in for a dialog with no menu in it.
 
@@ -2248,7 +2248,7 @@ and whatever gets added has to do the same — or the "not found" box ends up of
 
 ### `GUI.TEXT` draws two buttons and never says which keys press them
 
-Reported 2026-09-04, from `samples/GPC-HELP`'s find box: **"no idea that ENTER and ESC are valid."**
+Reported 2026-09-04, from `GPC-BASIC-TOOLS-SRC/GPC-HELP`'s find box: **"no idea that ENTER and ESC are valid."**
 
 The dialog paints `< OK >` and `< CANCEL >` two rows under the field, and neither one can be
 pressed. There is no `&` on either label, deliberately — every printable key belongs to the field,
@@ -2322,7 +2322,7 @@ The module costs a program that includes it and never calls it about 24 bytes of
 nothing at all to a program that does not include it — which is the whole argument for a module
 of one routine over a routine in a module of eight.
 
-`scratch/lineinput/KBTST.BASL` is the test: a key pushed with `kbdbuf_put` and NOT drained comes
+`source/scratch/lineinput/KBTST.BASL` is the test: a key pushed with `kbdbuf_put` and NOT drained comes
 back from `GET` (the control, without which the rest proves nothing), three pushed and drained
 leave `GET` empty, and a drain of an already empty buffer returns rather than waiting.
 
@@ -2372,7 +2372,7 @@ same stash change, so the second one is a two-line swap.
 
 ### Buttons — decide whether the library adopts them
 
-`samples/GPC-HELP/GPC-BASIC/GUI.INC.BL` is a **deliberately diverged copy**: the answers are drawn
+`GPC-BASIC-TOOLS-SRC/GPC-HELP/GPC-BASIC/GUI.INC.BL` is a **deliberately diverged copy**: the answers are drawn
 as `< OK >` in the panel's own attribute with the nibbles swapped, where the library still prints a
 dimmed hint line with one letter lit. `GUI.BUTTON`, `GUI.BUTTON.SIZE`, `GUI.BUTTON.WIDE`,
 `GUI.BUTTON.ROW` and `GUI.BTN.PAIR` are the routines; `GUI.YN`, `GUI.TEXT` and `GUI.SAY` call them.
@@ -2385,7 +2385,7 @@ is neither drawn nor counted in the width, and it is the only place the key is w
 
 It is out here rather than in `GPC-BASIC/` so the look can be seen running before every dialog in
 the tree changes. **The decision to make**: adopt it into the library (which changes
-`samples/editor`, `GUI.EXP.BL` and `MENU.EXP.BL`), put it behind a `GUI.BUTTONS` flag defaulting
+`GPC-BASIC-TOOLS-SRC/editor`, `GUI.EXP.BL` and `MENU.EXP.BL`), put it behind a `GUI.BUTTONS` flag defaulting
 off, or drop it and re-sync the copy.
 
 The colour is worth keeping either way: the button attribute is `GUI.PANEL` with foreground and
@@ -2397,7 +2397,7 @@ in the line are lit as the keys" has nothing to light when the row is two button
 
 ### A charset comparison, and what each one costs
 
-`samples/GPC-HELP` went PETSCII → ISO → CP437 in one sitting, because the trade-offs are not
+`GPC-BASIC-TOOLS-SRC/GPC-HELP` went PETSCII → ISO → CP437 in one sitting, because the trade-offs are not
 written down anywhere and each one had to be rediscovered. They should be, once, with a screenshot
 of each:
 
@@ -2419,7 +2419,7 @@ that switches per dialog would notice.
 
 ### How much of the GUI library fits in a bank?
 
-`samples/GPC-HELP` compiles to 10,474 bytes of p-code (23,530 embedded) and has **2,458 bytes of
+`GPC-BASIC-TOOLS-SRC/GPC-HELP` compiles to 10,474 bytes of p-code (23,530 embedded) and has **2,458 bytes of
 workspace left** — and it holds nothing but its index; the topic text lives in RAM bank 9 precisely
 because there was no room to keep it on the heap. The GUI stack is what ate it: measured on this box,
 
@@ -2488,7 +2488,7 @@ interpreter has no opinion about what is behind `$A000`.
   the GOSUB frame 5 bytes; the frame marker's size field is 5 bits, so it fits.
 
 **BUILT 2026-09-05 as `GP.BANKED <n>` / `GP.ENDBANKED`, and none of the three things this section
-said had to be built were needed.** See `samples/GPB-MODS-TESTING/PLAN.md` for the whole account.
+said had to be built were needed.** See `GPC-BASIC-TOOLS-SRC/GPB-MODS-TESTING/PLAN.md` for the whole account.
 
 - **No bank-aware call opcode.** Offsets are 16 bit and wrapping, so every target is reachable; a
   branch with one end in the bank is corrected by ONE BYTE, because both bases are page aligned.
@@ -2535,7 +2535,7 @@ trims listed above are worth ~1,300 for library work alone.
 
 ### Crunch AFTER BASLOAD, not before
 
-`samples/cruncher` runs on `.BASL` source. Measured on `HELP.BASL` 2026-09-04, and the source-level
+`GPC-BASIC-TOOLS-SRC/cruncher` runs on `.BASL` source. Measured on `HELP.BASL` 2026-09-04, and the source-level
 version is leaving most of it on the table:
 
 | | BASIC lines | saved |
@@ -2572,7 +2572,7 @@ then, so every `GOTO`/`GOSUB`/`ON` target has to be rewritten as lines merge, an
 is a silent branch into the middle of a statement. That is the whole trade — 646 bytes for owning
 line-number correctness.
 
-Test material is in `drive/`: `HELPC.BASL` (JOIN/KEEP), `HELPH.BASL` (HOIST), `HELPX.BASL`
+Test material is in `source/drive/`: `HELPC.BASL` (JOIN/KEEP), `HELPH.BASL` (HOIST), `HELPX.BASL`
 (JOIN+COLLAPSE), against `HELP.BASL`.
 
 ### RETURN in the editor was slow — FIXED, the table shift is GP.ASM now
@@ -2580,7 +2580,7 @@ Test material is in `drive/`: `HELPC.BASL` (JOIN/KEEP), `HELPH.BASL` (HOIST), `H
 Reported as "inserting a blank line scrolls slowly -- do ten and it takes a second or two", and it
 was never the scrolling: **75% of a RETURN was the line-table shift**, 17% the full repaint.
 
-**Old against new, in ONE program on ONE fixture** (`samples/editor/SLOTBEN.BASL` -- it carries a
+**Old against new, in ONE program on ONE fixture** (`GPC-BASIC-TOOLS-SRC/editor/SLOTBEN.BASL` -- it carries a
 verbatim copy of the pre-2026-09-02 loops, so the comparison owes nothing to two builds). 100 lines,
 insert/delete at index 1, ten repetitions, real speed (`--nowarp`; TI is meaningless under warp):
 
@@ -2604,7 +2604,7 @@ runtime keeps `zTemp0`.
 **The segment boundary, which is the trap the old note warned about.** The table is banks 1..3 at
 2048 entries, and one bank is selected for a whole copy, so the single entry whose destination is in
 the NEXT bank cannot go through the block. Those go the old way, and there are at most two in any
-shift. `samples/editor/SLOTTST.BASL` is the test: a 2,100-entry fixture, **every slot checked, not a
+shift. `GPC-BASIC-TOOLS-SRC/editor/SLOTTST.BASL` is the test: a 2,100-entry fixture, **every slot checked, not a
 sample**, across twelve cases -- insert and delete at 5, 0, 2040, 2047, 2048 and the last index.
 All twelve pass. A document under 2048 lines never crosses, which is exactly why a naive block
 passes every casual test and then corrupts the first long file it meets.
@@ -2626,7 +2626,7 @@ the next move here, and only now is it worth making.
 about the object: `STRMarkLine` (the line-number table), `CreateVariableRecord` (the variable name
 list) and `_CAWriteByte` (`objPtr` reaching `ObjectCeiling`). The two tables shared ONE 8K bank at
 `$A000-$BFFF` and grew towards each other, so the real limit was the SUM of the two -- and
-`samples/editor` had quietly reached **7,981 of 8,192 bytes**, 97.4% of it:
+`GPC-BASIC-TOOLS-SRC/editor` had quietly reached **7,981 of 8,192 bytes**, 97.4% of it:
 
 | | | |
 |---|---:|---:|
@@ -2665,7 +2665,7 @@ and rejects anything leaving less than `MIN_WS_PAGES`. With `ObjectBase` `$3b00`
 plus frame stack plus workspace, so the object may be at most **68 pages, 17,408 bytes**. That path
 prints `PROGRAM TOO BIG` with **no `@ line`**, because the compile already finished.
 
-Measured, not derived -- filler lines added to `samples/editor`, ten bytes of p-code each:
+Measured, not derived -- filler lines added to `GPC-BASIC-TOOLS-SRC/editor`, ten bytes of p-code each:
 
 | filler lines | object | `FREE` | result |
 |---:|---:|---:|---|
@@ -2694,7 +2694,7 @@ for another 200 lines and the honest number is now reported. The frame stack is 
 
 ### Save As accepts a BLANK name, and the editor then writes to nothing
 
-Reported 2026-09-02. `ED.CMD.SAVEAS` (`samples/editor/EDITOR.BASL`) takes whatever `ED.PROMPT` hands
+Reported 2026-09-02. `ED.CMD.SAVEAS` (`GPC-BASIC-TOOLS-SRC/editor/EDITOR.BASL`) takes whatever `ED.PROMPT` hands
 back and assigns it straight to `DOC.FILE.NAME$`:
 
     ED.PROMPT.MSG$ = "Save as: " : GOSUB ED.PROMPT
@@ -2834,7 +2834,7 @@ roughly halve the ~102 jiffies the repaint costs. Do it as its own change, and c
 
 ### A separate CRUNCHER utility for BASL source — and the C64 world is full of prior art
 
-**BUILT 2026-09-03 as `samples/cruncher/`.** `CRUNCH.PRG` (front end) writes `CRUNCH.INPUT`,
+**BUILT 2026-09-03 as `GPC-BASIC-TOOLS-SRC/cruncher/`.** `CRUNCH.PRG` (front end) writes `CRUNCH.INPUT`,
 chain-loads `CRUNCH.BIN` (engine); both GP.BASIC compiled by GPC, EMBEDDED so the sample stands
 alone. **It is X16-NATIVE, not the host-side Python this note asked for** -- the two-program shape
 was wanted instead, and the engine streams (`LINPUT#` in, `PRINT#` out) so a 62K source never
@@ -2866,7 +2866,7 @@ from `EDITOR.BASL`, so the engine must walk the whole `#INCLUDE` tree for the re
 when it rewrites one file. That is what scope `TREE` is for.
 
 Asked 2026-09-02, and it is worth doing because **a line costs exactly one byte of p-code.**
-Measured, not guessed: hand-compacting `samples/editor/EDITOR.BASL` on 2026-09-02 joined **80**
+Measured, not guessed: hand-compacting `GPC-BASIC-TOOLS-SRC/editor/EDITOR.BASL` on 2026-09-02 joined **80**
 lines and the object went **15,166 -> 15,086** -- 80 lines, 80 bytes, one for one. **A TRAILING
 `REM` ON A CODE LINE COSTS P-CODE TOO**, where a REM-only line is free: dropping four of them from
 `ED-MENUS.BASL` on 2026-09-03 took the object 13,127 -> 13,118, so call it ~2 bytes each. Both are
@@ -3141,9 +3141,9 @@ replacements rather than a rewrite, then prove the code did not move —
 Both editor rebuilds landed on `OK CODE 15166 FREE 6144 RT 13055`, `EDITOR.PRG` 26,899 bytes, so the
 trims are provably free. Watch two things: `BENCHROWS.BASL`'s `REM`s are the **GP.ASM source itself**
 (under `#REM 1`) and must not be touched, and `GUI.INC.BL` has **two copies** — `GPC-BASIC/` and
-`samples/editor/GPC-BASIC/` — that have to stay identical.
+`GPC-BASIC-TOOLS-SRC/editor/GPC-BASIC/` — that have to stay identical.
 
-**DONE, all of it.** `samples/editor/EDITOR.BASL` 709 -> 423 prose lines, `STORE.BASL`, and all
+**DONE, all of it.** `GPC-BASIC-TOOLS-SRC/editor/EDITOR.BASL` 709 -> 423 prose lines, `STORE.BASL`, and all
 thirteen `GPC-BASIC/*.INC.BL`: **2,195 -> 1,753 prose lines**, code verified identical file by file
 and the editor rebuilding to the same `OK CODE 15166 FREE 6144 RT 13055` with `EDITOR.PRG` the same
 26,899 bytes. `BENCHROWS.BASL` inspected and correctly left alone -- its `REM`s are GP.ASM source.
@@ -3325,11 +3325,11 @@ like the same program printed it. Settle the compiler's shape first, then follow
 reads "unless the compile removes dead code" or is gone, in the root library and the working copy
 alike; `MENUBAR.BANK.INC.BL` went with the twins. The `GPC-HELP` copies and `.HLP` pages are patched
 from the render delta and no longer list the `GP.FN` aliasing bug. The sample-local copies under
-`samples/editor/GPC-BASIC/` and `samples/XBASE/GPC-BASIC/` took the same wording the same day.
+`GPC-BASIC-TOOLS-SRC/editor/GPC-BASIC/` and `GPC-BASIC-TOOLS-SRC/XBASE/GPC-BASIC/` took the same wording the same day.
 
 Added 2026-09-13. GPC V1.1 removes unreached lines when `GPC.INPUT` line 5 names a removed-line file, and the banner
 then prints `DEAD CODE: N LINES REMOVED, B BYTES SAVED`. The help sources in `GPC-BASIC/`, which build
-GPB.HELP and the `samples/GPC-HELP/GPC-HELP*.md` copies, say neither.
+GPB.HELP and the `GPC-BASIC-TOOLS-SRC/GPC-HELP/GPC-HELP*.md` copies, say neither.
 
 - `GP-BASIC.FILES.md:44` says `GPC.INPUT` is "up to four text lines". It is five: document line 5,
   what the removed-line file holds, and the banner line.
@@ -3346,8 +3346,8 @@ GPB.HELP and the `samples/GPC-HELP/GPC-HELP*.md` copies, say neither.
 
 The help is being brought in line with GPC V1.1, the `GP.FN` fix and `.bgosub`. The example programs
 are documentation too, and nothing has checked them against those changes. The set is the 26
-`.EXP.BL` files in `GPC-BASIC/` and `samples/GPB-MODS-TESTING/GPC-BASIC/`, and the `.BASL` programs
-under `samples/`: editor 7, XBASE 4, GPB-MODS-TESTING 4, cruncher 3, GPC-HELP 1, color-test 1.
+`.EXP.BL` files in `GPC-BASIC/` and `GPC-BASIC-TOOLS-SRC/GPB-MODS-TESTING/GPC-BASIC/`, and the `.BASL` programs
+under `GPC-BASIC-TOOLS-SRC/`: editor 7, XBASE 4, GPB-MODS-TESTING 4, cruncher 3, GPC-HELP 1, color-test 1.
 
 Check each for:
 
@@ -3361,11 +3361,11 @@ Check each for:
 
 Found so far, by grep:
 
-- `samples/XBASE/XBASE.BASL` lines 26 to 136 include `SHIM.*` files and `X.BANK.INC.BL` twins from
+- `GPC-BASIC-TOOLS-SRC/XBASE/XBASE.BASL` lines 26 to 136 include `SHIM.*` files and `X.BANK.INC.BL` twins from
   its own `GPC-BASIC/` copies, and lines 235 to 259 claim bank numbers by shim name.
   `XBASE.GUI.TEST.BASL:84` and `:139` name `SHIM.GUIBANK`. XBASE is to be dropped, so decide that
   first.
-- `samples/GPC-HELP/GPC-BASIC/` names banked twins in `COMBO.INC.BL:54` and `:181`, `GUI.INC.BL:100`,
+- `GPC-BASIC-TOOLS-SRC/GPC-HELP/GPC-BASIC/` names banked twins in `COMBO.INC.BL:54` and `:181`, `GUI.INC.BL:100`,
   `LINEINPUT.INC.BL:66`, `MENUVERT.INC.BL:70` and `THEME.INC.BL:34`.
 - `FORM`, `GUI`, `GUI2TST`, `MENU`, `MENUDEMO` and `MENUTST.EXP.BL` each hold a `BANK` or
   `GP.BANKED` line. Check whether each is still needed.
@@ -3380,7 +3380,7 @@ SHARED` and `NOT IMPLEMENTED` in §3.10 and §3.12, `OUT OF MEMORY` in §7. Noth
 message on the compile screen has no place to be looked up. Add a subsection to §7 of
 `GPC-BASIC/GP-BASIC.md`, "Memory, and what the compiler tells you", that gives each message, what
 raises it and what to change, then carry it into `GPB.HELP` and the
-`samples/GPC-HELP/` copy. The `.HLP` files carry hand edits, so patch the render delta rather than
+`GPC-BASIC-TOOLS-SRC/GPC-HELP/` copy. The `.HLP` files carry hand edits, so patch the render delta rather than
 re-running `MKHELP.PY` plain.
 
 There are three sets.
@@ -3423,7 +3423,7 @@ to drive an interactive program headlessly.
 **The engine is `BASLOAD-GPC.BIN` now and the front end is `BASLOAD-GPC.PRG`**, the same division as
 `GPC.BIN` and `GPC.PRG`: the name a person types belongs to the thing a person runs. Every caller
 moved with it — `test/runtest.py`, `source/gpc/build_basl.py`, and `build_basl.py` stages both files
-into `drive/`.
+into `source/drive/`.
 
 The open questions closed as: **device 8, not asked for**; **an empty answer quits**, rather than
 error 2; **no last-name offer and no directory listing** — a bare prompt. The name is re-poked on
@@ -3463,24 +3463,24 @@ Open before writing it:
 
 ## Samples
 
-A `samples/` tree of real programs that show off what the compiler buys you, one directory per sample
-with its own `readme.md`. `make samples` mirrors the whole tree into `drive/samples/` (the emulator
+A `GPC-BASIC-TOOLS-SRC/` tree of real programs that show off what the compiler buys you, one directory per sample
+with its own `readme.md`. `make samples` mirrors the whole tree into `source/drive/samples/` (the emulator
 drive and the root of the release zip), so every sample is runnable in the emulator and ships in the
-release; `samples/` is the tracked master and `drive/samples/` is a wiped-and-recopied build
+release; `GPC-BASIC-TOOLS-SRC/` is the tracked master and `source/drive/samples/` is a wiped-and-recopied build
 artifact. Two exist:
 
-- **`samples/prg2basload/`** — the X16 ROM BASLOAD detokenizer written as BASLOAD source, whose own
+- **`GPC-BASIC-TOOLS-SRC/prg2basload/`** — the X16 ROM BASLOAD detokenizer written as BASLOAD source, whose own
   header measures the win: the 919-line, 17,883-byte paint program converts in 12:22 interpreted and
   1:51 compiled, ~6.7x. The template: a genuinely useful program, plus a readme that names the speed
   number rather than asserting "it's faster".
-- **`samples/editor/`** — GPC EDIT, an MS-DOS-EDIT-styled text/Markdown editor whose two renderers are
+- **`GPC-BASIC-TOOLS-SRC/editor/`** — GPC EDIT, an MS-DOS-EDIT-styled text/Markdown editor whose two renderers are
   inline `GP.ASM`. The speed number it names: a text row 2320 → **18.8** jiffies/1000 renders, a chrome
   field 2538 → **23.3** — a full-screen repaint from ~1.2 s to ~10 ms. Unshelved and shipped 2026-08-30
   (see the findings below).
 
 ### LOAD chaining — what outlived the variable carry
 
-`samples/shared-vars/` was deleted on 2026-09-12 along with the carry it demonstrated; a chained
+`GPC-BASIC-TOOLS-SRC/shared-vars/` was deleted on 2026-09-12 along with the carry it demonstrated; a chained
 program now clears memory on entry. See [[load-chain-clears-memory]]. Three of its measurements
 outlive it:
 
@@ -3490,19 +3490,19 @@ outlive it:
   the same variables in a different order lay them out differently. Nothing crosses a chain now,
   but the rule still governs `{VAR}` in `GP.ASM`.
 - SHARED-mode compiled programs are tiny (~0.5K each) because they share one `GPC.RT.nnn.BIN` (~11K).
-  `samples/cruncher/` is the chaining example that remains; it passes state through `CRUNCH.INPUT`.
+  `GPC-BASIC-TOOLS-SRC/cruncher/` is the chaining example that remains; it passes state through `CRUNCH.INPUT`.
 
 ### Editor sample — DONE, and it closed the prog8 render question
 
-`samples/editor/` (`EDITOR.BASL` + `STORE.BASL`, readme with the measurements). Shelved on branch
+`GPC-BASIC-TOOLS-SRC/editor/` (`EDITOR.BASL` + `STORE.BASL`, readme with the measurements). Shelved on branch
 `editor-sample` on 2026-07-21 because the perf question driving it was unanswered; unshelved and
 finished 2026-08-30, when `GP.ASM` made the answer buildable.
 
 - **It compiled on the current engine untouched.** The shelved source needed no porting — the whole
   cost of bringing it forward was a real `TEST.MD` fixture (the committed one was a stray copy of
   `GPC.BASL`, so the self-check's find assertions were passing over a document with no "bullet" and no
-  "markdown" in it) and the move to `samples/`.
-- **M5 shipped** — relocated to `samples/editor/`, real sample `.md`, `readme.md` naming the numbers,
+  "markdown" in it) and the move to `GPC-BASIC-TOOLS-SRC/`.
+- **M5 shipped** — relocated to `GPC-BASIC-TOOLS-SRC/editor/`, real sample `.md`, `readme.md` naming the numbers,
   picked up by `make samples`, self-check green (`M4 OK`).
 - **The speed fix is `GP.ASM`, not the block-blit command this entry used to recommend.** The old
   recommendation was a native built-in that streams a row buffer to `DATA0`, chosen to dodge inline
@@ -3532,7 +3532,7 @@ finished 2026-08-30, when `GP.ASM` made the answer buildable.
 
 ### Editor sample: PETSCII — DONE, and the encoding boundary is at the disk
 
-`samples/editor/` moved off ISO onto **charset 3, PET upper/lower**, on 2026-08-31. The rule:
+`GPC-BASIC-TOOLS-SRC/editor/` moved off ISO onto **charset 3, PET upper/lower**, on 2026-08-31. The rule:
 **PETSCII on disk, ASCII everywhere above it.**
 
 The renderers write document bytes straight into VERA, where a tile index is a *screen* code, so
@@ -3559,7 +3559,7 @@ identical to the original apart from `PRINT#` writing CR where the fixture had L
 **Still open — reading files that are ASCII on disk.** The editor now assumes disk files are PETSCII.
 Opening something authored on the host shows every letter case-swapped. Detecting encoding on load
 (no byte in `$61-$7A` is a decent PETSCII tell, since that run is graphics) or offering it as a
-command would fix it. `TEST.MD` was converted in place; `git show HEAD~1:samples/editor/TEST.MD` is
+command would fix it. `TEST.MD` was converted in place; `git show HEAD~1:GPC-BASIC-TOOLS-SRC/editor/TEST.MD` is
 the ASCII original and the swap is its own inverse.
 
 ### Ideas for more samples — TODO
@@ -3584,7 +3584,7 @@ Candidates, each meant to demonstrate one concrete reason to reach for the compi
 
 ### Check GPC.ERR — DONE
 
-`GPC.ERR` (the runtime error decoder; `drive/GPC.ERR.BASL` → `GPC.ERR.PRG`, freshened on release by
+`GPC.ERR` (the runtime error decoder; `source/drive/GPC.ERR.BASL` → `GPC.ERR.PRG`, freshened on release by
 `build_basl.py GPC.ERR.BASL GPC.ERR.PRG`) was given a pass. **Both halves check out, and the pass found
 a bug in the runtime rather than in GPC.ERR** — see "A runtime error named the line after the one that
 failed" below.
@@ -3603,7 +3603,7 @@ failed" below.
 a 46-character tail after `RUN` vanished completely and the program then waited forever at its first
 prompt. `-pastewarp`, and dropping `-warp`, change nothing. To test it headlessly, rebuild the same
 `.BASL` with only `CLEAR.KB` stubbed to a bare `RETURN` and drive that; the decode logic under test is
-untouched. (`LINPUT` programs such as `drive/MD5` are unaffected — no drain loop.)
+untouched. (`LINPUT` programs such as `source/drive/MD5` are unaffected — no drain loop.)
 
 ### `STASH.SLOT` — more than one rectangle in the same bank. BUILT 07/09/26
 
@@ -3614,7 +3614,7 @@ in, default 0; `STASH.NEXT` out. The `GP.ASM` blobs did not change at all.
 `STASH.WALK`.** The internal is now `STASH.ORG` rather than `STASH.HEAD`, because `STASH.HEADER`
 exists and one name being a prefix of the other fails silently rather than loudly.
 
-Six assertions in `scratch/stashvram/SLOTT.BASL`. Two worth naming: a save with `STASH.SLOT` never
+Six assertions in `source/scratch/stashvram/SLOTT.BASL`. Two worth naming: a save with `STASH.SLOT` never
 mentioned behaves exactly as before, and a rectangle saved at offset 8000 round-trips — the
 signed-`%` case the entry below predicted, and it holds.
 
@@ -3666,10 +3666,10 @@ makes the waste worse.
 against a baseline with the same body. Rectangles and blobs both, a bump allocator on 256-byte
 pages, LIFO release, and the compactor in its own file. **No `GP.ASM`, so no `#SYMFILE`** — the
 thing `STASH` cannot fix. It executes no `BANK` either, so it runs inside a `GP.BANKED` region:
-tested, `scratch/stashvram/SVB.BASL`, 4/4.
+tested, `source/scratch/stashvram/SVB.BASL`, 4/4.
 
 **The risk this entry said to retire first was retired first, and everything passed** —
-`scratch/stashvram/SVGATE.BASL`, 8/8. See [[vram-to-vram-memory-copy-limits]]. The three that
+`source/scratch/stashvram/SVGATE.BASL`, 8/8. See [[vram-to-vram-memory-copy-limits]]. The three that
 mattered: VERA's auto-increment DOES carry into bit 16 (nothing in the tree had ever crossed
 `$10000` mid-transfer); 15,360 bytes in one call is exact, across that line, both directions; and
 an overlapping slide DOWNWARD is safe, which is what the compactor does.
@@ -3728,9 +3728,9 @@ parked on VERA data ports at a large count. `BMX.PALCOPY` only proves it at 512 
 between two VRAM regions, read back scattered cells, compare against the same move done a byte at a
 time.
 
-### Undo buffer in VRAM — `samples/editor`
+### Undo buffer in VRAM — `GPC-BASIC-TOOLS-SRC/editor`
 
-The editor has no undo (`samples/editor/readme.md` says so). VRAM is where to look first: 128K that
+The editor has no undo (`GPC-BASIC-TOOLS-SRC/editor/readme.md` says so). VRAM is where to look first: 128K that
 costs nothing from the 17,152-byte p-code budget and nothing from the workspace, and that bank
 switching and string garbage collection cannot touch.
 
@@ -3837,7 +3837,7 @@ reached only through a computed `GOSUB`/`ON x GOSUB`. Neither exists in the curr
 scanner that assumes it will be wrong eventually, so warn rather than assume.
 
 Related, and the reason it matters: [[program-too-big-fires-early]] and the release-build split in
-`samples/editor/EDITOR.BASL` (`#IFNDEF ED.RELEASE`).
+`GPC-BASIC-TOOLS-SRC/editor/EDITOR.BASL` (`#IFNDEF ED.RELEASE`).
 
 - Copy the object code *down* after compiling, rather than leaving it above the compiler and its
   libraries (must stay on a page boundary). **The part that matters is DONE** — a saved `OBJECT.PRG`
@@ -3958,12 +3958,12 @@ Shipped, worth fixing (memory *and* speed — one allocation per character):
 
 | file | line | variable |
 |---|---|---|
-| `samples/editor/ED-STORE.BASL` | 143 | `LINE.TEXT$ + CHR$()` per char (loader) |
-| `samples/editor/ED-STORE.BASL` | 349 | `DOC.OUT$ + CHR$()` per char (saver) |
-| `samples/XBASE/GPC-BASIC/DBFILE.INC.BL` | 129 | `DBFILE.S$ + CHR$()` per byte |
-| `samples/XBASE/GPC-BASIC/DB.INC.BL` | 460 | `DB.BUF$ + STR.STR$` |
-| `samples/XBASE/XBASE.BASL` | 240, 402 | `XB.LINE$ +` |
-| `samples/prg2basload/prg2basload.basl` | 919 | `INDENT$ + " "` (small) |
+| `GPC-BASIC-TOOLS-SRC/editor/ED-STORE.BASL` | 143 | `LINE.TEXT$ + CHR$()` per char (loader) |
+| `GPC-BASIC-TOOLS-SRC/editor/ED-STORE.BASL` | 349 | `DOC.OUT$ + CHR$()` per char (saver) |
+| `GPC-BASIC-TOOLS-SRC/XBASE/GPC-BASIC/DBFILE.INC.BL` | 129 | `DBFILE.S$ + CHR$()` per byte |
+| `GPC-BASIC-TOOLS-SRC/XBASE/GPC-BASIC/DB.INC.BL` | 460 | `DB.BUF$ + STR.STR$` |
+| `GPC-BASIC-TOOLS-SRC/XBASE/XBASE.BASL` | 240, 402 | `XB.LINE$ +` |
+| `GPC-BASIC-TOOLS-SRC/prg2basload/prg2basload.basl` | 919 | `INDENT$ + " "` (small) |
 
 Ignore `EDITOR.BASL` 1095 / 1113 / 1294 / 1298 — all inside `#IFNDEF ED.RELEASE`, they do not
 ship. **Next step when this is picked up:** do the editor's two, measure the delta, and only then
@@ -3973,14 +3973,14 @@ decide about the rest.
 
 The probe walks the block chain and prints one line per block; a Python pass turns that into the
 tables above. The harness lived in `tmp-heap/` (untracked) driven by `source/unit-tests/devprobe.py`
-with `GPCWORK` pointed at that directory, per the "do not build in `drive/`" rule.
+with `GPCWORK` pointed at that directory, per the "do not build in `source/drive/`" rule.
 
 Three things that cost cycles and will again:
 
 - **A SHARED build's heap pointers are `$0411`/`$0419`** (`stringHighMemory`, `storeEndHigh`),
   *not* the runtime image's `$0400`/`$0408`. `availableMemory` is `$26` in both. Have the probe
   identify them itself by checking which candidate satisfies `FRE = ceiling - availableMemory`.
-- **`samples/editor/EDITOR.BASL` is committed in RELEASE mode** — all three of `ED.RELEASE`,
+- **`GPC-BASIC-TOOLS-SRC/editor/EDITOR.BASL` is committed in RELEASE mode** — all three of `ED.RELEASE`,
   `ED.NOCORE`, `ED.NOOPT` defined. A headless run then prints *nothing* and sits in the
   interactive loop, which reads exactly like a hang. Comment out `ED.RELEASE` plus one of the
   other two and set `DEBUG.MODE = 1`.

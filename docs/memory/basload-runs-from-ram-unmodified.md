@@ -13,7 +13,7 @@ metadata:
 apart from the two nondeterministic trailing bytes `build_basl.py` already documents.
 
 This kills the "patching BASLOAD means shipping a custom rom.bin and flashing real hardware"
-objection. It would ship in `drive/` beside `GPC.BIN`.
+objection. It would ship in `source/drive/` beside `GPC.BIN`.
 
 ## What was established
 

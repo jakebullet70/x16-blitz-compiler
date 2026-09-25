@@ -207,7 +207,7 @@ failure mode is a stale pointer reading whatever got the block next. Silent, and
 at a random later time. One byte cannot go stale.
 
 **One index, not two.** `LINEINPUT` asks `ALLOW$` first and skips `DENY$`
-entirely when it is set ([LINEINPUT.INC.BL:195-196](../../samples/GPB-MODS-TESTING/GPC-BASIC/LINEINPUT.INC.BL#L195)),
+entirely when it is set ([LINEINPUT.INC.BL:195-196](../../GPC-BASIC-TOOLS-SRC/GPB-MODS-TESTING/GPC-BASIC/LINEINPUT.INC.BL#L195)),
 so a field only ever uses one of the two. A new flag bit -- `GUI.CF.DENY`, 8 --
 says which kind the index names. Default is an allow set.
 
@@ -250,7 +250,7 @@ FORM.C.PROPER   3  upper after a space or at position 1, lower elsewhere
 `LINEINPUT` has no case handling today -- grep the file and the only `CASE` in
 it is `GP.CASE`. This adds `LINEINPUT.CASE` beside `LINEINPUT.ALLOW$` and
 `LINEINPUT.DENY$`, and the transform goes at the accept point, immediately after
-[LINEINPUT.INC.BL:195-196](../../samples/GPB-MODS-TESTING/GPC-BASIC/LINEINPUT.INC.BL#L195).
+[LINEINPUT.INC.BL:195-196](../../GPC-BASIC-TOOLS-SRC/GPB-MODS-TESTING/GPC-BASIC/LINEINPUT.INC.BL#L195).
 Per keystroke, not on exit: dBASE's `!` picture showed the capital as it was
 typed, and a field that silently rewrites itself on TAB reads as a glitch.
 `PROPER` is the only one that needs to look at anything but the key -- it tests

@@ -29,7 +29,7 @@ A style of 256 or more is an address -- the caller's own eight screen codes, cop
 `GPDrawCustom` and then indexed as `GPD_CUSTOM = 4`. `GPD_STYLES = 4`, so a plain 4..255 is
 `BAD STYLE`.
 
-Styles 1-3 are built from screen codes `$40-$7D`. Under `samples/edit`'s ASCII-ordered
+Styles 1-3 are built from screen codes `$40-$7D`. Under `GPC-BASIC-TOOLS-SRC/edit`'s ASCII-ordered
 font that range is ASCII letters, so **the single-line style draws "p @ B"** (observed
 as style 2, which is style 1 under the numbering above) and only **style 0
 survives**, because `$80-$FF` is the one region the re-order never touches. If a different

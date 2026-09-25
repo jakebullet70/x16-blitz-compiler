@@ -1,37 +1,37 @@
 ---
 name: make-libs-does-not-install-the-runtime
-description: "make libs rebuilds gp.library and GPC.BIN but never writes drive/GPB.RT.nnn.BIN. A new runtime opcode then compiles fine and dispatches into garbage at run time. Run make -C source/runtime gpc-rt as well."
+description: "make libs rebuilds gp.library and GPC.BIN but never writes source/drive/GPB.RT.nnn.BIN. A new runtime opcode then compiles fine and dispatches into garbage at run time. Run make -C source/runtime gpc-rt as well."
 metadata:
   type: project
 ---
 
 **`make libs` does not install the runtime binaries.** `source/runtime`'s default target is
 `build`, which assembles the test harness image into `source/runtime/build/`. The two files a
-compiled program actually loads — `drive/GPB.RT.nnn.BIN` and `drive/GPC.RT.nnn.BIN` — are
+compiled program actually loads — `source/drive/GPB.RT.nnn.BIN` and `source/drive/GPC.RT.nnn.BIN` — are
 written only by the **`gpc-rt`** target, through `scripts/rtname.py`.
 
 So after a change under `source/gp-runtime/` or `source/runtime/`:
 
     make libs                          # gp.library, runtime.library, GPC.BIN -- all fresh
-    make -C source/runtime gpc-rt      # ...and THIS is what drive/ runs against
+    make -C source/runtime gpc-rt      # ...and THIS is what source/drive/ runs against
 
 **An EMBEDDED compile needs the runtime IMAGES, and those ARE a `make libs` product.**
 `GPC.IMG.<nnn>.BIN` and `GP1.IMG.<nnn>.BIN` are streamed off the drive by the object writer, so
 the sample folder an embedded build runs in needs both beside `GPC.BIN`. Missing, the compile
 stops right after `PASS 1 ...` with `NO RUNTIME IMAGE` and writes no object. They are gitignored
 everywhere, so a fresh tree has none: run `make libs` (it only regenerates `version.asm`, no
-build-number bump) and copy the pair out of `drive/`. Hit 2026-09-24 on `samples/color-test`,
-where `drive/` carried the 124 runtimes but no 124 images at all.
+build-number bump) and copy the pair out of `source/drive/`. Hit 2026-09-24 on `GPC-BASIC-TOOLS-SRC/color-test`,
+where `source/drive/` carried the 124 runtimes but no 124 images at all.
 
 ## What it looks like when it bites
 
 Found 2026-09-08 building `GP.FN`. The compiler emitted the two new opcodes `$F1`/`$F2` correctly —
 p-code, branch offsets and variable addresses all decoded right out of the object — and every
-program using them wedged with `OUT OF MEMORY` and a runaway PC. The runtime in `drive/` was
+program using them wedged with `OUT OF MEMORY` and a runaway PC. The runtime in `source/drive/` was
 three and a half hours old and its vector table had no entries for them, so the dispatcher jumped
 through whatever followed the table.
 
-**The tell is one `ls`:** `drive/GPC.BIN` freshly dated, `drive/GPB.RT.121.BIN` hours behind it.
+**The tell is one `ls`:** `source/drive/GPC.BIN` freshly dated, `source/drive/GPB.RT.121.BIN` hours behind it.
 The name never changes (`rtbuild.txt` is pinned), so nothing notices.
 
 Bisecting the handlers cannot find this — gutting them to no-ops changes a file that is not being

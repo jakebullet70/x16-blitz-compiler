@@ -57,7 +57,7 @@ _ClearLoop1:
 		;		the workspace (see application/source/compiler/object.asm). So the top quarter
 		;		was reserved for nothing -- and unreachable, because strings only ever grow down
 		;		from this ceiling and arrays only ever grow up towards it. Measured on
-		;		samples/FSIM16_V1: workspace $7900-$9F00, ceiling $9600, and the highest byte the
+		;		GPC-BASIC-TOOLS-SRC/FSIM16_V1: workspace $7900-$9F00, ceiling $9600, and the highest byte the
 		;		program ever touched was $95FA. 2,304 of its 9,728 bytes, for nothing.
 		;
 		;		The ceiling is exclusive, so taking it right to the top is safe: StringConcrete

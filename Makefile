@@ -26,7 +26,7 @@ REVISION = r49
 
 #
 #		These are all commands, not files. "release" in particular used to collide with the
-#		release/ directory (now merged into drive/) -- make would see the directory, decide the
+#		release/ directory (now merged into source/drive/) -- make would see the directory, decide the
 #		target was already made, and skip it. Mark them phony so they always run regardless.
 #
 .PHONY: all libs release pullbuild latest samples
@@ -34,14 +34,14 @@ REVISION = r49
 all: libs samples
 
 #
-#		Mirror the samples/ tree into drive/ (the emulator's drive and the root of the release
-#		zip), so every sample is runnable in the emulator and ships in the release. samples/ is the
-#		master; drive/samples is a build artifact, wiped and re-copied each time so a renamed or
+#		Mirror the GPC-BASIC-TOOLS-SRC/ tree into source/drive/ (the emulator's drive and the root of the release
+#		zip), so every sample is runnable in the emulator and ships in the release. GPC-BASIC-TOOLS-SRC/ is the
+#		master; source/drive/samples is a build artifact, wiped and re-copied each time so a renamed or
 #		deleted sample never lingers. Runs on every build (it is a prerequisite of `all`).
 #
 samples:
 	rm -rf $(RELEASEDIR)samples
-	cp -r samples $(RELEASEDIR)samples
+	cp -r GPC-BASIC-TOOLS-SRC $(RELEASEDIR)samples
 
 #
 #		Build the library version of the components. 

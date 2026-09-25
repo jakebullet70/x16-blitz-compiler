@@ -6,7 +6,7 @@ metadata:
   type: project
 ---
 
-**BUILT 2026-09-08.** `samples/GPB-MODS-TESTING` grew a **second** `GP.BANKED` region, bank 7, and
+**BUILT 2026-09-08.** `GPC-BASIC-TOOLS-SRC/GPB-MODS-TESTING` grew a **second** `GP.BANKED` region, bank 7, and
 put `APPSYS`, `BANKMGR`, `STRCASE`, `STRINGS`, `STRUSING`, `SORT`, `STASHVRAM` and `FILEIO` in it.
 Resident object **15,254 -> 14,001 while gaining two modules and three panels**; workspace
 6,656 -> 7,680. A third region followed on 2026-09-09, and that build found the 37,632-byte `objPtr`

@@ -1,0 +1,16 @@
+@4.20 KV.INC.BL -- keys and values in one RAM bank (2)
+:+8        the value's length, 0-119
+:+9..      the value
+:slot 0    "*KVSTORE", 2, the version (1), the slot count (64)
+.
+.KV.EXP.BL, in GPC-BASIC-TOOLS-SRC/GPB-MODS-TESTING/GPC-BASIC/, calls every routine.
+.
+=EXAMPLE PROGRAM
+.
+.  KV.EXP.BL -- runnable, in the GPC-BASIC folder
+.
+=SEE ALSO
+.
+>57|3.12 Code in a bank
+>95|4.13 BANKMGR.INC.BL -- who owns which RAM bank
+>102|4.20 KV.INC.BL -- keys and values in one RAM bank

@@ -8,7 +8,7 @@ metadata:
   modified: 2026-09-19T14:45:12.096Z
 ---
 
-A library change made in samples/GPB-MODS-TESTING/GPC-BASIC/ stays there until GPBMODS has been
+A library change made in GPC-BASIC-TOOLS-SRC/GPB-MODS-TESTING/GPC-BASIC/ stays there until GPBMODS has been
 built and tested with it. Only then does it go anywhere else: root GPC-BASIC/ **and** the private
 GPC-BASIC/ copies inside other samples (editor, GPC-HELP, GPC-GUI-HELPER, XBASE).
 

@@ -2,7 +2,7 @@
 ## **
 ## **  IF.EXP.BL -- GP.IF / GP.ELSEIF / GP.ELSE / GP.ENDIF
 ## **
-## **  Build:  copy GPC-BASIC/GPB.INC.BL and this file into drive/, then
+## **  Build:  copy GPC-BASIC/GPB.INC.BL and this file into source/drive/, then
 ## **            python source/gpc/build_basl.py IF.EXP.BL IF.PRG
 ## **          and compile IF.PRG with GPC.BIN.
 ## **

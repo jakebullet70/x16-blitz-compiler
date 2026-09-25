@@ -10,8 +10,8 @@ metadata:
 
 A dBase II / XBase record keeper for the X16: data on disk, one record visible at a time, engine
 p-code in a `GP.BANKED` region, two databases open at once, and a bar-menu admin that is also the
-demo. Design in `samples/XBASE/PLAN.md`; the file skeleton, and where the code disagrees with the
-plan, in `samples/XBASE/readme.md`.
+demo. Design in `GPC-BASIC-TOOLS-SRC/XBASE/PLAN.md`; the file skeleton, and where the code disagrees with the
+plan, in `GPC-BASIC-TOOLS-SRC/XBASE/readme.md`.
 
 **Skeleton written 2026-09-08, nothing compiled or run.** Eleven files. The only check made on any
 of it is that every `GOSUB` and `GOTO` target resolves.
@@ -25,7 +25,7 @@ per record and a region cannot call a region, and `DBFORM` stays because it call
 bank 8 are both `BANKMGR.CLAIM`ed at startup, with an `XB.BANKSTOP` exit if either is taken.
 
 **THE BUILD PULLS FROM TWO DIRECTORIES AND THAT IS NOT A MISTAKE.** The library modules come from
-`samples/GPB-MODS-TESTING/GPC-BASIC/`, because that is where the `.BODY` renames, `SHIM.GUIBANK` and
+`GPC-BASIC-TOOLS-SRC/GPB-MODS-TESTING/GPC-BASIC/`, because that is where the `.BODY` renames, `SHIM.GUIBANK` and
 `BANKMGR` live. `GPB.INC.BL` is the one exception and comes from root. See
 [[library-working-copy-then-root]] for the skew.
 
@@ -48,7 +48,7 @@ the record ceiling, and does not retire [[ask-before-writing-asm]] generally.
 
 **The admin has no function keys and no keyboard shortcuts.** DBU names its eight bar titles F1-F8
 and the skeleton followed it until 2026-09-08, when the user took them out. ESC opens the bar and
-the arrows walk it, which is what `samples/edit/EDITOR.BASL` does. A CTRL-C quit shortcut was
+the arrows walk it, which is what `GPC-BASIC-TOOLS-SRC/edit/EDITOR.BASL` does. A CTRL-C quit shortcut was
 added in the same breath and removed in the next: **leaving is File Exit and there is no second way
 to it.**
 
@@ -73,7 +73,7 @@ fields still have to arrive in heap strings, so a banked record costs 32 blob ca
   descriptor, 33 KB before the first data record on a 32-field table. One float add per seek buys
   that back and is nothing against a stride-length `CHRIN` loop.
 - **`MACPTR` into the string heap, not into a bank.** The blob in
-  `samples/GPB-MODS-TESTING/GPC-BASIC/FILEDIR.INC.BL` already takes an arbitrary destination pointer
+  `GPC-BASIC-TOOLS-SRC/GPB-MODS-TESTING/GPC-BASIC/FILEDIR.INC.BL` already takes an arbitrary destination pointer
   and restores the caller's window on every exit path. Pointed at `GP.STRPTR(DB.BUF$(n)) + 1` it
   block-reads into a BASIC string. See [[macptr-wraps-banks-itself]].
 

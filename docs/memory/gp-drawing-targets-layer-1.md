@@ -7,7 +7,7 @@ metadata:
 
 **`GP.FILL` / `GP.BOX` / `GP.PRINTAT` / `GP.CHAR` all address LAYER 1 and nothing else.**
 `GPDrawAddress` (`gpdraw.asm`) hands off to `TileSetAddress` (`runtime/.../commands/tiles.asm`),
-whose header says it plainly: "Point VERA data port 0 at the **layer 1** map entry". `samples/edit`
+whose header says it plainly: "Point VERA data port 0 at the **layer 1** map entry". `GPC-BASIC-TOOLS-SRC/edit`
 found the same seam from the other side -- "every GP command addresses layer 1 only" -- which is why
 it needs its own `ED.ROW.STREAM` assembly to paint a document on layer 0.
 

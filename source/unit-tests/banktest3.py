@@ -7,7 +7,7 @@
 import glob, os, re, shutil, subprocess, time, sys
 
 ROOT = r"C:\dev\CmdrX16\dos_tools\x16-blitz-compiler"
-T = os.path.join(ROOT, "scratch", "banktest3")
+T = os.path.join(ROOT, "source", "scratch", "banktest3")
 E = os.path.join(ROOT, "bin", "x16emu")
 #   The interpreter running this, not a path off one machine: the hard-coded one went
 #   stale and the suite could not tokenise anything at all.
@@ -239,7 +239,7 @@ BIGEMB = [("BNKBIG", 100)]
 shutil.copy2(os.path.join(ROOT, "source", "application", "GPC.BIN"), T)
 for pattern in ("GPC.IMG.*.BIN", "GP1.IMG.*.BIN",
                 "GPB.RT.*.BIN", "GPC.RT.*.BIN", "GP1.RT.*.BIN"):
-    for f in glob.glob(os.path.join(ROOT, "drive", pattern)):
+    for f in glob.glob(os.path.join(ROOT, "source", "drive", pattern)):
         shutil.copy2(f, T)
 
 #   BNKOVL is BNK255 under another name, made fresh each run so the two cannot drift.

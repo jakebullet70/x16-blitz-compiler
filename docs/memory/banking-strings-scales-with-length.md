@@ -11,7 +11,7 @@ metadata:
 a bank, while a 30-character one costs 48 and nets about **41**. Count barely matters; length is
 the whole term.
 
-**Measured 2026-09-03, `samples/edit` menus -> bank 5 (`ED-MENUS.BASL`), and it BROKE EVEN.**
+**Measured 2026-09-03, `GPC-BASIC-TOOLS-SRC/edit` menus -> bank 5 (`ED-MENUS.BASL`), and it BROKE EVEN.**
 `FRE(0)` either side of `ED.MENU.SETUP`, release build:
 
 | | before | after | |

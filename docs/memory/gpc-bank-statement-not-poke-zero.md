@@ -29,11 +29,11 @@ keyboard layout tables at `$A000` bank 0, every bank read *identically* and `$A6
 back as `" the fiel"` — the editor's own document text, because the doc arena lives in
 that same banked window and the bank never actually changed.
 
-**It is documented in this tree already**, at the top of `samples/edit/STORE.BASL`:
+**It is documented in this tree already**, at the top of `GPC-BASIC-TOOLS-SRC/edit/STORE.BASL`:
 "the runtime's PEEK/POKE honour the last BANK statement, so a banked access is
 `BANK <bank> : PEEK/POKE $A000+<offset>`". Read that before inventing a mechanism.
 
-`samples/edit` reserves bank 1..3 for its line table and 4+ for content, and it sets
+`GPC-BASIC-TOOLS-SRC/edit` reserves bank 1..3 for its line table and 4+ for content, and it sets
 `BANK` before *every* banked access — so **bank 0 is free to borrow** and nothing needs
 restoring afterwards.
 

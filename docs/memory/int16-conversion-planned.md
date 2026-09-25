@@ -11,7 +11,7 @@ metadata:
 The library's untyped numeric scalars are to take `%` where they fit, then root, XBASE and GPB.HELP
 follow. Nothing was converted as of 2026-09-13.
 
-Handoff: `samples/GPB-MODS-TESTING/INT16-HANDOFF.md`. Tool: `source/gpc/int16scan.py`
+Handoff: `GPC-BASIC-TOOLS-SRC/GPB-MODS-TESTING/INT16-HANDOFF.md`. Tool: `source/gpc/int16scan.py`
 (`--names`, `--check`, `--spread`).
 
 **Why:** 4 B of workspace a scalar and zero p-code; about 1,384 B on GPBMODS, 1,500 B on XBASE.

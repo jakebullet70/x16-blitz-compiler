@@ -5,7 +5,7 @@ metadata:
   type: project
 ---
 
-**`ED.ROW.STREAM` (`samples/edit/EDITOR.BASL`) writes TWO CELLS PER FLUSH through VERA's FX cache,
+**`ED.ROW.STREAM` (`GPC-BASIC-TOOLS-SRC/edit/EDITOR.BASL`) writes TWO CELLS PER FLUSH through VERA's FX cache,
 and the flush is 4-BYTE ALIGNED: it lands at `address AND NOT 3`.** So the destination column must be
 EVEN. Column 0 is aligned, which is why nothing in this editor ever had to know -- until the line
 number gutter put the text base at byte 10 (column 5). That rounded down to byte 8: the whole

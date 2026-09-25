@@ -5,7 +5,7 @@ metadata:
   type: project
 ---
 
-Phase 5 of `samples/GPB-MODS-TESTING/GUI-CUA-PLAN.md` (demo panels, `GP-BASIC.GLOBALS.md`,
+Phase 5 of `GPC-BASIC-TOOLS-SRC/GPB-MODS-TESTING/GUI-CUA-PLAN.md` (demo panels, `GP-BASIC.GLOBALS.md`,
 help text — no new bank code) is **written but not verified or committed** as of 2026-09-10.
 
 Committed already: `2d18df6`, the six CUA modules into root `GPC-BASIC/` (THEME, MENUVERT,
@@ -15,13 +15,13 @@ Every bankable module is now two files instead: `X.INC.BL` with plain labels for
 
 Uncommitted in the working tree: `GPC-BASIC/GP-BASIC.md`, `GPC-BASIC/GP-BASIC.GLOBALS.md`
 (new §3/§4 sections for MENUBAR, GUI, GUI2, STASH, STASHFILE, SORT, STRCASE; the
-public-name-vs-`.BODY` rule), and `samples/GPB-MODS-TESTING/GPBMODS.BASL` (the new
+public-name-vs-`.BODY` rule), and `GPC-BASIC-TOOLS-SRC/GPB-MODS-TESTING/GPBMODS.BASL` (the new
 `GMX.D.FOCUS` demo panel, dropdown entry 11, `BS.CHROME` TAB line).
 
 **Still owed:** rebuild GPBMODS + GUIFRMT headlessly (last good: GUIFRMT 3,690 B /
 ALL TWENTY-FOUR PASS; GPBMODS 14,652 B, `.004` 8,194 `.005` 7,938 `.006` 3,330
 `.007` 4,098 `.008` 1,538) — delete the stale `.SRC.PRG` first, see
-[[headless-basl-build-recipe]]; regenerate help with `samples/GPC-HELP/MKHELP.PY`;
+[[headless-basl-build-recipe]]; regenerate help with `GPC-BASIC-TOOLS-SRC/GPC-HELP/MKHELP.PY`;
 mark phase 5 done in the plan (em dashes and §, the file is UTF-8); commit and push.
 
 **Deliberately outside phase 5** and still drifting: KB.INC.BL (root header is newer — a

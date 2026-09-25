@@ -43,7 +43,7 @@ _PNLoop:
 		;
 		;		They are not interchangeable even on screen: $1D steps over a cell and leaves
 		;		what was there, $20 blanks it. Anything that redraws a field in place -- e.g.
-		;		samples/FSIM16_V1's HUD -- depends on the difference. And to a file, to CMD or
+		;		GPC-BASIC-TOOLS-SRC/FSIM16_V1's HUD -- depends on the difference. And to a file, to CMD or
 		;		to a printer, $1D is a control code where stock writes a space, which is how
 		;		that sample's FLIGHT.LOG came out different compiled than interpreted.
 		;

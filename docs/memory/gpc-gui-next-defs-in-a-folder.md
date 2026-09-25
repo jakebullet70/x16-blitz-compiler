@@ -5,7 +5,7 @@ metadata:
   type: project
 ---
 
-**Next editing session on `samples/GPC-GUI-HELPER/GPC.GUI.BASL`:** the definition
+**Next editing session on `GPC-BASIC-TOOLS-SRC/GPC-GUI-HELPER/GPC.GUI.BASL`:** the definition
 files and project files it saves and loads move into a folder named
 **`GPC-GUI-DATA`**. Asked for 2026-09-16, deliberately deferred to its own session.
 

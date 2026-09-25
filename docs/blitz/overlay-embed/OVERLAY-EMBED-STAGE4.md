@@ -116,7 +116,7 @@ The refusal in `source/compiler/source/commands/gpbank.asm:83-87` was lifted
 temporarily again, both libraries were rebuilt, and the lift was then reverted;
 `git diff -- source/compiler/` is empty.
 
-**`BNKPK`, a throwaway probe** (left in `scratch/banktest3/`, which is not tracked)
+**`BNKPK`, a throwaway probe** (left in `source/scratch/banktest3/`, which is not tracked)
 — one region in bank 5 that is never called, and low code that does `BANK 5`
 and prints `PEEK(40960)`, `PEEK(40961)`, `PEEK(40962)`:
 

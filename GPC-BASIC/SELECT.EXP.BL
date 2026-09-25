@@ -2,7 +2,7 @@
 ## **
 ## **  SELECT.EXP.BL -- GP.SELECT / GP.CASE / GP.OTHER / GP.ENDSEL
 ## **
-## **  Build:  copy GPC-BASIC/GPB.INC.BL and this file into drive/, then
+## **  Build:  copy GPC-BASIC/GPB.INC.BL and this file into source/drive/, then
 ## **            python source/gpc/build_basl.py SELECT.EXP.BL SELECT.PRG
 ## **          and compile SELECT.PRG with GPC.BIN.
 ## **

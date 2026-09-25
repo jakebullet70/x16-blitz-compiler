@@ -48,11 +48,11 @@ say the object's name rather than the tokenised source's.
 
 | Source | `#SAVEAS` | `#SYMFILE` | |
 |---|---|---|---|
-| `samples/GPB-MODS-TESTING/GPBMODS.BASL` | `@:GPBMODS.SRC.PRG` | `@:GPBMODS.SRC.SYM` | ok |
-| `samples/GPC-HELP/GPB.HELP.BASL` | `@:GPB.HELP.SRC.PRG` | `@:GPB.HELP.SRC.SYM` | ok |
-| `samples/color-test/COLORTST.BASL` | `@:COLORTST.SRC.PRG` | `@:COLORTST.SYM` | ok |
+| `GPC-BASIC-TOOLS-SRC/GPB-MODS-TESTING/GPBMODS.BASL` | `@:GPBMODS.SRC.PRG` | `@:GPBMODS.SRC.SYM` | ok |
+| `GPC-BASIC-TOOLS-SRC/GPC-HELP/GPB.HELP.BASL` | `@:GPB.HELP.SRC.PRG` | `@:GPB.HELP.SRC.SYM` | ok |
+| `GPC-BASIC-TOOLS-SRC/color-test/COLORTST.BASL` | `@:COLORTST.SRC.PRG` | `@:COLORTST.SYM` | ok |
 | `GPC-BASIC/BMXVIEW.EXP.BL` | `@:BMXVIEW.PRG` | `@:BMXVIEW.SYM` | **wrong** |
-| `samples/edit/EDITOR.BASL` | `@:EDITOR.PRG` | `@:EDITOR.SYM` | **wrong** |
+| `GPC-BASIC-TOOLS-SRC/edit/EDITOR.BASL` | `@:EDITOR.PRG` | `@:EDITOR.SYM` | **wrong** |
 
 Those two lines are tracked source. Agree the edit before making it.
 
@@ -63,22 +63,22 @@ Those two lines are tracked source. Agree the edit before making it.
 Three files read as finished programs and are not. This is the part that costs an afternoon if
 nobody says it first.
 
-**`drive/EDITOR.PRG` and `drive/BMXVIEW.PRG` are tokenised BASL, not objects.** The
+**`source/drive/EDITOR.PRG` and `source/drive/BMXVIEW.PRG` are tokenised BASL, not objects.** The
 tokeniser wrote them under the name reserved for the compiler's output. The first eight bytes
 separate the two kinds with no ambiguity:
 
 | File | Head | Reads as |
 |---|---|---|
-| `drive/EDITOR.PRG` 27,316 B | `01 08 09 08 01 00 89 35` | line 1, token `$89` `GOTO` — **tokenised source** |
-| `drive/BMXVIEW.PRG` 4,182 B | `01 08 09 08 01 00 89 34` | **tokenised source** |
-| `drive/COLORTST.SRC.PRG` 4,051 B | `01 08 09 08 01 00 89 31` | **tokenised source** |
-| `drive/COLORTST.PRG` 3,039 B | `01 08 13 08 0a 00 9e 20` | line 10, token `$9e` `SYS` — **object** |
-| `samples/edit/C.EDITOR.PRG` 26,411 B | `01 08 13 08 0a 00 9e 20` | **object** |
+| `source/drive/EDITOR.PRG` 27,316 B | `01 08 09 08 01 00 89 35` | line 1, token `$89` `GOTO` — **tokenised source** |
+| `source/drive/BMXVIEW.PRG` 4,182 B | `01 08 09 08 01 00 89 34` | **tokenised source** |
+| `source/drive/COLORTST.SRC.PRG` 4,051 B | `01 08 09 08 01 00 89 31` | **tokenised source** |
+| `source/drive/COLORTST.PRG` 3,039 B | `01 08 13 08 0a 00 9e 20` | line 10, token `$9e` `SYS` — **object** |
+| `GPC-BASIC-TOOLS-SRC/edit/C.EDITOR.PRG` 26,411 B | `01 08 13 08 0a 00 9e 20` | **object** |
 
 A `.MAP` beside the file says the same thing: the compiler writes one and the tokeniser does
 not. Neither `EDITOR.MAP` nor `BMXVIEW.MAP` exists.
 
-**`samples/GPC-HELP/GPB.HELP.PRG` was compiled EMBEDDED while the table said SHARED. FIXED on
+**`GPC-BASIC-TOOLS-SRC/GPC-HELP/GPB.HELP.PRG` was compiled EMBEDDED while the table said SHARED. FIXED on
 12th September 2026** by the rebuild against runtime 121: `helpbuild.py` produced a 14,595-byte
 SHARED object and installed `GPB.RT.121.BIN` and `GPC.RT.121.BIN` beside it. A SHARED object
 carries the name of the runtime it wants; an EMBEDDED one carries the runtime itself and names
@@ -86,18 +86,18 @@ nothing. Searching each object for a runtime filename, after that rebuild:
 
 | Object | Runtime name inside | Mode |
 |---|---|---|
-| `drive/GPBMODS.PRG` | `GPB.RT.121` | SHARED |
-| `drive/COLORTST.PRG` | `GPB.RT.121` | SHARED |
-| `drive/GPC.PRG` | `GPB.RT.121` | SHARED |
-| `samples/edit/C.EDITOR.PRG` | none | EMBEDDED, as its table entry says |
-| `samples/GPC-HELP/GPB.HELP.PRG` | `GPB.RT.121` | SHARED, matching its table entry |
+| `source/drive/GPBMODS.PRG` | `GPB.RT.121` | SHARED |
+| `source/drive/COLORTST.PRG` | `GPB.RT.121` | SHARED |
+| `source/drive/GPC.PRG` | `GPB.RT.121` | SHARED |
+| `GPC-BASIC-TOOLS-SRC/edit/C.EDITOR.PRG` | none | EMBEDDED, as its table entry says |
+| `GPC-BASIC-TOOLS-SRC/GPC-HELP/GPB.HELP.PRG` | `GPB.RT.121` | SHARED, matching its table entry |
 
 It had been a hand build from 08:08 that `samplesbuild.py` failed to replace, and failed to
 delete either, because it deleted the stale `GPB.PRG` under the wrong stem. The 121 rebuild
 replaced it: the drive is SHARED now, and the `runtimes` entry in the program table copies
 `GPB.RT.121.BIN` and `GPC.RT.121.BIN` in beside the object.
 
-**`samples/edit/C.EDITOR.PRG` is a real object from 3rd September**, nine days behind its
+**`GPC-BASIC-TOOLS-SRC/edit/C.EDITOR.PRG` is a real object from 3rd September**, nine days behind its
 source. It is not a placeholder and not this build's.
 
 ---
@@ -106,13 +106,13 @@ source. It is not a placeholder and not this build's.
 
 | Bat | Runs? | Why |
 |---|---|---|
-| `gpbmods-demo.bat` | yes | its drive is `drive/`, and the object is current |
+| `gpbmods-demo.bat` | yes | its drive is `source/drive/`, and the object is current |
 | `color-demo.bat` | yes | same drive, same |
 | `help-demo.bat` | yes | on the EMBEDDED 08:08 object, not on this build's |
-| `bmx-demo.bat` | **no** | `scratch/demo/` does not exist |
-| `menu-demo.bat` | **no** | `scratch/demo/` does not exist, and nothing builds `C.MENU.PRG` |
+| `bmx-demo.bat` | **no** | `source/scratch/demo/` does not exist |
+| `menu-demo.bat` | **no** | `source/scratch/demo/` does not exist, and nothing builds `C.MENU.PRG` |
 
-`scratch/demo/` is build output and is not in git. `samplesbuild.py` creates it when BMXVIEW installs,
+`source/scratch/demo/` is build output and is not in git. `samplesbuild.py` creates it when BMXVIEW installs,
 so it appears the moment BMXVIEW builds. `C.MENU.PRG` does not: `MENU.EXP.BL` appears in no
 `.py`, no `.sh` and no makefile, so `menu-demo.bat` stays dead until a sixth entry is added to
 the program table.
@@ -141,12 +141,12 @@ Staged from the tree as it stands:
 |---|---|
 | GPBMODS | the real 12,885-byte object and its eight overlays |
 | COLORTST | the real 3,039-byte object |
-| EDITOR | `samples/edit/C.EDITOR.PRG` — real, and from 3rd September |
-| BMXVIEW | **a placeholder** — `scratch/demo/C.BMXVIEW.PRG` does not exist |
+| EDITOR | `GPC-BASIC-TOOLS-SRC/edit/C.EDITOR.PRG` — real, and from 3rd September |
+| BMXVIEW | **a placeholder** — `source/scratch/demo/C.BMXVIEW.PRG` does not exist |
 | GPB.HELP | the EMBEDDED 08:08 object, staged at the package root |
 
 The BMX images are globbed rather than listed, and 8 of the original 28 remain in
-`samples/BMXVIEWER/SAMPLES` — the other 20 are staged deletions in git. The package takes
+`GPC-BASIC-TOOLS-SRC/BMXVIEWER/SAMPLES` — the other 20 are staged deletions in git. The package takes
 whatever is in the folder, so that count follows the tree with no error either way.
 
 ---
@@ -160,11 +160,11 @@ whatever is in the folder, so that count follows the tree with no error either w
    This fixes BMXVIEW and EDITOR and makes all five sources consistent. Tracked source — agree
    it first. The alternative is to have `samplesbuild.py` read the `#SAVEAS` line out of the
    source and ask for that name, which changes no source at all.
-3. **Delete `drive/EDITOR.PRG` and `drive/BMXVIEW.PRG`** before the next run. They are
+3. **Delete `source/drive/EDITOR.PRG` and `source/drive/BMXVIEW.PRG`** before the next run. They are
    tokenised source under object names. `samplesbuild.py` removes them itself at the top of
    each build, so this only matters if something reads them first.
 4. ~~**Rebuild GPB.HELP** and confirm the object names a runtime and that `GPB.RT.nnn.BIN`
-   arrives in `samples/GPC-HELP`.~~ DONE 12th September 2026 -- both confirmed, on 121.
+   arrives in `GPC-BASIC-TOOLS-SRC/GPC-HELP`.~~ DONE 12th September 2026 -- both confirmed, on 121.
 5. **A `set -e`, or a status check on line 62 of `release.sh`**, so a failed sample stops the
    packaging rather than being stubbed into it.
 6. **A sixth program-table entry for `MENU.EXP.BL`**, if `menu-demo.bat` is meant to work.

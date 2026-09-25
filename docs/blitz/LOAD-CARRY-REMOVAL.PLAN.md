@@ -65,13 +65,13 @@ chained program clears on entry by itself.
 
 Both real chains in the tree pass their parameters through a disk file and would not notice:
 
-- `source/gpc/GPC.BASL:85-105` (and its identical copy `drive/GPC.BASL`) writes
+- `source/gpc/GPC.BASL:85-105` (and its identical copy `source/drive/GPC.BASL`) writes
   `GPC.INPUT`, then `LOAD "GPC.BIN"`. This is the compiler's own front-end to engine handoff.
-- `samples/cruncher/CRUNCH.BASL:100-115` writes `CRUNCH.INPUT`, then `LOAD "CRUNCH.BIN"`.
+- `GPC-BASIC-TOOLS-SRC/cruncher/CRUNCH.BASL:100-115` writes `CRUNCH.INPUT`, then `LOAD "CRUNCH.BIN"`.
 - `OASIS/tmp-test/` chains `T1`..`T9` and `C.T1`..`C.T9` through `CHAIN.DAT`, nine hops
   interpreted and nine compiled.
 
-`samples/shared-vars/` is the only thing in the repository that depends on the carry, and it
+`GPC-BASIC-TOOLS-SRC/shared-vars/` is the only thing in the repository that depends on the carry, and it
 exists to demonstrate it.
 
 ## 4. The assembly edits
@@ -153,11 +153,11 @@ for `GPC.RT.120.BIN` and will not find it. That is the whole point of moving the
 nothing keeps running on the old runtime by accident.
 
 The stale `.BIN` files already staged around the tree go with it. `samplesbuild.py:158`
-clears older ones where it installs, but the copies under `scratch/*/`, `OASIS/tmp-test/` and
-`samples/GPC-HELP/` want checking by hand.
+clears older ones where it installs, but the copies under `source/scratch/*/`, `OASIS/tmp-test/` and
+`GPC-BASIC-TOOLS-SRC/GPC-HELP/` want checking by hand.
 
 Prose that names the old number reads stale afterwards. `help-demo.bat:42` and
-`drive/readme.md:21-23` are the two that are operational rather than illustrative.
+`source/drive/readme.md:21-23` are the two that are operational rather than illustrative.
 
 ## 6. Prose that names the carry
 
@@ -166,18 +166,18 @@ document that describes a mechanism the runtime no longer has is worse than no d
 
 | file | what is there |
 |---|---|
-| `samples/shared-vars/readme.md` | the whole document is about the carry |
-| `samples/shared-vars/PRG1.BASL:6-11`, `PRG2.BASL:6-10` | header REMs, and `PRG2` asserts the variables survived |
+| `GPC-BASIC-TOOLS-SRC/shared-vars/readme.md` | the whole document is about the carry |
+| `GPC-BASIC-TOOLS-SRC/shared-vars/PRG1.BASL:6-11`, `PRG2.BASL:6-10` | header REMs, and `PRG2` asserts the variables survived |
 | `GPC-BASIC/GP-BASIC.md:2488` | the *LOAD chaining leaks array strings* section |
 | `docs/memory/load-chain-strands-array-strings.md` | the defect note; becomes history, not a live hazard |
 | `docs/blitz/GP-BASIC.ASM.RESEARCH.md:314, 345, 1625-1626` | cites the shared-vars readme for the offset rule |
 | `docs/blitz/GP-BASIC.TIERS.md:508` | lists `loadChainSig` among the storage symbols |
 | `docs/oasis/FULL-SOURCE.PLAN.md:71-76, 195-205` | the mixed-chain argument and the `CLR`-on-entry section |
 | `docs/oasis/MSGPOST.PLAN.md:70-95, 175-200` | the golden RAM collision table and the handoff comparison |
-| `source/gpc/GPC.BASL:100-102` and `drive/GPC.BASL:100-102` | a `REM` claiming the chain works exactly as stock BASIC does and that variables survive |
-| `drive/GPCTEST.BASL:100-102` | the same `REM` |
-| `samples/cruncher/CRUNCH.BASL:110-112` | "chain-loads exactly as stock BASIC does inside a running program" -- true enough about the mechanism, but check the wording still reads right |
-| `OASIS/tmp-test/gen.py:7` | cites `samples/shared-vars` as the proven form for a compiled `LOAD` |
+| `source/gpc/GPC.BASL:100-102` and `source/drive/GPC.BASL:100-102` | a `REM` claiming the chain works exactly as stock BASIC does and that variables survive |
+| `source/drive/GPCTEST.BASL:100-102` | the same `REM` |
+| `GPC-BASIC-TOOLS-SRC/cruncher/CRUNCH.BASL:110-112` | "chain-loads exactly as stock BASIC does inside a running program" -- true enough about the mechanism, but check the wording still reads right |
+| `OASIS/tmp-test/gen.py:7` | cites `GPC-BASIC-TOOLS-SRC/shared-vars` as the proven form for a compiled `LOAD` |
 | `TODO.md:2968-2990` | the sample entry and the findings block |
 | `TODO.md:3062-3066` | *Shared-runtime, THREE programs sharing variables -- TODO*; this item is cancelled by the change |
 
@@ -187,11 +187,11 @@ are copied and fix the master.
 The `REM` in `GPC.BASL` is worth keeping in some form: it explains why there is no `,8` on
 the `LOAD`, which is a real trap. Only the "and variables survive" half is wrong.
 
-`scratch/release/SRC/GPC.BASL` is a build artefact under a gitignored directory. Leave it.
+`release/TMP/SRC/GPC.BASL` is a build artefact under a gitignored directory. Leave it.
 
 ## 7. The sample
 
-`samples/shared-vars/` has no purpose after this. It is not in `samplesbuild.py`, so nothing
+`GPC-BASIC-TOOLS-SRC/shared-vars/` has no purpose after this. It is not in `samplesbuild.py`, so nothing
 breaks by leaving it, but it demonstrates a mechanism that will not exist.
 
 Two options, and this one is the user's call:
@@ -200,7 +200,7 @@ Two options, and this one is the user's call:
   chains; `PRG2` reads them back and checks them. That keeps a chaining sample, and the
   point it makes -- SHARED mode means one 11 KB runtime for two ~0.5 KB programs -- survives
   the rewrite intact. `OASIS/tmp-test/SVARS.BASL` is a worked example of the shape.
-- **Delete it**, and let `samples/cruncher/` stand as the chaining example it already is.
+- **Delete it**, and let `GPC-BASIC-TOOLS-SRC/cruncher/` stand as the chaining example it already is.
 
 Either way `TODO.md:3062` (extend it to three programs) is dead.
 
@@ -218,7 +218,7 @@ What to check afterwards:
 
 - `source/runtime/build/code.lbl` -- `loadChainSig` is gone and `StorageEnd` has fallen by 4.
 - The runtime is about 44 bytes smaller than the 10,956 of build 120.
-- `samples/cruncher/` still chains: `CRUNCH.BASL` to `CRUNCH.BIN` through `CRUNCH.INPUT`.
+- `GPC-BASIC-TOOLS-SRC/cruncher/` still chains: `CRUNCH.BASL` to `CRUNCH.BIN` through `CRUNCH.INPUT`.
   This is the one in-tree chain that a person can run end to end.
 - The compiler still chains to its own engine -- `GPC.BASL` to `GPC.BIN` through `GPC.INPUT`.
   This exercises the same path on the tool you are building with, so a regression here shows
@@ -231,10 +231,10 @@ What to check afterwards:
 
 - Do not build `PICKDEMO`, or tokenise or stage it. Standing order.
 - Do not regenerate the help. The `GP-BASIC.md` edit in section 6 changes
-  `samples/GPC-HELP/HELP-TXT/H072.HLP`, which is committed and clean, and the user has a
+  `GPC-BASIC-TOOLS-SRC/GPC-HELP/HELP-TXT/H072.HLP`, which is committed and clean, and the user has a
   bulk `.HLP` edit in flight. Make the `GP-BASIC.md` change, say that `MKHELP.PY` is owed,
   and stop.
 - Do not commit without asking.
-- `GPC-BASIC/BMXVIEW.EXP.BL` and `samples/edit/EDITOR.BASL` each have a `#SAVEAS`/`#SYMFILE`
+- `GPC-BASIC/BMXVIEW.EXP.BL` and `GPC-BASIC-TOOLS-SRC/edit/EDITOR.BASL` each have a `#SAVEAS`/`#SYMFILE`
   pair that is tracked source with an outstanding question against it. Not part of this work;
   do not touch them in passing.

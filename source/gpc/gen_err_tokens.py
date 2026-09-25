@@ -14,9 +14,9 @@ from c64tokens import C64TokenStore
 
 GPB     = os.path.join(ROOT,"GPC-BASIC","GPB.INC.BL")
 #		The tracked copy, and the one BASLOAD reads: an #INCLUDE resolves on the emulator
-#		drive, which is samples/GPC.ERR/.
+#		drive, which is GPC-BASIC-TOOLS-SRC/GPC.ERR/.
 DEFAULT = [os.path.join(ROOT,"GPC-BASIC","ERRTOKEN.INC.BL"),
-		   os.path.join(ROOT,"samples","GPC.ERR","GPC-BASIC","ERRTOKEN.INC.BL")]
+		   os.path.join(ROOT,"GPC-BASIC-TOOLS-SRC","GPC.ERR","GPC-BASIC","ERRTOKEN.INC.BL")]
 
 #
 #		The GP.* set as BASLOAD sees it. The #TOKEN lines are what tokenises a source, so they

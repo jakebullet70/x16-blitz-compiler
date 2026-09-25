@@ -40,7 +40,7 @@ import time
 
 HERE      = os.path.dirname(os.path.abspath(__file__))
 ROOT      = os.path.abspath(os.path.join(HERE, "..", ".."))
-TESTING   = os.path.join(ROOT, "drive")
+TESTING   = os.path.join(ROOT, "source", "drive")
 EMUDIR    = os.path.join(ROOT, "bin", "x16emu")
 EMU       = os.path.join(EMUDIR, "x16emu.exe" if os.name == "nt" else "x16emu")
 ROM       = os.path.join(EMUDIR, "rom.bin")
@@ -187,15 +187,15 @@ def compile_one(source, obj, mapfile="", shared=True, deadlist=""):
 	#		map and not getting one did not succeed, whatever is sitting in the object file.
 	#
 	if stopped is not None:
-		die("%s stopped compiling %s -- see drive/GPCCOMP.LOG\n%s"
+		die("%s stopped compiling %s -- see source/drive/GPCCOMP.LOG\n%s"
 			% (ENGINE, source, report(stopped)))
 	if not finished:
-		die("%s did not finish %s within %ds -- see drive/GPCCOMP.LOG"
+		die("%s did not finish %s within %ds -- see source/drive/GPCCOMP.LOG"
 			% (ENGINE, source, TIMEOUT))
 	if not os.path.exists(objpath):
-		die("%s did not compile %s -- see drive/GPCCOMP.LOG" % (ENGINE, source))
+		die("%s did not compile %s -- see source/drive/GPCCOMP.LOG" % (ENGINE, source))
 	if mapfile and not os.path.exists(os.path.join(TESTING, mapfile)):
-		die("%s wrote no map for %s -- see drive/GPCCOMP.LOG" % (ENGINE, source))
+		die("%s wrote no map for %s -- see source/drive/GPCCOMP.LOG" % (ENGINE, source))
 	print("  compiled %s -> %s (%d bytes, %s)"
 		  % (source, obj, os.path.getsize(objpath), "SHARED" if shared else "EMBEDDED"))
 	os.remove(os.path.join(TESTING, "GPCCOMP.LOG"))
@@ -206,7 +206,7 @@ def main():
 	args = sys.argv[1:]
 	shared = True
 	deadlist = ""
-	#		--drive DIR compiles where a sample lives rather than in drive/.
+	#		--drive DIR compiles where a sample lives rather than in source/drive/.
 	#		--strip FILE removes dead code and writes the lines left out to FILE. Off unless
 	#		asked for, so every build that does not pass it is compiled exactly as before.
 	while args and args[0] in ("--embedded", "--drive", "--strip"):

@@ -1612,7 +1612,7 @@ the `POKE`-per-byte idiom it replaces (§14.8).
 
 ### 17.1 BASLOAD has an explicit switch for this
 
-`drive/MSEDIT/BASLOAD.MD` documents **`#REM 0` / `#REM 1`**:
+`source/drive/MSEDIT/BASLOAD.MD` documents **`#REM 0` / `#REM 1`**:
 
 > *"This option lets you select whether REM statements are included in the
 > resulting code or not. `#REM 0` turns off the output and `#REM 1` turns it on
@@ -1621,7 +1621,7 @@ the `POKE`-per-byte idiom it replaces (§14.8).
 > in force until changed. **The default value is 0 (off).**"*
 
 Confirmed in the tree: every `.BASL` here sets `#REM 0` explicitly
-(`drive/GPC.BASL:4`, `drive/GPC.ERR.BASL:5`, `OASIS/tmp-test/T1.BASL:2`), and
+(`source/drive/GPC.BASL:4`, `source/drive/GPC.ERR.BASL:5`, `OASIS/tmp-test/T1.BASL:2`), and
 a `.PRG` built with it in force was measured to contain **no `$8F` byte at all**
 — the REMs really are stripped.
 
@@ -1980,7 +1980,7 @@ to rebuild:
 
 - **Line attribution** — BASLOAD tracks included files and emits `REM #nn-mm`, so
   an error inside the include names the include, not the `#INCLUDE` line.
-- **Nesting**, to the X16's ten-open-files limit (`drive/MSEDIT/BASLOAD.MD`).
+- **Nesting**, to the X16's ten-open-files limit (`source/drive/MSEDIT/BASLOAD.MD`).
 
 ### 19.2 DROPPED — `GP.ASMFILE "MYCODE.ASM"`
 

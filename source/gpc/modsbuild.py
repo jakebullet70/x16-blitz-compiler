@@ -5,10 +5,10 @@
 import os, shutil, subprocess, sys, time
 
 ROOT    = r"C:\dev\CmdrX16\dos_tools\x16-blitz-compiler"
-SAMPLE  = os.path.join(ROOT, "samples", "GPB-MODS-TESTING")
+SAMPLE  = os.path.join(ROOT, "GPC-BASIC-TOOLS-SRC", "GPB-MODS-TESTING")
 WORKLIB = os.path.join(SAMPLE, "GPC-BASIC")
 ROOTLIB = os.path.join(ROOT, "GPC-BASIC")
-TESTING = os.path.join(ROOT, "drive")
+TESTING = os.path.join(ROOT, "source", "drive")
 GPCDIR  = os.path.join(ROOT, "source", "gpc")
 
 # the working copy is upstream for every module...

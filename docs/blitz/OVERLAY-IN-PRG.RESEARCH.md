@@ -36,7 +36,7 @@ Four escapes were considered and all four fail:
 
 ## 2. What the measurements say
 
-`samples/GPC-GUI-HELPER`, as built on 2026-09-16:
+`GPC-BASIC-TOOLS-SRC/GPC-GUI-HELPER`, as built on 2026-09-16:
 
 | file | bytes | bank |
 |---|---|---|

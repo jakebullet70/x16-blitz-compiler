@@ -6,7 +6,7 @@ metadata:
   type: reference
 ---
 
-**Measured 2026-09-07, `scratch/stashvram/SVGATE.BASL`, 8/8 green.** These were the open questions
+**Measured 2026-09-07, `source/scratch/stashvram/SVGATE.BASL`, 8/8 green.** These were the open questions
 under `STASHVRAM.INC.BL`, and all four answers are yes.
 
 A VRAM-to-VRAM copy is r0 = `$9F23` (DATA0, source), r1 = `$9F24` (DATA1, target), r2 = count,
@@ -37,7 +37,7 @@ happened passes: two regions holding the same pattern give the same CRC either w
 - `memory_copy` counts in **16 bits**, so anything at or above 65,536 must be chunked. A `#DEFINE`
   of `$8000` is no good as the chunk size — a `#DEFINE` is a signed int16 and it arrives as
   `-32768`, clamping the count negative. `$4000` is the largest round chunk that stays positive.
-- `HELP.PAGE.SHIFT` (`samples/GPC-HELP/GPB.HELP.BASL:835`) already shipped this at 4,480 bytes and
+- `HELP.PAGE.SHIFT` (`GPC-BASIC-TOOLS-SRC/GPC-HELP/GPB.HELP.BASL:835`) already shipped this at 4,480 bytes and
   is the blob-free template to copy: geometry asked of VERA, two ports, the 17-bit split, r0/r1/r2
   poked, one `GP.CALL`. Benchmarked at **1.6 jiffies against STASH's 11.0**.
 - A VRAM address is 17 bits, so `GP.HIBYTE`/`GP.LOBYTE` cannot split it (they reach 65,535) and

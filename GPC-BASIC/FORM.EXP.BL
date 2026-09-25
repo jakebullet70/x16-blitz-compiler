@@ -19,7 +19,7 @@
 ## **  would otherwise inherit the last one's.
 ## **
 ## **  Build:  copy GPB.INC.BL, THEME.INC.BL, APPSYS.INC.BL, LINEINPUT.INC.BL
-## **          and this file into drive/, then
+## **          and this file into source/drive/, then
 ## **            python source/gpc/build_basl.py FORM.EXP.BL FORM.PRG
 ## **          and compile FORM.PRG with GPC.BIN.
 ## **

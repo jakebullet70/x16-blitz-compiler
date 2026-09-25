@@ -2,11 +2,11 @@
 setlocal
 
 rem ---------------------------------------------------------------------------
-rem  Launch Box16 with the drive/ directory as its drive, so LOAD "GPC.PRG"
+rem  Launch Box16 with the source/drive/ directory as its drive, so LOAD "GPC.PRG"
 rem  and the rest just work. This .bat lives in USER-RUNS, under the project root; the programs
-rem  live in drive/ (the shipping release), and the emulator in bin/box16/.
+rem  live in source/drive/ (the shipping release), and the emulator in bin/box16/.
 rem
-rem      box16.bat                 boot to BASIC in drive/
+rem      box16.bat                 boot to BASIC in source/drive/
 rem      box16.bat GPC.PRG         load the compiler and RUN it
 rem      box16.bat OBJECT.PRG      run a compiled program
 rem
@@ -18,7 +18,7 @@ rem ---------------------------------------------------------------------------
 
 for %%I in ("%~dp0..") do set "ROOT=%%~fI\"
 set "ROOT=%ROOT:~0,-1%"
-set "DRIVE=%ROOT%\drive"
+set "DRIVE=%ROOT%source\drive"
 set "BOX16=%ROOT%\bin\box16\Box16.exe"
 set "ROM=%ROOT%\bin\box16\rom.bin"
 

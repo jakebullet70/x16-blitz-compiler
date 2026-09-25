@@ -27,7 +27,7 @@ line of its own. Folding the statement up onto it removes a source line and no o
 
 ## Why this matters
 
-`samples/cruncher/readme.md` says **"a line costs exactly one byte of p-code, plus a four-byte
+`GPC-BASIC-TOOLS-SRC/cruncher/readme.md` says **"a line costs exactly one byte of p-code, plus a four-byte
 entry in the compiler's line-number table"**, and that is true -- of BASIC lines. It is easy to
 read it as "source lines", and then to spend an afternoon pulling labels onto statements for
 nothing. The cruncher's own rule 2 ("a label names a line, so a line carrying one cannot fold into

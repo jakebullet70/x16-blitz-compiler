@@ -62,9 +62,9 @@ code: "this cannot be one GP.CALL", not "the one call version does not work, bec
 
 **Two traps in this repo:** `EDBENCH.BASL`'s `REM`s are the **GP.ASM source itself** under `#REM 1`
 and must not be touched, and `GUI.INC.BL` exists in **two copies** (`GPC-BASIC/` and
-`samples/edit/GPC-BASIC/`) that have to stay identical.
+`GPC-BASIC-TOOLS-SRC/edit/GPC-BASIC/`) that have to stay identical.
 
-**RAISED AGAIN 2026-09-05, on `samples/GPC-HELP/GPB.HELP.BASL`** -- *"are these comments for you or
+**RAISED AGAIN 2026-09-05, on `GPC-BASIC-TOOLS-SRC/GPC-HELP/GPB.HELP.BASL`** -- *"are these comments for you or
 for me? I do not need them. I do not like when I look at code and 90% of the page is a big comment
 and there are like 4 lines of code."* The answer is that they are for nobody: I do not need them to
 read the code either. 474 comment lines to 787 of code, a 67-line header before the first `#DEFINE`,
@@ -86,7 +86,7 @@ a pointer to `readme.md`, and three paragraphs of library internals a caller can
 **A sweep is not done when the prose is better. It is done when blocks are gone.** Report which
 blocks were deleted by name, not how the surviving ones now read.
 
-**Progress:** `samples/edit/EDITOR.BASL` (709 → 423 prose lines), `STORE.BASL` and
+**Progress:** `GPC-BASIC-TOOLS-SRC/edit/EDITOR.BASL` (709 → 423 prose lines), `STORE.BASL` and
 `GPC-BASIC/GUI.INC.BL` (372 → 256) are done. A library module cuts less than a sample — its
 parameter table and per-routine in/out blocks are what a caller opens the file to read, so `GUI`
 cut 31% against the editor's 40%. Twelve `GPC-BASIC/*.INC.BL` remain, worst first `STRCASE` 90%,

@@ -368,7 +368,7 @@ already filled. The stores are deferred to the end of the list now. See §9.
 
 ## 8. First build -- DONE 08/09/26
 
-Built against purpose-made tests in `drive/` rather than against XBASE: that sample is parked and
+Built against purpose-made tests in `source/drive/` rather than against XBASE: that sample is parked and
 carries its own `GPC-BASIC`, so it is a slow cycle for a first build and it entangles the banked
 case with its own state. **XBASE is the next step, not this one.**
 
@@ -459,7 +459,7 @@ deferral cost was evaluation stack -- N formals in N of the twelve slots where o
 that is the hazard §10 closes.
 
 **Every GP.FN program wedged with `OUT OF MEMORY` and a runaway PC, and no code was wrong.**
-`drive/GPB.RT.nnn.BIN` was three and a half hours stale: `make libs` builds `gp.library` and
+`source/drive/GPB.RT.nnn.BIN` was three and a half hours stale: `make libs` builds `gp.library` and
 `GPC.BIN` but never installs the runtime, which is `make -C source/runtime gpc-rt`. The compiler
 emitted `$F1`/`$F2` correctly and the loaded runtime's vector table had no entries for them.
 Bisecting the handlers "changed nothing" because the gutted file was not the one being loaded. See
@@ -592,7 +592,7 @@ Ctrl+C poll. **The old code paid none of it**, so it is purely additive, with tw
 
 ### The test
 
-**`drive/DEFFNS.BASL`.** A twelve-formal verb `WIDE` -- `W.A`..`W.L`, `RETURNS W.R`, body
+**`source/drive/DEFFNS.BASL`.** A twelve-formal verb `WIDE` -- `W.A`..`W.L`, `RETURNS W.R`, body
 `W.R = W.A + W.L` -- called by both `GP.SUB` and `GP.FN` with `1..11` and a last argument
 `N + N * 2 + N * 3 + N * 4` at `N = 1`. Twelve formals is `PROC_MAXFORMALS` and the last argument is
 four terms deep, so the arguments alone filled the stack and the depth ran off the end of it. Both

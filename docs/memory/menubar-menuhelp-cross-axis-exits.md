@@ -7,7 +7,7 @@ metadata:
 
 **The module was called `MENUHELP.INC.BL` when this was written and is `MENUVERT.INC.BL` now.**
 
-**The composition, built 2026-09-01 for `samples/edit`.**
+**The composition, built 2026-09-01 for `GPC-BASIC-TOOLS-SRC/edit`.**
 
 `MENUBAR.INC.BL` is a horizontal bar; `MENUVERT.INC.BL` is a vertical menu. A menu bar with
 dropdowns needs both at once, and the join is two flags — each module handing back a key that means

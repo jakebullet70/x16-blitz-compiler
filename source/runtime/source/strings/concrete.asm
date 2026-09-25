@@ -40,7 +40,7 @@ _SCNoMinimum:
 		;		BEFORE TAKING THE CEILING DOWN, LOOK FOR A DEAD BLOCK. write_string flags a
 		;		block it outgrows (control bit 7), and until 02/09/26 nothing ever read that
 		;		flag, so every string that grew past its block leaked it for good. Measured on
-		;		samples/edit: startup alone left ~3.5K of corpses in a 5K workspace, and its
+		;		GPC-BASIC-TOOLS-SRC/edit: startup alone left ~3.5K of corpses in a 5K workspace, and its
 		;		self-check's "intermittent" OUT OF MEMORY was that leak wobbling a page either
 		;		side of the line. First fit, and the max length is KEPT -- a corpse is its size
 		;		however it is reborn. The blocks tile the heap exactly from stringHighMemory up
