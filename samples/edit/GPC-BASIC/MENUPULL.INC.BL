@@ -17,7 +17,7 @@
 ## **      where the screen under a dropdown is kept: MENU.SAVE.VRAM, the
 ## **      default, or MENU.SAVE.BANK.
 ## **  MENU.SHADOW     non-zero gives a boxed dropdown a drop shadow, solid
-## **                  cells in MENU.SHADOWATTR (0 is black), trimmed at the
+## **                  cells in MENU.SHADOWATTR% (0 is black), trimmed at the
 ## **                  screen edge. The save-under covers it.
 ## **
 ## **   out  MENU.EXITKEY    the key that ended it
@@ -40,7 +40,7 @@
 ## **  with SV.MAX handles, 1 if SV.MAX is 0. A program that uses STASHVRAM
 ## **  itself sets SV.MAX, with a handle to spare for the menu, and runs
 ## **  GOSUB MENUPULL.SVSTART rather than DIM the table: the compiler takes
-## **  one DIM of an array, and it is here. MENU.SAVE.BANK keeps it in bank MENU.STASHBANK
+## **  one DIM of an array, and it is here. MENU.SAVE.BANK keeps it in bank MENU.STASHBANK%
 ## **  with STASH. Set that before the first call to choose the bank; left at
 ## **  0, the first call takes one from BANKMGR. If there is no room either
 ## **  way the dropdown still runs and the screen is not put back.
@@ -131,67 +131,67 @@ MENUPULL.BESIDE:
     IF MID$(MENU.FLAG$(MENU.BAR), MENU.CUR, 1) <> "0" THEN MENU.CUR = MENU.PULLAT
     RETURN
 
-## ---- under the item, and pulled left to stay on screen. MENU.EDGE is the frame.
+## ---- under the item, and pulled left to stay on screen. MENU.EDGE% is the frame.
 MENUPULL.PLACE:
     MENU.RUNCOL = MENU.SELX : MENU.RUNROW = MENU.BARY + 1
-    MENU.EDGE = 2
-    IF MENU.STYLE = MENU.NOBOX THEN MENU.EDGE = 0
-    GP.CALL MENUPULL.SCRMODE, 0, 0, 0, 1 : MENU.COLS = GP.X : MENU.ROWS = GP.Y
-    IF MENU.RUNCOL + MENU.WIDE + MENU.EDGE > MENU.COLS THEN MENU.RUNCOL = MENU.COLS - MENU.WIDE - MENU.EDGE
+    MENU.EDGE% = 2
+    IF MENU.STYLE = MENU.NOBOX THEN MENU.EDGE% = 0
+    GP.CALL MENUPULL.SCRMODE, 0, 0, 0, 1 : MENU.COLS% = GP.X : MENU.ROWS% = GP.Y
+    IF MENU.RUNCOL + MENU.WIDE + MENU.EDGE% > MENU.COLS% THEN MENU.RUNCOL = MENU.COLS% - MENU.WIDE - MENU.EDGE%
     IF MENU.RUNCOL < 0 THEN MENU.RUNCOL = 0
-    MENU.SHW = 0 : MENU.SHH = 0
-    IF MENU.SHADOW = 0 OR MENU.EDGE = 0 THEN RETURN
-    MENU.SHW = MENU.COLS - MENU.RUNCOL - MENU.WIDE - MENU.EDGE
-    IF MENU.SHW > 2 THEN MENU.SHW = 2
-    IF MENU.RUNROW + MENU.COUNT + MENU.EDGE < MENU.ROWS THEN MENU.SHH = 1
+    MENU.SHW% = 0 : MENU.SHH% = 0
+    IF MENU.SHADOW = 0 OR MENU.EDGE% = 0 THEN RETURN
+    MENU.SHW% = MENU.COLS% - MENU.RUNCOL - MENU.WIDE - MENU.EDGE%
+    IF MENU.SHW% > 2 THEN MENU.SHW% = 2
+    IF MENU.RUNROW + MENU.COUNT + MENU.EDGE% < MENU.ROWS% THEN MENU.SHH% = 1
     RETURN
 
 ## ---- the shadow: two columns down the right from the second row, one row
 ## ---- under from the third column, so the box's corners stay clear.
 MENUPULL.SHADE:
-    MENU.BOXR = MENU.RUNCOL + MENU.WIDE + MENU.EDGE
-    MENU.BOXB = MENU.RUNROW + MENU.COUNT + MENU.EDGE
-    IF MENU.SHW > 0 THEN GP.FILL MENU.BOXR, MENU.RUNROW + 1, MENU.SHW, MENU.COUNT + MENU.EDGE - 1, 32, MENU.SHADOWATTR
-    IF MENU.SHH > 0 THEN GP.FILL MENU.RUNCOL + 2, MENU.BOXB, MENU.WIDE + MENU.EDGE + MENU.SHW - 2, 1, 32, MENU.SHADOWATTR
+    MENU.BOXR% = MENU.RUNCOL + MENU.WIDE + MENU.EDGE%
+    MENU.BOXB% = MENU.RUNROW + MENU.COUNT + MENU.EDGE%
+    IF MENU.SHW% > 0 THEN GP.FILL MENU.BOXR%, MENU.RUNROW + 1, MENU.SHW%, MENU.COUNT + MENU.EDGE% - 1, 32, MENU.SHADOWATTR%
+    IF MENU.SHH% > 0 THEN GP.FILL MENU.RUNCOL + 2, MENU.BOXB%, MENU.WIDE + MENU.EDGE% + MENU.SHW% - 2, 1, 32, MENU.SHADOWATTR%
     RETURN
 
-## ---- MENU.STASHED is not 0 when there is something to put back: the
+## ---- MENU.STASHED% is not 0 when there is something to put back: the
 ## ---- STASHVRAM handle, or -1 for the bank.
 MENUPULL.SAVE:
-    MENU.STASHED = 0
+    MENU.STASHED% = 0
     IF MENU.SAVEMODE = MENU.SAVE.BANK THEN GOTO MENUPULL.SAVEBANK
     IF SV.READY = 0 THEN GOSUB MENUPULL.SVSTART
     IF SV.READY = 0 THEN RETURN
     SV.X = MENU.RUNCOL : SV.Y = MENU.RUNROW
-    SV.W = MENU.WIDE + MENU.EDGE + MENU.SHW : SV.H = MENU.COUNT + MENU.EDGE + MENU.SHH
+    SV.W = MENU.WIDE + MENU.EDGE% + MENU.SHW% : SV.H = MENU.COUNT + MENU.EDGE% + MENU.SHH%
     GOSUB SV.SAVE
-    MENU.STASHED = SV.HND
+    MENU.STASHED% = SV.HND
     RETURN
 
 MENUPULL.SAVEBANK:
-    IF MENU.STASHBANK = 0 THEN GOSUB BANKMGR.GET.FREE.BANK : MENU.STASHBANK = BANKMGR.BANK
-    IF MENU.STASHBANK = 0 THEN RETURN
-    STASH.BANK = MENU.STASHBANK : STASH.SLOT = 0
+    IF MENU.STASHBANK% = 0 THEN GOSUB BANKMGR.GET.FREE.BANK : MENU.STASHBANK% = BANKMGR.BANK
+    IF MENU.STASHBANK% = 0 THEN RETURN
+    STASH.BANK = MENU.STASHBANK% : STASH.SLOT = 0
     STASH.X = MENU.RUNCOL : STASH.Y = MENU.RUNROW
-    STASH.W = MENU.WIDE + MENU.EDGE + MENU.SHW : STASH.H = MENU.COUNT + MENU.EDGE + MENU.SHH
+    STASH.W = MENU.WIDE + MENU.EDGE% + MENU.SHW% : STASH.H = MENU.COUNT + MENU.EDGE% + MENU.SHH%
     GOSUB STASH.SAVE
-    MENU.STASHED = STASH.OK
+    MENU.STASHED% = STASH.OK
     RETURN
 
 ## ---- once, and only when the program has not started STASHVRAM itself. A
 ## ---- refused SV.INIT leaves SV.READY 0 and nothing is saved from then on.
 MENUPULL.SVSTART:
-    IF MENU.SVTRIED <> 0 THEN RETURN
-    MENU.SVTRIED = -1
+    IF MENU.SVTRIED% <> 0 THEN RETURN
+    MENU.SVTRIED% = -1
     IF SV.MAX < 1 THEN SV.MAX = 1
     DIM SV.PAGE%(SV.MAX) : DIM SV.PAGES%(SV.MAX)
     GOSUB SV.INIT
     RETURN
 
 MENUPULL.RESTORE:
-    IF MENU.STASHED = 0 THEN RETURN
-    IF MENU.SAVEMODE = MENU.SAVE.BANK THEN STASH.BANK = MENU.STASHBANK : STASH.SLOT = 0 : STASH.MOVE = 0 : GOSUB STASH.RESTORE : RETURN
-    SV.HND = MENU.STASHED : SV.MOVE = 0
+    IF MENU.STASHED% = 0 THEN RETURN
+    IF MENU.SAVEMODE = MENU.SAVE.BANK THEN STASH.BANK = MENU.STASHBANK% : STASH.SLOT = 0 : STASH.MOVE = 0 : GOSUB STASH.RESTORE : RETURN
+    SV.HND = MENU.STASHED% : SV.MOVE = 0
     GOSUB SV.RESTORE
     GOSUB SV.FREE
     RETURN

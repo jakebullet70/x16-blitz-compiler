@@ -41,7 +41,9 @@
 ## **  MENU.ROUND, MENU.THICK, or 256+ for a glyph table. MENU.NOBOX draws
 ## **  none and puts the first row there instead.
 ## **
-## **  Set once by the caller, and read by every run:
+## **  The attributes below come out of the theme, and a theme change reaches
+## **  them on the next draw. A caller sets one only to differ from the theme,
+## **  and that setting lasts until the theme moves under it:
 ## **      MENU.ATTR       rows, background * 16 + fg
 ## **      MENU.HIATTR     the highlighted row; 0 inverts MENU.ATTR
 ## **      MENU.HOTATTR    the hot key letter; 0 leaves it untinted
@@ -430,9 +432,42 @@ MENU.SKIPLOOP:
     IF MENU.CUR > MENU.COUNT THEN GOSUB MENU.WRAPBOT
     GOTO MENU.SKIPLOOP
 
+## ***********************************************************************
+## **  MENU.THEME -- every menu attribute from THEME.CLR. The bar is BAR and
+## **  a popup TEXT; the lit row is HILITE, a hot key BORDER's colour over the
+## **  row's background, a disabled row DIMMED's the same way, the frame TEXT,
+## **  and a dropdown's shadow SHADOW.
+## **
+## **  A draw calls it itself once the palette has moved, so a program that
+## **  wants the theme's colours writes nothing. Call it by hand only after
+## **  poking THEME.CLR straight, and set a MENU attribute after it to differ
+## **  from the theme.
+## ***********************************************************************
+MENU.THEME:
+    IF THEME.READY% = 0 THEN GOSUB THEME.SELECT
+    MENU.THEMEAT% = THEME.STAMP%
+    MENU.BARATTR = THEME.CLR(THEME.BAR)
+    MENU.BARHI = THEME.CLR(THEME.HILITE)
+    MENU.BARHOT = (MENU.BARATTR AND 240) + (THEME.CLR(THEME.BORDER) AND 15)
+    MENU.ATTR = THEME.CLR(THEME.TEXT)
+    MENU.HIATTR = THEME.CLR(THEME.HILITE)
+    MENU.HOTATTR = (MENU.ATTR AND 240) + (THEME.CLR(THEME.BORDER) AND 15)
+    MENU.DISATTR = (MENU.ATTR AND 240) + (THEME.CLR(THEME.DIMMED) AND 15)
+    MENU.SEPATTR = MENU.ATTR
+    MENU.SHADOWATTR% = THEME.CLR(THEME.SHADOW)
+    RETURN
+
+## ---- the palette checked against the one the attributes were taken from.
+## Every draw path reaches this through MENU.LIGHT.
+MENU.THEMESYNC:
+    IF THEME.READY% = 0 THEN GOSUB THEME.SELECT
+    IF MENU.THEMEAT% <> THEME.STAMP% THEN GOSUB MENU.THEME
+    RETURN
+
 ## ---- MENU.RUNSLOT's colours: MENU.PLAIN the rows, MENU.HILITE the highlight,
 ## MENU.TINT the hot key. A HILITE of 0 inverts PLAIN.
 MENU.LIGHT:
+    GOSUB MENU.THEMESYNC
     MENU.PLAIN = MENU.ATTR : MENU.HILITE = MENU.HIATTR : MENU.TINT = MENU.HOTATTR
     IF MENU.RUNSLOT = MENU.BAR THEN GOSUB MENU.BARLIGHT
     IF MENU.HILITE = 0 THEN MENU.HILITE = (MENU.PLAIN AND 15) * 16 + INT(MENU.PLAIN / 16)

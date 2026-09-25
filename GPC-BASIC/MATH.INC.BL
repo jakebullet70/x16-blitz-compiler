@@ -1,0 +1,43 @@
+## ***********************************************************************
+## **  MATH.INC.BL -- the smaller and the larger of two numbers.
+## **
+## **      MATH.MIN    MATH.RESULT = the smaller of the two
+## **      MATH.MAX    MATH.RESULT = the larger
+## **
+## **  Requires GPB.INC.BL, and does not #INCLUDE it.
+## **
+## **      MATH.FIRST = 10 : MATH.SECOND = 4 : GOSUB MATH.MIN
+## **      GP.SUB MATH.MINOF, 10, 4
+## **      ROWS = GP.FN(MATH.MINOF, WANTED, AVAILABLE)
+## **
+## **   in   MATH.FIRST     one of the two numbers
+## **        MATH.SECOND    the other
+## **
+## **   out  MATH.RESULT    the answer, and what GP.FN reads back
+## **
+## **  Both routines share all three variables.
+## **
+## ***********************************************************************
+#IFNDEF MATH.DEFS
+#DEFINE MATH.DEFS 1
+
+GOTO MATH.SKIP
+
+## ---- MATH.MIN ----
+
+MATH.MIN:
+    GP.DEFPROC MATH.MINOF, MATH.FIRST, MATH.SECOND RETURNS MATH.RESULT
+    MATH.RESULT = MATH.FIRST
+    IF MATH.SECOND < MATH.FIRST THEN MATH.RESULT = MATH.SECOND
+    RETURN
+
+## ---- MATH.MAX ----
+
+MATH.MAX:
+    GP.DEFPROC MATH.MAXOF, MATH.FIRST, MATH.SECOND RETURNS MATH.RESULT
+    MATH.RESULT = MATH.FIRST
+    IF MATH.SECOND > MATH.FIRST THEN MATH.RESULT = MATH.SECOND
+    RETURN
+
+MATH.SKIP:
+#ENDIF

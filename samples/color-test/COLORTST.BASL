@@ -1,8 +1,8 @@
 #SAVEAS "@:COLORTST.SRC.PRG"
-#SYMFILE "@:COLORTST.SYM"
-#INCLUDE "GPB.INC.BL"
-#INCLUDE "APPSYS.INC.BL"
-#INCLUDE "THEME.INC.BL"
+#SYMFILE "@:COLORTST.SRC.SYM"
+#INCLUDE "GPC-BASIC/GPB.INC.BL"
+#INCLUDE "GPC-BASIC/APPSYS.INC.BL"
+#INCLUDE "GPC-BASIC/THEME.INC.BL"
 
 ## ***********************************************************************
 ## **
@@ -24,7 +24,7 @@
 ## **  text falls back to black or white.
 ## **
 ## **  CUSTOM INHERITS WHAT IS ON SCREEN. T writes the roles back to THEME.CLR
-## **  before cycling and THEME.ID 4 loads nothing, so the theme you step to
+## **  before cycling and THEME.ID% 4 loads nothing, so the theme you step to
 ## **  CUSTOM from is the one it starts as. The four before it DO load, so tune
 ## **  after arriving at CUSTOM, or tune GRAY and press T once.
 ## **
@@ -79,7 +79,7 @@ GP.CALL APPSYS.SCRMODE, 0, 0, 0, 1
 APPSYS.COLS = GP.X
 APPSYS.ROWS = GP.Y
 
-THEME.ID = 0 : GOSUB THEME.SELECT
+THEME.ID% = 0 : GOSUB THEME.SELECT
 GOSUB CTX.FROMTHEME
 CT.SEL = 0
 
@@ -236,7 +236,7 @@ CTX.CNAME:
 
 
 CTX.THNAME:
-  GP.SELECT THEME.ID
+  GP.SELECT THEME.ID%
     GP.CASE 1
       CT.TH$ = "DARK  "
     GP.CASE 2

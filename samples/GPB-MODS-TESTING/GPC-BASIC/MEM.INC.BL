@@ -1,0 +1,81 @@
+## ***********************************************************************
+## **  MEM.INC.BL -- block copy and block fill, through the KERNAL.
+## **
+## **      MEM.COPY    MEM.COUNT bytes from MEM.SOURCE to MEM.TARGET
+## **      MEM.FILL    MEM.COUNT bytes of MEM.VALUE at MEM.TARGET
+## **
+## **  Requires GPB.INC.BL, and does not #INCLUDE it.
+## **
+## **      MEM.SOURCE = A : MEM.TARGET = B : MEM.COUNT = 200 : GOSUB MEM.COPY
+## **      GP.SUB MEM.BLOCKCOPY, A, B, 200
+## **      IF GP.FN(MEM.BLOCKCOPY, A, B, 200) = 0 THEN <it was refused>
+## **
+## **   in   MEM.SOURCE     where MEM.COPY reads, 0 to 65535
+## **        MEM.TARGET     where either one writes, 0 to 65535
+## **        MEM.COUNT      how many bytes, 1 to 65535. Anything else is
+## **                       refused, not truncated.
+## **        MEM.VALUE      the byte MEM.FILL writes, 0 to 255
+## **
+## **   out  MEM.OK         -1 done, 0 refused, and what GP.FN reads back
+## **
+## **  The two routines share MEM.TARGET, MEM.COUNT and MEM.OK.
+## **
+## **  The two regions of a copy may overlap with the target below the
+## **  source.
+## **
+## **  An address in $9F00-$9FFF is used without being stepped. Point a
+## **  VERA data port at the start of the run and pass $9F23 or $9F24 to
+## **  move a whole block in one call. STASHVRAM.INC.BL is the worked
+## **  example.
+## **
+## **  A block over 65535 bytes goes a chunk at a time, as
+## **  STASHVRAMGC.INC.BL does. A chunk size above $4000 must not be a
+## **  #DEFINE, which is a signed 16-bit value.
+## **
+## **  WARNING: both ends must be low RAM below $9F00, or a $9F00-$9FFF
+## **  I/O port. No bank survives the call, so $A000-$BFFF is out of
+## **  reach. Move a banked block a window at a time, or write the call
+## **  in GP.ASM.
+## **
+## **  WARNING: reaching either routine carries the 1,536-byte GP block.
+## **  GP.CALL lives in it.
+## **
+## **  To run it from a bank, put the #INCLUDE between GP.BANKED and
+## **  GP.ENDBANKED. GPC-BASIC/BANKED-OR-NOT.md has the rules.
+## ***********************************************************************
+#IFNDEF MEM.DEFS
+#DEFINE MEM.DEFS 1
+
+## memory_copy takes source, target and count in r0, r1 and r2 at $02-$07.
+## memory_fill takes address and count in r0 and r1, and the fill byte in
+## the accumulator.
+#DEFINE MEM.MEMORYCOPY $FEE7
+#DEFINE MEM.MEMORYFILL $FEE4
+
+GOTO MEM.SKIP
+
+## ---- MEM.COPY ----
+MEM.COPY:
+    GP.DEFPROC MEM.BLOCKCOPY, MEM.SOURCE, MEM.TARGET, MEM.COUNT RETURNS MEM.OK
+    MEM.OK = 0
+    IF MEM.COUNT < 1 THEN RETURN
+    IF MEM.COUNT > 65535 THEN RETURN
+    POKE 2, GP.LOBYTE(MEM.SOURCE) : POKE 3, GP.HIBYTE(MEM.SOURCE)
+    POKE 4, GP.LOBYTE(MEM.TARGET) : POKE 5, GP.HIBYTE(MEM.TARGET)
+    POKE 6, GP.LOBYTE(MEM.COUNT) : POKE 7, GP.HIBYTE(MEM.COUNT)
+    GP.CALL MEM.MEMORYCOPY : MEM.OK = -1
+    RETURN
+
+## ---- MEM.FILL ----
+MEM.FILL:
+    GP.DEFPROC MEM.BLOCKFILL, MEM.TARGET, MEM.COUNT, MEM.VALUE RETURNS MEM.OK
+    MEM.OK = 0
+    IF MEM.COUNT < 1 THEN RETURN
+    IF MEM.COUNT > 65535 THEN RETURN
+    POKE 2, GP.LOBYTE(MEM.TARGET) : POKE 3, GP.HIBYTE(MEM.TARGET)
+    POKE 4, GP.LOBYTE(MEM.COUNT) : POKE 5, GP.HIBYTE(MEM.COUNT)
+    GP.CALL MEM.MEMORYFILL, GP.LOBYTE(MEM.VALUE) : MEM.OK = -1
+    RETURN
+
+MEM.SKIP:
+#ENDIF

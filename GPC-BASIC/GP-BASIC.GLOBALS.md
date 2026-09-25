@@ -42,6 +42,8 @@ The convention is one dotted prefix per module, and nothing writes outside its o
 | `FILE.DIR.` | `FILEDIR.INC.BL` | reading a directory, kept apart from the rest of `FILE.` |
 | `SV.` | `STASHVRAM.INC.BL` | the VRAM store. `SVGC.` is `STASHVRAMGC.INC.BL`'s one constant |
 | `KV.` | `KV.INC.BL` | keys and values in one RAM bank |
+| `MATH.` | `MATH.INC.BL` | the smaller and the larger of two numbers |
+| `MEM.` | `MEM.INC.BL` | a block copied, a block filled, and the two KERNAL constants |
 
 Pick anything else for your own program. `AIRLIFT.`, `GAME.`, `MAP.` — a prefix costs nothing at
 runtime because BASLOAD crunches every identifier down to a short BASIC variable, so a long
@@ -366,8 +368,8 @@ Routines, arguments and examples: §4.12.
 dialogs, each with an `EX` form that also takes the title and the second and third lines.
 `LIST.BEGIN`, `LIST.ARRAY`, `LIST.BANK`, `LISTTO.RUN`, `LIST.ITEM` and `LIST.SORT` build a list box
 a step at a time; `PANELOPEN`, `PANELCLOSE` and the `FORM.` verbs do the same for a form.
-`DLGRESET`, `DLGSHADOW` and `DLGGLYPH` set what every dialog starts from, and `KBCLEAR` throws away
-what is already typed.
+`DLGRESET`, `DLGSHADOW`, `DLGSHADOWCLR`, `DLGSTYLE` and `DLGGLYPH` set what every dialog starts
+from, and `KBCLEAR` throws away what is already typed.
 
 | | |
 |---|---|
@@ -452,6 +454,36 @@ Routines, arguments and examples: §4.8.
 
 `#SYMFILE` again. **Do not write `#AUTONUM` in a program that includes this** — it sets the STEP,
 and only the default 1 survives.
+
+### `MATH.INC.BL` — the smaller and the larger of two numbers
+
+Routines, arguments and examples: §4.22.
+
+| | |
+|---|---|
+| in | `MATH.FIRST` `MATH.SECOND` — the two numbers, in either order |
+| out | `MATH.RESULT` — the answer, and what `GP.FN` reads back |
+| verbs | `MATH.MINOF` `MATH.MAXOF` — the same two routines called in one line |
+| internal | — |
+
+All three names are shared by `MATH.MIN` and `MATH.MAX`. The formals of a `GP.DEFPROC` are ordinary
+variables, so `GP.SUB MATH.MINOF` writes `MATH.FIRST` and `MATH.SECOND` exactly as a `GOSUB` caller
+would.
+
+### `MEM.INC.BL` — a block copied, a block filled
+
+Routines, arguments and examples: §4.23.
+
+| | |
+|---|---|
+| in | `MEM.SOURCE` — where `MEM.COPY` reads, 0 to 65535<br>`MEM.TARGET` — where either routine writes<br>`MEM.COUNT` — 1 to 65535, refused outside that<br>`MEM.VALUE` — the byte `MEM.FILL` writes, 0 to 255 |
+| out | `MEM.OK` — -1 done, 0 refused, and what `GP.FN` reads back |
+| verbs | `MEM.BLOCKCOPY` `MEM.BLOCKFILL` |
+| internal | — |
+| constants | `MEM.MEMORYCOPY` `MEM.MEMORYFILL` — the two KERNAL entry points |
+
+`MEM.TARGET`, `MEM.COUNT` and `MEM.OK` are shared by both routines, so a fill overwrites the target
+a copy was set up with.
 
 ---
 

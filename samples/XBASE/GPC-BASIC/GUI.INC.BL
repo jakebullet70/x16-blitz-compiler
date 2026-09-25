@@ -30,7 +30,7 @@
 ## **  COMBO.DRAW and COMBO.KEY, named in GUI.FORM.PAINT and GUI.FORM.STEP --
 ## **  are resolved across the whole program and do not care about order.
 ## **
-## **      THEME.ID = 0 : GOSUB THEME.SELECT
+## **      THEME.ID% = 0 : GOSUB THEME.SELECT
 ## **      GUI.BANK = 8
 ## **      GUI.MSG$ = "Delete the file?"
 ## **      GOSUB GUI.YN

@@ -11,7 +11,6 @@
 ## **      GP.SUB MENU.ITEM, " E&XIT "
 ## **      GP.SUB MENU.BEGIN, MENU.DROP + 2
 ## **      GP.SUB MENU.ITEM, " &ABOUT "
-## **      GOSUB MENU.THEME
 ## **      GP.SUB MENU.DRAWBAR, 0, 0, MENU.NOBOX
 ## **      GOSUB MENU.KEYS.ON
 ## **
@@ -44,12 +43,9 @@
 ## **  MENU.SAVESCREEN says. The bar item is lit while its dropdown is open
 ## **  and plain again after.
 ## **
-## **  GOSUB MENU.THEME     the menu colours from THEME.CLR. The bar is BAR
-## **                       and a dropdown TEXT; the lit row is HILITE, a hot
-## **                       key BORDER's colour over the row's background, a
-## **                       disabled row DIMMED's the same way, and the frame
-## **                       TEXT. Run it again after a theme change, and set a
-## **                       MENU colour after it to differ.
+## **  The colours are the theme's, taken by MENU.INC.BL on the first draw and
+## **  again whenever the theme moves. Nothing here needs saying about them.
+## **
 ## **  GOSUB MENU.KEYS.ON   makes ALT with a bar hot key type that key.
 ## **  GOSUB MENU.KEYS.OFF  puts the keyboard layout back.
 ## **
@@ -166,18 +162,6 @@ MENU.ALTHIT:
     GOSUB MENU.MODSNOW
     IF (MENU.MODS AND MENU.MOD.ALT) = 0 THEN RETURN
     MENU.WALKAT = GP.FN(MENU.HOTROW, MENU.BAR, MENU.GOTKEY%)
-    RETURN
-
-MENU.THEME:
-    IF THEME.READY = 0 THEN GOSUB THEME.SELECT
-    MENU.BARATTR = THEME.CLR(THEME.BAR)
-    MENU.BARHI = THEME.CLR(THEME.HILITE)
-    MENU.BARHOT = (MENU.BARATTR AND 240) + (THEME.CLR(THEME.BORDER) AND 15)
-    MENU.ATTR = THEME.CLR(THEME.TEXT)
-    MENU.HIATTR = THEME.CLR(THEME.HILITE)
-    MENU.HOTATTR = (MENU.ATTR AND 240) + (THEME.CLR(THEME.BORDER) AND 15)
-    MENU.DISATTR = (MENU.ATTR AND 240) + (THEME.CLR(THEME.DIMMED) AND 15)
-    MENU.SEPATTR = MENU.ATTR
     RETURN
 
 ## ---- the plain table finds the key that types each letter, and the ALT

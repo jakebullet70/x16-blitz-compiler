@@ -202,6 +202,8 @@ Three implementations, and what each costs:
 | **The drive** | BASIC | `FILEDIR.INC.BL` — `FILE.DIR.INIT` `OPEN` `NEXT`, into a bank or low RAM · §4.16 |
 | **Screen — stash** | BASIC | `STASHVRAM.INC.BL` — `SV.SAVE` `SV.RESTORE` `SV.PUT` `SV.GET`, kept in VRAM · §4.18 |
 | **Screen — stash** | BASIC | `STASHVRAMGC.INC.BL` — `SV.COMPACT` · §4.19 |
+| **Numbers** | BASIC | `MATH.INC.BL` — `MATH.MIN` `MATH.MAX` · §4.22 |
+| **Memory** | BASIC | `MEM.INC.BL` — `MEM.COPY` `MEM.FILL`, the KERNAL's block move · §4.23 |
 
 The rule is in §1: assembly for tight loops and bulk data moves, BASIC for everything else, and a
 composite for anything that is only a spelling of keywords already present.
@@ -1603,9 +1605,9 @@ IF N = 0 THEN <cancelled>
 ```
 
 Requires `GPB.INC.BL` and `BANKMGR.INC.BL`, with `BANKMGR.INIT` run before the first
-`MENU.BEGIN`. `#INCLUDE` a store straight before `MENU.INC.BL`: `MENU.INC.BANKED.BL` for the sizes
-below. Its groups are banked, so the program gets a `NAME.OVL` beside its `.PRG` in either
-build — ship both.
+`MENU.BEGIN`, and a SHARED compile. `#INCLUDE "MENU.INC.BANKED.BL"` straight before
+`MENU.INC.BL`. Its groups are banked, so the program gets a `NAME.OVL` beside its `.PRG`.
+Ship both.
 
 A menu is built into a slot, then run from it. There are two slots, so the bar survives while its
 dropdown is built:
@@ -1616,10 +1618,10 @@ dropdown is built:
 | `MENU.POPUP` | 32 |
 
 A row past the slot's size is dropped, and so is a row added before any `MENU.BEGIN`. The sizes
-are the store file's, not `MENU.INC.BL`'s: `MENU.BAR.MAX`, `MENU.POPUP.MAX`, `MENU.POOL.MAX` and
-`MENU.POOLBASE` are declared beside the `SPC` lines they count, because a define that does not
-match its lines silently loses rows off the end of a menu. To change them, copy a store file and
-edit the defines and the lines together. `MENU.POOLBASE` is `MENU.BAR.MAX + MENU.POPUP.MAX`.
+are `MENU.BAR.MAX`, `MENU.POPUP.MAX`, `MENU.POOL.MAX` and `MENU.POOLBASE`, declared in
+`MENU.INC.BL`. A group in `MENU.INC.BANKED.BL` holds one `SPC` line per row it counts, so raising
+a define means adding lines to the group to match. A define that does not match its lines silently
+loses rows off the end of a menu. `MENU.POOLBASE` is `MENU.BAR.MAX + MENU.POPUP.MAX`.
 
 The text and hints are kept in bank `MENU.TEXTBANK`, which the first `MENU.BEGIN` claims from
 `BANKMGR` (§4.13). It is 62 unless the program writes `#DEFINE MENU.TEXTBANK n` before the
@@ -2044,6 +2046,7 @@ previous dialog set carries into the next one.
 | `DLGRESET bank` | the RAM bank the covered cells go to | every other input back to its default |
 | `DLGSHADOW on` · `DLGGLYPH on` | non-zero | the shadow and the frame glyphs, for every box after it |
 | `DLGSHADOWCLR attr` | a packed colour | the shadow's own colour; 0, the default, is black on black |
+| `DLGSTYLE style` | a `GP.BOX` style (§3.7); 0, the default, is a solid block | the frame every box after it draws; `DLGGLYPH` overrides it |
 | `KBCLEAR` | — | the keyboard buffer emptied |
 | `MSGBOX msg$` | | `GUI.KEY` — something to say, and one way out |
 | `ASKYN msg$` · `ASKOK msg$` | | -1 for yes, or OK |
@@ -2578,11 +2581,76 @@ Any other key is offered to the buttons' marked letters.
 file, as `COMBO.INC.BL` does. A program that includes the GUI and leaves this one out stops with
 `LABEL NOT FOUND`.
 
-`GPBMODS` (§4.22) runs three boxes and a combo on one form, under DIALOG > CHECK BOX + COMBO.
+`GPBMODS` (§4.24) runs three boxes and a combo on one form, under DIALOG > CHECK BOX + COMBO.
 
 ---
 
-### 4.22 `GPBMODS` — the harness that drives every module
+### 4.22 `MATH.INC.BL` — the smaller and the larger of two numbers
+
+| Routine | in | out |
+|---|---|---|
+| `MATH.MIN` | `MATH.FIRST` `MATH.SECOND` | `MATH.RESULT` |
+| `MATH.MAX` | `MATH.FIRST` `MATH.SECOND` | `MATH.RESULT` |
+
+```basic
+#INCLUDE "GPB.INC.BL"
+#INCLUDE "MATH.INC.BL"
+
+MATH.FIRST = WANTED : MATH.SECOND = AVAILABLE
+GOSUB MATH.MIN
+ROWS = MATH.RESULT
+```
+
+Both routines share all three variables. The verbs are `MATH.MINOF` and `MATH.MAXOF`, so the same
+answer comes back from `GP.SUB MATH.MINOF, WANTED, AVAILABLE` or from `GP.FN(MATH.MINOF, WANTED,
+AVAILABLE)` inside an expression.
+
+**`GP.FN` brings the GP block in**, 1,536 bytes. `GOSUB` and `GP.SUB` leave it out.
+
+Floats and integers both, and no range check. Equal arguments answer `MATH.FIRST`.
+
+A module rather than a keyword because choosing between two values needs a branch, and a composite
+cannot have one (§1).
+
+---
+
+### 4.23 `MEM.INC.BL` — a block copied, a block filled
+
+| Routine | in | out |
+|---|---|---|
+| `MEM.COPY` | `MEM.SOURCE` `MEM.TARGET` `MEM.COUNT` | `MEM.OK` |
+| `MEM.FILL` | `MEM.TARGET` `MEM.COUNT` `MEM.VALUE` | `MEM.OK` |
+
+```basic
+#INCLUDE "GPB.INC.BL"
+#INCLUDE "MEM.INC.BL"
+
+MEM.TARGET = 4096 : MEM.COUNT = 1000 : MEM.VALUE = 32
+GOSUB MEM.FILL
+IF MEM.OK = 0 THEN PRINT "REFUSED"
+```
+
+The KERNAL's `memory_copy` and `memory_fill`. The verbs are `MEM.BLOCKCOPY` and `MEM.BLOCKFILL`, and
+the two routines share `MEM.TARGET`, `MEM.COUNT` and `MEM.OK`.
+
+`MEM.COUNT` is 1 to 65535. Anything outside that is refused and `MEM.OK` comes back 0, never
+truncated. A longer block goes a chunk at a time; a chunk size above `$4000` cannot be a `#DEFINE`,
+which is signed. `STASHVRAMGC.INC.BL` (§4.19) is the worked example.
+
+Regions may overlap with the target below the source.
+
+**WARNING: both ends are low RAM below `$9F00`, or a `$9F00-$9FFF` I/O port.** No bank survives the
+call, so `$A000-$BFFF` cannot be reached. Move a banked block a window at a time.
+
+An address in `$9F00-$9FFF` is used without being stepped. Point a VERA data port at the start of a
+run and pass `$9F23` or `$9F24` to move a whole block in one call. `STASHVRAM.INC.BL` (§4.18) does
+that by hand.
+
+Either routine brings the GP block in, 1,536 bytes, because `GP.CALL` lives there.
+
+---
+
+### 4.24 `GPBMODS` — the harness that drives every module
 
 `samples/GPB-MODS-TESTING/GPBMODS.BASL`. A menu bar of nine dropdowns whose rows reach nearly every
 public entry point in this section. It is the one program that holds all twenty-one modules at once, and
@@ -2718,6 +2786,8 @@ The convention is one dotted prefix per module, and nothing writes outside its o
 | `STRCASE.` | `STRCASE.INC.BL` |
 | `BMX.` / `BMXK.` | `BMX.INC.BL` (variables / its KERNAL constants) |
 | `KV.` | `KV.INC.BL` |
+| `MATH.` | `MATH.INC.BL` |
+| `MEM.` | `MEM.INC.BL`, its two KERNAL constants included |
 
 Use any other prefix for your own program: `GAME.`, `MAP.`, `AIRLIFT.`. A prefix costs nothing at
 runtime — BASLOAD crunches every identifier to a short BASIC variable, so a long readable name and a

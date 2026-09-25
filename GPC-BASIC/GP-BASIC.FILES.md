@@ -161,8 +161,7 @@ removes dead code, including a module costs its whole size whether or not it is 
 | `STASHVRAMGC.INC.BL` | closes the holes a `STASHVRAM` freed out of order. Its own file, so it costs nothing unless called |
 | `LINEINPUT.INC.BL` | a positioned, length-limited entry field |
 | `MENU.INC.BL` | menus built a row at a time: a popup and a bar, run with `MENUTO.VERT` and `MENUTO.BAR`. Needs `BANKMGR.INC.BL` and a SHARED compile |
-| `MENU.INC.BANKED.BL` | the menu row store, and the `MENU.*.MAX` sizes that describe it. `#INCLUDE` it straight before `MENU.INC.BL` |
-| `MENU.INC.BANKED.SMALL.BL` | the same store with 42 text rows and 18 hint rows instead of 112 and 48. About 4K smaller. Include this **or** `MENU.INC.BANKED.BL`, never both |
+| `MENU.INC.BANKED.BL` | the menu row store, one `SPC` line per row the `MENU.*.MAX` sizes in `MENU.INC.BL` count. `#INCLUDE` it straight before `MENU.INC.BL` |
 | `MENUPULL.INC.BL` | a dropdown under a bar item, `MENUTO.PULLDOWN`. Needs `STASH.INC.BL` |
 | `GUI.INC.BL` | the box that puts the screen back, and the form and list controls inside it |
 | `GUI-DIALOGS.INC.BL` | every dialog as a verb: `MSGBOX`, `ASKYN`, `INPUTBOX`, `PICKMENU`, `LISTBOX`, the `LIST.` verbs and `FORM.`. `#INCLUDE` it after `GUI`, `COMBO` and `CHECK` |
@@ -180,6 +179,8 @@ removes dead code, including a module costs its whole size whether or not it is 
 | `FILEDIR.INC.BL` | read a directory, into a RAM bank or into low RAM |
 | `DOS.INC.BL` | a smaller alternative to `FILEIO.INC.BL`: `DOSX` sends a command to the drive and returns the error, `DOS.EXISTS` tests for a file. Include one of the two, not both |
 | `KV.INC.BL` | strings by key in one RAM bank, saved and loaded as one file. No `GP.ASM`, so no `#SYMFILE` |
+| `MATH.INC.BL` | the smaller and the larger of two numbers, as a `GOSUB` or as a verb |
+| `MEM.INC.BL` | a block copied and a block filled, through the KERNAL. Low RAM and the I/O page only |
 
 What each one costs in bytes is in the command reference, under *At a glance*.
 

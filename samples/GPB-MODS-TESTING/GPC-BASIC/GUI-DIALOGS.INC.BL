@@ -9,9 +9,9 @@
 ## **
 ## **  EVERY VERB STARTS CLEAN. It calls GUI.DEFAULTS before it sets anything,
 ## **  so nothing a previous dialog set -- title, placement, button labels --
-## **  carries into this one. Three things are kept: the bank DLGRESET was given,
-## **  which is where the covered cells are saved, and the DLGSHADOW, DLGSHADOWCLR
-## **  and DLGGLYPH settings.
+## **  carries into this one. Five things are kept: the bank DLGRESET was given,
+## **  which is where the covered cells are saved, and the DLGSHADOW, DLGSHADOWCLR,
+## **  DLGSTYLE and DLGGLYPH settings.
 ## **
 ## **  The short verb takes the message. The EX verb takes a title and three
 ## **  message lines first, always in that order, then its own arguments.
@@ -20,6 +20,9 @@
 ## **  DLGSHADOW on                        non-zero shadows every box after it
 ## **  DLGSHADOWCLR attr                  the shadow's colour, packed as the X16
 ## **                                      packs one; 0, the default, is black on black
+## **  DLGSTYLE style                      the frame every box after it draws:
+## **                                      0 solid, 1 single line, 2 rounded,
+## **                                      3 thick. DLGGLYPH overrides it
 ## **  DLGGLYPH on                         non-zero frames every box from the
 ## **                                      six GUI.EDGE.* and GUI.CORNER.*
 ## **  KBCLEAR                             empty the keyboard buffer
@@ -101,7 +104,7 @@ GUI.DEFAULTS:
     GUI.BANK = DLG.HOMEBANK
     GUI.MSG$ = "" : GUI.MSG2$ = "" : GUI.MSG3$ = ""
     GUI.TITLE$ = "" : GUI.BTN.ONE$ = "" : GUI.BTN.TWO$ = "" : GUI.BTN.THREE$ = ""
-    GUI.STYLE = 0 : GUI.GLYPH = DLG.GLYPH : GUI.PLACE = 0 : GUI.X = 0 : GUI.Y = 0
+    GUI.STYLE = DLG.STYLE : GUI.GLYPH = DLG.GLYPH : GUI.PLACE = 0 : GUI.X = 0 : GUI.Y = 0
     GUI.ROW.OFFSET = 0 : GUI.PANEL.IN = 0 : GUI.BORDER.IN = 0 : GUI.OKCANCEL = 0
     GUI.DEFAULT = 1 : GUI.SHADOW = DLG.SHADOW
     GUI.SHADOW.ATTR = DLG.SHADOWATTR : GUI.LEN = 0 : GUI.MASK = 0 : GUI.TEXT$ = ""
@@ -124,6 +127,11 @@ DLG.RESET:
 DLG.SETSHADOW:
     GP.DEFPROC DLGSHADOW, DLG.SHADOW
     GUI.SHADOW = DLG.SHADOW
+    RETURN
+
+DLG.SETSTYLE:
+    GP.DEFPROC DLGSTYLE, DLG.STYLE
+    GUI.STYLE = DLG.STYLE
     RETURN
 
 DLG.SETGLYPH:

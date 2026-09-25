@@ -5,27 +5,38 @@
 ## **  The colours are an array, read by BASIC for COLOR and the GP drawing
 ## **  commands, so they save and load like any other.
 ## **
-## **      THEME.ID   0 X16       blue page, white text -- the default
-## **                  1 DARK      black page, light grey text
-## **                  2 LIGHT     white page, black text
-## **                  3 GRAY      dark grey page, light blue frames
-## **                  4 CUSTOM    whatever THEME.CLR already holds
+## **      THEME.ID%  0 X16       blue page, white text -- the default
+## **                 1 DARK      black page, light grey text
+## **                 2 LIGHT     white page, black text
+## **                 3 GRAY      dark grey page, light blue frames
+## **                 4 CUSTOM    whatever THEME.CLR already holds
 ## **
 ## **  THEME.NEXT cycles to the following one and loads it, which is what a
 ## **  program binds to a key. THEME.RESET reloads the one already selected.
+## **
+## **  THEME.STAMP% counts the loads. A module that copies colours out of THEME.CLR
+## **  keeps the stamp it copied at and re-reads when the two differ, so a theme
+## **  change reaches it with nothing asked of the program.
 ## **
 ## **  CUSTOM loads nothing, leaving THEME.CLR as it stands, so a program that lets
 ## **  the user change colours carries those changes into it. Selected before any
 ## **  other theme it takes X16's values.
 ## **
 ## **  Usage:
-## **      THEME.ID = 1 : GOSUB THEME.SELECT
+## **      THEME.ID% = 1 : GOSUB THEME.SELECT
 ## **      GP.BOX 4,2,30,8, 2, THEME.CLR(THEME.BORDER)
 ## **      GP.PRINTAT 6,3, "TITLE", THEME.CLR(THEME.TITLE)
 ## **
 ## **  The values are packed attributes, background * 16 + foreground, as the GP
 ## **  drawing commands take them. For COLOR, which wants the halves separately,
 ## **  use THEME.SET.
+## **
+## **  THE MODULE'S OWN SCALARS CARRY %, THE ARRAY DOES NOT. An untyped scalar is six
+## **  bytes of the 4,096-byte variable arena and an int16 is two, so the six scalars
+## **  here are 24 bytes of it. That arena is what raises TOO MANY VARIABLES, and it is
+## **  a different budget from the free memory the banner calls LOW FREE. THEME.CLR is
+## **  read by name in every module that draws, so typing it would rename ninety-odd
+## **  call sites to buy array elements, which come out of LOW FREE instead.
 ## **
 ## **  TO RUN IT FROM A RAM BANK, put the #INCLUDE between GP.BANKED and
 ## **  GP.ENDBANKED. A call from outside the region selects the region's bank
@@ -46,6 +57,10 @@
 ##
 ## BAR is a menu bar or status line: a background of its own, so the band
 ## stands off the page. BORDER's colour marks a hot key on it.
+##
+## SHADOW is the colour a drop shadow is filled with -- a menu's, a dialog's --
+## and it is black on every palette. It is a role rather than a constant so that
+## a program which changes its colours changes this one with them.
 
 #DEFINE THEME.PAGE 0
 #DEFINE THEME.TEXT 1
@@ -56,7 +71,8 @@
 #DEFINE THEME.WARN 6
 #DEFINE THEME.FOCUS 7
 #DEFINE THEME.BAR 8
-#DEFINE THEME.SLOTS 9
+#DEFINE THEME.SHADOW 9
+#DEFINE THEME.SLOTS 10
 
 ## How many themes THEME.NEXT cycles through.
 #DEFINE THEME.COUNT 5
@@ -68,56 +84,77 @@
 
 GOTO THEME.SKIP
 
-## THEME.SELECT -- fill THEME.CLR from THEME.ID.
+## THE PALETTES HOLD THE PACKED NUMBER, NOT background * 16 + foreground. The compiler
+## folds no constants, so 6 * 16 + 14 emits five bytes of p-code and does the multiply
+## every time a theme loads, where 110 emits two. The comment above each palette carries
+## the background and foreground pair every number was built from.
+
+## THEME.SELECT -- fill THEME.CLR from THEME.ID%.
 ##
 ## THEME.CLR is DIMmed here, because DIMming an array GPC has already auto-dimensioned
-## is an error. No DATA statement, because READ walks every DATA in the whole program
-## in order and a library owning one would derail the caller's READs.
+## is an error. The bound is THEME.SLOTS - 1: DIM X(n) gives n+1 elements and the roles
+## run 0..THEME.SLOTS-1, so DIMming to THEME.SLOTS allocated an element nobody writes.
+## No DATA statement, because READ walks every DATA in the whole program in order and a
+## library owning one would derail the caller's READs.
+##
+## SHADOW is black in all four palettes, so it is written once here rather than four
+## times below. CUSTOM must keep the colours it already has, so it turns back before
+## that line -- except on the pass that created the array, which has nothing to keep
+## and falls through to X16 like any other first load.
 
 THEME.SELECT:
-    THEME.FIRST = 0
-    IF THEME.READY = 0 THEN DIM THEME.CLR(THEME.SLOTS) : THEME.READY = -1 : THEME.FIRST = -1
-    IF THEME.ID = 1 THEN GOTO THEME.SELECT.DARK
-    IF THEME.ID = 2 THEN GOTO THEME.SELECT.LIGHT
-    IF THEME.ID = 3 THEN GOTO THEME.SELECT.GRAY
-    IF THEME.ID = 4 THEN GOTO THEME.SELECT.CUSTOM
+    THEME.STAMP% = THEME.STAMP% + 1
+    THEME.FIRST% = 0
+    IF THEME.READY% = 0 THEN DIM THEME.CLR(THEME.SLOTS - 1) : THEME.READY% = -1 : THEME.FIRST% = -1
+    IF THEME.ID% = 4 AND THEME.FIRST% = 0 THEN RETURN
+    THEME.CLR(THEME.SHADOW) = 0
+    IF THEME.ID% = 1 THEN GOTO THEME.SELECT.DARK
+    IF THEME.ID% = 2 THEN GOTO THEME.SELECT.LIGHT
+    IF THEME.ID% = 3 THEN GOTO THEME.SELECT.GRAY
 
+## page 6,6   text 6,1   title 6,3   border 6,14   hilite 1,6
+## dimmed 6,12   warn 6,13   focus 7,6   bar 12,1
 THEME.SELECT.X16:
-    THEME.CLR(THEME.PAGE)   = 6 * 16 + 6
-    THEME.CLR(THEME.TEXT)   = 6 * 16 + 1
-    THEME.CLR(THEME.TITLE)  = 6 * 16 + 3
-    THEME.CLR(THEME.BORDER) = 6 * 16 + 14
-    THEME.CLR(THEME.HILITE) = 1 * 16 + 6
-    THEME.CLR(THEME.DIMMED) = 6 * 16 + 12
-    THEME.CLR(THEME.WARN)   = 6 * 16 + 13
-    THEME.CLR(THEME.FOCUS)  = 7 * 16 + 6
-    THEME.CLR(THEME.BAR)    = 12 * 16 + 1
+    THEME.CLR(THEME.PAGE)   = 102
+    THEME.CLR(THEME.TEXT)   = 97
+    THEME.CLR(THEME.TITLE)  = 99
+    THEME.CLR(THEME.BORDER) = 110
+    THEME.CLR(THEME.HILITE) = 22
+    THEME.CLR(THEME.DIMMED) = 108
+    THEME.CLR(THEME.WARN)   = 109
+    THEME.CLR(THEME.FOCUS)  = 118
+    THEME.CLR(THEME.BAR)    = 193
     RETURN
 
+## page 0,0   text 0,15   title 0,1   border 0,11   hilite 15,0
+## dimmed 0,12   warn 0,8   focus 7,0   bar 6,1
 THEME.SELECT.DARK:
-    THEME.CLR(THEME.PAGE)   = 0 * 16 + 0
-    THEME.CLR(THEME.TEXT)   = 0 * 16 + 15
-    THEME.CLR(THEME.TITLE)  = 0 * 16 + 1
-    THEME.CLR(THEME.BORDER) = 0 * 16 + 11
-    THEME.CLR(THEME.HILITE) = 15 * 16 + 0
-    THEME.CLR(THEME.DIMMED) = 0 * 16 + 12
-    THEME.CLR(THEME.WARN)   = 0 * 16 + 8
-    THEME.CLR(THEME.FOCUS)  = 7 * 16 + 0
-    THEME.CLR(THEME.BAR)    = 6 * 16 + 1
+    THEME.CLR(THEME.PAGE)   = 0
+    THEME.CLR(THEME.TEXT)   = 15
+    THEME.CLR(THEME.TITLE)  = 1
+    THEME.CLR(THEME.BORDER) = 11
+    THEME.CLR(THEME.HILITE) = 240
+    THEME.CLR(THEME.DIMMED) = 12
+    THEME.CLR(THEME.WARN)   = 8
+    THEME.CLR(THEME.FOCUS)  = 112
+    THEME.CLR(THEME.BAR)    = 97
     RETURN
 
 ## A white page. DIMMED is mid grey rather than dark grey so that reversing it
 ## for a status bar still leaves the text readable on it.
+##
+## page 1,1   text 1,0   title 1,6   border 1,11   hilite 0,1
+## dimmed 1,12   warn 1,2   focus 7,0   bar 15,0
 THEME.SELECT.LIGHT:
-    THEME.CLR(THEME.PAGE)   = 1 * 16 + 1
-    THEME.CLR(THEME.TEXT)   = 1 * 16 + 0
-    THEME.CLR(THEME.TITLE)  = 1 * 16 + 6
-    THEME.CLR(THEME.BORDER) = 1 * 16 + 11
-    THEME.CLR(THEME.HILITE) = 0 * 16 + 1
-    THEME.CLR(THEME.DIMMED) = 1 * 16 + 12
-    THEME.CLR(THEME.WARN)   = 1 * 16 + 2
-    THEME.CLR(THEME.FOCUS)  = 7 * 16 + 0
-    THEME.CLR(THEME.BAR)    = 15 * 16 + 0
+    THEME.CLR(THEME.PAGE)   = 17
+    THEME.CLR(THEME.TEXT)   = 16
+    THEME.CLR(THEME.TITLE)  = 22
+    THEME.CLR(THEME.BORDER) = 27
+    THEME.CLR(THEME.HILITE) = 1
+    THEME.CLR(THEME.DIMMED) = 28
+    THEME.CLR(THEME.WARN)   = 18
+    THEME.CLR(THEME.FOCUS)  = 112
+    THEME.CLR(THEME.BAR)    = 240
     RETURN
 
 ## From the XFMGR file manager's theme module. DIMMED and WARN are not in it.
@@ -125,54 +162,53 @@ THEME.SELECT.LIGHT:
 ## WARN IS LIGHT RED, NOT RED. This is the only theme with a dark grey page, and
 ## plain red on it is barely legible. BAR is mid grey, one step lighter than the page,
 ## rather than the blue it used to be: a blue band over a grey page belongs to no theme.
+##
+## page 11,11   text 11,1   title 11,7   border 11,14   hilite 14,1
+## dimmed 11,12   warn 11,10   focus 7,11   bar 12,1
 THEME.SELECT.GRAY:
-    THEME.CLR(THEME.PAGE)   = 11 * 16 + 11
-    THEME.CLR(THEME.TEXT)   = 11 * 16 + 1
-    THEME.CLR(THEME.TITLE)  = 11 * 16 + 7
-    THEME.CLR(THEME.BORDER) = 11 * 16 + 14
-    THEME.CLR(THEME.HILITE) = 14 * 16 + 1
-    THEME.CLR(THEME.DIMMED) = 11 * 16 + 12
-    THEME.CLR(THEME.WARN)   = 11 * 16 + 10
-    THEME.CLR(THEME.FOCUS)  = 7 * 16 + 11
-    THEME.CLR(THEME.BAR)    = 12 * 16 + 1
+    THEME.CLR(THEME.PAGE)   = 187
+    THEME.CLR(THEME.TEXT)   = 177
+    THEME.CLR(THEME.TITLE)  = 183
+    THEME.CLR(THEME.BORDER) = 190
+    THEME.CLR(THEME.HILITE) = 225
+    THEME.CLR(THEME.DIMMED) = 188
+    THEME.CLR(THEME.WARN)   = 186
+    THEME.CLR(THEME.FOCUS)  = 123
+    THEME.CLR(THEME.BAR)    = 193
     RETURN
-
-## THEME.FIRST is set only when THEME.SELECT created the array, the one case with
-## nothing to keep.
-THEME.SELECT.CUSTOM:  
-    IF THEME.FIRST = 0 THEN RETURN
-    GOTO THEME.SELECT.X16
 
 ## THEME.NEXT -- the following theme, selected. It GOTOs THEME.SELECT rather than
 ## GOSUBing it, so THEME.SELECT's RETURN is the one the caller gets.
-THEME.NEXT:  
-    THEME.ID = THEME.ID + 1 : IF THEME.ID >= THEME.COUNT THEN THEME.ID = 0
+THEME.NEXT:
+    THEME.ID% = THEME.ID% + 1 : IF THEME.ID% >= THEME.COUNT THEN THEME.ID% = 0
     GOTO THEME.SELECT
 
 ## THEME.RESET -- the selected theme's shipped values, throwing away any changes.
-## CUSTOM has none of its own, so it resets to X16.
-THEME.RESET:  
-    IF THEME.ID = 4 THEN GOTO THEME.SELECT.X16
+## CUSTOM has none of its own, so it resets to X16 -- and writes SHADOW on the way,
+## because that jump lands past the line in THEME.SELECT which would have written it.
+THEME.RESET:
+    THEME.STAMP% = THEME.STAMP% + 1
+    IF THEME.ID% = 4 THEN THEME.CLR(THEME.SHADOW) = 0 : GOTO THEME.SELECT.X16
     GOTO THEME.SELECT
 
-## THEME.SET -- make THEME.ATTR the colour PRINT uses.
+## THEME.SET -- make THEME.ATTR% the colour PRINT uses.
 ##
-##   in   THEME.ATTR   a packed attribute, e.g. THEME.CLR(THEME.TEXT)
+##   in   THEME.ATTR%   a packed attribute, e.g. THEME.CLR(THEME.TEXT)
 ##
 ## WARNING: AND 15 is safe only because a packed attribute is 0..255. AND is 16-bit
 ## signed and raises OUT OF RANGE above 32767.
 
-THEME.SET:  
-    COLOR THEME.ATTR AND 15, INT(THEME.ATTR / 16)
+THEME.SET:
+    COLOR THEME.ATTR% AND 15, INT(THEME.ATTR% / 16)
     RETURN
 
 ## THEME.HI -- the inverse of a packed attribute, for pre-drawing a row that should
 ## already look selected.
 ##
-##   in   THEME.ATTR   packed attribute      out  THEME.INV
+##   in   THEME.ATTR%   packed attribute      out  THEME.INV%
 
-THEME.HI:  
-    THEME.INV = (THEME.ATTR AND 15) * 16 + INT(THEME.ATTR / 16) 
+THEME.HI:
+    THEME.INV% = (THEME.ATTR% AND 15) * 16 + INT(THEME.ATTR% / 16)
     RETURN
 
 THEME.SKIP:

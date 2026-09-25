@@ -14,6 +14,10 @@
 ## **  THEME.NEXT cycles to the following one and loads it, which is what a
 ## **  program binds to a key. THEME.RESET reloads the one already selected.
 ## **
+## **  THEME.STAMP% counts the loads. A module that copies colours out of THEME.CLR
+## **  keeps the stamp it copied at and re-reads when the two differ, so a theme
+## **  change reaches it with nothing asked of the program.
+## **
 ## **  CUSTOM loads nothing, leaving THEME.CLR as it stands, so a program that lets
 ## **  the user change colours carries those changes into it. Selected before any
 ## **  other theme it takes X16's values.
@@ -28,8 +32,8 @@
 ## **  use THEME.SET.
 ## **
 ## **  THE MODULE'S OWN SCALARS CARRY %, THE ARRAY DOES NOT. An untyped scalar is six
-## **  bytes of the 4,096-byte variable arena and an int16 is two, so the five scalars
-## **  here are 20 bytes of it. That arena is what raises TOO MANY VARIABLES, and it is
+## **  bytes of the 4,096-byte variable arena and an int16 is two, so the six scalars
+## **  here are 24 bytes of it. That arena is what raises TOO MANY VARIABLES, and it is
 ## **  a different budget from the free memory the banner calls LOW FREE. THEME.CLR is
 ## **  read by name in every module that draws, so typing it would rename ninety-odd
 ## **  call sites to buy array elements, which come out of LOW FREE instead.
@@ -99,10 +103,11 @@ GOTO THEME.SKIP
 ## and falls through to X16 like any other first load.
 
 THEME.SELECT:
+    THEME.STAMP% = THEME.STAMP% + 1
     THEME.FIRST% = 0
     IF THEME.READY% = 0 THEN DIM THEME.CLR(THEME.SLOTS - 1) : THEME.READY% = -1 : THEME.FIRST% = -1
     IF THEME.ID% = 4 AND THEME.FIRST% = 0 THEN RETURN
-    THEME.CLR(THEME.SHADOW) = 64
+    THEME.CLR(THEME.SHADOW) = 0
     IF THEME.ID% = 1 THEN GOTO THEME.SELECT.DARK
     IF THEME.ID% = 2 THEN GOTO THEME.SELECT.LIGHT
     IF THEME.ID% = 3 THEN GOTO THEME.SELECT.GRAY
@@ -182,7 +187,8 @@ THEME.NEXT:
 ## CUSTOM has none of its own, so it resets to X16 -- and writes SHADOW on the way,
 ## because that jump lands past the line in THEME.SELECT which would have written it.
 THEME.RESET:
-    IF THEME.ID% = 4 THEN THEME.CLR(THEME.SHADOW) = 64 : GOTO THEME.SELECT.X16
+    THEME.STAMP% = THEME.STAMP% + 1
+    IF THEME.ID% = 4 THEN THEME.CLR(THEME.SHADOW) = 0 : GOTO THEME.SELECT.X16
     GOTO THEME.SELECT
 
 ## THEME.SET -- make THEME.ATTR% the colour PRINT uses.

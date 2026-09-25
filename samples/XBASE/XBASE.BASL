@@ -257,7 +257,7 @@ IF XB.BANKFAIL$ <> "" THEN GOTO XB.BANKSTOP
 
 ## THEME.SELECT, not THEME.LOAD. The banked library renamed it: the low memory
 ## label is SHIM.THEMEBANK's shim and the body it calls is THEME.SELECT.BODY.
-THEME.ID = 3
+THEME.ID% = 3
 GOSUB THEME.SELECT
 
 

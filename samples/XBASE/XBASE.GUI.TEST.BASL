@@ -141,12 +141,12 @@ XB.CMD.TESTCOMBO:
 ## nothing, and that is worth walking through rather than skipping: it shows
 ## that the palette already in THEME.CLR survives a selection that writes none.
 XB.CMD.TESTTHEME:
-    THEME.ID = THEME.ID + 1
-    IF THEME.ID >= THEME.COUNT THEN THEME.ID = 0
+    THEME.ID% = THEME.ID% + 1
+    IF THEME.ID% >= THEME.COUNT THEN THEME.ID% = 0
     GOSUB THEME.SELECT
     GOSUB XB.SCREEN
     GOSUB XB.VIEW.DRAW
     GOSUB XB.RENDER.MENUBAR
-    XB.MSG$ = "THEME " + MID$(STR$(THEME.ID), 2)
+    XB.MSG$ = "THEME " + MID$(STR$(THEME.ID%), 2)
     GOSUB XB.SAY
     RETURN
