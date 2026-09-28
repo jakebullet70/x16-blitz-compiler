@@ -22,6 +22,8 @@ again. See [memory-is-git-tracked](memory-is-git-tracked.md).
 - [Compact early, not at the end](compact-early-not-at-the-end.md) — remind the user to /compact at the end of EVERY turn that lands a step; cost is context size x turns
 
 ## Build and toolchain
+- [USER-RUNS demos broken by Build 127](user-runs-demos-broken-by-build-127.md) — runtimes back beside each sample; GPC.ERR and GPC.GUI objects still 126, need a rebuild
+- [Tool home layout deferred](tool-home-layout-deferred.md) — /GPC/ + /BASIC-SRC/ is next-version; copy the nine tool files into every working folder; research in docs/blitz/TOOL-HOME-LAYOUT.RESEARCH.md
 - [Build toolchain location](build-toolchain-location.md) — make, 64tass, python are off-PATH in C:\8bitProgramming; build setup is in docs/BUILDING.md
 - [Git Bash sed strips CRLF](git-bash-sed-strips-crlf.md) — `sed -i` writes LF and `grep -c $'\r$'` lies; count with Python bytes
 - [App make skips compiler.library](app-make-does-not-rebuild-compiler-library.md) — use `make libs`; [it does not install the runtime](make-libs-does-not-install-the-runtime.md) either; [the baseline is the application copy](baseline-compiler-is-the-application-copy.md), source/drive/GPC.BIN can be stale
