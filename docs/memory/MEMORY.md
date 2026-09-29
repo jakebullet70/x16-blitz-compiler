@@ -102,6 +102,7 @@ again. See [memory-is-git-tracked](memory-is-git-tracked.md).
 - [FOR 1 TO 0 runs once](gpc-basic-for-loop-runs-once.md) — guard every FOR 1 TO LEN()
 - [X16 BASIC conformance](blitz-x16-basic-conformance.md) — 4 real defects fixed; `SLEEP 0` returns at once and still diverges
 - [No END crashes at exit](program-without-end-crashes.md) — runs off the last line into $ffff; end every test program with END
+- [Interpreter LOAD chain is safe](x16-interpreter-load-chain-is-safe.md) — R49 moves VARTAB, a longer chained program runs clean
 - [X16 BASIC coverage](gpc-x16-basic-coverage.md) — the 7 lexer blockers on valid X16 BASIC
 - [R44+ keywords](blitz-x16-r44-plus-keywords.md) — CLOSED: all 10 are in; do not re-fix
 

@@ -54,8 +54,8 @@ cannot answer the question it is there to answer.
 
 ## The front end
 
-`BASLOAD-GPC.PRG` is what you `RUN`. It asks for a source file, hands it to the engine, prints what
-comes back, and asks again — an empty answer quits.
+`BASLOAD-GPC.PRG` is what you `RUN`. It asks for one source file, hands it to the engine, prints what
+comes back, and ends. An empty answer ends without tokenising.
 
 ```
 BASLOAD --> BASIC SOURCE TO TOKENISED PRG (GPC VERSION)
@@ -68,8 +68,6 @@ TOKENISING HELLO.BASL ...
 
 SUCCESS
 
-SOURCE FILE:
-
 AND... BYE!
 ```
 
@@ -81,22 +79,19 @@ has to run from `READY.` with nothing on the disk but itself and the engine, so 
 not used on purpose: it splits a name on a comma, answers a bare RETURN by leaving the variable
 alone rather than emptying it, and prints `?REDO FROM START` at its own discretion.
 
-Two things in it are not obvious:
-
-- **The engine is loaded once, behind a guard.** `LOAD` inside a running program restarts it *and*
-  clears variables, so the guard is a POKEd byte at `$0400` — golden RAM, which the engine backs up
-  and restores around every run, so it survives a tokenise and the loop never reloads. It is
-  checked together with the engine's own first byte (`$4C`, a `JMP`), so a cold boot that happens
-  to have 42 sitting at `$0400` still cannot `SYS` into nothing.
-- **The name is re-poked every time.** The engine answers in the buffer it was asked in — the
-  message at `$BF00` overwrites the name — so a launcher that poked once would hand its own error
-  text to the engine as the next file name.
+**The engine is loaded once, behind a guard.** `LOAD` inside a running program restarts it *and*
+clears variables, so the guard is a POKEd byte at `$0400`. That is golden RAM, which the engine backs
+up and restores around every run, so a second `RUN` finds the engine and does not reload it. The
+guard is checked together with the engine's own first byte (`$4C`, a `JMP`), so a cold boot that
+happens to have 42 sitting at `$0400` still cannot `SYS` into nothing. It is 0 while the engine
+runs, because a clean run can chain to `.BASLOAD.NEXT`, which may load over the engine.
 
 There is no prompt for the output name and there cannot be: that is the source's own `#SAVEAS`.
 The device is 8.
 
-**The poked-name path is untouched.** A caller that sets up the ABI itself still gets exactly what
-it always did — `test/runtest.py` and `source/gpc/build_basl.py` both still call the engine direct.
+**The poked-name path is untouched.** A caller that sets up the ABI itself gets what the front end
+gets, `.BASLOAD.NEXT` included. `test/runtest.py` and `source/gpc/build_basl.py` both call the
+engine direct.
 
 ## Test
 
@@ -123,10 +118,10 @@ at close and stops there, so the compare is `rom[:-2]` against the whole of the 
 `runfront.py` drives the front end. **An interactive program cannot be pasted at** — `x16emu -bas`
 types at the `READY.` prompt only, and once a program is running the rest is dropped, not queued —
 so it generates a **fixed-answer variant from the real source**, asserting on every substitution.
-Only the key reader goes untested. The three answers are a **missing file, then a good one, then
-nothing**, which is the arrangement that catches the name not being re-poked, and the verdict is
-the screen rather than the output file: a run that fails partway still writes a complete, valid,
-wrong program.
+Only the key reader goes untested. It boots four times, one answer each: a **missing file, a file
+whose include is missing, a good one, and nothing**. The driver POKEs the answer's number into
+`$0401` before `RUN`. The verdict is the screen rather than the output file: a run that fails
+partway still writes a complete, valid, wrong program.
 
 ```
   PASS -- the front end loaded the engine, tokenised HELLO.BASL to 34 bytes, and quit
@@ -152,6 +147,14 @@ This is the ABI the front end drives, and any other caller can drive it the same
 
 A message that ends in a colon is the one expecting that number after it; `SYMBOL TABLE FULL` and
 the rest do not, and get a zero rather than a line. Print the number only when it is non-zero.
+
+**`.BASLOAD.NEXT` runs after a clean tokenise.** When the return code would be 0, the engine looks
+for `.BASLOAD.NEXT` on the source's device. If it is there, the engine prints
+`RUNNING .BASLOAD.NEXT`, loads it at the start of BASIC and runs it, the way a `LOAD` inside a
+running program does, and `SYS` does not return. The file is not deleted, so it runs after every
+clean tokenise in that folder. A failed tokenise never chains. With no such file, `SYS` returns as
+before, with R1, R2 and the message unchanged. A load that fails part way is BASIC's `?LOAD ERROR`,
+because the caller's program is already overwritten. The BASIC entry points it uses are R49's.
 
 **`BANK 0`, not `POKE 0,0`.** X16 BASIC saves and restores the RAM bank around every `PEEK` and
 `POKE`, so `POKE 0,0` selects nothing and the name lands in whichever bank was live. The symptom is

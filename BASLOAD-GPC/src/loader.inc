@@ -147,6 +147,108 @@ exit:
     bridge_setaddr KERNAL_CLRCHN
     bridge_call
 
-    rts                             ;=== GPC === the SAVE is gone; out_close wrote the file
+    lda KERNAL_R1                   ;=== GPC === a clean run hands over to .BASLOAD.NEXT
+    bne :+
+    jsr chain_next
+:   rts                             ;=== GPC === the SAVE is gone; out_close wrote the file
 
 .endproc
+
+;=== GPC begin ===
+;WARNING: pinned to R49 BASIC, from the emulator's basic.sym. The four routine
+;addresses move with any other ROM.
+BASIC_ROM_BANK = 4
+BASIC_TXTTAB   = $df
+BASIC_IERROR   = $0300
+BASIC_ERLOAD   = 29
+BASIC_STXTPT   = $caa7
+BASIC_LNKPRG   = $c88f
+BASIC_CLEART   = $ca6a
+BASIC_NEWSTT   = $cc21
+KERNAL_SETMSG  = $ff90
+
+;******************************************************************************
+;Function name: chain_next
+;Purpose......: Loads .BASLOAD.NEXT from the source's device and runs it, the
+;               way a LOAD inside a running BASIC program does
+;Input........: Nothing. Call it last, once every file is closed.
+;Output.......: Does not return when the file loads. When there is no such
+;               file it returns with zero page and golden RAM restored and R1
+;               and R2 unchanged.
+;Errors.......: A load that fails part way raises BASIC's ?LOAD ERROR, because
+;               the caller's program text is already overwritten.
+.proc chain_next
+    ;The restore puts back golden RAM, which holds the bridge, file_device and
+    ;rom_bank. What is still needed goes on the stack, and the KERNAL is
+    ;called directly.
+    ldx #3
+:   lda KERNAL_R1,x
+    pha
+    dex
+    bpl :-
+    lda ROM_SEL
+    pha
+    lda file_device
+    pha
+    jsr main_restore_ram
+
+    stz ROM_SEL
+    lda #0                          ; a quiet LOAD, and the state RUN leaves
+    jsr KERNAL_SETMSG
+    pla
+    tax
+    lda #1
+    ldy #0                          ; load to X/Y
+    jsr KERNAL_SETLFS
+    lda #next_name_end-next_name
+    ldx #<next_name
+    ldy #>next_name
+    jsr KERNAL_SETNAM
+    lda #0
+    ldx BASIC_TXTTAB
+    ldy BASIC_TXTTAB+1
+    jsr KERNAL_LOAD
+    bcs not_there
+
+    stx KERNAL_VARTAB
+    sty KERNAL_VARTAB+1
+    jsr KERNAL_READST
+    and #$ff-$40                    ; end of file is not an error
+    bne load_failed
+
+    ldx #0
+:   lda msg_running,x
+    beq :+
+    jsr KERNAL_CHROUT
+    inx
+    bra :-
+
+:   lda #BASIC_ROM_BANK
+    sta ROM_SEL
+    jsr BASIC_STXTPT
+    jsr BASIC_LNKPRG
+    jsr BASIC_CLEART                ; ends in stkini, which empties the stack under this return
+    jmp BASIC_NEWSTT
+
+load_failed:
+    lda #BASIC_ROM_BANK
+    sta ROM_SEL
+    ldx #BASIC_ERLOAD
+    jmp (BASIC_IERROR)
+
+not_there:
+    pla
+    sta ROM_SEL
+    ldx #0
+:   pla
+    sta KERNAL_R1,x
+    inx
+    cpx #4
+    bne :-
+    rts
+
+next_name: .byt ".BASLOAD.NEXT"
+next_name_end:
+msg_running: .byt 13, "RUNNING .BASLOAD.NEXT", 13, 0
+.endproc
+;=== GPC end ===

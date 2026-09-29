@@ -16,30 +16,25 @@
 #		queued, so a GET loop never sees it. See docs/memory/paste-cannot-drive-a-running-program.
 #
 #		So this generates a FIXED-ANSWER VARIANT from the real source -- the three prompt lines
-#		become three canned answers -- and asserts on every substitution, so the harness cannot
+#		become a canned answer -- and asserts on every substitution, so the harness cannot
 #		quietly test a file that no longer says what it thinks. Everything except the key reader
 #		is the real front end: the LOAD guard, the poke of the name, the SYS, the bank dance on
-#		return, the message read-back, and the loop that comes round for the next file. The key
-#		reader is the one lifted verbatim from GPC.BASL.
+#		return, and the message read-back. The key reader is the one lifted verbatim from GPC.BASL.
 #
-#		THE ANSWERS ARE A MISSING FILE, A FILE WHOSE #INCLUDE IS MISSING, A GOOD ONE, THEN NOTHING.
-#		The second proves a failed include is reported on the right line and leaves the engine
-#		able to tokenise the next file. The engine replies in the
-#		buffer it was asked in -- the message at $bf00 overwrites the name -- so a front end that
-#		poked the name once would hand its own error text to the engine as the next file name.
-#		Only a bad file followed by a good one can catch that, and it costs one extra pass.
+#		FOUR BOOTS, ONE ANSWER EACH: a missing file, a file whose #INCLUDE is missing, a good one,
+#		and nothing. The front end takes one name a run, so the driver POKEs the answer's number
+#		into $0401 before RUN and the variant picks its name from there. The second answer proves
+#		a failed include is reported on the right line.
 #
-#		Two emulator runs, because the variant is BASLOAD source like any other:
+#		Five emulator runs, because the variant is BASLOAD source like any other:
 #
-#		  1. tokenise it, with the ENGINE -- the same driver build.py uses
-#		  2. LOAD the result and RUN it, and let it tokenise test/HELLO.BASL through the front
-#		     end's own path
+#		  1.   tokenise it, with the ENGINE -- the same driver build.py uses
+#		  2-5. LOAD the result and RUN it, once per answer
 #
 #		THE VERDICT IS THE SCREEN, not the output file. A run that fails partway still writes a
-#		complete, valid, WRONG program, so HELLO.PRG existing proves nothing on its own. Three
-#		things have to be on it, in order: an ERROR for the file that is not there, SUCCESS for
-#		the one that is, and BYE -- which says the loop came round a third time, took the empty
-#		answer and left, rather than hanging in a GET.
+#		complete, valid, WRONG program, so HELLO.PRG existing proves nothing on its own. Every boot
+#		has to reach BYE, the missing file has to be reported, the missing include on its line,
+#		and the good file as SUCCESS.
 #
 #		THE RAW BYTES IN THE LOG ARE NOT ON THE SCREEN. x16emu -echo hooks CHROUT, so it also
 #		catches everything the engine STREAMS to the output file. build_basl.py sees the same
@@ -90,8 +85,8 @@ TOKENISE = """10 IF PEEK(1024)=42 THEN 50
 RUN
 """
 
-#	Run 2: nothing but LOAD and RUN. The front end does its own LOAD of the engine from there.
-LAUNCH = 'LOAD"{prg}",8\nRUN\n'
+#	Runs 2-5: the answer, then LOAD and RUN. The front end does its own LOAD of the engine.
+LAUNCH = 'POKE 1025,{answer}\nLOAD"{prg}",8\nRUN\n'
 
 
 def die(msg):
@@ -110,21 +105,14 @@ def make_variant():
     #	Its own output name, so a test run can never overwrite the shipped front end.
     src = swap('#SAVEAS "@:BASLOAD-GPC.PRG"', '#SAVEAS "@:%s"' % VARPRG, "#SAVEAS line")
 
-    #	The prompt itself. NF is the pass counter, and the four answers are the whole test:
-    #	a name that is not there, a name whose include is not there, a name that is, and an
-    #	empty one to quit.
-    #
-    #	THE MISSING FILE GOES FIRST ON PURPOSE. The engine answers in the buffer it was asked in
-    #	-- the message at $bf00 overwrites the name -- so a front end that poked the name once
-    #	would hand its own error text to the engine as the second file name. Asking for a bad
-    #	file and then a good one is the only arrangement that can catch that.
+    #	The prompt itself. The driver POKEs the answer's number into $0401 before RUN; any
+    #	other number is the empty answer.
     old = 'GOSUB FLUSH.KEYS\nPR$="SOURCE FILE: "\nGOSUB GETNAME\n'
     new = ('REM ---- FIXED ANSWERS, SUBSTITUTED BY test/runfront.py ----\n'
            'NM$=""\n'
-           'IF NF=0 THEN NM$="%s"\n'
-           'IF NF=1 THEN NM$="%s"\n'
-           'IF NF=2 THEN NM$="%s"\n'
-           'NF=NF+1\n' % (MISSING, NOINC, SAMPLE))
+           'IF PEEK(1025)=1 THEN NM$="%s"\n'
+           'IF PEEK(1025)=2 THEN NM$="%s"\n'
+           'IF PEEK(1025)=3 THEN NM$="%s"\n' % (MISSING, NOINC, SAMPLE))
     src = swap(old, new, "prompt block")
 
     with open(os.path.join(DRIVE, VARIANT), "w", newline="\n", encoding="utf-8") as f:
@@ -191,31 +179,33 @@ def main():
     if os.path.exists(outpath):
         os.remove(outpath)
 
-    print("  running it -- it should LOAD the engine and tokenise %s..." % SAMPLE)
-    log = emulate(LAUNCH.format(prg=VARPRG), 90, until=lambda: "BYE" in tail(DRIVE))
+    print("  running it once per answer -- each should LOAD the engine and reach BYE...")
+    logs = []
+    for answer in (1, 2, 3, 0):
+        log = emulate(LAUNCH.format(answer=answer, prg=VARPRG), 90,
+                      until=lambda: "BYE" in tail(DRIVE))
+        if "BYE" not in log:
+            die("answer %d never reached BYE -- the front end hung or crashed. Echo log tail:\n%s"
+                % (answer, log[-500:]))
+        logs.append(log)
+    missing_log, noinc_log, sample_log, empty_log = logs
 
-    if "BYE" not in log:
-        die("the front end never reached BYE -- it hung, crashed, or never took the empty\n"
-            "               answer. Echo log tail:\n%s" % log[-500:])
     #	The missing file has to be REPORTED, not swallowed: an error the user cannot see is the
     #	failure mode streaming has no fallback for. The engine hands back the drive's own status
     #	line for this one -- "62, FILE NOT FOUND,00,00" -- rather than one of its own messages,
     #	which is why the test looks for that and not for the word ERROR.
-    before = log.split("SUCCESS")[0]
-    if "FILE NOT FOUND" not in before:
-        die("%s was not reported before the good file. Echo log:\n%s"
-            % (MISSING, log[-800:]))
-    #	A missing #INCLUDE is reported against the file and line that asked for it. The front
-    #	end once appended R1H..R2H to a message that already ended in the number, so line 3
-    #	came out as 33.
-    lines = re.findall(r"NOINC\.BASL:(\d+)", before)
+    if "FILE NOT FOUND" not in missing_log:
+        die("%s was not reported. Echo log:\n%s" % (MISSING, missing_log[-800:]))
+    #	A missing #INCLUDE is reported against the file and line that asked for it.
+    lines = re.findall(r"NOINC\.BASL:(\d+)", noinc_log)
     if lines != ["3"]:
         die("%s's missing include should read NOINC.BASL:3, got %s. Echo log:\n%s"
-            % (NOINC, lines or "nothing", log[-800:]))
-    if "SUCCESS" not in log:
-        die("the front end ran but the engine did not report SUCCESS -- so the name was not\n"
-            "               re-poked, and the second file was never tokenised. Echo log tail:\n%s"
-            % log[-500:])
+            % (NOINC, lines or "nothing", noinc_log[-800:]))
+    if "SUCCESS" not in sample_log:
+        die("the front end ran but the engine did not report SUCCESS for %s. Echo log tail:\n%s"
+            % (SAMPLE, sample_log[-500:]))
+    if "TOKENISING" in empty_log:
+        die("the empty answer tokenised something. Echo log tail:\n%s" % empty_log[-500:])
     if not os.path.exists(outpath) or os.path.getsize(outpath) == 0:
         die("SUCCESS on screen but no %s was written" % OUTPUT)
     data = open(outpath, "rb").read()
