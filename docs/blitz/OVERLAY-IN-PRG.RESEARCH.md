@@ -4,8 +4,10 @@ Research, 2026-09-16. No code was written. The question was whether a compiled p
 can carry its `GP.BANKED` region data inside the `.PRG` instead of shipping a `NAME.nnn`
 file beside it for every region.
 
-The short answer is that one file is reachable only for small programs, and the useful
-work is in getting from N extra files down to one.
+The short answer is option D. A program whose code and regions fit in 39,679 bytes ships as
+one PRG. A larger one ships as the PRG and `NAME.OVL`. One file of any size is possible, but
+LOAD then prints `?OUT OF MEMORY ERROR`, and that was ruled out on 2026-09-29. Section 6 has
+the mechanism and 6.5 the decision.
 
 ## 1. The wall
 
@@ -15,18 +17,18 @@ KERNAL cannot be asked to stop early, and it cannot scatter one file to several 
 
     $9F00 - $0801 = 39,679 bytes
 
-**Any scheme that appends region bytes to the PRG is capped at 39,679 bytes of total
-payload, regions included.** For comparison, a shared banked program's low code today has
+**A clean LOAD is capped at 39,679 bytes of total payload, regions included.** A longer
+file loads up to `$9EFF` and stops with an error, which section 6 turns to use. For comparison, a shared banked program's low code today has
 to end below `RTGPBASE $6F00` (`common.inc:113`), which is 26,367 bytes of payload; the
 regions are on top of that and pay no low-RAM price at all.
 
-Four escapes were considered and all four fail:
+Four escapes were considered:
 
-- **Re-LOAD the program's own file into scratch banks.** The tail is still inside the stream
-  the first LOAD delivers, so it hits the wall before the re-read starts.
-- **OPEN the program's own file, seek past the low part with the CMDR-DOS `P` command, and
-  MACPTR the tail into banks.** Same wall, for the same reason. `P` also carries a hostfs
-  warning: footnote 7 of *Working with CMDR-DOS* says the `,?,M` mode "Doesn't work in the
+- **Re-LOAD the program's own file into scratch banks.** Fails. A second LOAD stops at
+  `$9F00` the same way the first does.
+- **OPEN the program's own file, skip the low part, and read the tail into banks.** Works,
+  and section 6 builds on it. The skip is a read-and-discard loop, so the CMDR-DOS `P` seek
+  is not needed. `P` also carries a hostfs warning: footnote 7 of *Working with CMDR-DOS* says the `,?,M` mode "Doesn't work in the
   emulator and hostfs", and the headless build loop runs on hostfs, so `P` is unverified
   here and cannot be leaned on.
 - **Pad the low part up to `$A000` so LOAD spills into the banked window.** Costs
@@ -170,16 +172,97 @@ does not. Never more than two files, and one file whenever the program is small 
 
 ## 5. Where it stands
 
-Option D is the shape that gets the single file the question asked for without
-reintroducing a build-side size wall.
+Option C2 is built, to `OVERLAY-SINGLE-FILE.PLAN.md`: one `NAME.OVL`, read through `ACPTR`.
+`ACPTR` measured 8,192 bytes in 17 jiffies under hostfs. The SD card image number is
+still owed.
 
-Within C, C2 is the pick, conditional on one measurement: `ACPTR` throughput under hostfs
-and under a mounted SD card image. If 8K reads in under about 0.3 s, C2 wins outright — one
-page, no new KERNAL calls, smallest file. If it is slow, C1 and accept the second page. C3
-is much the cheapest to build and needs no new bootstrap logic at all, but the eightfold
-file inflation on GPBMODS and the sparse-span fallback make it the weaker trade.
+Option D is chosen and not built. Section 6 shows a single file works at any size, at the
+price of an error on LOAD. Section 6.5 rules that out.
 
-Nothing here is decided and nothing has been built.
+## 6. The wall is soft
+
+Read from the X16 ROM and x16emu source on 2026-09-28. Nothing has been run.
+
+The KERNAL LOAD stops cleanly at the I/O page. `x16-rom kernal/cbm/channel/load.s` reads
+in `MACPTR` blocks until `$9D00` and one byte at a time from there (`cmp #$9d`). The byte
+loop tests for `$9F00` (`cmp #$9f`, `beq ld81`). At `ld81` it closes the file and returns
+error 16. Every byte up to `$9EFF` is written and none past it. A file that ends exactly
+at `$9EFF` meets end-of-file first and loads with no error.
+
+BASIC then prints `?OUT OF MEMORY ERROR`. `cload` in `basic/code26.s` takes the error exit
+before it sets `vartab` and before it runs `lnkprg`. The program text at `$0801` is intact,
+and its line links came from the file, so `RUN` should reach the SYS line.
+
+x16emu gets past the error. `-prg` pastes `LOAD":*",8,1` and `-run` pastes `RUN` as a
+separate line (`src/main.c:1829-1840`), so the RUN arrives after the error. The
+`USER-RUNS` batch files keep working.
+
+### 6.1 The shape
+
+- The file is today's PRG with the `.OVL` stream appended, in the same format, `$01` end
+  marker included.
+- The bootstrap opens its own PRG in place of `NAME.OVL`, through the same 48-byte name
+  slot.
+- It reads and discards the low part. The compiler bakes that length into the page.
+- The existing `ACPTR` region reader then runs unchanged.
+
+The tail always comes from disk, so how much of the file LOAD delivered does not matter.
+Nothing caps the size, which keeps `compiler-must-not-cap-program-size`.
+
+A file of 39,679 bytes or less loads clean. GPBMODS is 10,249 bytes of low part and
+32,016 of regions, 42,265 in all, so it would print the error.
+
+### 6.2 The costs
+
+1. **The error on large programs.** `RUN"NAME"` and the `↑NAME` load-and-run shortcut
+   both abort on it. The user types LOAD, then RUN.
+2. **Chaining.** GPC's LOAD statement writes `10 LOAD "<name>"` at `$0801` and RUNs it
+   in the ROM (`load.asm`). A program-mode LOAD that raises error 16 stops there, so a
+   chain into a large single file never runs. The chain needs a KERNAL LOAD of its own
+   that accepts error 16 for a GPC file. That code has to sit outside `$0801-$9EFF`,
+   since the file lands over the runtime.
+3. **Bootstrap room.** The extension page has 9 free bytes, `$09F7-$09FF` in the current
+   listing. The skip loop needs more than that. It either squeezes out of the existing
+   code or takes a second page. A second page moves banked p-code from `$0A00` to `$0B00`,
+   256 bytes off every banked program's low RAM.
+4. **Startup time.** At the measured rate, skipping GPBMODS' 10,249-byte low part costs
+   about 21 jiffies, 0.35 s. The region read already costs 75 jiffies, 1.25 s.
+5. **The name is baked.** The bootstrap opens the name it was compiled under, so a
+   renamed PRG stops with `?OVL`. A renamed PRG with a separate `.OVL` still finds it.
+6. **No resident runtime on a second run.** A file that runs past `RTGPBASE $6F00`, or
+   `RTBASE $7700`, overwrites the runtime on LOAD, so every run reloads it.
+7. **The compiler side.** The regions are written during pass two alongside the object,
+   so they cannot stream straight into the PRG. The simplest route writes `NAME.OVL` as
+   now, appends its bytes to the PRG and scratches it. The CMDR-DOS `C` command does not
+   work on hostfs (*Working with CMDR-DOS*, footnote 7), so the compiler copies the bytes
+   itself, about 1 to 2 s a compile.
+
+### 6.3 Owed before building
+
+- LOAD a file over 39,679 bytes and confirm `RUN` reaches the SYS line, and that the stale
+  `vartab` does a SYS bootstrap no harm.
+- The same on a mounted SD card image. The same KERNAL code runs there, but nothing in the
+  tree mounts one.
+- A self re-OPEN straight after the LOAD, under hostfs and on the SD image.
+
+### 6.4 Compression
+
+The KERNAL has an LZSA2 decompressor, `memory_decompress $FEED`, and a streaming form,
+extapi `memory_decompress_from_func`, which takes its bytes from a caller's function. It
+could shrink the appended regions and keep more programs under the clean-LOAD line. The
+compressor would have to run inside the compiler on the X16, which is the expensive part.
+The single file does not need it.
+
+### 6.5 The decision
+
+Decided 2026-09-29: `?OUT OF MEMORY ERROR` on LOAD is not acceptable. The plan is option D.
+
+- The compiler appends the regions to the PRG when the total fits in 39,679 bytes.
+- It writes `NAME.OVL` beside the PRG when the total does not fit.
+- Every file loads clean, so `RUN"NAME"`, `↑NAME` and the GPC LOAD chain keep working.
+- The probes in 6.3 are not needed.
+- Still open: room on the extension page for a second region path beside the `ACPTR`
+  reader (section 3).
 
 Related: `region-overlay-ovl-file`, `object-writer-regions-vs-low-code`,
 `object-file-must-fit-under-the-runtime`, `compiler-must-not-cap-program-size`,

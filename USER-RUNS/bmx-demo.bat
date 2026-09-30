@@ -8,28 +8,25 @@ rem  screen mode and colour back.
 rem
 rem      XMASCARD   CANDLE   CAT1   BEARDGUY   TREE7   ROBOSPIDER
 rem
-rem  Source: GPC-BASIC\BMXVIEW.EXP.BL, on GPC-BASIC\BMX.INC.BL
+rem  Source: GPC-BASIC-TOOLS-SRC/BMXVIEWER/BMXVIEW.BASL, on that folder's own
+rem  GPC-BASIC/BMX.INC.BL. GPC-BASIC/BMXVIEW.EXP.BL is the library copy of the
+rem  same program, and is not what this runs.
 rem
-rem  source\scratch\demo\ is BUILD OUTPUT and is not in git. To make it:
-rem    1. copy GPB.INC.BL, APPSYS.INC.BL, BMX.INC.BL and BMXVIEW.EXP.BL
-rem       from GPC-BASIC\ into source\drive\
-rem    2. python source\gpc\build_basl.py BMXVIEW.EXP.BL BMXVIEW.PRG
-rem    3. compile source\drive\BMXVIEW.PRG with GPC.BIN, and put the object
-rem       in source\scratch\demo\ as C.BMXVIEW.PRG
-rem    4. copy any .BMX files you want into source\scratch\demo\ -- GPC-BASIC-TOOLS-SRC\BMXVIEWER\SAMPLES
-rem       has eight, one for each header shape the viewer has to handle
+rem  The sample folder IS the drive. It holds the object and the .BMX images.
+rem  To build or rebuild it:
+rem      python source/gpc/samplesbuild.py BMXVIEW
 rem ---------------------------------------------------------------------------
 setlocal
 for %%I in ("%~dp0..") do set "ROOT=%%~fI\"
-set "DEMO=%ROOT%source\scratch\demo"
+set "DRIVE=%ROOT%GPC-BASIC-TOOLS-SRC\BMXVIEWER"
 
-if not exist "%DEMO%\C.BMXVIEW.PRG" (
+if not exist "%DRIVE%\BMXVIEW.PRG" (
 	echo.
-	echo   source\scratch\demo\C.BMXVIEW.PRG is not built yet.
-	echo   See the notes at the top of this file for the four steps.
+	echo   GPC-BASIC-TOOLS-SRC\BMXVIEWER\BMXVIEW.PRG is not built yet.
+	echo   Build it with:  python source\gpc\samplesbuild.py BMXVIEW
 	echo.
 	exit /b 1
 )
 
-"%ROOT%bin\x16emu\x16emu.exe" -rom "%ROOT%bin\x16emu\rom.bin" -fsroot "%DEMO%" -scale 2 -sound none -prg "%DEMO%\C.BMXVIEW.PRG" -run
+"%ROOT%bin\x16emu\x16emu.exe" -rom "%ROOT%bin\x16emu\rom.bin" -fsroot "%DRIVE%" -scale 2 -sound none -prg "%DRIVE%\BMXVIEW.PRG" -run
 endlocal

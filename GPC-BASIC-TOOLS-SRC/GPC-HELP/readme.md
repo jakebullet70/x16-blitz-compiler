@@ -1,6 +1,6 @@
-# GPB.HELP
+# GPC.HELP
 
-The GP.BASIC and BASL reference, on the machine. A scrolling master index over 88 topics, written
+The GP.BASIC and BASL reference, on the machine. A scrolling master index over 90 topics, written
 in GP.BASIC and built from `GPC-BASIC/` — the manual, the name register, the file list and the
 module banner headers — by a script, so the help cannot drift from the library it documents.
 
@@ -40,9 +40,9 @@ every example in it — and writes them with a header naming where they came fro
 
 | category | topics | from |
 |---|---:|---|
-| Getting started | 2 | `GP-BASIC.md` §1–2 |
+| Getting started | 3 | `GP-BASIC.md` §1–2 |
 | What is in GPC | 8 | `GP-BASIC.FILES.md` |
-| GP.* core keywords | 25 | `GP-BASIC.md` §3 |
+| GP.* core keywords | 26 | `GP-BASIC.md` §3 |
 | BASL modules | 33 | `GP-BASIC.md` §4, plus the banner headers of `STASH` and `STASHFILE` |
 | Globals and naming | 15 | `GP-BASIC.md` §5 and `GP-BASIC.GLOBALS.md` |
 | The traps | 1 | `GP-BASIC.md` §6 |
@@ -77,7 +77,7 @@ python GPC-BASIC-TOOLS-SRC/GPC-HELP/MKHELPWIN.PY
 Run all three from the repository root, with these arguments, so the command line in the generated
 header stays reproducible.
 
-`MKHELP.PY` reads `GPC-BASIC/` and writes `HELP-TXT/H001.HLP`…`H088.HLP`, `HELP-TXT/GPB.HELP.IDX`
+`MKHELP.PY` reads `GPC-BASIC/` and writes `HELP-TXT/H001.HLP`…`H090.HLP`, `HELP-TXT/GPC.HELP.IDX`
 and `GPC-HELP.md`. `MKHELPWIN.PY` reads `GPC-HELP.md` and writes `GPC-HELP.WIN.md`.
 
 **Everything the viewer reads is in the one subfolder**, opened through the CMD path syntax
@@ -116,20 +116,20 @@ It builds in this folder, with nothing staged into `source\drive\`. The source i
 are off PATH; see `docs/BUILDING.md`.
 
 ```
-python source\gpc\samplesbuild.py GPB.HELP
+python source\gpc\samplesbuild.py GPC.HELP
 ```
 
 That runs the two steps below, then copies `GPB.RT.nnn.BIN`, `GPC.RT.nnn.BIN` and `GP1.RT.nnn.BIN`
-from `source\drive\` into this folder. `nnn` is the build number, 124 today. Git ignores all three
-copies.
+from the tool home, `GPC-BASIC-TOOLS-SRC\GPC\`, into this folder. `nnn` is the build number, 128 today.
+Git ignores all three copies.
 
 ```
-python source\gpc\build_basl.py     --drive GPC-BASIC-TOOLS-SRC\GPC-HELP GPB.HELP.BASL GPB.HELP.SRC.PRG
-python source\gpc\compile_shared.py --drive GPC-BASIC-TOOLS-SRC\GPC-HELP GPB.HELP.SRC.PRG GPB.HELP.PRG GPB.HELP.MAP
+python source\gpc\build_basl.py     --drive GPC-BASIC-TOOLS-SRC\GPC-HELP GPC.HELP.BASL GPC.HELP.SRC.PRG
+python source\gpc\compile_shared.py --drive GPC-BASIC-TOOLS-SRC\GPC-HELP GPC.HELP.SRC.PRG GPC.HELP.PRG GPC.HELP.MAP
 ```
 
 The object is SHARED: it loads `GPB.RT.nnn.BIN`, `GPC.RT.nnn.BIN` and `GP1.RT.nnn.BIN` off the
-drive when it runs, and reads its regions from `GPB.HELP.OVL`. 20,055 bytes of object, 6,659 of
+drive when it runs, and reads its regions from `GPC.HELP.OVL`. 8,128 bytes of object, 20,747 of
 overlay.
 
 **No `#AUTONUM`.** The directive sets the *step* between generated line numbers, not whether lines
@@ -144,11 +144,11 @@ answered `Y`. `GPC.BIN` removes it when line 5 of `GPC.INPUT` names a file. `GPC
 up for this program:
 
 ```
-GPB.HELP.SRC.PRG
-C.GPB.HELP.SRC.PRG
-M.GPB.HELP.SRC.PRG
+GPC.HELP.SRC.PRG
+C.GPC.HELP.SRC.PRG
+M.GPC.HELP.SRC.PRG
 SHARED
-D.GPB.HELP.SRC.PRG
+D.GPC.HELP.SRC.PRG
 ```
 
 The five lines are source, object, map, `SHARED`, and the removed-line list. Tokenise first, then run
@@ -158,7 +158,7 @@ the engine on this folder from the repository root:
 bin\x16emu\x16emu.exe -rom bin\x16emu\rom.bin -fsroot GPC-BASIC-TOOLS-SRC\GPC-HELP -prg GPC-BASIC-TOOLS-SRC\GPC-HELP\GPC.BIN -run
 ```
 
-`D.GPB.HELP.SRC.PRG` lists the removed BASIC line numbers. Git ignores the three outputs.
+`D.GPC.HELP.SRC.PRG` lists the removed BASIC line numbers. Git ignores the three outputs.
 `GP-BASIC.md` §7, under Removing dead code, has the rules.
 
 ## The decisions, and the measurements behind them
@@ -196,8 +196,8 @@ because no row can show more.
 
 **The index bank** holds eight bytes a row at the front — text offset low and high, length, type,
 topic, section line, topic length low and high — and the text above them. `HELP.MAXIX` is 250 rows:
-2,000 bytes of records and 6,192 for text. Rows past the end are dropped. Today's index is 174 rows
-and 5,895 bytes of text.
+2,000 bytes of records and 6,192 for text. Rows past the end are dropped. Today's index is 179 rows
+and 5,992 bytes of text.
 
 There is no list control, and none is wanted: the section and cross-reference pickers are at most 12
 items, which fit a screen, so `MENU.POPUP` does the job.
@@ -325,7 +325,7 @@ flag, because `screen_set_charset` does not clear bit 6 on its own.
 
 ## `GPC-BASIC/` here
 
-The thirteen modules `GPB.HELP.BASL` includes, so a rebuild needs nothing from the master library.
+The thirteen modules `GPC.HELP.BASL` includes, so a rebuild needs nothing from the master library.
 The build reads them from this folder. In `#INCLUDE` order they are `GPB`, `THEME`, `STASH`,
 `STRCASE`, `APPSYS`, `BANKMGR`, `MENU.INC.BANKED`, `MENU`, `LINEINPUT`, `GUI`, `COMBO`, `CHECK` and
 `GUI-DIALOGS`. They are refreshed from the master library when the sample is rebuilt, and can lag
@@ -336,7 +336,7 @@ has combo and check controls.
 
 ## The self-check
 
-`GPB.HELP.BASL` carries a headless harness behind one flat symbol. **Comment out `#DEFINE
+`GPC.HELP.BASL` carries a headless harness behind one flat symbol. **Comment out `#DEFINE
 HELP.RELEASE 1`** and build as above; it runs instead of the viewer, prints to the log, and stops.
 With the symbol defined, the harness is not compiled at all.
 
@@ -345,9 +345,9 @@ behind each topic and section row, and prints:
 
 | line | on a pass |
 |---|---|
-| `INDEX ROWS` | 174 |
+| `INDEX ROWS` | 179 |
 | `ROWS WITHOUT A TOPIC OR LENGTH` | 0 |
-| `ROWS OPENED` | 166, every row but the eight category headings |
+| `ROWS OPENED` | 171, every row but the eight category headings |
 | `ROWS WITH NO TOPIC RECORD` | 0 |
 | `ROWS WHOSE LENGTH DISAGREES` | 0 |
 | `SECTIONS PAST THE END` | 0 |
@@ -363,23 +363,23 @@ A length that disagrees does not stop the viewer.
 
 | | |
 |---|---|
-| `GPB.HELP.BASL` | the viewer |
-| `GPB.HELP.PRG` | compiled SHARED, 20,055 bytes — what `help-demo.bat` runs |
-| `GPB.HELP.OVL` | the region overlay, 6,659 bytes — sits beside the PRG on the drive |
+| `GPC.HELP.BASL` | the viewer |
+| `GPC.HELP.PRG` | compiled SHARED, 8,128 bytes — what `help-demo.bat` runs |
+| `GPC.HELP.OVL` | the region overlay, 20,747 bytes — sits beside the PRG on the drive |
 | `GPC-BASIC/` | the thirteen modules the viewer includes |
-| `HELP-TXT/GPB.HELP.IDX` | the master index, 174 rows |
-| `HELP-TXT/H001.HLP`…`H088.HLP` | one topic each |
+| `HELP-TXT/GPC.HELP.IDX` | the master index, 179 rows |
+| `HELP-TXT/H001.HLP`…`H090.HLP` | one topic each |
 | `MKHELP.PY` | the content build |
 | `MKHELPWIN.PY` | `GPC-HELP.md` to `GPC-HELP.WIN.md` |
 | `GPC-HELP.md`, `GPC-HELP.WIN.md` | the same content, for a PC |
 | `GPC-HELP-TESTING.md` | the PC file, over the working library |
 | `GPC.PRG`, `GPC.BIN` | the compiler's front end and engine, for building in this folder |
 | `GPC.INPUT` | the engine's five lines for this program, with dead code removed |
-| `GPC.ERR.PRG` | turns a runtime error's address into a source line, using the map |
+| `GPC.ERR.PRG`, `GPC.ERR.OVL` | turns a runtime error's address into a source line, using the map |
 | `BASLOAD-GPC.PRG`, `BASLOAD-GPC.BIN` | the tokeniser's front end and engine |
 | `XT`, `XFMGR/` | the XFMGR file manager, for looking at an export. Dev only, not part of the sample |
 | `.gitattributes` | keeps the `.HLP` and `.IDX` bytes as built |
 
 Build outputs, ignored by git: `GPB.RT.nnn.BIN`, `GPC.RT.nnn.BIN`, `GP1.RT.nnn.BIN`,
-`GPB.HELP.SRC.PRG`, `GPB.HELP.SRC.SYM`, `GPB.HELP.MAP`, and the `C.`, `M.` and `D.` files a
+`GPC.HELP.SRC.PRG`, `GPC.HELP.SRC.SYM`, `GPC.HELP.MAP`, and the `C.`, `M.` and `D.` files a
 dead-code compile writes.

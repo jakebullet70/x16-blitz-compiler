@@ -1,99 +1,103 @@
-@4.12 GUI-DIALOGS.INC.BL -- every dialog as a verb
+@4.10 STRUSING.INC.BL -- a number to a template
 .
-=4.12 GUI-DIALOGS.INC.BL -- EVERY DIALOG AS A VERB
-.
-=WHAT IT COSTS
-.
-.    BASIC -- ordinary BASL in a .INC.BL, called with GOSUB. Free unless you
-.    #INCLUDE it.
+=4.10 STRUSING.INC.BL -- A NUMBER TO A TEMPLATE
 .
 =DESCRIPTION
 .
-.A dialog is a call with its arguments in it. Nothing is set up in globals
-.first, and nothing a previous dialog set carries into the next one.
+.  STR.USING
+.      IN: STR.USING.NUM STR.USING.MASK$
+.      OUT: STR.USING.STR$, a field
 .
-.  DLGRESET bank
-.      IN: the RAM bank the covered cells go to
-.      OUT: every other input back to its default
+.  STR.USING.FIX
+.      IN: STR.USING.NUM STR.USING.DP
+.      OUT: STR.USING.STR$, digits only
 .
-.  DLGSHADOW on - DLGGLYPH on
-.      IN: non-zero
-.      OUT: the shadow and the frame glyphs, for every box after it
+:#INCLUDE "STRUSING.INC.BL"
+:
+:STR.USING.NUM = 1234.5 : STR.USING.MASK$ = "#,##0.00"
+:GOSUB STR.USING
+:PRINT STR.USING.STR$ : REM 1,234.50
 .
-.  DLGSHADOWCLR attr
-.      IN: a packed colour
-.      OUT: the shadow's own colour; 0, the default, is black on black
+.Pure BASIC. It needs no #SYMFILE and depends on no other module, so a
+.program can take it without taking STRINGS.INC.BL (SEC 4.2) -- and the other
+.way round.
 .
-.  DLGSTYLE style
-.      IN: a GP.BOX style (SEC 3.7); 0, the default, is a solid block
-.      OUT: the frame every box after it draws; DLGGLYPH overrides it
+.  #
+.      MEANS: a digit position, space if the number does not reach it
 .
-.  KBCLEAR
-.      IN: --
-.      OUT: the keyboard buffer emptied
+.  0
+.      MEANS: a digit position, zero if the number does not reach it
 .
-.  MSGBOX msg$
-.      OUT: GUI.KEY -- something to say, and one way out
+.  .
+.      MEANS: the decimal point everything aligns on
 .
-.  ASKYN msg$ - ASKOK msg$
-.      OUT: -1 for yes, or OK
+.  ,
+.      MEANS: anywhere in the mask, groups the integer part in threes
 .
-.  ASK3 t$, m$, b1$, b2$, b3$, dflt, esc
-.      OUT: the button pressed, 1..3; esc is the one ESC means, and b3$ ""
-.        leaves two
+.  +
+.      MEANS: first character only: a sign column, + or -
 .
-.  ASKTEXT msg$, len
-.      OUT: the typed line, "" when cancelled
+.  -
+.      MEANS: first character only: a sign column, - or a space
 .
-.  INPUTBOX msg$, start$, len
-.      OUT: the text either way; GUI.OK says which
+.PRINT USING's mask, from BASIC 7.0, less the four characters that earn
+.nothing here: $ floating currency, a trailing sign, ^^^^ exponential, and =
+./ > -- those last two justify a string, which is STR.PADC and STR.PADL (SEC
+.4.2).
 .
-.  PICKMENU msg$, sel
-.      IN: the popup slot of MENU.INC.BL (SEC 4.6)
-.      OUT: the row, 1..N, or 0 cancelled
+.The result is exactly LEN(STR.USING.MASK$) characters, right justified, so a
+.column of them lines up on the point. Everything after the point prints, so
+.# and 0 do not differ there. A point with no digit positions after it is
+.ignored.
 .
-.  LISTBOX msg$, count, rows
-.      IN: GUI.LIST.ITEM$()
-.      OUT: the row, or 0 cancelled
+:"###0.00"    12.5    ->  "  12.50"        "#,##0.00"   1234.5  ->  "1,234.50
+:"0000.00"    12.5    ->  "0012.50"        "+##0.00"      -1.5  ->  "-  1.50"
+:"##000"        42    ->  "  042"          "##0"         12345  ->  "***"
 .
-.  LISTBOXM msg$, count, rows
-.      IN: the same
-.      OUT: how many are marked; GUI.LISTBOX.MARKS$ which
+.Too wide fills the whole field with *. That is deliberate and visible;
+.overflowing the width instead would push the rest of the row along and
+.misalign every column after it. A negative value with no sign column spends
+.one digit position on its minus, and stars when there is none to spend --
+."##0" holds -12 but not -123.
 .
-.  ASKLINE x, y, label$, len
-.      OUT: a line typed in place, no box; LINEINPUT.KEY 27 cancelled
+.Rounding is half away from zero, done on the absolute value before the sign
+.goes back on. INT alone floors toward minus infinity, which rounds -1.5 and
+.1.5 in opposite directions. -0.004 to two places is "0.00", not "-0.00": a
+.signed zero in a column reads as a real negative.
 .
-.  PANELOPEN t$, m$, rows, width - PANELCLOSE
-.      OUT: an empty box at GUI.INNER.LEFT and .TOP, and the screen back
+.WARNING: the value must scale to under 1,000,000,000. The digits are built
+.by multiplying up by 10 ^ DP and rounding, and STR$ turns over to E notation
+.at 1e9 -- so two decimal places reach 9,999,999.99 and five reach
+.9,999.99999. Past that the field fills with * rather than printing something
+.wrong.
 .
-:GP.SUB DLGRESET, 8
-:GP.SUB MSGBOX, "DISK FULL"
-:IF GP.FN(ASKYN, "DELETE THE FILE?") THEN GOSUB DELETEIT
-:F$ = GP.FN(ASKTEXT, "FILE NAME?", 16)
+.STR.USING.FIX is the same digits with no field over them: STR.USING.NUM to
+.STR.USING.DP places, sign attached, no leading space. Right justify it with
+.STR.PADL if you want a column.
 .
-.Every verb has an EX form that takes a title and three message lines first,
-.always in that order, then its own arguments: MSGBOXEX t$, m$, m2$, m3$,
-.btn$, ASKYNEX t$, m$, m2$, m3$, dflt, okc, INPUTBOXEX ... start$, len, mask,
-.PICKMENUEX ... sel, flags, LISTBOXEX ... count, rows, multi. dflt 2 makes
-.the second button the default; okc non-zero says OK and CANCEL rather than
-.YES and NO; flags are MENU.MUSTSEL, .NOWRAP and .GAMEPAD.
+.The digits do not come out of STR$'s fraction, and cannot. STR$ trims
+.trailing zeros, so 12.30 comes back as "12.3"; it drops the leading zero of
+.a pure fraction, so a half is " .5"; and it takes significant digits, never
+.decimal places -- FloatToString records that a fixed-decimal mode was tried
+.and printed 12345678.9 as 12345678.8984375. So a scaled integer is the only
+.exact route, and the 1e9 ceiling above is its price.
 .
-.#INCLUDE it after GUI.INC.BL, COMBO.INC.BL and CHECK.INC.BL: a verb is
-.compiled before any call to it, and this one calls all of them. The rows are
-.filled first, because an array cannot be an argument -- MENU.BEGIN/MENU.ITEM
-.for PICKMENU, GUI.LIST.ITEM$(1..count) for the listbox, and the caller owns
-.that DIM.
+.Cost: 726 bytes of p-code, of which STR.USING.FIX alone is 205. Its own
+.module rather than a routine in STRINGS.INC.BL for that reason -- a program
+.wanting STR.PADL and a split should not carry a mask parser.
 .
-.Up and down move, PgUp and PgDn page, HOME and END jump, SPACE toggles a
-.mark in multi. TAB moves to the buttons and back, RETURN takes <<OK>> from
-.anywhere, ESC and STOP cancel -- and O and C press their buttons while the
-.eye is still in the list, which a list can offer and a typing field cannot.
+.Example: STRUSING.EXP.BL. Regression test: USINGT.EXP.BL, thirty-nine cases
+.-- both entry points, every mask character, the rounding traps, the sign
+.column and both overflows. Text and length are compared every time: the
+.result is a field, so a right answer in the wrong number of columns still
+.breaks the table.
 .
-.In multi, GUI.LISTBOX.SEL is not the answer -- it is where the cursor was
-.left. The marks are: GUI.LISTBOX.MARKS$ is count characters with "1" for
-.marked. They are cleared on every call, so one run never reports the run
-.before it.
+=EXAMPLE PROGRAM
 .
-.The bottom frame edge reads 2 SELECTED OF 20 in multi, 20 ITEMS for a single
-.list too long to see at once, and is blank for one that fits.
+.  STRUSING.EXP.BL -- runnable, in the GPC-BASIC folder
+.  USINGT.EXP.BL -- runnable, in the GPC-BASIC folder
 .
+=SEE ALSO
+.
+>72|4.2 STRINGS.INC.BL -- string helpers
+>94|4.10 STRUSING.INC.BL -- a number to a template

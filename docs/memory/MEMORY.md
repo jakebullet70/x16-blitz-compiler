@@ -8,21 +8,23 @@ again. See [memory-is-git-tracked](memory-is-git-tracked.md).
 ## How to work in this repo
 - [Answer the question asked](answer-the-question-asked.md) — lead with the number asked for; and [measure before changing code](measure-before-changing-code.md), probes beat edit-and-see
 - [Review findings must be reachable](review-findings-must-be-reachable.md) — drop anything only invalid source or a typo triggers
+- [Tech doc structure spec](tech-doc-structure-spec.md) — named sections, document inputs/outputs/errors, never invent a detail
 - [Prose style is flat reference](prose-style-is-flat-reference.md) — five settled rules, `doc-style` owns them; [help topics are current behaviour only](help-topic-writing-rules.md); [HLP files carry hand edits](hlp-files-carry-hand-edits.md), so patch the render delta
 - [Write readable code, user crunches](write-readable-code-user-crunches.md) — one statement a line, an unexplained SRC edit is his crunch pass; [comments light](comments-light-code-should-flow.md), heavy REMs mean bad naming
 - [Ask before writing asm](ask-before-writing-asm.md) — standing order: agree GP.ASM or 64tass first
 - [Keep Claude's files off the root](keep-claude-files-off-the-root.md) — source/drive and source/scratch are Claude's; the root is the user's
 - [Commit to main directly](commit-to-main-directly.md) — solo repo, no branch; [never commit OASIS](never-commit-oasis.md), stage by name
 - [Compiler must not cap program size](compiler-must-not-cap-program-size.md) — a build-side wall is a bug; and [no backward compatibility](no-backward-compatibility-needed.md), replaced layers get ripped out
+- [BMXVIEW: two copies, one master](bmxview-two-copies-one-master.md) — BMXVIEWER/BMXVIEW.BASL is the program, GPC-BASIC/BMXVIEW.EXP.BL is the library sample; sync back, adjusting the #INCLUDE prefix
 - [Library working copy, then root](library-working-copy-then-root.md) — edit in GPC-BASIC-TOOLS-SRC/GPB-MODS-TESTING/GPC-BASIC/, drift runs BOTH ways; [test in GPBMODS first](test-in-gpbmods-before-spreading.md); [samples build in place](samples-build-in-place.md), never staged into source/drive/
 - [GUI only through verbs](gui-only-through-verbs.md) — no GOSUB GUI.* in a program; forms and pickers become verbs like MENU
 - [No ship language, no unasked builds](no-ship-language-this-is-dev.md) — [run builds in the background](run-builds-in-background.md), a typed message cancels an in-flight tool; [build, report, hand it back](build-report-dont-investigate.md)
-- [Compile shared, not embedded](compile-shared-not-embedded.md) — SHARED is the p-code number
+- [Compile shared, not embedded](compile-shared-not-embedded.md) — SHARED is the p-code number; [release samples are the exception](release-samples-shape.md), own BASL plus a standalone EMBEDDED PRG
 - [The compiler is GPC](name-the-compiler-gpc.md) — "Blitz" is a heritage nod; and [concurrent agents run here](user-runs-concurrent-agents-here.md), so re-read before any write
 - [Compact early, not at the end](compact-early-not-at-the-end.md) — remind the user to /compact at the end of EVERY turn that lands a step; cost is context size x turns
 
 ## Build and toolchain
-- [USER-RUNS demos broken by Build 127](user-runs-demos-broken-by-build-127.md) — runtimes back beside each sample, GPC.ERR rebuilt; GPC.GUI.PRG still 126, rebuild with the GPC.GUI work
+- [USER-RUNS demos broken by Build 127](user-runs-demos-broken-by-build-127.md) — runtimes back beside each sample; the tree moved to build 128 on 2026-09-30
 - [Tool home layout deferred](tool-home-layout-deferred.md) — /GPC/ + /BASIC-SRC/ is next-version; copy the nine tool files into every working folder; research in docs/blitz/TOOL-HOME-LAYOUT.RESEARCH.md
 - [Build toolchain location](build-toolchain-location.md) — make, 64tass, python are off-PATH in C:\8bitProgramming; build setup is in docs/BUILDING.md
 - [Git Bash sed strips CRLF](git-bash-sed-strips-crlf.md) — `sed -i` writes LF and `grep -c $'\r$'` lies; count with Python bytes
@@ -32,7 +34,7 @@ again. See [memory-is-git-tracked](memory-is-git-tracked.md).
 - [GPC.ERR builds in its sample folder](gpcerr-builds-in-its-sample-folder.md) — never standalone
 - [Runtime storage is the golden RAM](runtime-storage-is-golden-ram.md) — $0400 to StorageEnd, which MOVES; a test routine goes at $0780; [tests share the product's memory](tests-share-the-products-memory.md)
 - [/GPC/NAME opens from any folder](gpc-home-path-form.md) — measured on R49 hostfs; the plain form works, no CMD syntax needed
-- [Paste can't drive a running program](paste-cannot-drive-a-running-program.md) — use a fixed-answer variant. x16emu r49 runs tests, Box16 debugs
+- [Paste can't drive a running program](paste-cannot-drive-a-running-program.md) — use a fixed-answer variant, or `POKE 780,K:SYS 65219` to queue keys. x16emu r49 runs tests, Box16 debugs
 - [File I/O dies in a GP.DO key loop](file-io-error-in-gpdo-key-loop.md) — the seven shapes already ruled out
 - [Retired keyword defers to runtime](retired-keyword-defers-to-runtime.md) — stale callers compile clean and explode
 
@@ -50,11 +52,11 @@ again. See [memory-is-git-tracked](memory-is-git-tracked.md).
 - [Scalar variable space caps at 4,096 bytes](scalar-variable-space-caps-at-4096.md) — 11-bit halved operand, now checked; [every scalar was allocated 6 bytes](every-scalar-allocated-six-bytes.md), FIXED 2026-09-20, GPBMODS 4,322 -> 3,482
 - [PROGRAM TOO BIG was the workspace](program-too-big-fires-early.md) — FIXED; a bank per table, 4,096 lines; [OUT OF MEMORY $02B8](gpbmods-out-of-memory-02b8.md) was StartRuntime never setting X
 - [SHARED p-code cap is RTBASE](gpc-shared-pcode-cap-is-rtbase.md) — 22,016 bytes, not $9F00; [the full slack table](gpc-blitz-runtime-slack-and-limits.md) — LOW FREE minus 4096 is the headroom
-- [Run-side workspace, read from the PRG](run-side-workspace-read-from-the-prg.md) — two bootstrap page numbers give the budget; [52 B cushion below GPBase](gpc-core-page-cushion-below-gpbase.md)
+- [Run-side workspace, read from the PRG](run-side-workspace-read-from-the-prg.md) — two bootstrap page numbers give the budget; [10 B cushion below GPBase](gpc-core-page-cushion-below-gpbase.md)
 - [Compiler-emitted bank switch](compiler-emitted-bank-switch.md) — .bgosub emitted, twins merged, shims deleted 2026-09-14; [banks work in progress](banks-work-in-progress.md) — ALL-BANKS done, HANDLER-BANK at step 28, both uncommitted
 - [Opcode numbers follow handler order](opcode-numbers-follow-handler-order.md) — moving a `;;` handler renumbers p-code; open a section per handler instead
-- [Library sizes owed to help](library-sizes-belong-in-help.md) — runtime 10,956 B always; GPC-BASIC costs only what you #INCLUDE
-- [Runtime footprint](blitz-x16-runtime-footprint.md) — 10,956 B in every program, and how to shrink it
+- [Library sizes owed to help](library-sizes-belong-in-help.md) — runtime 10,239 B CORE / 11,775 GP.BASIC embedded, none shared; GPC-BASIC costs only what you #INCLUDE
+- [Runtime footprint](blitz-x16-runtime-footprint.md) — build 128 sizes, an older component split, and how to shrink it
 - [String heap scavenger](string-heap-scavenger.md) — SHIPPED: dead blocks reused, +1 page RT; [string blocks never shrink](gpc-string-blocks-never-shrink.md), never build a big temporary
 - [BINPUT# caps at 255 bytes](binput-caps-at-255-bytes.md) — three caps land on one number; it is a CHRIN loop
 - [LOAD chain clears memory](load-chain-clears-memory.md) — the variable carry is GONE; no leak, no CLR needed
@@ -100,9 +102,10 @@ again. See [memory-is-git-tracked](memory-is-git-tracked.md).
 - [IF semantics](gpc-if-semantics.md) — a false IF skips the WHOLE line. Blitz gets this right.
 - [FOR STEP 0 semantics](gpc-for-step0-semantics.md) — STEP 0 needs EXACT equality. **Blitz gets this wrong.**
 - [FOR 1 TO 0 runs once](gpc-basic-for-loop-runs-once.md) — guard every FOR 1 TO LEN()
+- [Empty INPUT gives ""](gpc-input-empty-line.md) — FIXED 2026-09-29; ROM keeps the old value, a chosen divergence
 - [X16 BASIC conformance](blitz-x16-basic-conformance.md) — 4 real defects fixed; `SLEEP 0` returns at once and still diverges
-- [No END crashes at exit](program-without-end-crashes.md) — runs off the last line into $ffff; end every test program with END
 - [Interpreter LOAD chain is safe](x16-interpreter-load-chain-is-safe.md) — R49 moves VARTAB, a longer chained program runs clean
+- [No END crashes at exit](program-without-end-crashes.md) — runs off the last line into $ffff; end every test program with END
 - [X16 BASIC coverage](gpc-x16-basic-coverage.md) — the 7 lexer blockers on valid X16 BASIC
 - [R44+ keywords](blitz-x16-r44-plus-keywords.md) — CLOSED: all 10 are in; do not re-fix
 
@@ -114,6 +117,7 @@ again. See [memory-is-git-tracked](memory-is-git-tracked.md).
 - [GP.ASM {VAR} symbol lookup, FIXED](gpasm-var-lookup-rescans-symfile.md) — was 95% of GPBMODS compile; now read once into banks 13-14, 317 s to 20 s
 
 ## X16 platform / toolchain
+- [PRINT and SCREEN drop the input channel](print-and-screen-drop-the-input-channel.md) — re-CHKIN before every MACPTR; on the wrong channel it moves nothing and still reports a count
 - [MACPTR wraps banks itself](macptr-wraps-banks-itself.md) — the caller that wants it is STASH, not FILEDIR
 - [Scrolling a screen region](scrolling-a-screen-region.md) — no GP command; three ways to do it by hand
 - [GP drawing targets layer 1](gp-drawing-targets-layer-1.md) — no row clamp, and L1_MAPBASE is POKEable
@@ -123,8 +127,9 @@ again. See [memory-is-git-tracked](memory-is-git-tracked.md).
 - [Object file must fit under the runtime](object-file-must-fit-under-the-runtime.md) — regions were invisible to the fit check
 - [Wildcard scratch eats the source](wildcard-scratch-eats-the-source.md) — S0:NAME.B* matches NAME.BASL
 - [One NAME.OVL holds every region](region-overlay-ovl-file.md) — BUILT; banks 2-255, 127 regions; bank and page count ahead of each region, $01 end marker, read through ACPTR
+- [Banked error address can't be placed](banked-error-address-unplaceable.md) — FIXED in runtime build 128: a region error prints `$bb:AAAA`, the map and GPC.ERR use the same form
 - [Object writer: regions vs low code](object-writer-regions-vs-low-code.md) — the streamer pads forward 65,535 bytes with no check firing
-- [Overlay inside the PRG: research](overlay-in-prg-research.md) — the option C plan came out of it; a LOADed file caps at 39,679 bytes total
+- [Overlay inside the PRG: research](overlay-in-prg-research.md) — option C built; option D DECIDED 2026-09-29 (one PRG up to 39,679, PRG + .OVL above); the any-size single file was REJECTED, LOAD must never print ?OUT OF MEMORY
 - [A second region for the utilities](second-region-for-the-utilities.md) — BUILT; a BANK statement is the ONLY disqualifier; regions call each other, a GOTO across is refused
 - [Banked code loses the bank on a call out](gp-banked-call-out-loses-the-bank.md) — a region may not BANK itself back; every call into a region is now .bgosub, library shims gone
 - [FILEDIR banks whole](filedir-bank-split.md) — BUILT; the switch moved into its two blobs

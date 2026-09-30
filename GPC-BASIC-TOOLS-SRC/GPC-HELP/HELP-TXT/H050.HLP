@@ -1,114 +1,75 @@
-@4.11 GUI.INC.BL -- the box that puts the screen back, and the form in it
+@4.9 MENUPULL.INC.BL -- a dropdown under a bar item
 .
-=4.11 GUI.INC.BL -- THE BOX THAT PUTS THE SCREEN BACK, AND THE FORM IN IT
-.
-=WHAT IT COSTS
-.
-.  ASM: GP.BOX GP.FILL GP.PRINTAT
-.    ASM -- machine code in the GP runtime block. One GP keyword pays for the
-.    whole block.
-.  COMPOSITE: GP.CHAR GP.PRINTAT GP.FILL
-.    COMPOSITE -- no machine code. The compiler expands it into keywords that
-.    already exist. Runtime cost is zero.
+=4.9 MENUPULL.INC.BL -- A DROPDOWN UNDER A BAR ITEM
 .
 =DESCRIPTION
 .
-.  GUI.OPEN
-.      IN: GUI.BODY.ROWS GUI.BODY.WIDTH
-.      OUT: GUI.INNER.LEFT .TOP .WIDTH -- the box on its own
+.  N = GP.FN(MENUTO.PULLDOWN, barnum, style)
+.      IN: the popup slot, the bar MENUTO.BAR or MENU.DRAWBAR last drew,
+.        MENU.STASHBANK
+.      OUT: N MENU.EXITKEY MENU.NEXTBAR MENU.BARNUM MENU.SELX MENU.SELW
 .
-.  GUI.CLOSE
-.      IN: --
-.      OUT: the screen as it was
+:MENU.BARFLAGS = MENU.DOWNEXIT
+:B = GP.FN(MENUTO.BAR, 0, 0, MENU.NOBOX)
+:GP.DO
+:    IF B = 0 THEN GP.EXITDO
+:    GOSUB MY.FILL
+:    N = GP.FN(MENUTO.PULLDOWN, B, MENU.ROUND)
+:    B = MENU.NEXTBAR
+:GP.LOOP
 .
-.The dialogs are not here. They are one-line verbs in GUI-DIALOGS.INC.BL, SEC
-.4.12, and a program calls those. This file is what they are built out of:
-.the box, the control block, and GUI.FORM, the loop that runs a mix of
-.controls under one focus.
+.MY.FILL is the caller's: MENU.BEGIN MENU.POPUP and the rows for bar item B.
 .
-:GP.SUB PANELOPEN, " READY ", "", 4, 30
-:GP.PRINTAT GUI.INNER.LEFT, GUI.INNER.TOP, "MY OWN ROWS", THEME.CLR(THEME.TEX
-:GP.SUB PANELCLOSE
+.Requires MENU.INC.BL (SEC 4.6) and STASH.INC.BL (SEC 3.6), included by the
+.caller, and a #SYMFILE for STASH. A program with no dropdown leaves this
+.file out and does not carry STASH.
 .
-.Requires GPB.INC.BL, STASH.INC.BL, THEME.INC.BL, BANKMGR.INC.BL,
-.MENU.INC.BL, LINEINPUT.INC.BL, COMBO.INC.BL and CHECK.INC.BL, and #INCLUDEs
-.none of them. All of them are needed whichever dialog you call: BASLOAD
-.resolves every label in the file, so leaving one out is LABEL NOT FOUND.
-.MENU.INC.BL goes in before GUI.INC.BL, for its #DEFINEs. COMBO.INC.BL and
-.CHECK.INC.BL go in after it. It wants a #SYMFILE, because STASH does.
+.MENUTO.PULLDOWN marks bar item barnum, opens the popup slot under it and
+.runs it. A barnum out of range or disabled returns 0 and draws nothing. The
+.bar is the one last drawn, where it was drawn, read with MENU.GAP and
+.MENU.BARFLAGS as they are now. The item the last call marked is unmarked and
+.barnum is marked. It stays marked on the way out, in MENU.MARKED.
 .
-.PICKMENU runs the popup slot inside its box. Build the rows with MENU.BEGIN
-.MENU.POPUP and MENU.ITEM first. & hot keys are tinted in GUI.BORDER, and the
-.highlight is as wide as the widest row.
+.The dropdown's corner is the item's column on the row under the bar, moved
+.left if the box would run off the screen. The screen width comes from the
+.KERNAL's screen_mode. The style and colours are MENUTO.VERT's (SEC 4.6), and
+.the run adds MENU.KEYEXIT to MENU.FLAGS.
 .
-.Everything the box takes -- three message lines, a title, the style, the
-.placement, the shadow, the frame glyphs, the bank the covered cells go to --
-.is listed in full in GP-BASIC.GLOBALS.md SEC 3. GUI.BANK = 0 does not save
-.the cells, and then the box is still on screen when the call returns.
+.  N
+.      the row, for RETURN or a hot key. Any other exit is 0
 .
-.Every control has a focus, and TAB moves it. A dialog states its controls
-.and GUI.FORM runs them. A control is a button, a field, a list, a combo (SEC
-.4.17) or a check box (SEC 4.21); it hands back one of six verdicts -- stay,
-.next, previous, press, default, cancel -- and the dispatcher is one loop
-.whatever the mix.
+.  MENU.EXITKEY
+.      the key that ended it
 .
-.The default button and the focused control are different things. The default
-.is what RETURN presses from anywhere and is drawn <<LIKE THIS>>; the focus
-.is where TAB has got to and is drawn in THEME.FOCUS. INPUTBOX opens with the
-.default on OK and the focus in the field -- which is the point of keeping
-.the two apart, and GUI.DEFAULT sets only the first.
+.  MENU.NEXTBAR
+.      the bar item LEFT or RIGHT walks to, stepping over disabled items as
+.        the bar does. With no live neighbour it is barnum. 0 for any other
+.        exit
 .
-.The answers are buttons. GUI.BTN.ONE$ and GUI.BTN.TWO$ carry them, and &
-.marks the accelerator: "&CANCEL" lights the C. An accelerator is live only
-.while the focused control does not eat printable keys, so C presses CANCEL
-.from the button row or from inside a list, and types a C in a field.
+.  MENU.BARNUM
+.      the bar's row count
 .
-.The typing dialog's answer is GUI.TEXT$, and the verb is INPUTBOX. BASLOAD
-.will not have a label and a variable of one name, and the $ does not
-.separate them.
+.  MENU.SELX MENU.SELW
+.      the item's column and width
 .
-=Fields on a form
+.The screen under the dropdown is saved first and put back after, in STASH
+.slot 0 of bank MENU.STASHBANK. Set it before the first call to choose the
+.bank. Left at 0, the first call takes one from BANKMGR.GET.FREE.BANK. If
+.none is free, the dropdown still runs and the screen is not put back.
 .
-.  GUI.FORM.ADD.FIELD
-.      IN: LINEINPUT.X .Y .LEN .TEXT$ and the rest of LINEINPUT's inputs
-.      OUT: GUI.CTRL.N -- the field's control number
+.WARNING: MENUTO.PULLDOWN sets STASH.BANK, STASH.SLOT, STASH.MOVE, STASH.X,
+.STASH.Y, STASH.W and STASH.H. Set them again before the caller's own next
+.STASH call.
 .
-:LINEINPUT.X = GUI.INNER.LEFT : LINEINPUT.Y = GUI.INNER.TOP
-:LINEINPUT.LEN = 20 : LINEINPUT.TEXT$ = "UNTITLED"
-:GOSUB GUI.FORM.ADD.FIELD
-:NAME.CTRL = GUI.CTRL.N
-:REM ... run the form ...
-:PRINT GUI.CTRL.TEXT$(NAME.CTRL)
-.
-.The text belongs to the control, in GUI.CTRL.TEXT$(n). LINEINPUT has one
-.buffer, so a field copies its text in when it takes the focus and back out
-.when it leaves. Read GUI.CTRL.TEXT$(n) after GUI.FORM.RUN. That is what lets
-.one form carry several fields.
-.
-.The field is painted as soon as it is added, so a field that never takes the
-.focus is still drawn.
-.
-.Upper case, on the default charset. GP.PRINTAT converts PETSCII and BASLOAD
-.passes literals through as source bytes, so charset 2 lands lower case on
-.the graphics half of the font. ISO mode fixes the text and breaks the frame,
-.GP.BOX's $40-$7D being letters. Upper case with a frame, mixed case without
-.one, or re-order the font and set GUI.GLYPH.
-.
-.Example: GUI.EXP.BL.
+.Example: pass 6 of MENUTO.EXP.BL.
 .
 =EXAMPLE PROGRAM
 .
-.  GUI.EXP.BL -- runnable, in the GPC-BASIC folder
+.  MENUTO.EXP.BL -- runnable, in the GPC-BASIC folder
 .
 =SEE ALSO
 .
->92|4.12 GUI-DIALOGS.INC.BL -- every dialog as a verb
->26|3. Command reference
->99|4.17 COMBO.INC.BL -- a drop-down list that folds into one row
->104|4.21 CHECK.INC.BL -- a check box, [X] or [ ]
->90|4.11 GUI.INC.BL -- the box that puts the screen back, and the form in 
->112|STASH.INC.BL -- save a text rectangle, and put it back.
->66|4.1 THEME.INC.BL -- named colour roles
->95|4.13 BANKMGR.INC.BL -- who owns which RAM bank
->79|4.6 MENU.INC.BL -- menus built a row at a time
->77|4.4 LINEINPUT.INC.BL -- a positioned entry field
+>84|4.6 MENU.INC.BL -- menus built a row at a time
+>44|3.6 Screen -- stash and restore
+>93|4.9 MENUPULL.INC.BL -- a dropdown under a bar item
+>117|STASH.INC.BL -- save a text rectangle, and put it back.

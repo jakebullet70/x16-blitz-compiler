@@ -9,7 +9,7 @@
 ## **  needs a #SYMFILE above its includes.
 ## **
 ## **  Usage:
-## **      ERR.SRC.NAME$ = "GPB.HELP.SRC.PRG"
+## **      ERR.SRC.NAME$ = "GPC.HELP.SRC.PRG"
 ## **      GOSUB ERR.SRC.OPEN
 ## **      IF ERR.SRC.READY = 0 THEN <ERR.SRC.WHY$ says why>
 ## **      ERR.SRC.WANT = 1669

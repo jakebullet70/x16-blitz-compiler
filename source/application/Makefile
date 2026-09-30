@@ -101,12 +101,13 @@ release:  build
 	$(CCOPY) build$(S)*.bas $(RELEASEDIR)
 	$(CCOPY) $(BINDIR)tokenise.zip $(RELEASEDIR)
 	#
-	#		The on-machine reference, so a staged drive can run GPB.HELP beside the
-	#		compiler. The PRG is checked in already built (EMBEDDED, so it needs no
-	#		runtime beside it); HELP-TXT holds the index and the topics, and the viewer
-	#		opens both as //HELP-TXT/:NAME -- so the folder has to arrive as a folder.
+	#		The on-machine reference, so a staged drive can run GPC.HELP beside the
+	#		compiler. The PRG is checked in already built, SHARED, and reads its regions
+	#		from GPC.HELP.OVL beside it. HELP-TXT holds the index and the topics, and the
+	#		viewer opens both as //HELP-TXT/:NAME -- so the folder has to arrive as a folder.
 	#
-	$(CCOPY) $(ROOTDIR)GPC-BASIC-TOOLS-SRC$(S)GPC-HELP$(S)GPB.HELP.PRG $(RELEASEDIR)
+	$(CCOPY) $(ROOTDIR)GPC-BASIC-TOOLS-SRC$(S)GPC-HELP$(S)GPC.HELP.PRG $(RELEASEDIR)
+	$(CCOPY) $(ROOTDIR)GPC-BASIC-TOOLS-SRC$(S)GPC-HELP$(S)GPC.HELP.OVL $(RELEASEDIR)
 	$(CCOPY) -r $(ROOTDIR)GPC-BASIC-TOOLS-SRC$(S)GPC-HELP$(S)HELP-TXT $(RELEASEDIR)
 	#
 	#		There is deliberately no CHANGES.txt here. The original author's was deleted ("Del

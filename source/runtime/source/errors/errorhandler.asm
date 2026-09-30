@@ -62,26 +62,40 @@ _EHDisplayMsg:
 		iny
 		lda 	(zTemp0),y
 		bne 	_EHDisplayMsg
-		lda 	#32
+		ldy 	#3 							; " @ $", printed from the last byte of _EHAtText down
+_EHDisplayAt:
+		lda 	_EHAtText,y
 		jsr 	XPrintCharacterToChannel
-		lda 	#64
+		dey
+		bpl 	_EHDisplayAt
+		;
+		;		Where the error is, in the form the map file and GPC.ERR use. Low p-code is an
+		;		offset from the p-code base, "$0143". P-code at $A000 up is in a GP.BANKED region,
+		;		which runs from $A000 in its own bank, so it is the bank and the run address,
+		;		"$14:A043". The compiler puts one region in a bank, so the pair names one byte.
+		;		SelectRAMBank is the region's bank: bank 1 was put back above.
+		;
+		lda 	codePtr+1
+		cmp 	#$A0
+		bcc 	_EHLowCode
+		lda 	SelectRAMBank
+		jsr 	_EHDisplayHex
+		lda 	#':'
 		jsr 	XPrintCharacterToChannel
-		lda 	#32
-		jsr 	XPrintCharacterToChannel
-		jsr 	EHDisplayCodePtr
-		sec 								; report error.
-		jmp 	EndRuntime
-
-EHDisplayCodePtr:
-		lda 	#'$'
-		jsr 	XPrintCharacterToChannel
+		lda 	codePtr+1
+		bra 	_EHDisplayPage
+_EHLowCode:
 		sec
-		lda 	codePtr+1 					; display the p-code address of the error.
 		sbc 	runtimeHigh
+_EHDisplayPage:
 		jsr 	_EHDisplayHex
 		lda 	codePtr
 		jsr 	_EHDisplayHex
-		rts
+		sec 								; report error.
+		jmp 	EndRuntime
+
+_EHAtText:
+		.text 	"$ @ "
 
 _EHDisplayHex:
 		pha

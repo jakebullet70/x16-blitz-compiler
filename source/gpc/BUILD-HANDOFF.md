@@ -19,10 +19,9 @@ python source/gpc/samplesbuild.py GPB.HELP         one, by name
 python source/gpc/samplesbuild.py --list           the table, no build
 ```
 
-`source/gpc/helpbuild.py` is a shim over `samplesbuild.py GPB.HELP` and nothing more.
-`xbasebuild.py` and `modsbuild.py` are the older one-program scripts that
-`samplesbuild.py` was modelled on; they still work and are still the fallback if the new
-script is in your way.
+`source/gpc/helpbuild.py` is a shim over `samplesbuild.py GPC.HELP` and nothing more.
+`xbasebuild.py` is the older one-program script that `samplesbuild.py` was modelled on;
+it still works and is the fallback if the new script is in your way.
 
 Budget **six to ten minutes per program**. GPBMODS alone was 6m 11s on this machine.
 

@@ -1,83 +1,38 @@
-@4. Module reference -- the BASL library
+@3.12 Code in a bank
 .
-=4. MODULE REFERENCE -- THE BASL LIBRARY
+=3.12 CODE IN A BANK
 .
-.Called with GOSUB. Arguments go into named variables before the call,
-.results come back in named variables after it. Every module is
-.position-independent -- each jumps over itself -- so #INCLUDE it anywhere,
-.including the top of the program.
+=SYNTAX
 .
-.Any of them can run from a RAM bank. Put its #INCLUDE between GP.BANKED and
-.GP.ENDBANKED (SEC 3.12). A call into the region selects its bank, so the
-.GOSUBs in this section read the same either way.
+:GP.BANKED <bank>
+:    ... p-code ...
+:GP.ENDBANKED
 .
-.STASH and STASHFILE are the two that cannot: both execute BANK, and a
-.GP.BANKED region may not contain that statement. STASHVRAM (SEC 4.18) is the
-.one to reach for inside a region. See BANKED-OR-NOT.md and
-.GP-BASIC.GLOBALS.md SEC 4.
+=WHAT IT COSTS
 .
-=Low memory or a bank -- what differs
+.  ASM: GP.BANKED GP.ENDBANKED
+.    ASM -- machine code in the GP runtime block. One GP keyword pays for the
+.    whole block.
 .
-.A module is one file. #INCLUDE "X.INC.BL" puts it in low memory, and the
-.same line between GP.BANKED and GP.ENDBANKED puts it in a RAM bank. The
-.GOSUB at the call site is the same either way.
+=DESCRIPTION
 .
-.Low memory is the one that runs out. A SHARED program has about 17,920 bytes
-.of p-code under the runtime and every #INCLUDE spends it; a region spends
-.8,192 bytes of a RAM bank the program was not using. Bank what you can. A
-.module called inside a loop goes where the loop is: a call between a region
-.and anywhere outside it switches the bank twice.
+.Marks a run of p-code as belonging at $A000 in that RAM bank rather than in
+.low memory. Both keywords are alone on their line and the bank is a decimal
+.constant.
 .
-.The banked form works in either build, and both write the same NAME.OVL
-.beside the program. A SHARED program's bootstrap opens it; an EMBEDDED
-.program opens it itself, at startup, before the runtime begins. So the first
-.banked module makes an EMBEDDED program two files: ship the .OVL with the
-..PRG, and a program that cannot find it stops with ?OVL. A program with no
-.region at all has no .OVL and is one file as before. Either way it loads
-.with LOAD and RUN.
+.They are compile-time markers and select nothing. BANK is the statement that
+.selects a bank, and these are deliberately not spelled like it. Nothing
+.happens at run time where the GP.BANKED line is.
 .
-.The regions are never in the file the loader reads, so nothing caps them but
-.the banks the machine has; a region asking for a bank that is not there
-.stops with ?RAM. A banked embedded program does carry the whole runtime
-.rather than the smaller core, whether or not it calls a GP.BASIC keyword.
-.
-.samples/GPB-MODS-TESTING/PICKDEMO.BASL is a complete program in this shape,
-.in 99 lines.
-.
-.Banking a module makes room in either build, and it used to make room in
-.only one. An embedded object once carried its regions appended to the .PRG,
-.so a byte moved into a region was still a byte in the file and the last byte
-.landed where it always had. The regions go in the .OVL now, which the loader
-.never reads, so a banked module leaves low memory and leaves the file with
-.it. Splitting the modules across more regions costs two header bytes a
-.region and nothing else. What a region does not buy is a smaller .OVL: the
-.bytes are still shipped, in the file beside the program rather than inside
-.it.
-.
-.  Include
-.      LOW MEMORY: #INCLUDE "X.INC.BL"
-.      A RAM BANK: the same, inside GP.BANKED
-.
-.  Entry label
-.      LOW MEMORY: THEME.SELECT
-.      A RAM BANK: THEME.SELECT
-.
-.  Costs per call
-.      LOW MEMORY: one GOSUB; from a region, one byte more and two bank
-.        switches
-.      A RAM BANK: from outside the region, one byte more and two bank
-.        switches
-.
-.  Low memory used
-.      LOW MEMORY: the whole module
-.      A RAM BANK: none
+.This is how a program gets past the shared p-code ceiling. Low-memory p-code
+.has to fit under the runtime -- about 17,920 bytes, SEC 7 -- and a region
+.does not count against it. Every region of the program goes into one overlay
+.file, NAME.OVL, written beside the .PRG and read in at startup. That is true
+.of an EMBEDDED build as well, so a banked program is two files in either
+.mode.
 .
 :#DEFINE MY.GUICODE 4
-:#DEFINE MY.THEMECODE 9
 :GOTO MY.LIBEND
-:GP.BANKED MY.THEMECODE
-:#INCLUDE "THEME.INC.BL"
-:GP.ENDBANKED
 :GP.BANKED MY.GUICODE
 :#INCLUDE "MENU.INC.BANKED.BL"
 :#INCLUDE "MENU.INC.BL"
@@ -89,26 +44,47 @@
 :GP.ENDBANKED
 :MY.LIBEND:
 .
-.A region is 8,192 bytes, and that is the whole of the grouping. The GUI
-.modules fill one, so THEME has its own. THEME comes first because the GUI
-.modules read its #DEFINEs. A call from one region to the other costs the
-.same bank switches as a call from low memory.
+.The GOTO over the region is not optional. Falling in through the bridge
+.GP.BANKED leaves works at program start and stops working the day anything
+.selects another bank first. The compiler does not catch a fall-in.
 .
-.Include a module once. One #INCLUDE in low memory and another in a region is
-.DUPLICATE SYMBOL where the module has no #IFNDEF guard. Where it has one,
-.the module lands at the first #INCLUDE and the second produces nothing.
+.#DEFINE the bank above the GP.BANKED line. BASLOAD replaces a name only once
+.it has read its #DEFINE, and the number is then fixed when the program
+.compiles.
 .
-.SEC 3.12 has the rules, what a region may not contain, and the .OVL file a
-.banked program ships.
+.Claim the bank, or something else hands it out:
 .
-=SEE ALSO
+:BANKMGR.SET.BANK = MY.GUICODE : GOSUB BANKMGR.CLAIM
 .
->57|3.12 Code in a bank
->100|4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM
->66|4.1 THEME.INC.BL -- named colour roles
->79|4.6 MENU.INC.BL -- menus built a row at a time
->77|4.4 LINEINPUT.INC.BL -- a positioned entry field
->90|4.11 GUI.INC.BL -- the box that puts the screen back, and the form in 
->99|4.17 COMBO.INC.BL -- a drop-down list that folds into one row
->104|4.21 CHECK.INC.BL -- a check box, [X] or [ ]
->92|4.12 GUI-DIALOGS.INC.BL -- every dialog as a verb
+=What fits
+.
+.32 pages -- the whole of $A000-$BFFF, 8,192 bytes. The entry bridge, the
+.alignment padding, the exit bridge, the end marker and every GP.ASM block in
+.the region are part of what has to fit, so the usable payload is a little
+.under the window. Past it the compiler stops and names the region's
+.GP.BANKED line, not the line it happened to be on when it ran out.
+.
+.Banks 2 to 255, and at most 127 regions. Bank 0 is the KERNAL's and bank 1
+.is reserved for the runtime; the compiler refuses both. A 512 K X16 has
+.banks up to 63 and a 2 MB one up to 255, and a program that names a bank the
+.machine does not have prints ?RAM and returns to READY before it loads
+.anything. GP.BANKEDSTR banks count toward the 127: one region over it stops
+.the compile with TOO MANY GP.BANKED REGIONS, and one text bank over it with
+.NO REGION LEFT FOR GP.BANKEDSTR TEXT. No two regions may share a bank: the
+.second would land at $A000 on top of the first.
+.
+=What a region may not contain
+.
+.BANK is the one statement refused inside a region. Code fetched from the
+.window cannot be running when the window changes, and BANK changes it and
+.leaves it changed. PEEK and POKE put the bank back after each access, and
+.BLOAD and BSAVE are not refused. A BANK statement keeps STASH and STASHFILE
+.in low memory; STASHVRAM (SEC 4.18) has none, so it goes in.
+.
+.GP.BANKEDSTR (SEC 3.10) inside a region is free: it emits no p-code at all,
+.so a text group costs the region nothing.
+.
+.A GP.ASM block inside a region goes into the region's bank. A block that
+.writes $00, the RAM bank register, must be GP.ASM LOW (SEC 3.9). The
+.compiler refuses a direct store to $00 without it.
+.

@@ -6,6 +6,9 @@
 ##                     works and still centres
 ##
 ## A was 93 jiffies before the block path and is 19 after.
+## BMX.INC.BL reaches BASIC's variables through {VAR}, so this program needs a
+## #SYMFILE. It goes BEFORE the #INCLUDEs and its name must match the PRG.
+#SYMFILE "@:BMXSPD.SYM"
 #INCLUDE "GPB.INC.BL"
 #INCLUDE "BMX.INC.BL"
 #SAVEAS "@:BMXSPD.PRG"

@@ -1,13 +1,16 @@
 ---
 name: gpc-core-page-cushion-below-gpbase
-description: In the EMBEDDED image 52 bytes sit between the core's last byte and GPBase $2F00 since build 123 moved handlers to bank 1; crossing costs every embedded program 256 B. SHARED has 379 B core and 633 B GP block free. Measure from rtimage.lbl, not a listing.
+description: In the EMBEDDED image 10 bytes sit between the core's last byte and GPBase $3000 at build 128; crossing costs every embedded program 256 B. SHARED has 379 B core and 633 B GP block free. Measure from rtimage.lbl, not a listing.
 metadata:
   node_type: memory
   type: project
   originSessionId: d7531322-9a88-4f9a-8bdd-54f6afe99cb4
 ---
 
-**Re-measured 2026-09-15, build 123: 52 bytes left in the embedded image.** Build 123 moved the
+**Re-measured 2026-09-30, build 128: 10 bytes left.** `FloatIsZero` ends at `$2FF6` below `GPBase
+$3000`; the banked error print took 9. See [[banked-error-address-unplaceable]].
+
+**Measured 2026-09-15, build 123: 52 bytes left in the embedded image.** Build 123 moved the
 rarely used handlers, `FloatTangent` among them, to bank 1. The last core routine is now
 `FloatIsZero`, 9 B at `$2ec3`, so the core ends at `$2ecc` and `GPBase` is `$2f00`. The 45 B that
 copy the bank code to bank 1 at start are inside that figure. Before build 123 the cushion was 4 B

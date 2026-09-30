@@ -287,7 +287,7 @@ def render(groups, src_name):
     out = []
     out.append("# GP.BASIC and BASL -- the reference, for reading on Windows")
     out.append("")
-    out.append("The same material `GPB.HELP.PRG` shows on the X16, laid out for an editor or a")
+    out.append("The same material `GPC.HELP.PRG` shows on the X16, laid out for an editor or a")
     out.append("browser instead of an 80x30 screen: the 120-line pages are joined back up, each")
     out.append("title appears once, and the cross references are links.")
     out.append("")

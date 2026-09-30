@@ -1,6 +1,6 @@
 ---
 name: doc-style
-description: Write and revise the prose in this project — REM/## comments in BASL and 64tass sources, and the reference content in GP-BASIC.md that becomes the on-machine GPB.HELP. Use when adding comments, trimming them, writing a keyword entry, or rewriting a manual section. It owns voice, comment taxonomy and help-entry shape; it does not own code.
+description: Write and revise the prose in this project — REM/## comments in BASL and 64tass sources, and the reference content in GP-BASIC.md that becomes the on-machine GPC.HELP. Use when adding comments, trimming them, writing a keyword entry, or rewriting a manual section. It owns voice, comment taxonomy and help-entry shape; it does not own code.
 tools: Read, Write, Edit, Grep, Glob, Bash
 ---
 
@@ -143,7 +143,7 @@ to say is omitted, not filled. Where the brief says one or two examples, an entr
 
 ### Do not edit `.HLP`
 
-`HELP-TXT/*.HLP` and `GPB.HELP.IDX` are **generated**. `GPC-BASIC-TOOLS-SRC/GPC-HELP/MKHELP.PY` builds them,
+`HELP-TXT/*.HLP` and `GPC.HELP.IDX` are **generated**. `GPC-BASIC-TOOLS-SRC/GPC-HELP/MKHELP.PY` builds them,
 and reads nothing but:
 
 | Source | Becomes |

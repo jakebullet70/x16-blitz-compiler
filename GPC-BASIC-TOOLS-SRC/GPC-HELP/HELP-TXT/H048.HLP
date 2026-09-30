@@ -1,75 +1,56 @@
-@4.9 MENUPULL.INC.BL -- a dropdown under a bar item
+@4.7 SORT.INC.BL -- shell sort a string array
 .
-=4.9 MENUPULL.INC.BL -- A DROPDOWN UNDER A BAR ITEM
+=4.7 SORT.INC.BL -- SHELL SORT A STRING ARRAY
 .
 =DESCRIPTION
 .
-.  N = GP.FN(MENUTO.PULLDOWN, barnum, style)
-.      IN: the popup slot, the bar MENUTO.BAR or MENU.DRAWBAR last drew,
-.        MENU.STASHBANK
-.      OUT: N MENU.EXITKEY MENU.NEXTBAR MENU.BARNUM MENU.SELX MENU.SELW
+.  SORT.RUN
+.      IN: SORT.PTR SORT.DESCEND SORT.NOCASE
+.      OUT: SORT.OK SORT.COUNT
 .
-:MENU.BARFLAGS = MENU.DOWNEXIT
-:B = GP.FN(MENUTO.BAR, 0, 0, MENU.NOBOX)
-:GP.DO
-:    IF B = 0 THEN GP.EXITDO
-:    GOSUB MY.FILL
-:    N = GP.FN(MENUTO.PULLDOWN, B, MENU.ROUND)
-:    B = MENU.NEXTBAR
-:GP.LOOP
+:#SYMFILE "@:MYPROG.SYM"
+:#INCLUDE "SORT.INC.BL"
+:
+:SORT.PTR = GP.ARRPTR(NAME$())
+:SORT.DESCEND = 0 : SORT.NOCASE = 0
+:GOSUB SORT.RUN
 .
-.MY.FILL is the caller's: MENU.BEGIN MENU.POPUP and the rows for bar item B.
+.Shell sort with Ciura's gap sequence -- 132, 57, 23, 10, 4, 1 -- moving the
+.2-byte element pointers rather than string data. A swap costs the same
+.whatever the strings are: no temporary, no copy, no heap traffic.
 .
-.Requires MENU.INC.BL (SEC 4.6) and STASH.INC.BL (SEC 3.6), included by the
-.caller, and a #SYMFILE for STASH. A program with no dropdown leaves this
-.file out and does not carry STASH.
+.The array is passed as an address because a BASL subroutine cannot be passed
+.an array; GP.ARRPTR is a keyword for this purpose. The empty parentheses in
+.GP.ARRPTR(A$()) are required -- A$ and A$() are different variables.
 .
-.MENUTO.PULLDOWN marks bar item barnum, opens the popup slot under it and
-.runs it. A barnum out of range or disabled returns 0 and draws nothing. The
-.bar is the one last drawn, where it was drawn, read with MENU.GAP and
-.MENU.BARFLAGS as they are now. The item the last call marked is unmarked and
-.barnum is marked. It stays marked on the way out, in MENU.MARKED.
+.SORT.OK is -1 when it sorted and 0 if the sort was refused: more than 255
+.elements, so DIM A$(254) is the largest accepted (DIM A$(255) is 256
+.elements), or an array whose elements are not strings. The element count and
+.the type are read from the array's own header, three bytes below what
+.GP.ARRPTR returns, so a wrong count cannot be passed in.
 .
-.The dropdown's corner is the item's column on the row under the bar, moved
-.left if the box would run off the screen. The screen width comes from the
-.KERNAL's screen_mode. The style and colours are MENUTO.VERT's (SEC 4.6), and
-.the run adds MENU.KEYEXIT to MENU.FLAGS.
+.Never-assigned elements are empty strings, not garbage. A DIM A$(20) with
+.five entries filled sorts its fifteen empties to the front; a null pointer
+.reads as "", as it does elsewhere in the runtime.
 .
-.  N
-.      the row, for RETURN or a hot key. Any other exit is 0
+.SORT.DESCEND and SORT.NOCASE are ordinary variables rather than arguments,
+.so they are sticky. Set both on every call.
 .
-.  MENU.EXITKEY
-.      the key that ended it
+.The program must have a #SYMFILE, placed before the #INCLUDEs. The assembly
+.reaches BASIC's variables through {VAR}, and BASLOAD crunches every name
+.before the compiler sees it; without the mapping the compile stops with {}
+.NEEDS #SYMFILE.
 .
-.  MENU.NEXTBAR
-.      the bar item LEFT or RIGHT walks to, stepping over disabled items as
-.        the bar does. With no live neighbour it is barnum. 0 for any other
-.        exit
-.
-.  MENU.BARNUM
-.      the bar's row count
-.
-.  MENU.SELX MENU.SELW
-.      the item's column and width
-.
-.The screen under the dropdown is saved first and put back after, in STASH
-.slot 0 of bank MENU.STASHBANK. Set it before the first call to choose the
-.bank. Left at 0, the first call takes one from BANKMGR.GET.FREE.BANK. If
-.none is free, the dropdown still runs and the screen is not put back.
-.
-.WARNING: MENUTO.PULLDOWN sets STASH.BANK, STASH.SLOT, STASH.MOVE, STASH.X,
-.STASH.Y, STASH.W and STASH.H. Set them again before the caller's own next
-.STASH call.
-.
-.Example: pass 6 of MENUTO.EXP.BL.
+.Example: ARRAYS.EXP.BL. Regression test: SORT.EXP.BL, eight cases including
+.a 200-element array -- element 128 is where the doubled index stops fitting
+.in a byte. Every case checks content as well as order: a sort that reads the
+.wrong element leaves the array in order with a string duplicated.
 .
 =EXAMPLE PROGRAM
 .
-.  MENUTO.EXP.BL -- runnable, in the GPC-BASIC folder
+.  ARRAYS.EXP.BL -- runnable, in the GPC-BASIC folder
+.  SORT.EXP.BL -- runnable, in the GPC-BASIC folder
 .
 =SEE ALSO
 .
->79|4.6 MENU.INC.BL -- menus built a row at a time
->40|3.6 Screen -- stash and restore
->88|4.9 MENUPULL.INC.BL -- a dropdown under a bar item
->112|STASH.INC.BL -- save a text rectangle, and put it back.
+>91|4.7 SORT.INC.BL -- shell sort a string array

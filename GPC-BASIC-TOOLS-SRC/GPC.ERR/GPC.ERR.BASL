@@ -175,6 +175,23 @@ ERR.MAKE.HEX4:
 
 
 ## ===========================================================================
+## ERR.ADDRESS.TEXT -- an address as the runtime prints it, into ERR.ADDRESS$.
+##
+##   in   ERR.ADDRESS.BANK    0 for low code, else the region's bank, 1 to 255
+##        ERR.ADDRESS.VALUE   0 to 65535
+##   out  ERR.ADDRESS$        "$0143" for low code, "$14:A043" in a region
+## ===========================================================================
+ERR.MAKE.ADDRESS.TEXT:
+    GP.DEFPROC ERR.ADDRESS.TEXT, ERR.ADDRESS.BANK, ERR.ADDRESS.VALUE RETURNS ERR.ADDRESS$
+    GP.SUB HEX4, ERR.ADDRESS.VALUE
+    ERR.ADDRESS$ = "$" + ERR.HEX4$
+    IF ERR.ADDRESS.BANK = 0 THEN RETURN
+    GP.SUB HEX4, ERR.ADDRESS.BANK
+    ERR.ADDRESS$ = "$" + RIGHT$(ERR.HEX4$, 2) + ":" + MID$(ERR.ADDRESS$, 2)
+    RETURN
+
+
+## ===========================================================================
 ## ERR.BOOT -- banks, theme, the dialog engine and the picker, once.
 ## ===========================================================================
 ERR.BOOT:
@@ -537,30 +554,36 @@ ERR.PAINT.FILES:
 ## ERR.PAINT.ANSWER -- the rows of the answer, and the one that says why there
 ## is no answer.
 ##
-## The offset row is the point of the whole tool. An address ON a line's first
-## opcode is a statement that failed; an address INSIDE the line is a statement
+## The offset row is the point of the whole tool. An address on a line's first
+## opcode is a statement that failed; an address inside the line is a statement
 ## that ran part way.
+##
+## A region has no end record, so an address past its last record is shown as
+## an offset into that last line.
 ## ---------------------------------------------------------------------------
 ERR.PAINT.ANSWER:
     ERR.Y = ERR.FRAME.TOP + 4
     GP.IF ERR.HAVE.ADDRESS <> 0 THEN
-        GP.SUB HEX4, ERR.TARGET
-        ERR.TEXT$ = "$" + ERR.HEX4$
-        GP.IF ERR.MAP.OFFSET < 0 THEN
+        GP.SUB ERR.ADDRESS.TEXT, ERR.TARGET.BANK, ERR.TARGET
+        ERR.TEXT$ = ERR.ADDRESS$
+        GP.IF ERR.LAST.OFFSET < 0 AND ERR.TARGET.BANK <> 0 THEN
+            ERR.TEXT$ = ERR.TEXT$ + "  THE MAP HOLDS NO REGION IN THAT BANK"
+        GP.ELSEIF ERR.MAP.OFFSET < 0 THEN
             ERR.TEXT$ = ERR.TEXT$ + "  IS BEFORE THE FIRST MAPPED LINE"
-        GP.ELSEIF ERR.PAST.END <> 0 THEN
+        GP.ELSEIF ERR.PAST.END <> 0 AND ERR.TARGET.BANK = 0 THEN
             ERR.TEXT$ = ERR.TEXT$ + "  IS PAST THE LAST RECORD IN THE MAP"
         GP.ELSEIF ERR.MAP.OFFSET = ERR.TARGET THEN
             ERR.TEXT$ = ERR.TEXT$ + "  IS THE FIRST OPCODE OF THE LINE"
         GP.ELSE
-            GP.SUB HEX4, ERR.MAP.OFFSET
-            ERR.TEXT$ = ERR.TEXT$ + "  IS $" + ERR.HEX4$ + " +" + STR$(ERR.TARGET - ERR.MAP.OFFSET)
+            GP.SUB ERR.ADDRESS.TEXT, ERR.TARGET.BANK, ERR.MAP.OFFSET
+            ERR.TEXT$ = ERR.TEXT$ + "  IS " + ERR.ADDRESS$ + " +" + STR$(ERR.TARGET - ERR.MAP.OFFSET)
         GP.ENDIF
         GP.PRINTAT 3, ERR.Y, ERR.TEXT$, THEME.CLR(THEME.TEXT)
     GP.ENDIF
 
+    ## A lookup that found nothing has already said why on the row above.
     GP.IF ERR.TARGET.LINE < 0 THEN
-        GP.PRINTAT 3, ERR.Y + 2, "NOTHING LOOKED UP YET", THEME.CLR(THEME.DIMMED)
+        IF ERR.HAVE.ADDRESS = 0 THEN GP.PRINTAT 3, ERR.Y + 2, "NOTHING LOOKED UP YET", THEME.CLR(THEME.DIMMED)
         RETURN
     GP.ENDIF
 
@@ -951,7 +974,7 @@ ERR.ASK.ADDRESS:
         GP.SUB MSGBOX, "CHOOSE A MAP FIRST"
         RETURN
     GP.ENDIF
-    ERR.TYPED$ = GP.FN(ASKTEXT, "ERROR ADDRESS, LIKE $34A7", 30)
+    ERR.TYPED$ = GP.FN(ASKTEXT, "ERROR ADDRESS, LIKE $34A7 OR $14:A043", 30)
     IF GP.ISEMPTY(ERR.TYPED$) THEN RETURN
     GOSUB ERR.PARSE.ADDRESS
     GP.IF ERR.PARSED < 0 THEN
@@ -961,6 +984,7 @@ ERR.ASK.ADDRESS:
     GOSUB ERR.STATE.CLEAR
     GOSUB ERR.BUSY.OPEN
     ERR.TARGET = ERR.PARSED
+    ERR.TARGET.BANK = ERR.PARSED.BANK
     ERR.HAVE.ADDRESS = -1
     GOSUB ERR.MAP.SCAN
     ERR.TARGET.LINE = ERR.MAP.LINE
@@ -1002,21 +1026,30 @@ ERR.ASK.LINE:
 
 
 ## ===========================================================================
-## ERR.MAP.SCAN -- the largest offset at or below ERR.TARGET.
+## ERR.MAP.SCAN -- the largest address at or below ERR.TARGET, among the
+## records in the target's bank.
 ##
 ##   in   ERR.TARGET        the address asked about
-##   out  ERR.MAP.OFFSET    that offset, -1 if the target is below them all
+##        ERR.TARGET.BANK   its region's bank, 0 for low code
+##   out  ERR.MAP.OFFSET    that address, -1 if the target is below them all
 ##        ERR.MAP.LINE      the BASIC line it belongs to, -1 with it
 ##        ERR.CODE.LINE     the same, ignoring the setup records
-##        ERR.PAST.END      -1 when the target is beyond the last record
+##        ERR.LAST.OFFSET   the highest address in the bank, -1 when the map
+##                          has no record in it
+##        ERR.PAST.END      -1 when the target is beyond that highest address
 ##
-## The map is "HHHH DDDDD" a record, ascending, LF ended. Records ascend even
-## for a program with banked regions: there is one address space.
+## A record is "HHHH DDDDD" in low code and "BB:HHHH DDDDD" in a region, LF
+## ended: the address the runtime prints, then the decimal BASIC line that
+## starts there. Low code is bank 0.
 ##
-## The last two records are the compiler's own setup and their line numbers are
-## not source lines. An address that LANDS on one is setup code and is reported
-## as such. An address PAST the whole map is not: nothing was compiled there,
-## and the useful answer is the last line that was.
+## The records are in source order, not address order. Each region's records
+## are one run, ascending, with low-code records before and after the runs, so
+## every record is read.
+##
+## The last two records are the compiler's own setup, in low code, and their
+## line numbers are not source lines. An address that lands on one is setup
+## code and is reported as such. An address past the last record of its bank
+## is not, and the useful answer is ERR.CODE.LINE, the last line below it.
 ## ===========================================================================
 ERR.MAP.SCAN:
     ERR.MAP.OFFSET = -1
@@ -1025,31 +1058,50 @@ ERR.MAP.SCAN:
     ERR.CODE.OFFSET = -1
     ERR.LAST.OFFSET = -1
     ERR.PAST.END = 0
+    ERR.TARGET.BANK.HEX$ = ""
+    GP.IF ERR.TARGET.BANK <> 0 THEN
+        GP.SUB HEX4, ERR.TARGET.BANK
+        ERR.TARGET.BANK.HEX$ = RIGHT$(ERR.HEX4$, 2)
+    GP.ENDIF
     ERR.BUSY.TEXT$ = "READING THE MAP"
     GOSUB ERR.BUSY.STEP
     OPEN 2, 8, 2, ERR.MAP.NAME$
     GP.DO
         LINPUT# 2, ERR.LINE$, ERR.LF
         GOSUB ERR.BUSY.TICK
-        GP.IF LEN(ERR.LINE$) >= 6 THEN
-            ERR.HEX$ = LEFT$(ERR.LINE$, 4)
-            GOSUB ERR.HEXVAL
-            IF ERR.HEXVALUE > ERR.LAST.OFFSET THEN ERR.LAST.OFFSET = ERR.HEXVALUE
-            ERR.VALUE = VAL(MID$(ERR.LINE$, 6))
-            GP.IF ERR.HEXVALUE <= ERR.TARGET AND ERR.HEXVALUE > ERR.MAP.OFFSET THEN
-                ERR.MAP.OFFSET = ERR.HEXVALUE
-                ERR.MAP.LINE = ERR.VALUE
-            GP.ENDIF
-            GP.IF ERR.HEXVALUE <= ERR.TARGET AND ERR.HEXVALUE > ERR.CODE.OFFSET AND ERR.VALUE < ERR.SETUP.LINE THEN
-                ERR.CODE.OFFSET = ERR.HEXVALUE
-                ERR.CODE.LINE = ERR.VALUE
-            GP.ENDIF
-        GP.ENDIF
+        GOSUB ERR.MAP.RECORD
         IF ST <> 0 THEN GP.EXITDO
     GP.LOOP
     CLOSE 2
     GOSUB ERR.CHANNEL.KICK
-    IF ERR.TARGET > ERR.LAST.OFFSET THEN ERR.PAST.END = -1
+    IF ERR.LAST.OFFSET >= 0 AND ERR.TARGET > ERR.LAST.OFFSET THEN ERR.PAST.END = -1
+    RETURN
+
+
+## ---- one map record, weighed only when its bank is the target's.
+## ---- ERR.TARGET.BANK.HEX$ is that bank as the map writes it, "" for low code.
+ERR.MAP.RECORD:
+    IF LEN(ERR.LINE$) < 6 THEN RETURN
+    ERR.RECORD.BANK.HEX$ = ""
+    ERR.RECORD.ADDRESS.AT = 1
+    GP.IF MID$(ERR.LINE$, 3, 1) = ":" THEN
+        ERR.RECORD.BANK.HEX$ = LEFT$(ERR.LINE$, 2)
+        ERR.RECORD.ADDRESS.AT = 4
+    GP.ENDIF
+    IF ERR.RECORD.BANK.HEX$ <> ERR.TARGET.BANK.HEX$ THEN RETURN
+    IF LEN(ERR.LINE$) < ERR.RECORD.ADDRESS.AT + 5 THEN RETURN
+    ERR.HEX$ = MID$(ERR.LINE$, ERR.RECORD.ADDRESS.AT, 4)
+    GOSUB ERR.HEXVAL
+    IF ERR.HEXVALUE > ERR.LAST.OFFSET THEN ERR.LAST.OFFSET = ERR.HEXVALUE
+    ERR.VALUE = VAL(MID$(ERR.LINE$, ERR.RECORD.ADDRESS.AT + 5))
+    GP.IF ERR.HEXVALUE <= ERR.TARGET AND ERR.HEXVALUE > ERR.MAP.OFFSET THEN
+        ERR.MAP.OFFSET = ERR.HEXVALUE
+        ERR.MAP.LINE = ERR.VALUE
+    GP.ENDIF
+    GP.IF ERR.HEXVALUE <= ERR.TARGET AND ERR.HEXVALUE > ERR.CODE.OFFSET AND ERR.VALUE < ERR.SETUP.LINE THEN
+        ERR.CODE.OFFSET = ERR.HEXVALUE
+        ERR.CODE.LINE = ERR.VALUE
+    GP.ENDIF
     RETURN
 
 
@@ -1176,14 +1228,21 @@ ERR.CHANNEL.KICK:
 
 
 ## ===========================================================================
-## ERR.PARSE.ADDRESS -- ERR.TYPED$ to ERR.PARSED, or -1.
+## ERR.PARSE.ADDRESS -- ERR.TYPED$ to an address, in either form the runtime
+## prints.
+##
+##   in   ERR.TYPED$        "$0143" or "$14:A043", with or without the "$",
+##                          or the whole error line
+##   out  ERR.PARSED        the address, -1 for none
+##        ERR.PARSED.BANK   the region's bank, 0 for low code
 ##
 ## Takes the text after the last "$" if there is one, then its leading hex
-## digits, so a whole error line can be pasted in.
+## digits. Hex followed by ":" was the bank, and the address is the hex after
+## the colon.
 ## ===========================================================================
 ERR.PARSE.ADDRESS:
     ERR.PARSED = -1
-    ERR.HEX$ = ""
+    ERR.PARSED.BANK = 0
     ERR.AT = 0
     GP.DO
         ERR.FOUND = GP.INSTR(ERR.TYPED$, "$", ERR.AT + 1)
@@ -1201,6 +1260,26 @@ ERR.PARSE.ADDRESS:
     STRCASE.MODE = STRCASE.UPPER
     GOSUB STRCASE.GO
     ERR.AT = 1
+    GOSUB ERR.PARSE.HEX.RUN
+    IF LEN(ERR.HEX$) = 0 THEN RETURN
+    GOSUB ERR.HEXVAL
+    GP.IF ERR.AT = GP.INSTR(ERR.SCAN$, ":") THEN
+        IF ERR.HEXVALUE > 255 THEN RETURN
+        ERR.PARSED.BANK = ERR.HEXVALUE
+        ERR.AT = ERR.AT + 1
+        GOSUB ERR.PARSE.HEX.RUN
+        IF LEN(ERR.HEX$) = 0 THEN RETURN
+        GOSUB ERR.HEXVAL
+    GP.ENDIF
+    IF ERR.HEXVALUE > 65535 THEN RETURN
+    ERR.PARSED = ERR.HEXVALUE
+    RETURN
+
+
+## ---- the hex digits of ERR.SCAN$ from ERR.AT into ERR.HEX$, leaving ERR.AT
+## ---- on the first character past them.
+ERR.PARSE.HEX.RUN:
+    ERR.HEX$ = ""
     GP.DO
         IF ERR.AT > LEN(ERR.SCAN$) THEN GP.EXITDO
         ERR.DIGIT$ = MID$(ERR.SCAN$, ERR.AT, 1)
@@ -1208,10 +1287,6 @@ ERR.PARSE.ADDRESS:
         ERR.HEX$ = ERR.HEX$ + ERR.DIGIT$
         ERR.AT = ERR.AT + 1
     GP.LOOP
-    GP.IF LEN(ERR.HEX$) > 0 THEN
-        GOSUB ERR.HEXVAL
-        ERR.PARSED = ERR.HEXVALUE
-    GP.ENDIF
     RETURN
 
 
@@ -1239,6 +1314,7 @@ ERR.HEXVAL:
 ERR.STATE.CLEAR:
     ERR.HAVE.ADDRESS = 0
     ERR.TARGET = 0
+    ERR.TARGET.BANK = 0
     ERR.MAP.OFFSET = -1
     ERR.MAP.LINE = -1
     ERR.CODE.LINE = -1

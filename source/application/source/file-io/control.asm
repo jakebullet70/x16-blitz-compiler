@@ -21,8 +21,9 @@
 ;
 ;		A shorter file reads its missing lines as empty.
 ;
-;		A line ends at CR, at LF, or at anything else below a space, and an empty line is
-;		skipped -- so a control file written on a CRLF host is as good as one written on the X16.
+;		A line ends at CR, at a lone LF, or at any other byte below a space. An LF straight after
+;		a CR is swallowed, so CRLF ends one line. An empty line still advances cfLine, so it keeps
+;		its slot and reads as empty.
 ;
 ;		Lowercase is folded to upper. A name typed in ASCII lowercase is not the PETSCII the
 ;		KERNAL wants, and it is the mistake a caller will actually make; the host filesystems
@@ -161,7 +162,7 @@ _RCFFail:
 ;		own labelled line -- the whole of the compiler's startup output. Three short lines so
 ;		nothing wraps in 40 columns.
 ;
-;			GPC SQUEALING... V0.9.113
+;			GPC SQUEALING... V1.1.0
 ;			in:  <source>
 ;			out: <object>
 ;

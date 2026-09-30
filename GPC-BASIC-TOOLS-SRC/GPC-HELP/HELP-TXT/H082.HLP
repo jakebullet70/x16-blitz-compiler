@@ -1,26 +1,92 @@
-@5. TRUE IS -1
+@3. The modules (8)
+=STRCASE.INC.BL -- case, in place
 .
-=5. TRUE IS -1
+.Routines, arguments and examples: SEC 4.8.
 .
-.Every flag the library hands back is -1 for true and 0 for false, and
-.anything written against it should be too. GUI.OK GUI.ANSWER GUI.STASHED
-.STASH.OK SORT.OK MENU.OK FILE.OK BANKMGR.OK APPSYS.IS.EMULATOR -- all of
-.them.
+.  in
+.      STRCASE.PTR -- GP.STRPTR of the string
+.      STRCASE.MODE -- STRCASE.UPPER or STRCASE.LOWER
 .
-.That is what a comparison in this compiler evaluates to, so a flag and a
-.test read the same way, and it is the value NOT wants: NOT is -x-1, so NOT
-.-1 is 0 while NOT 1 is -2, which is still true. IF itself tests non-zero, so
-.IF FLAG THEN works either way and IF FLAG = 1 THEN is the spelling that
-.breaks.
+.  out
+.      the string itself, rewritten in place
 .
-:IF GUI.OK THEN <accepted> : REM yes
-:IF NOT GUI.OK THEN <cancelled> : REM yes
-:IF GUI.OK = 0 THEN <cancelled> : REM yes
-:IF GUI.OK = 1 THEN <accepted> : REM NO -- it is -1
+.  verbs
+.      STR.UCASE STR.LCASE -- a string in, a cased copy back, through
+.        STRCASE.S$
 .
-.A flag the CALLER sets is read as non-zero, so LINEINPUT.MASK = 1 and
-.STASH.MOVE = 1 still work. Write -1 in new code all the same.
+.  internal
+.      STRCASE.ADDR% STRCASE.OP% STRCASE.S$
 .
-.Printing one needs STR$ whole. The MID$(STR$(N), 2) idiom strips the leading
-.space STR$ puts on a positive number; -1 has no leading space, so that idiom
-.eats the minus and prints 1.
+.  constants
+.      STRCASE.UPPER STRCASE.LOWER
+.
+.STR.UCASE and STR.LCASE are the two STR. names this file owns. The rest of
+.STR. is STRINGS.INC.BL's, and the two verbs are named for the module they
+.are to move into.
+.
+.#SYMFILE again. Do not write #AUTONUM in a program that includes this -- it
+.sets the STEP, and only the default 1 survives.
+.
+=MATH.INC.BL -- the smaller and the larger of two numbers
+.
+.Routines, arguments and examples: SEC 4.22.
+.
+.  in
+.      MATH.FIRST MATH.SECOND -- the two numbers, in either order
+.
+.  out
+.      MATH.RESULT -- the answer, and what GP.FN reads back
+.
+.  verbs
+.      MATH.MINOF MATH.MAXOF -- the same two routines called in one line
+.
+.  internal
+.      --
+.
+.All three names are shared by MATH.MIN and MATH.MAX. The formals of a
+.GP.DEFPROC are ordinary variables, so GP.SUB MATH.MINOF writes MATH.FIRST
+.and MATH.SECOND exactly as a GOSUB caller would.
+.
+=MEM.INC.BL -- a block copied, a block filled
+.
+.Routines, arguments and examples: SEC 4.23.
+.
+.  in
+.      MEM.SOURCE -- where MEM.COPY reads, 0 to 65535
+.      MEM.TARGET -- where either routine writes
+.      MEM.COUNT -- 1 to 65535, refused outside that
+.      MEM.VALUE -- the byte MEM.FILL writes, 0 to 255
+.
+.  out
+.      MEM.OK -- -1 done, 0 refused, and what GP.FN reads back
+.
+.  verbs
+.      MEM.BLOCKCOPY MEM.BLOCKFILL
+.
+.  internal
+.      --
+.
+.  constants
+.      MEM.MEMORYCOPY MEM.MEMORYFILL -- the two KERNAL entry points
+.
+.MEM.TARGET, MEM.COUNT and MEM.OK are shared by both routines, so a fill
+.overwrites the target a copy was set up with.
+.
+=EXAMPLE PROGRAM
+.
+.  FORM.EXP.BL -- runnable, in the GPC-BASIC folder
+.
+=SEE ALSO
+.
+>71|4.1 THEME.INC.BL -- named colour roles
+>81|4.3 APPSYS.INC.BL -- start politely, leave it as you found it
+>72|4.2 STRINGS.INC.BL -- string helpers
+>94|4.10 STRUSING.INC.BL -- a number to a template
+>101|4.14 KB.INC.BL -- the keyboard buffer, emptied
+>82|4.4 LINEINPUT.INC.BL -- a positioned entry field
+>83|4.5 BMX.INC.BL -- a BMX bitmap into VERA
+>102|4.15 FILEIO.INC.BL -- the drive: status, files, directories
+>103|4.16 FILEDIR.INC.BL -- a directory, into a bank or into low RAM
+>105|4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM
+>107|4.20 KV.INC.BL -- keys and values in one RAM bank
+>84|4.6 MENU.INC.BL -- menus built a row at a time

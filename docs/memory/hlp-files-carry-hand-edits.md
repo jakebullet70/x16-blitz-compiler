@@ -12,7 +12,7 @@ The committed `GPC-BASIC-TOOLS-SRC/GPC-HELP/HELP-TXT/*.HLP` files were trimmed b
 generated: H001, H002, H003, H011, H013, H015, H022 and others, as of 2026-09-13. The masters under
 `GPC-BASIC/` still hold the longer text, so `MKHELP.PY` over the tree puts it back. The index line
 counts were not updated for those edits; an untouched topic's file is one line longer than its
-`GPB.HELP.IDX` count.
+`GPC.HELP.IDX` count.
 
 **Why:** found 2026-09-13, when a full regeneration for the dead-code and GP.FN help changes rewrote
 28 files and undid the trims.
@@ -35,7 +35,7 @@ into m. Snapshot `HELP-TXT` first, because the renames overwrite each other. Als
 the header's command line and the CRs.
 
 **The index can refuse a patch, and then it is carried row by row** (2026-09-15, the `CHECK.INC.BL`
-entry at H058). The committed `GPB.HELP.IDX` held a row the masters no longer make (`S` "Staying
+entry at H058). The committed `GPC.HELP.IDX` held a row the masters no longer make (`S` "Staying
 inside it" under topic 78). It also lacked a row they do make, from another session's uncommitted
 §7 work in `GP-BASIC.md`, so the renumbering hunk failed. Instead, match each committed row to an
 old-render row by type, topic and title with the section number stripped. Write the new render's

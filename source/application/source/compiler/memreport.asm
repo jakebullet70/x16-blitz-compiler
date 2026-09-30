@@ -86,14 +86,15 @@ _PMRLowEnd:
 		ldy 	#SharedText >> 8
 _PMRMode:
 		jsr 	PrintMessage
-		ldx 	#CoreText & $FF
-		ldy 	#CoreText >> 8
 		lda 	gpUsed
 		ldx 	ModeText 					; an EMBEDDED program with a region carries them whether it
 		cpx 	#'S' 						; calls one or not: the p-code run page has to be a constant
 		beq 	_PMRWhich 					; and that is what makes it one -- see PrepareObjectCode.
 		ora 	gpBankActive 				; A shared program patches its bootstrap from gpUsed alone
 _PMRWhich:
+		ldx 	#CoreText & $FF 			; X and Y load after the test, which uses X
+		ldy 	#CoreText >> 8
+		cmp 	#0 							; the cpx above leaves Z set, so test A again
 		beq 	_PMRHandlers
 		ldx 	#GPBasicText & $FF
 		ldy 	#GPBasicText >> 8

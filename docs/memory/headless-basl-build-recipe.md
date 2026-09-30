@@ -86,7 +86,7 @@ summary -- the real message is two lines above the BASIC error.
 
 **THE SYM IS NAMED AFTER THE SOURCE PRG, NOT THE PROGRAM.** `SymBuildName` (`symfile.asm`) replaces
 the source's `.PRG` with `.SYM`, so `#SAVEAS "@:X.SRC.PRG"` needs `#SYMFILE "@:X.SRC.SYM"` --
-`GPB.HELP.BASL` is the model, `COLORTST.BASL` has the mismatch and only escapes it by using no
+`GPC.HELP.BASL` is the model, `COLORTST.BASL` has the mismatch and only escapes it by using no
 `{VAR}`. Get it wrong and the tokenise succeeds and writes the SYM; the COMPILE then stops with
 `{} NEEDS #SYMFILE @ 98`, naming a line inside `STASH.INC.BL` and saying nothing about a file
 name. Cost the first build of `GPC-BASIC-TOOLS-SRC/GPB-MODS-TESTING`, 05/09/26.

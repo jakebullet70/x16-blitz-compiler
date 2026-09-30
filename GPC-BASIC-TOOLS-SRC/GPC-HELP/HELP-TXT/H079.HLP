@@ -1,120 +1,99 @@
-@3. The modules (7)
-=GUI-DIALOGS.INC.BL -- every dialog as a verb
+@3. The modules (5)
+=MENU.INC.BL -- menus built a row at a time
 .
-.Routines, arguments and examples: SEC 4.12.
+.Routines, arguments and examples: SEC 4.6.
 .
-.MSGBOX, ASKYN, ASKOK, ASKTEXT, INPUTBOX, PICKMENU, LISTBOX and LISTBOXM are
-.the dialogs, each with an EX form that also takes the title and the second
-.and third lines. LIST.BEGIN, LIST.ARRAY, LIST.BANK, LISTTO.RUN, LIST.ITEM
-.and LIST.SORT build a list box a step at a time; PANELOPEN, PANELCLOSE and
-.the FORM. verbs do the same for a form. DLGRESET, DLGSHADOW, DLGSHADOWCLR,
-.DLGSTYLE and DLGGLYPH set what every dialog starts from, and KBCLEAR throws
-.away what is already typed.
+.  verbs
+.      MENU.BEGIN MENU.ITEM MENU.ITEMX MENU.SELECTED MENU.DRAWBAR, called
+.        with GP.SUB
+.      MENUTO.VERT MENUTO.BAR, called with GP.FN
 .
 .  in
-.      the arguments, in the call. They land in DLG. and NOT in the GUI.
-.        inputs: GUI.DEFAULTS runs after they are stored and would clear them
-.      DLGRESET bank -- the RAM bank every dialog saves the screen into,
-.        once, before the first one
-.      GUI.LIST.ITEM$() -- the rows, 1..count, for the array-backed list
-.        verbs, and the caller owns the DIM
+.      MENU.ATTR -- the rows, packed attribute
+.      MENU.HIATTR -- the highlighted row; 0 inverts MENU.ATTR
+.      MENU.HOTATTR -- the hot key letter; 0 leaves it untinted
+.      MENU.DISATTR -- a disabled row; 0 is MENU.ATTR
+.      MENU.SEPATTR -- separators and the frame; 0 is MENU.ATTR
+.      MENU.SEPCHR -- the separator glyph; 0 is MENU.LINE
+.      MENU.FLAGS -- the popup's flags
+.      MENU.BARFLAGS -- the bar's flags
+.      MENU.GAP -- cells between bar items
+.      MENU.HINTX MENU.HINTY MENU.HINTW MENU.HINTATTR -- the hint field;
+.        MENU.HINTW 0 is off
+.      MENU.MARKED -- the bar item MENU.DRAWBAR lights
 .
 .  out
-.      GUI.ANSWER -- ASKYN, ASKOK
-.      GUI.TEXT$ and GUI.OK -- INPUTBOX
-.      GUI.SEL -- PICKMENU
-.      GUI.LISTBOX.SEL .MARKS$ .MARKED -- the listbox verbs
-.      GUI.KEY -- 13 accepted, 27 cancelled
+.      MENU.EXITKEY -- the key that ended the run
+.      MENU.BARNUM -- the bar's row count
+.      MENU.SELX MENU.SELW -- the chosen bar item's column and width
+.      MENU.MARKED -- the bar item left lit
+.      MENU.OK -- 0 if bank MENU.TEXTBANK was already claimed
+.
+.  formals
+.      MENU.SLOT MENU.SEL MENU.ROWTEXT$ MENU.ROWHINT$ MENU.ROWON MENU.RUNROW
+.        MENU.RUNCOL MENU.STYLE MENU.CHOSEN
+.
+.  arrays
+.      MENU.FLAG$() MENU.HOTKEY$() MENU.HOTCOL$() -- DIMmed by the module on
+.        the first MENU.BEGIN
+.
+.  banked groups
+.      MENU.TEXTS MENU.HINTS, in MENU.INC.BANKED.BL
 .
 .  internal
-.      the whole of DLG.*
-.
-.In a multi-select list GUI.LISTBOX.SEL is not the answer -- it is where the
-.cursor was left. The marks are.
-.
-.The scrolling list is not in this module. It is GUI.CT.LIST, one of
-.GUI.FORM's control types, and lives in GUI.INC.BL beside the field. This
-.file is the dialog around it: measure, open, hand the control its geometry,
-.add a button row, run the form, answer. GUI.LIST.FETCH, in GUI.INC.BL, is
-.the one place a row is read, and it reads either the array or a RAM bank
-.holding the GP.BSTR image layout -- which is how LIST.BANK shows a directory
-.that was never in low memory.
-.
-=STASH.INC.BL -- save a text rectangle, and put it back
-.
-.  in
-.      STASH.BANK -- the RAM bank to keep the cells in, 1..255, and it is
-.        yours: this writes the whole of it
-.      STASH.X STASH.Y STASH.W STASH.H -- the rectangle, in cells, for
-.        STASH.SAVE
-.      STASH.MOVE -- non-zero pastes to STASH.X/STASH.Y instead of where it
-.        came from
-.
-.  out
-.      STASH.OK -- -1 if it fitted and was saved, 0 if not
-.
-.  internal
-.      STASH.AT STASH.BASE STASH.BYTES STASH.HI STASH.MAPW STASH.MODE
-.        STASH.ROW STASH.STRIDE
-.      STASH.DEST% STASH.NBYTES% STASH.VADDR% STASH.VCTRL% STASH.WAS% -- the
-.        {VAR} slots the blobs read
+.      MENU.ATCOL MENU.ATROW MENU.BARX MENU.BARY MENU.BASE MENU.BOXH
+.        MENU.BOXW MENU.CAP MENU.CODE MENU.COUNT MENU.CUR MENU.DONE
+.        MENU.DRAWN MENU.DRAWX MENU.DRAWY MENU.EACH MENU.EXITBIT MENU.FRAME
+.        MENU.GLYPH MENU.HAVE MENU.HILITE MENU.HINTAT MENU.HOTAT MENU.HOTCH$
+.        MENU.HOTHIT MENU.INKEY$ MENU.LEFTW MENU.MOVE MENU.PADHELD
+.        MENU.PADNEW MENU.PADNOW MENU.PADRAW MENU.PAINT MENU.READY MENU.ROW
+.        MENU.ROWFLAG$ MENU.ROWIS$ MENU.ROWW MENU.RUNBASE MENU.RUNFLAGS
+.        MENU.RUNSLOT MENU.SCAN MENU.SHOW$ MENU.SKIPS MENU.SPAN MENU.STEP
+.        MENU.TEXTW MENU.TINTAT MENU.USE MENU.WANT MENU.WAS MENU.WIDE
 .
 .  constants
-.      STASH.LCONFIG STASH.LMAPBASE STASH.WINDOW STASH.HEADER STASH.MAXBYTES
+.      MENU.TEXTBANK MENU.BAR MENU.POPUP MENU.BAR.MAX MENU.POPUP.MAX MENU.ON
+.        MENU.OFF
+.      MENU.SOLID MENU.THIN MENU.ROUND MENU.THICK MENU.NOBOX
+.      MENU.MUSTSEL MENU.KEEPMARK MENU.NOWRAP MENU.GAMEPAD MENU.DOWNEXIT
+.        MENU.UPEXIT MENU.KEYEXIT MENU.HINTMID
+.      MENU.DOWN MENU.UP MENU.LEFT MENU.RIGHT MENU.ENTER MENU.ESC MENU.STOP
+.        MENU.LINE
+.      MENU.PORT MENU.PAD.UP MENU.PAD.DOWN MENU.PAD.LEFT MENU.PAD.RIGHT
+.        MENU.PAD.B MENU.PAD.START
 .
-.STASH.RESTORE needs only the bank. Four header bytes -- w, h, x, y -- go in
-.first, so the rectangle describes itself and cannot be put back at the wrong
-.size.
+.The formals are the verbs' arguments. GP.DEFPROC formals are ordinary shared
+.variables (SEC 3.11), so a formal holds the last value passed until the next
+.call.
 .
-.A bank is 8,192 bytes and a cell is two, so 4,094 cells fit: 63x63, larger
-.than any dialog and not a whole 80x60 screen. Too big is refused before the
-.first write with STASH.OK = 0, rather than running on into the next bank.
+.GUI.INC.BL sets MENU.RUNSLOT, reads MENU.READY, MENU.COUNT and MENU.WIDE,
+.and calls MENU.MEASURE. A program of your own should not.
 .
-.It needs a #SYMFILE in your program, because it reads its arguments through
-.{VAR} names. It restores the caller's RAM bank on the way out -- it did not
-.always, and a caller that worked around that can stop.
+=MENUPULL.INC.BL -- a dropdown under a bar item
 .
-.STASH.SLOT and STASH.NEXT are not in this copy. GP-BASIC.md SEC 3.6
-.describes them -- a byte offset into the bank, and the offset just past what
-.was written, so one bank holds a stack of rectangles instead of one a level.
-.They are in GPC-BASIC-TOOLS-SRC/GPB-MODS-TESTING/GPC-BASIC/STASH.INC.BL and have not
-.reached the root library yet. Until they do, one rectangle a bank.
+.Routines, arguments and examples: SEC 4.9. Its variables use the MENU.
+.prefix; MENUPULL. is its labels and one constant.
 .
-=STASHFILE.INC.BL -- a saved text rectangle, through a file
-.
-.STASH.FILE.SAVE, STASH.FILE.LOAD and STASH.FILE.PUT, and no variables of its
-.own -- it sets STASH.* and calls through. The prefix exists to keep the
-.three routine names apart from the rest of STASH., not to hold state. Kept a
-.separate #INCLUDE: unless the compile removes dead code, the disk half is
-.127 bytes a program that never writes one would still carry.
-.
-=SORT.INC.BL -- shell sort a string array
-.
-.Routines, arguments and examples: SEC 4.7.
+.  verbs
+.      MENUTO.PULLDOWN, called with GP.FN
 .
 .  in
-.      SORT.PTR -- GP.ARRPTR of the array, element zero, the 3-byte header
-.        already skipped. A BASL subroutine cannot be passed an array, so the
-.        caller takes its address and this sorts through that
-.      SORT.DESCEND -- non-zero, largest first
-.      SORT.NOCASE -- non-zero folds case while comparing
+.      MENU.STASHBANK -- the bank the covered cells go to; 0 takes one from
+.        BANKMGR on the first call
 .
 .  out
-.      SORT.OK -- -1 if it sorted, 0 if it refused
-.      SORT.COUNT -- elements found in the array header
+.      MENU.NEXTBAR -- the bar item LEFT or RIGHT walks to, or 0
+.      MENU.EXITKEY MENU.BARNUM MENU.SELX MENU.SELW MENU.MARKED, as for
+.        MENU.INC.BL
+.
+.  formals
+.      MENU.PULLAT MENU.STYLE MENU.CHOSEN
 .
 .  internal
-.      SORT.TYPE -- the type byte it read back
-.      SORT.BASE% SORT.CHR% SORT.CNT% SORT.DESC% SORT.FOLD% SORT.GAP% SORT.I%
-.        SORT.J% SORT.LL% SORT.LR% SORT.RN% SORT.TMP% -- every one a {VAR}
-.        slot
+.      MENU.COLS MENU.EDGE MENU.LEFTOF MENU.RIGHTOF MENU.STASHED, and
+.        STASH.BANK STASH.SLOT STASH.MOVE STASH.X STASH.Y STASH.W STASH.H,
+.        which it sets
 .
-.Note SORT.COUNT is an output, read out of the array header, not a size you
-.hand in -- and SORT.PTR is GP.ARRPTR, not GP.STRPTR like the rest of the
-.library's pointer arguments. Both are easy to write the other way round.
-.
-.Also needs a #SYMFILE. 255 elements, so DIM A$(254) is the largest; beyond
-.that SORT.OK is 0 rather than a wrong answer. String arrays only. It moves
-.2-byte pointers rather than string data, so a swap is cheap and the array's
-.own storage never moves.
+.  constants
+.      MENUPULL.SCRMODE
 .

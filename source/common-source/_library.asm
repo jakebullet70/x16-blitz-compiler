@@ -295,8 +295,8 @@ MemoryStorage = $400
 ;		of the same image, so the core's bytes are identical in both and there is no second
 ;		build to keep in step:
 ;
-;			GPC.RT.nnn.BIN   loads at RTGPBASE -- GPB handlers AND core
-;			GPC.RC.nnn.BIN   loads at RTBASE   -- core only
+;			GPB.RT.nnn.BIN   loads at RTGPBASE, GPB handlers and core
+;			GPC.RT.nnn.BIN   loads at RTBASE, core only
 ;
 ;		A program's workspace then ends at RTBASE if it uses no GPB keyword and at RTGPBASE if it
 ;		does, which is 2,560 bytes back for the first kind and no change at all for the second.

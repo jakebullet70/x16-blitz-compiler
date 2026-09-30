@@ -23,9 +23,8 @@ rem  A sample lives in its own folder, so CD into it and run it:
 rem
 rem      DOS"CD:SAMPLES"           then CD:GPBMODS, then RUN "GPBMODS.PRG"
 rem
-rem  Both of the things a sample loads still resolve from down there. A region
-rem  overlay (.nnn) is loaded from beside the program, and the shared runtime is
-rem  fetched from the drive root with a leading slash.
+rem  A sample is embedded, so the one file it loads is its region overlay,
+rem  NAME.OVL, from beside the program.
 rem
 rem  XFMGR AND XT ARE DEV ONLY. release.sh stages them into TMP for this bat and
 rem  leaves them out of the zip.

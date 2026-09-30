@@ -1,11 +1,14 @@
 ---
 name: overlay-in-prg-research
-description: "Research only, 2026-09-16: putting GP.BANKED region data inside the PRG instead of N .nnn files. A LOADed file is capped at 39,679 bytes total, so a single file only works for small programs; the write-up is docs/blitz/OVERLAY-IN-PRG.RESEARCH.md"
+description: "Putting GP.BANKED region data inside the PRG. A clean LOAD caps at 39,679 bytes; one file of any size works via self re-OPEN but LOAD prints ?OUT OF MEMORY, which the user REJECTED 2026-09-29. Option D chosen, not built. Write-up: docs/blitz/OVERLAY-IN-PRG.RESEARCH.md"
 metadata:
+  node_type: memory
   type: project
+  originSessionId: 222be9a4-b83e-46a2-97e4-f9c3d57d0c2e
+  modified: 2026-09-29T06:43:58.602Z
 ---
 
-**Asked 2026-09-16. Researched, nothing decided, nothing built.**
+**Asked 2026-09-16. Option C built. Option D decided 2026-09-29, not built.**
 
 The full write-up with all the arithmetic is
 [docs/blitz/OVERLAY-IN-PRG.RESEARCH.md](../blitz/OVERLAY-IN-PRG.RESEARCH.md). Read that
@@ -19,23 +22,44 @@ which needs a build.
 
 **The binding number is `$9F00 - $0801 = 39,679`.** BASIC's `LOAD` puts the whole file in
 low RAM from `$0801` and low RAM ends at `ObjectCeiling`. So appending regions to the PRG
-caps a program's total payload there, regions included. No trick lifts it: a self re-LOAD,
-a `P` seek plus MACPTR, and padding up to `$A000` were all checked and all fail, because
-the tail is inside the stream the first LOAD already delivered.
+caps a *clean* LOAD there, regions included.
+
+**CORRECTED 2026-09-28: the wall is soft, so a single file of any size is possible.** The
+X16 KERNAL LOAD does not overrun I/O. `x16-rom kernal/cbm/channel/load.s` drops from MACPTR
+blocks to single bytes at `$9D00` (`cmp #$9d`), and the byte loop stops at `$9F00`
+(`cmp #$9f` / `ld81`), closes the file and returns error 16. Everything to `$9EFF` is intact.
+BASIC's `cload` (`basic/code26.s`) then prints `?OUT OF MEMORY` and skips the `vartab` /
+`lnkprg` update, but the program text is in memory and `RUN` should reach the SYS line
+(read, not yet run). So the bootstrap can re-OPEN its own PRG, skip the low part, and run
+the existing `.OVL` reader over the tail. The cost is that error on LOAD for any file over
+39,679, and `RUN"NAME"` aborts on it. x16emu `-prg -run` survives it: it pastes the LOAD and
+the RUN as separate lines (`src/main.c`). The earlier "same wall" verdict assumed the overrun
+corrupts memory, and it does not.
+
+**Section 6 of the research doc has the full review: shape, seven costs, three probes owed.**
+The costs most likely to bite: GPC's own LOAD chain (`load.asm` writes `10 LOAD"name"` and
+RUNs it in the ROM) dies on error 16, so chaining into a big single file needs its own
+KERNAL LOAD placed outside `$0801-$9EFF`; and the skip loop does not fit the page.
+
+**DECIDED 2026-09-29: `?OUT OF MEMORY ERROR` on LOAD is not acceptable.** Do not propose the
+self re-OPEN single file again. The plan is option D: append the regions when the total fits
+in 39,679 bytes, write `NAME.OVL` beside the PRG when it does not. Every file loads clean.
+**Why:** the user will not ship a program whose LOAD prints an error. **How to apply:** any
+region-packaging work builds D; what D still needs is room on the extension page for a
+second region path beside the `ACPTR` reader.
 
 **The extension page had three free bytes**, `$09ED-$09EF` — the GP.BSTR table is pinned at
 `GPBSTRBANKS $09F0`, and any loader bigger than the one it replaced would have needed a
 second page and moved banked p-code from `$0A00` to `$0B00`. It did not come to that: the
-`ACPTR` reader that replaced the bank bitmap and the name poker came out SMALLER, and the
-page now has seven free bytes.
+`ACPTR` reader that replaced the bank bitmap and the name poker came out SMALLER. GP.BSTR's
+table now copies to `$07F0`, and the listing of 2026-09-28 shows nine free bytes,
+`$09F7-$09FF`.
 
 **`MACPTR` is used nowhere in this codebase.** Only the address is defined. Any design that
 reaches for it is writing first-use code with an `ACPTR` fallback, not reusing something.
 
-**The preferred shape is D**: append the regions into the PRG when the total fits under
-`$9F00`, and fall back to a single self-describing `.OVL` when it does not. A plain append
-with no fallback is a build-side size wall, which [[compiler-must-not-cap-program-size]]
-forbids.
+**D keeps the fallback because** a plain append with no `.OVL` is a build-side size wall,
+which [[compiler-must-not-cap-program-size]] forbids.
 
 **`ACPTR` was measured on 2026-09-16 and it passes.** Under hostfs, at real speed, a byte loop
 reads 8,192 bytes in **17 jiffies, 0.283 s**, against a 0.3 s threshold; `CHRIN` over the same

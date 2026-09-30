@@ -1,7 +1,7 @@
 #!/bin/sh
 # ***************************************************************************
 #  release.sh -- build, stage and package a versioned release. POSIX; run from
-#  Git Bash. Invoked by USER-RUNSelease.bat, or directly.
+#  Git Bash. Invoked by USER-RUNS/release.bat, or directly.
 #
 #     release.sh          build everything, stage release/TMP, then zip it
 #     release.sh stage    stage release/TMP from the CURRENT build -- no rebuild,
@@ -19,10 +19,10 @@
 #     make release                     stage the engine + samples into source/drive/
 #     make -C source/runtime gpc-rt    both shared runtimes and their bank code, GPB/GPC/GP1.RT.nnn.BIN
 #     make -C source/gpc release       GPC.PRG + GPC.ERR (tokenised, then compiled)
-#     source/gpc/samplesbuild.py       the five sample programs, each tokenised
+#     source/gpc/samplesbuild.py       the seven sample programs, each tokenised
 #                                      then compiled
 #
-#  THE SAMPLE BUILD COMES LAST because GPB.HELP and the others are compiled SHARED and
+#  THE SAMPLE BUILD COMES LAST because GPC.HELP and the others are compiled SHARED and
 #  want the runtime that gpc-rt has just written. It is also the slow half: each program
 #  drives the emulator twice, so samplesbuild.py streams its output and ticks every ten
 #  seconds with the size of the file the running stage is writing. A stage that is
@@ -58,7 +58,7 @@ if [ "$DO_BUILD" = 1 ]; then
     make -C source/runtime gpc-rt
     echo "== make -C source/gpc release  (GPC.PRG + GPC.ERR, tokenised and compiled) =="
     make -C source/gpc release
-    echo "== samplesbuild.py  (GPBMODS, GPB.HELP, COLORTST, BMXVIEW, EDITOR) =="
+    echo "== samplesbuild.py  (GPBMODS, GPC.HELP, COLORTST, BMXVIEW, GPC.GUI, EDIT, GPC.ERR) =="
     python source/gpc/samplesbuild.py
 fi
 
@@ -108,16 +108,25 @@ from genrtimage import imageName, bankImageName     # noqa: E402
 #     GPC.PRG GPC.BIN GPC/GP1.IMG.nnn.BIN  the compiler
 #     GPB/GPC/GP1.RT.nnn.BIN               both shared runtimes and their bank code
 #     GPC.ERR.PRG  GPC.HELP.PRG            the two companion programs
+#     BASLOAD-GPC.PRG BASLOAD-GPC.BIN      the streaming tokeniser
 #     README.md LICENSE MANIFEST.TXT
 #     HELP-TXT/       the help viewer's index and topics
 #     GPC-BASIC/      the GP.BASIC library, whole, with its manual
-#     GPC-BASLOAD/    the tokeniser, its documents and its source as one zip
-#     SRC/            the BASLOAD source of the two tools, plus a README
-#     GPC-ERROR/      GPC.ERR.BASL and the 22 modules it includes, ready to rebuild
+#     SRC/            source. Nothing under it is needed to run GPC.
+#        GPC/           GPC.BASL and the one module it includes
+#        GPC-ERROR/     GPC.ERR.BASL and the 22 modules it includes
+#        GPC-HELP/      GPC.HELP.BASL, the 13 modules it includes and its help content
+#        GPC-BASLOAD/   the tokeniser, its documents and its source as one zip
 #     SAMPLES/<PROG>/ one folder per sample program
 #
-#  A sample in its own folder still resolves both of the things it loads. A region
-#  overlay (.nnn) is LOADed from BESIDE THE PROGRAM, and the shared runtime is fetched
+#  WARNING: one folder a tool under SRC/, and each carries its own copy of every module
+#  its source #INCLUDEs. BASLOAD resolves an #INCLUDE against the folder it runs in, so
+#  GPC-BASIC/ at the release root is out of reach from inside SRC/. A source folder
+#  without its modules looks complete and cannot be rebuilt. The copies are the ones the
+#  shipped object was built from, not the library masters.
+#
+#  Every sample is EMBEDDED, so a sample folder needs nothing from the drive root. A region
+#  overlay (NAME.OVL) is LOADed from BESIDE THE PROGRAM. A SHARED object fetches its runtime
 #  from the DRIVE ROOT with a LEADING SLASH (bootstrap.asm:285), which works from any
 #  depth. SHARED vs EMBEDDED is not a preference: a SHARED object carries no runtime and
 #  asks for GPB.RT.nnn.BIN when it uses a GP keyword and GPC.RT.nnn.BIN when it does not.
@@ -125,7 +134,7 @@ from genrtimage import imageName, bankImageName     # noqa: E402
 #  one loads GP1.RT.nnn.BIN, the bank code, from the same place.
 #
 #  The help content folder keeps the name HELP-TXT. The viewer opens its files as
-#  //HELP-TXT/:NAME (GPB.HELP.BASL:218), so the name is not ours to choose here.
+#  //HELP-TXT/:NAME (GPC.HELP.BASL:218), so the name is not ours to choose here.
 #
 #  GPC.INPUT (the control-file template) is deliberately NOT shipped: GPC.PRG drives the
 #  compile interactively, and the file is per-user state (git-ignored in source/drive/).
@@ -152,10 +161,15 @@ from genrtimage import imageName, bankImageName     # noqa: E402
 #   GPC.ERR.OVL     the banked half of that helper, its region overlay. It is not optional:
 #                   GPC.ERR.PRG reads it by name as it starts and stops without it.
 #   GPC.HELP.PRG    the on-machine reference -- the manual, the globals register and the
-#                   file list, readable on the X16. SHARED since 12th Sep 2026. In the
-#                   tree it is GPB.HELP.PRG; the release names it for the compiler it
-#                   ships with. The program never opens itself by name, so the rename
-#                   is safe, and it still finds HELP-TXT/GPB.HELP.IDX beside it.
+#                   file list, readable on the X16. Compiled SHARED. It reads
+#                   HELP-TXT/GPC.HELP.IDX beside it.
+#   GPC.HELP.OVL    the banked half of the reference, its region overlay. It is not
+#                   optional: the program reads it as it starts and stops without it.
+#                   WARNING: the overlay name is compiled into GPC.HELP.PRG, so neither
+#                   file can be renamed here.
+#   BASLOAD-GPC.PRG the streaming tokeniser, the same pair SRC/GPC-BASLOAD/ ships with its
+#   BASLOAD-GPC.BIN source. It writes as it reads, so a source is not bounded by BASIC RAM
+#                   the way the ROM's BASLOAD is.
 ROOTFILES = [
     ("source/drive/GPC.PRG",                     "GPC.PRG"),
     ("source/drive/GPC.BIN",                     "GPC.BIN"),
@@ -166,10 +180,17 @@ ROOTFILES = [
     ("source/drive/" + bank_filename(),          bank_filename()),
     ("GPC-BASIC-TOOLS-SRC/GPC.ERR/GPC.ERR.PRG",         "GPC.ERR.PRG"),
     ("GPC-BASIC-TOOLS-SRC/GPC.ERR/GPC.ERR.OVL",         "GPC.ERR.OVL"),
-    ("GPC-BASIC-TOOLS-SRC/GPC-HELP/GPB.HELP.PRG",       "GPC.HELP.PRG"),
+    ("GPC-BASIC-TOOLS-SRC/GPC-HELP/GPC.HELP.PRG",       "GPC.HELP.PRG"),
+    ("GPC-BASIC-TOOLS-SRC/GPC-HELP/GPC.HELP.OVL",       "GPC.HELP.OVL"),
+    ("BASLOAD-GPC/build/BASLOAD-GPC.PRG",       "BASLOAD-GPC.PRG"),
+    ("BASLOAD-GPC/build/BASLOAD-GPC.BIN",       "BASLOAD-GPC.BIN"),
     ("README.md",                           "README.md"),
     ("LICENSE",                             "LICENSE"),
 ]
+
+# README.md serves the repo and the release. Everything from this line on is for the source
+# tree, and the staged copy stops above it.
+README_CUT = "<!-- release: the rest is for the source tree -->"
 
 # The GP.BASIC library ships whole, straight from the repo master rather than from source/drive/ --
 # source/drive/ holds only the staged copies of whatever was last built there, and they are
@@ -184,16 +205,25 @@ ROOTFILES = [
 TREES = [
     ("GPC-BASIC-TOOLS-SRC/GPC-HELP/HELP-TXT",   "HELP-TXT"),
     ("GPC-BASIC",                   "GPC-BASIC"),
-    ("GPC-BASIC-TOOLS-SRC/GPC.ERR/GPC-BASIC",   "GPC-ERROR/GPC-BASIC"),
+    ("GPC-BASIC-TOOLS-SRC/GPC.ERR/GPC-BASIC",   "SRC/GPC-ERROR/GPC-BASIC"),
+    ("GPC-BASIC-TOOLS-SRC/GPC-HELP/GPC-BASIC",  "SRC/GPC-HELP/GPC-BASIC"),
+    ("GPC-BASIC-TOOLS-SRC/GPC-HELP/HELP-TXT",   "SRC/GPC-HELP/HELP-TXT"),
 ]
 
-# GPC.ERR's source, whole and rebuildable. SRC/GPC.ERR.BASL is the same file on its own,
-# for reading. The #INCLUDE lines name GPC-BASIC/, so the modules have to sit in a folder
-# of that name beside the source, and they are the sample folder's copies rather than the
-# library masters: those are what the shipped object was built from.
+# GPC.ERR's source, whole and rebuildable. Its #INCLUDE lines name GPC-BASIC/, so the 22
+# modules sit in a folder of that name beside the source. They are the sample folder's
+# copies rather than the library masters: those are what the shipped object was built from.
 GPCERR_SRC = [
-    ("GPC-BASIC-TOOLS-SRC/GPC.ERR/GPC.ERR.BASL", "GPC-ERROR/GPC.ERR.BASL"),
-    ("GPC-BASIC-TOOLS-SRC/GPC.ERR/readme.md",    "GPC-ERROR/README.md"),
+    ("GPC-BASIC-TOOLS-SRC/GPC.ERR/GPC.ERR.BASL", "SRC/GPC-ERROR/GPC.ERR.BASL"),
+    ("GPC-BASIC-TOOLS-SRC/GPC.ERR/readme.md",    "SRC/GPC-ERROR/README.md"),
+]
+
+# GPC.HELP's source, the same shape as GPC-ERROR, with the help content it was built beside.
+# GPC-HELP.md is the whole reference as one document, rendered from the same source.
+GPCHELP_SRC = [
+    ("GPC-BASIC-TOOLS-SRC/GPC-HELP/GPC.HELP.BASL", "SRC/GPC-HELP/GPC.HELP.BASL"),
+    ("GPC-BASIC-TOOLS-SRC/GPC-HELP/GPC-HELP.md",   "SRC/GPC-HELP/GPC-HELP.md"),
+    ("GPC-BASIC-TOOLS-SRC/GPC-HELP/readme.md",     "SRC/GPC-HELP/README.md"),
 ]
 
 # The tokeniser: the runnable pair, the ROM image for anyone flashing it in, and its two
@@ -201,47 +231,65 @@ GPCERR_SRC = [
 # reference material, and four .inc files at this level would read like something the
 # release needs.
 BASLOAD_FILES = [
-    ("BASLOAD-GPC/build/BASLOAD-GPC.BIN",   "GPC-BASLOAD/BASLOAD-GPC.BIN"),
-    ("BASLOAD-GPC/build/BASLOAD-GPC.PRG",   "GPC-BASLOAD/BASLOAD-GPC.PRG"),
-    ("BASLOAD-GPC/build/basload-rom.bin",   "GPC-BASLOAD/basload-rom.bin"),
-    ("BASLOAD-GPC/README.md",               "GPC-BASLOAD/README.md"),
-    ("BASLOAD-GPC/RESEARCH.md",             "GPC-BASLOAD/RESEARCH.md"),
+    ("BASLOAD-GPC/build/BASLOAD-GPC.BIN",   "SRC/GPC-BASLOAD/BASLOAD-GPC.BIN"),
+    ("BASLOAD-GPC/build/BASLOAD-GPC.PRG",   "SRC/GPC-BASLOAD/BASLOAD-GPC.PRG"),
+    ("BASLOAD-GPC/build/basload-rom.bin",   "SRC/GPC-BASLOAD/basload-rom.bin"),
+    ("BASLOAD-GPC/README.md",               "SRC/GPC-BASLOAD/README.md"),
+    ("BASLOAD-GPC/RESEARCH.md",             "SRC/GPC-BASLOAD/RESEARCH.md"),
 ]
 BASLOAD_SRC_DIR = "BASLOAD-GPC/src"
-BASLOAD_SRC_ZIP = "GPC-BASLOAD/BASLOAD-SRC.ZIP"
+BASLOAD_SRC_ZIP = "SRC/GPC-BASLOAD/BASLOAD-SRC.ZIP"
 
-# The BASLOAD source of the two tools. Reference only. SRC/README.TXT says so, and gives
-# the two steps that rebuild either one.
-SRCBASL = [("source/drive/GPC.BASL",                     "GPC.BASL"),
-           ("GPC-BASIC-TOOLS-SRC/GPC.ERR/GPC.ERR.BASL",         "GPC.ERR.BASL")]
+# The front end's source folder, the same shape as GPC-ERROR. GPC.BASL #INCLUDEs one
+# module by bare name, so GPB.INC.BL sits beside it. Both come from source/drive/, which
+# is where the front end is edited and where the shipped GPC.PRG was compiled.
+SRCBASL = [("source/drive/GPC.BASL",        "GPC/GPC.BASL"),
+           ("source/drive/GPB.INC.BL",      "GPC/GPB.INC.BL")]
 
 # One folder per sample. "fake" names the one file worth stubbing when it is not there --
-# the program itself. The globs cannot be listed by name because their count follows the
-# source: a region's overlays, and the BMX images.
+# the program itself. The one glob is the BMX images, whose count follows the source.
+#
+# WARNING: a region overlay is named NAME.OVL and the program reads that literal as it
+# starts. It is not optional and it cannot be renamed.
 SAMPLES = [
     {
         "dir":   "GPBMODS",
-        "files": [("source/drive/GPBMODS.PRG",                    "GPBMODS.PRG"),
-                  ("GPC-BASIC-TOOLS-SRC/GPB-MODS-TESTING/GPBMODS.BASL",  "GPBMODS.BASL")],
-        "globs": [("source/drive", lambda n: n.startswith("GPBMODS.") and len(n) == 11 and n[8:].isdigit())],
+        "files": [("GPC-BASIC-TOOLS-SRC/GPB-MODS-TESTING/GPBMODS.PRG",   "GPBMODS.PRG"),
+                  ("GPC-BASIC-TOOLS-SRC/GPB-MODS-TESTING/GPBMODS.OVL",   "GPBMODS.OVL"),
+                  ("GPC-BASIC-TOOLS-SRC/GPB-MODS-TESTING/GPBMODS.BASL",  "GPBMODS.BASL"),
+                  ("GPC-BASIC-TOOLS-SRC/GPB-MODS-TESTING/GPB-MENUS.BASL", "GPB-MENUS.BASL")],
+        "globs": [],
         "fake":  "GPBMODS.PRG",
     },
+    #   WARNING: EDIT.OVL keeps its name. EDIT.PRG reads the overlay by that literal,
+    #   so renaming it here breaks the program. EDIT.BASL #INCLUDEs the ten ED-*.BASL
+    #   files beside it; GPC-BASIC/ is out of reach from a sample folder, so the tree
+    #   ships to be read, not rebuilt.
     {
-        "dir":   "EDITOR",
-        "files": [("GPC-BASIC-TOOLS-SRC/edit/C.EDITOR.PRG",            "C.EDITOR.PRG"),
-                  ("GPC-BASIC-TOOLS-SRC/edit/EDITOR.BASL",             "EDITOR.BASL"),
-                  ("GPC-BASIC-TOOLS-SRC/edit/ED-MENUS.BASL",           "ED-MENUS.BASL"),
-                  ("GPC-BASIC-TOOLS-SRC/edit/ED-STORE.BASL",           "ED-STORE.BASL"),
-                  ("GPC-BASIC-TOOLS-SRC/edit/TEST.MD",                 "TEST.MD")],
+        "dir":   "EDIT",
+        "files": [("GPC-BASIC-TOOLS-SRC/edit/EDIT.PRG",              "EDIT.PRG"),
+                  ("GPC-BASIC-TOOLS-SRC/edit/EDIT.OVL",              "EDIT.OVL"),
+                  ("GPC-BASIC-TOOLS-SRC/edit/EDIT.BASL",             "EDIT.BASL"),
+                  ("GPC-BASIC-TOOLS-SRC/edit/ED-CLIP.BASL",          "ED-CLIP.BASL"),
+                  ("GPC-BASIC-TOOLS-SRC/edit/ED-DIALOG.BASL",        "ED-DIALOG.BASL"),
+                  ("GPC-BASIC-TOOLS-SRC/edit/ED-DOC-CONST.BASL",     "ED-DOC-CONST.BASL"),
+                  ("GPC-BASIC-TOOLS-SRC/edit/ED-FONT.BASL",          "ED-FONT.BASL"),
+                  ("GPC-BASIC-TOOLS-SRC/edit/ED-MENUS.BASL",         "ED-MENUS.BASL"),
+                  ("GPC-BASIC-TOOLS-SRC/edit/ED-MISC.BASL",          "ED-MISC.BASL"),
+                  ("GPC-BASIC-TOOLS-SRC/edit/ED-SEL.BASL",           "ED-SEL.BASL"),
+                  ("GPC-BASIC-TOOLS-SRC/edit/ED-STORE.BASL",         "ED-STORE.BASL"),
+                  ("GPC-BASIC-TOOLS-SRC/edit/ED-STR-CONST.BASL",     "ED-STR-CONST.BASL"),
+                  ("GPC-BASIC-TOOLS-SRC/edit/ED-UNDO.BASL",          "ED-UNDO.BASL"),
+                  ("GPC-BASIC-TOOLS-SRC/edit/TEST.MD",               "TEST.MD")],
         "globs": [],
-        "fake":  "C.EDITOR.PRG",
+        "fake":  "EDIT.PRG",
     },
     {
         "dir":   "BMXVIEW",
-        "files": [("source/scratch/demo/C.BMXVIEW.PRG",                     "C.BMXVIEW.PRG"),
-                  ("GPC-BASIC/BMXVIEW.EXP.BL",               "BMXVIEW.EXP.BL")],
+        "files": [("GPC-BASIC-TOOLS-SRC/BMXVIEWER/BMXVIEW.PRG",      "BMXVIEW.PRG"),
+                  ("GPC-BASIC-TOOLS-SRC/BMXVIEWER/BMXVIEW.BASL",    "BMXVIEW.BASL")],
         "globs": [("GPC-BASIC-TOOLS-SRC/BMXVIEWER/SAMPLES", lambda n: n.upper().endswith(".BMX"))],
-        "fake":  "C.BMXVIEW.PRG",
+        "fake":  "BMXVIEW.PRG",
     },
     {
         "dir":   "COLORTST",
@@ -270,41 +318,78 @@ DEV_PREFIXES = ("XT", "XFMGR/")
 NOT_SHIPPED = DEV_PREFIXES + ("MANIFEST.TXT",)
 
 SRC_README = (
-    "GPC -- SRC FOLDER (SOURCE, NOT NEEDED TO RUN)\n"
-    "=============================================\n"
+    "GPC SRC folder (source, not needed to run)\n"
+    "==========================================\n"
     "\n"
-    "This folder holds the BASLOAD source of the GPC tools:\n"
+    "This folder holds the GP.BASIC source of the GPC tools, one folder per tool.\n"
+    "It is here for reference only. Nothing in this folder is needed to run GPC.\n"
+    "The ready-to-run programs are in the parent folder.\n"
     "\n"
-    "    GPC.BASL       the compiler front end\n"
-    "    GPC.ERR.BASL   the error-line helper\n"
+    "    SRC/\n"
+    "      README.TXT            this file\n"
+    "      GPC/\n"
+    "        GPC.BASL            the compiler front end\n"
+    "        GPB.INC.BL          the one module it includes\n"
+    "      GPC-ERROR/\n"
+    "        GPC.ERR.BASL        the error-line helper\n"
+    "        README.md           its own notes\n"
+    "        GPC-BASIC/          the 22 modules it includes\n"
+    "      GPC-HELP/\n"
+    "        GPC.HELP.BASL       the on-machine reference viewer\n"
+    "        README.md           its own notes\n"
+    "        GPC-BASIC/          the 13 modules it includes\n"
+    "        HELP-TXT/           the help content it reads\n"
+    "        GPC-HELP.md         the same reference as one document\n"
+    "      GPC-BASLOAD/\n"
+    "        BASLOAD-GPC.PRG     the tokeniser front end\n"
+    "        BASLOAD-GPC.BIN     the tokeniser engine\n"
+    "        basload-rom.bin     the ROM image, for anyone flashing it in\n"
+    "        README.md\n"
+    "        RESEARCH.md\n"
+    "        BASLOAD-SRC.ZIP     the tokeniser's own 64tass source\n"
     "\n"
-    "It is here for reference only -- you do NOT need anything in this folder to\n"
-    "run GPC. The ready-to-run programs are in the parent folder.\n"
+    "BASLOAD resolves an #INCLUDE against the folder it runs in. GPC-BASIC/ at the\n"
+    "release root is out of reach from inside SRC/, so each source folder carries\n"
+    "its own copies of the modules. Go into the tool's folder first, then run\n"
+    "BASLOAD there.\n"
     "\n"
-    "To compile, run GPC.PRG, with GPC.BIN, the GPC.IMG.nnn.BIN and GP1.IMG.nnn.BIN\n"
-    "images and the GPB.RT.nnn.BIN and GP1.RT.nnn.BIN runtime files beside it. To\n"
-    "turn a runtime error's \"@ $XXXX\" into a source line, run GPC.ERR.PRG, which\n"
-    "needs GPC.ERR.OVL beside it. The .BASL sources are never loaded at run time.\n"
+    "GPC.BASL has one include line, #INCLUDE \"GPB.INC.BL\", a bare name with no\n"
+    "folder. GPC.ERR.BASL has 22 and GPC.HELP.BASL has 13, each naming a module\n"
+    "in GPC-BASIC/, as in #INCLUDE \"GPC-BASIC/GPB.INC.BL\".\n"
+    "The module copies here are the ones the shipped objects were compiled from,\n"
+    "not the library masters.\n"
     "\n"
-    "BOTH TOOLS ARE WRITTEN IN GP.BASIC, so rebuilding either is a TWO step job and\n"
-    "BASLOAD on its own is not enough. BASLOAD (built into every R49 ROM) does the\n"
-    "first step -- its own #SAVEAS writes the tokenised program out:\n"
+    "All three tools are written in GP.BASIC. Rebuilding one takes two steps, and\n"
+    "BASLOAD does only the first. BASLOAD is built into every R49 ROM. The parent\n"
+    "folder also ships BASLOAD-GPC.PRG, which writes its output as it reads, so a\n"
+    "source is not bounded by BASIC RAM. Its own source is in SRC/GPC-BASLOAD/.\n"
+    "Each source carries its own #SAVEAS, so BASLOAD names the output itself:\n"
     "\n"
-    '    BASLOAD "GPC.BASL"        writes GPC.SRC.PRG\n'
-    '    BASLOAD "GPC.ERR.BASL"    writes GPC.ERR.SRC.PRG\n'
+    "    in SRC/GPC/         BASLOAD \"GPC.BASL\"       writes GPC.SRC.PRG\n"
+    "    in SRC/GPC-ERROR/   BASLOAD \"GPC.ERR.BASL\"   writes GPC.ERR.SRC.PRG\n"
+    "    in SRC/GPC-HELP/    BASLOAD \"GPC.HELP.BASL\"  writes GPC.HELP.SRC.PRG\n"
     "\n"
-    "What it writes CANNOT BE RUN. Nothing in BASIC sits behind the GP tokens, so\n"
-    "the ROM can neither LIST nor RUN those files -- they are compiler INPUT. The\n"
-    "second step is to compile them, and the shipped GPC.PRG and GPC.ERR.PRG\n"
-    "already are.\n"
+    "The @: in each #SAVEAS means overwrite. Each output is written into its own\n"
+    "folder, beside its source. None of the three can overwrite a shipped program\n"
+    "in the parent folder.\n"
     "\n"
-    "Both lines are safe to run: GPC.SRC.PRG and GPC.ERR.SRC.PRG are names\n"
-    "nothing else in the folder uses, so neither writes over a shipped program.\n"
+    "What BASLOAD writes cannot be run. No BASIC code sits behind the GP tokens,\n"
+    "so the ROM can neither LIST nor RUN those files. They are input for the\n"
+    "compiler. The second step is to compile that output with GPC. The shipped\n"
+    "GPC.PRG, GPC.ERR.PRG and GPC.HELP.PRG are already compiled.\n"
     "\n"
-    "AND IF GPC.PRG ITSELF IS EVER THE BROKEN THING, you do not need a front end to\n"
-    "compile. GPC.BIN reads a file called GPC.INPUT straight off the drive: write\n"
-    "the source name, the object name and a blank line into it with any editor and\n"
-    "RUN GPC.BIN. Driving the compiler is all the front end ever does.\n"
+    "To compile, run GPC.PRG. It needs GPC.BIN, the GPC.IMG.nnn.BIN and\n"
+    "GP1.IMG.nnn.BIN images, and the GPB.RT.nnn.BIN, GPC.RT.nnn.BIN and\n"
+    "GP1.RT.nnn.BIN runtime files beside it. All of those are in the parent folder.\n"
+    "\n"
+    "GPC.ERR.PRG turns the \"@ $XXXX\" of a runtime error into a source line. It\n"
+    "needs GPC.ERR.OVL beside it. GPC.HELP.PRG needs GPC.HELP.OVL and the HELP-TXT/\n"
+    "folder beside it. The .BASL sources are never loaded at run time.\n"
+    "\n"
+    "GPC.BIN compiles without a front end, so a broken GPC.PRG does not stop a\n"
+    "compile. GPC.BIN reads a file called GPC.INPUT straight off the drive. Write\n"
+    "the source name, the object name and a blank line into it with any editor,\n"
+    "then RUN GPC.BIN. Driving the compiler is all the front end does.\n"
 )
 
 # ===========================================================================
@@ -384,6 +469,17 @@ if do_stage:
             else:
                 missing.append(src_rel)
 
+    readme = os.path.join(TMP, "README.md")
+    if os.path.isfile(readme):
+        with open(readme, encoding="utf-8", newline="") as f:
+            text = f.read()
+        cut = text.find(README_CUT)
+        if cut < 0:
+            print("release: WARNING -- README.md has no cut line, so it ships whole")
+        else:
+            with open(readme, "w", encoding="utf-8", newline="") as f:
+                f.write(text[:cut].rstrip() + ("\r\n" if "\r\n" in text else "\n"))
+
     for src_dir_rel, dst_dir_rel in TREES:
         print("release: %-12s -- %d files" % (dst_dir_rel + "/", put_tree(src_dir_rel, dst_dir_rel)))
 
@@ -411,7 +507,7 @@ if do_stage:
     else:
         missing.append(BASLOAD_SRC_DIR)
 
-    for src_rel, dst_rel in GPCERR_SRC:
+    for src_rel, dst_rel in GPCERR_SRC + GPCHELP_SRC:
         if not put(src_rel, dst_rel):
             missing.append(src_rel)
 

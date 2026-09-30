@@ -31,7 +31,7 @@ Both shared runtimes are needed. Which one a program wants is decided when it is
 it runs, so a drive carrying only one works for half the programs built against it. Every shared
 program also loads `GP1.RT.nnn.BIN`, from the same place its runtime loaded from. A program that
 cannot find a runtime file prints `?RT`, the third letter of its name and the build number, such as
-`?RTB126` for `GPB.RT.126.BIN`, and stops.
+`?RTB128` for `GPB.RT.128.BIN`, and stops.
 
 The front end needs `GPB.RT.nnn.BIN` and `GP1.RT.nnn.BIN` for itself: `GPC.PRG` is a compiled
 GP.BASIC program built in shared mode. The compiler front end is written in the language it
@@ -103,6 +103,29 @@ front end asks for a source file, hands it to the engine, prints what comes back
 empty answer quits. It is plain X16 BASIC rather than GP.BASIC, because it has to run from `READY.`
 with nothing on the disk but itself and the engine.
 
+### `.BASLOAD.NEXT` runs after a clean tokenise
+
+The engine chains when the run's return code would be 0. A failed tokenise never chains. The engine
+looks for `.BASLOAD.NEXT` on the source's device, the device passed in the ABI.
+
+When the file is there the engine prints `RUNNING .BASLOAD.NEXT`, loads it at the start of BASIC,
+and runs it the way a `LOAD` inside a running BASIC program does. The `SYS` that started the engine
+does not return. `.BASLOAD.NEXT` is an ordinary BASIC PRG. The file is not deleted, so it runs
+after every clean tokenise in that folder. When there is no such file the `SYS` returns as before,
+with R1, R2 and the message unchanged.
+
+Every caller of the engine's ABI gets this, not only the front end. `test/runtest.py` and
+`source/gpc/build_basl.py` both call the engine direct and both chain.
+
+The front end holds its re-entry guard byte at `$0400` down to 0 across the `SYS`. A chained
+program is free to load over the engine at `$6000`, and the next run of the front end loads the
+engine again.
+
+The BASIC entry points the chain uses are pinned to ROM R49.
+
+**WARNING:** a load that fails part way raises BASIC's `?LOAD ERROR`. The caller's program text is
+already overwritten by then, so there is nothing to return to.
+
 ### A failed run deletes its own output
 
 Streaming created one failure the ROM never had. A run that died partway through pass 2 still wrote
@@ -140,12 +163,13 @@ fork.
 
 ## 4. The tools
 
-`GPC.ERR.PRG` turns a runtime error's `@ $XXXX` into a source line, using the debug map the
-compiler writes when `MAKE A DEBUG MAP?` is answered yes. Without the map the address cannot be
-resolved.
+`GPC.ERR.PRG` turns the address a runtime error prints into a source line. The address is `$027E`
+in low memory, or `$0C:AAF4` in a `GP.BANKED` region: the bank, a colon, and the run address. It
+reads the debug map the compiler writes when `MAKE A DEBUG MAP?` is answered yes. Without the map
+the address cannot be resolved.
 
-`GPB.HELP.PRG` is this reference, on the machine. It reads `HELP-TXT/` beside it — `GPB.HELP.IDX`
-and one `.HLP` per topic — and shows 74 topics at 80x30. Arrows, `PgUp` / `PgDn`, `HOME` and `END`
+`GPC.HELP.PRG` is this reference, on the machine. It reads `HELP-TXT/` beside it — `GPC.HELP.IDX`
+and one `.HLP` per topic — and shows 90 topics at 80x30. Arrows, `PgUp` / `PgDn`, `HOME` and `END`
 move. `RETURN` opens the highlighted index row. `/` finds and `N` repeats the search. `L` follows a
 topic's cross references, `X` writes its code out as a `.BL` where it has any, `T` cycles the colour
 themes, `?` is the about box. `ESC` goes back a step, and quits from the index.

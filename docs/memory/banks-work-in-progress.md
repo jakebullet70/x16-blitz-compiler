@@ -71,7 +71,7 @@ Makefiles), handler step 12 (the moved handler files, the polynomial sources and
 `Makefile`, `release.sh`, `.gitignore`, `dcref.py`, `banktest3.py`), handler step 23 (`object.asm`, `api.asm`,
 `bumpbuild.py`, `x16_storage.inc`), handler step 24 (`00rtimage.header`, `10object.divider`,
 `genrtimage.py`, `object.asm`, application `Makefile`), handler step 28 (the manual, the three help Markdown
-copies, `H001.HLP`, `H076.HLP` and `GPB.HELP.IDX` in both `HELP-TXT` folders, `README.md`, the GPBMODS
+copies, `H001.HLP`, `H076.HLP` and `GPC.HELP.IDX` in both `HELP-TXT` folders, `README.md`, the GPBMODS
 `PLAN.md`, `source/drive/readme.md`, `help-demo.bat`, `fntest.py`, `BUILD-HANDOFF.md`, four notes), both plans and `docs/blitz/EMBEDDED-VS-SHARED.md`. Another agent changed
 `source/compiler/source/main/compiler.asm`; check it before staging.
 

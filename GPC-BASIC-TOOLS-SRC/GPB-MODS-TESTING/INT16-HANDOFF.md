@@ -160,8 +160,7 @@ Line numbers are the working copy's unless the file is a project's own.
    - `--spread GPBMODS` shows where a module's names are used outside it.
 4. `python source/gpc/int16scan.py --check GPBMODS GUIFRMT` must report no NEW pair. FILE.DIR.SLOW is
    the one known pair until FILEDIR is converted.
-5. Ask, then build in the background: `python source/gpc/modsbuild.py GPBMODS`. Add `GUIFRMT` when a
-   module it includes changed.
+5. Ask, then build in the background: `python source/gpc/samplesbuild.py GPBMODS`.
 6. `python source/gpc/int16scan.py GPBMODS`. The variable space must fall by exactly 4 B for each
    converted name. Any other drop means a missed site or a misread object.
 7. Hand the build to the user to walk the module's panel. Panels cannot be driven by paste.

@@ -1,17 +1,17 @@
 @echo off
 rem ---------------------------------------------------------------------------
-rem  help-demo.bat -- GPB.HELP, the GP.BASIC and BASL reference, in a VISIBLE
+rem  help-demo.bat -- GPC.HELP, the GP.BASIC and BASL reference, in a VISIBLE
 rem  window.
 rem
 rem  EVERYTHING IT READS IS IN GPC-BASIC-TOOLS-SRC\GPC-HELP\HELP-TXT -- the index and the
 rem  topics alike -- opened through the CMD path syntax "//HELP-TXT/:NAME", which
 rem  is what CMDR-DOS documents and what a real SD card wants.
 rem
-rem  Source: GPC-BASIC-TOOLS-SRC\GPC-HELP\GPB.HELP.BASL on thirteen modules -- GPB, THEME,
+rem  Source: GPC-BASIC-TOOLS-SRC\GPC-HELP\GPC.HELP.BASL on thirteen modules -- GPB, THEME,
 rem  STASH, STRCASE, APPSYS, BANKMGR, MENU.INC.BANKED, MENU, LINEINPUT, GUI,
 rem  COMBO, CHECK and GUI-DIALOGS -- all shipped in GPC-BASIC-TOOLS-SRC\GPC-HELP\GPC-BASIC\
 rem  beside the sample so a rebuild needs nothing from GPC-BASIC\. The object is
-rem  SHARED, so GPB.RT.nnn.BIN, GPC.RT.nnn.BIN, GP1.RT.nnn.BIN and GPB.HELP.OVL
+rem  SHARED, so GPB.RT.nnn.BIN, GPC.RT.nnn.BIN, GP1.RT.nnn.BIN and GPC.HELP.OVL
 rem  have to sit beside the PRG on the drive. See GPC-BASIC-TOOLS-SRC\GPC-HELP\readme.md for
 rem  the rebuild, and for the measurements behind the design decisions.
 rem ---------------------------------------------------------------------------
@@ -29,16 +29,16 @@ if not exist "%ROM%" (
 	echo ROM not found: "%ROM%"
 	exit /b 1
 )
-if not exist "%DRIVE%\GPB.HELP.PRG" (
+if not exist "%DRIVE%\GPC.HELP.PRG" (
 	echo.
-	echo   GPC-BASIC-TOOLS-SRC\GPC-HELP\GPB.HELP.PRG is not built.
+	echo   GPC-BASIC-TOOLS-SRC\GPC-HELP\GPC.HELP.PRG is not built.
 	echo   See the rebuild section of GPC-BASIC-TOOLS-SRC\GPC-HELP\readme.md.
 	echo.
 	exit /b 1
 )
-if not exist "%DRIVE%\HELP-TXT\GPB.HELP.IDX" (
+if not exist "%DRIVE%\HELP-TXT\GPC.HELP.IDX" (
 	echo.
-	echo   GPC-BASIC-TOOLS-SRC\GPC-HELP\HELP-TXT\GPB.HELP.IDX is missing -- no index to
+	echo   GPC-BASIC-TOOLS-SRC\GPC-HELP\HELP-TXT\GPC.HELP.IDX is missing -- no index to
 	echo   load and will say so and stop. Rebuild the content with:
 	echo.
 	echo       python GPC-BASIC-TOOLS-SRC\GPC-HELP\MKHELP.PY
@@ -46,5 +46,5 @@ if not exist "%DRIVE%\HELP-TXT\GPB.HELP.IDX" (
 	exit /b 1
 )
 
-"%X16EMU%" -rom "%ROM%" -fsroot "%DRIVE%" -scale 2 -sound none -prg "%DRIVE%\GPB.HELP.PRG" -run
+"%X16EMU%" -rom "%ROM%" -fsroot "%DRIVE%" -scale 2 -sound none -prg "%DRIVE%\GPC.HELP.PRG" -run
 endlocal

@@ -1,10 +1,16 @@
 ---
 name: blitz-x16-runtime-footprint
-description: The runtime is 10,956 B copied verbatim into every compiled program (VM+handlers 7.3K, ifloat32 2.3K, polynomials 0.9K); ~2x the C64 Blitz runtime (est. ~5.8K) because we bundle our own 32-bit float+transcendentals (~3.2K) and ~2K of X16 hardware handlers. The size counterpart to the speed yardstick.
+description: Build 128 runtime is 10,239 B (CORE) or 11,775 B (GP.BASIC) plus 2,432 B of bank 1 code in an embedded program, none in a shared one; the component split below is from an older 10,956 B build. ~2x the C64 Blitz runtime (est. ~5.8K) because we bundle our own 32-bit float+transcendentals. The size counterpart to the speed yardstick.
 metadata:
   type: project
   originSessionId: e067067c-f194-41ca-978d-951f2d4c1c2e
 ---
+
+**Build 128, 2026-09-30:** an embedded object carries `$0801` to `GPBase $3000`, 10,239 bytes,
+when no `GP.` keyword is used, and `$0801` to `ObjectBase $3600`, 11,775 bytes, when one is. The
+2,432 bytes of bank 1 code (`GP1`) ride with it. A shared object carries no runtime and loads
+`GPC.RT` or `GPB.RT` plus `GP1.RT` at run time. The component table and the `$3300` addresses below
+are from an earlier 10,956 byte build; re-measure before quoting them.
 
 The **size** counterpart to [[blitz-c64-benchmark-yardstick]] (which is about speed). Every number
 below was measured from `source/application/build/code.lst` and then adversarially re-verified from

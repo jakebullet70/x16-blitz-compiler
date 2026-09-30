@@ -1,114 +1,88 @@
-@4.6 MENU.INC.BL -- menus built a row at a time
+@4.4 LINEINPUT.INC.BL -- a positioned entry field
 .
-=4.6 MENU.INC.BL -- MENUS BUILT A ROW AT A TIME
-.
-=WHAT IT COSTS
-.
-.    BASIC -- ordinary BASL in a .INC.BL, called with GOSUB. Free unless you
-.    #INCLUDE it.
+=4.4 LINEINPUT.INC.BL -- A POSITIONED ENTRY FIELD
 .
 =DESCRIPTION
 .
-.  GP.SUB MENU.BEGIN, slot
-.      IN: MENU.BAR or MENU.POPUP
-.      OUT: the slot emptied; the rows that follow go into it
+.  LINEINPUT.GET
+.      IN: LINEINPUT.X .Y .LEN .ATTR .TEXT$ .MASK .ALLOW$ .DENY$
+.      OUT: LINEINPUT.TEXT$ LINEINPUT.KEY
 .
-.  GP.SUB MENU.ITEM, text$
-.      IN: the row's text
-.      OUT: a row appended, with no hint, enabled
+.  LINEINPUT.ASK
+.      IN: the same plus LINEINPUT.LABEL$
+.      OUT: the same; LINEINPUT.X restored
 .
-.  GP.SUB MENU.ITEMX, text$, hint$, on
-.      IN: the text, the hint, and on, tested <> 0
-.      OUT: a row appended
+:LINEINPUT.X = 10 : LINEINPUT.Y = 6
+:LINEINPUT.LEN = 20
+:LINEINPUT.ATTR = THEME.CLR(THEME.TEXT)
+:LINEINPUT.TEXT$ = ""
+:GOSUB LINEINPUT.GET
+:IF LINEINPUT.KEY = 27 THEN GOTO CANCELLED
 .
-.  GP.SUB MENU.SELECTED, n
-.      IN: the row the next run opens on
-.      OUT: --
+.INPUT and LINPUT cannot be used on a drawn screen: both take the bottom of
+.the screen, scroll it, echo in the current colour, and accept any length. A
+.LINEINPUT field stays at the given position, in the given colour, and stops
+.at the given width.
 .
-.  R = GP.FN(MENU.HOTROW, slot, key)
-.      IN: a slot and a key code
-.      OUT: R, the first live row with that hot key, matched without case, or
-.        0
+.LINEINPUT.KEY is the key that ended the field, which is what makes a
+.multi-field form possible:
 .
-.  N = GP.FN(MENUTO.VERT, row, col, style)
-.      IN: the popup slot, and the inputs below
-.      OUT: N, 1 to the row count, or 0 for ESC. MENU.EXITKEY
+.  13
+.      RETURN -- finished
 .
-.  N = GP.FN(MENUTO.BAR, row, col, style)
-.      IN: the bar slot, MENU.GAP MENU.BARFLAGS
-.      OUT: N MENU.EXITKEY MENU.BARNUM MENU.SELX MENU.SELW MENU.MARKED
+.  27 / 3
+.      ESC / STOP -- cancelled, and LINEINPUT.TEXT$ is put back to what it
+.        was
 .
-.  GP.SUB MENU.DRAWBAR, row, col, style
-.      IN: the bar slot, MENU.MARKED
-.      OUT: the bar on screen, not run, with MENU.MARKED lit
+.  17 / 145 / 9
+.      cursor down / up / TAB -- left the field, text kept
 .
-:#INCLUDE "GPB.INC.BL"
-:#INCLUDE "BANKMGR.INC.BL"
-:#INCLUDE "MENU.INC.BANKED.BL"
-:#INCLUDE "MENU.INC.BL"
-:
-:GOSUB BANKMGR.INIT
-:MENU.ATTR = 6 * 16 + 1
-:MENU.HOTATTR = 6 * 16 + 7
-:MENU.DISATTR = 6 * 16 + 12
-:GP.SUB MENU.BEGIN, MENU.POPUP
-:GP.SUB MENU.ITEMX, "&ADD RECORD", "APPEND A BLANK RECORD", MENU.ON
-:GP.SUB MENU.ITEMX, "&DEL RECORD", "", MENU.OFF
-:GP.SUB MENU.ITEM, "-"
-:GP.SUB MENU.ITEM, "&QUIT"
-:N = GP.FN(MENUTO.VERT, 4, 10, MENU.ROUND)
-:IF N = 0 THEN <cancelled>
+.A form is therefore a loop over fields rather than a sequence of prompts,
+.and the user can return to an earlier field without restarting.
 .
-.Requires GPB.INC.BL and BANKMGR.INC.BL, with BANKMGR.INIT run before the
-.first MENU.BEGIN, and a SHARED compile. #INCLUDE "MENU.INC.BANKED.BL"
-.straight before MENU.INC.BL. Its groups are banked, so the program gets a
-.NAME.OVL beside its .PRG. Ship both.
+.LINEINPUT.MASK non-zero displays asterisks while holding the real string.
+.The field does not scroll: when it is full, further characters are refused
+.and the cursor inverts the last character rather than sitting past the end.
+.The cursor blinks off TI rather than a delay loop; a delay loop would
+.swallow keys pressed during it.
 .
-.A menu is built into a slot, then run from it. There are two slots, so the
-.bar survives while its dropdown is built:
+.LINEINPUT.ALLOW$ and LINEINPUT.DENY$ restrict what may be typed. Both are
+.empty by default, and the field then takes any printable character, as it
+.always has. ALLOW$ lists the characters accepted and DENY$ the ones refused;
+.a caller that sets both gets ALLOW$, and DENY$ is not consulted. A refused
+.key changes nothing -- not the text, and not the caret.
 .
-.  MENU.BAR
-.      ROWS: 16
+.They compare raw bytes, so a set of LETTERS depends on the charset: PETSCII
+.shifted letters arrive as $C1-$DA and ISO ones as $41-$5A, and an ALLOW$
+.written for one silently refuses every capital in the other. Digits are
+.48-57 in both. Use ALLOW$ for a closed set short enough to write out, DENY$
+.for everything-except:
 .
-.  MENU.POPUP
-.      ROWS: 32
+.  Digits only
+.      SPELLING: ALLOW$ = "0123456789"
 .
-.A row past the slot's size is dropped, and so is a row added before any
-.MENU.BEGIN. The sizes are MENU.BAR.MAX, MENU.POPUP.MAX, MENU.POOL.MAX and
-.MENU.POOLBASE, declared in MENU.INC.BL. A group in MENU.INC.BANKED.BL holds
-.one SPC line per row it counts, so raising a define means adding lines to
-.the group to match. A define that does not match its lines silently loses
-.rows off the end of a menu. MENU.POOLBASE is MENU.BAR.MAX + MENU.POPUP.MAX.
+.  Number with sign and point
+.      SPELLING: ALLOW$ = "0123456789.-"
 .
-.The text and hints are kept in bank MENU.TEXTBANK, which the first
-.MENU.BEGIN claims from BANKMGR (SEC 4.13). It is 62 unless the program
-.writes #DEFINE MENU.TEXTBANK n before the #INCLUDE. If another owner has
-.claimed that bank, MENU.OK is 0 and every row is dropped. Text is cut to 30
-.characters and a hint to 50. MENU.FLAG$(), MENU.HOTKEY$() and MENU.HOTCOL$()
-.are the module's own arrays, DIMmed on the first MENU.BEGIN. Do not DIM
-.them.
+.  Yes or no
+.      SPELLING: ALLOW$ = "YyNn"
 .
-.MENU.SELECTED sets the row the next run opens on. The next MENU.BEGIN or run
-.clears it, and without it a run opens on row 1.
+.  Letters, no digits
+.      SPELLING: DENY$ = "0123456789"
 .
-.MENU.HOTROW looks a key up the way a run does. Use it on a key a
-.MENU.KEYEXIT run handed back, to open the bar item with that letter, or for
-.an ALT+letter the program reads itself.
+.  Filename, no punctuation
+.      SPELLING: DENY$ = ",:=*?"
 .
-=Rows
+.Both are sticky, like every other input in the library, so a form sets them
+.on the way into each field rather than once at the top.
 .
-.& marks the hot key: "SAVE &AS" is stored as SAVE AS with hot key A at
-.column 6. Only the first & counts, && is a literal &, and a trailing & stays
-.in the text. A hot key is matched without case, the first live row with it
-.wins, and it chooses the row at once.
+.Example: FORM.EXP.BL -- three fields, one masked and one digits-only, in a
+.themed panel.
 .
-.A row whose text is one hyphen, "-", is a separator. It draws as a line of
-.MENU.SEPCHR, still counts as a row, and the cursor steps over it.
+=EXAMPLE PROGRAM
 .
-.MENU.ITEMX with on 0 adds a disabled row. The cursor steps over it, its hot
-.key and RETURN are refused, and it draws in MENU.DISATTR.
+.  FORM.EXP.BL -- runnable, in the GPC-BASIC folder
 .
-.A caller keeping its rows in GP.BANKEDSTR groups (SEC 3.10) can put the
-.enable mask at index 0 of the hint group, "1" for on and "0" for off a row,
-.and pass VAL(MID$(GP.BSTR(HH, 0), I, 1)) as on.
+=SEE ALSO
 .
+>82|4.4 LINEINPUT.INC.BL -- a positioned entry field

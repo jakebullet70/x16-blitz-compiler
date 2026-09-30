@@ -1,33 +1,43 @@
-@3.12 Code in a bank (2)
-=The overlay file
+@3.11.3 GP.FN -- call a verb from inside an expression
 .
-.Every region of a program goes into one file, NAME.OVL, and the file says
-.what is in it. Each region is introduced by two bytes -- the bank it belongs
-.in, then how many pages of it follow -- and those pages come next. Then the
-.next region, and so on to end of file. So a region costs its padded page
-.count plus two bytes, the padding rather than the p-code in it, and the
-.banks may be in any order with any gaps between them.
+=3.11.3 GP.FN
 .
-.The overlay ships beside the .PRG, in both builds. The program reads it once
-.per load, not once per RUN, and a missing or truncated one stops it with
-.?OVL; a region for a bank the machine does not have stops it with ?RAM.
-.Nothing pairs a .OVL to its .PRG, so a stale one is read. SEC 7 lists every
-.file a program ships.
+.  Syntax    GP.FN(verb [, expression ...])
+.  Does      Assigns each expression to the matching formal, calls the
+.            routine, and gives back the variable the declaration
+.            named after RETURNS.
+.  Kind      FUNCTION. Two runtime opcodes bracket the call.
+.  Notes     The verb must be declared RETURNS. Its type is the type
+.            of the term, so a verb returning a string is a string
+.            term and concatenates.
+.            The body may be as long as it likes and may print, read
+.            files, open blocks and call other verbs. The caller's
+.            half-built expression and its string temporaries are
+.            carried across it.
+.            Costs 5 bytes of p-code at the call site against GP.SUB's
+.            3, plus the read of the RETURNS variable that the long
+.            spelling pays anyway, plus 2 bytes for each argument
+.            after the first -- an argument waits on the frame stack
+.            until the call, so the number of formals is not a limit.
+.            A string result costs 3 bytes more: it is copied into a
+.            temporary, so two calls to one verb may share an
+.            expression.
+.  WARNING   The call must sit below its GP.DEFPROC (SEC 3.11.1), as
+.            GP.SUB's (SEC 3.11.2) does.
+.            The body must not call its own verb: there is one set of
+.            formals and it would write over the arguments in use.
+.            An argument may be as deep an expression as any other,
+.            and however many there are only one of them is on the
+.            evaluation stack at a time.
+.  Example
 .
-.Reading it costs time at startup. The bootstrap reads the file a byte at a
-.time, at roughly 26,000 bytes a second, so a program with 32K of regions
-.waits about a second and a quarter before its first line runs. Nothing else
-.in the program pays it.
+:            PRINT "AREA "; GP.FN(AREA, 3, 4)
+:            T = A + GP.FN(AREA, 3, 4) * 2
+:            PRINT "X" + GP.FN(TAG, "AB") + "Y"
+:            PRINT GP.FN(TAG, "AB") + GP.FN(TAG, "CD")
+:            PRINT GP.FN(AREA, 2, GP.FN(AREA, 3, 4))
 .
 =SEE ALSO
 .
->166|7. Memory, and what the compiler tells you
->100|4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM
->51|3.10 Text in a bank
->44|3.9 Inline assembly
->79|4.6 MENU.INC.BL -- menus built a row at a time
->77|4.4 LINEINPUT.INC.BL -- a positioned entry field
->90|4.11 GUI.INC.BL -- the box that puts the screen back, and the form in 
->99|4.17 COMBO.INC.BL -- a drop-down list that folds into one row
->104|4.21 CHECK.INC.BL -- a check box, [X] or [ ]
->92|4.12 GUI-DIALOGS.INC.BL -- every dialog as a verb
+>59|3.11.1 GP.DEFPROC -- declare a verb and its arguments
+>60|3.11.2 GP.SUB -- call a verb

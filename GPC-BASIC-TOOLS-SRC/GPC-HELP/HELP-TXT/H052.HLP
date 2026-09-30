@@ -1,39 +1,98 @@
-@4.12 GUI-DIALOGS.INC.BL -- every dialog as a verb (2)
-=A list built a step at a time, out of an array or out of a bank
+@4.11 GUI.INC.BL -- the box that puts the screen back, and the form in it
 .
-.  LIST.BEGIN title$, rows
-.      OUT: a list box declared, not yet drawn
+=4.11 GUI.INC.BL -- THE BOX THAT PUTS THE SCREEN BACK, AND THE FORM IN IT
 .
-.  LIST.ARRAY count
-.      IN: GUI.LIST.ITEM$()
-.      OUT: its rows come from the array
+=WHAT IT COSTS
 .
-.  LIST.BANK bank, first, last
-.      IN: a RAM bank in the GP.BSTR image layout
-.      OUT: its rows come from the bank
+.  ASM: GP.BOX GP.FILL GP.PRINTAT
+.    ASM -- machine code in the GP runtime block. One GP keyword pays for the
+.    whole block.
+.  COMPOSITE: GP.CHAR GP.PRINTAT GP.FILL
+.    COMPOSITE -- no machine code. The compiler expands it into keywords that
+.    already exist. Runtime cost is zero.
 .
-.  LISTTO.RUN
-.      OUT: the row, or 0 cancelled
+=DESCRIPTION
 .
-.  LIST.ITEM n
-.      OUT: row n as text
+.  GUI.OPEN
+.      IN: GUI.BODY.ROWS GUI.BODY.WIDTH
+.      OUT: GUI.INNER.LEFT .TOP .WIDTH -- the box on its own
 .
-.  LIST.SORT bank, first, last
-.      OUT: that bank's rows in order, in place
+.  GUI.CLOSE
+.      IN: --
+.      OUT: the screen as it was
 .
-:GP.SUB LIST.BEGIN, " OPEN FILE ", 12
-:GP.SUB LIST.BANK, MY.BANK%, 0, N - 1
-:SEL = GP.FN(LISTTO.RUN)
-:IF SEL > 0 THEN F$ = GP.FN(LIST.ITEM, SEL)
+.The dialogs are not here. They are one-line verbs in GUI-DIALOGS.INC.BL, SEC
+.4.12, and a program calls those. This file is what they are built out of:
+.the box, the control block, and GUI.FORM, the loop that runs a mix of
+.controls under one focus.
 .
-.A bank list never comes into low memory. The bank holds the GP.BSTR image
-.layout -- a 16-bit count at $A000, an offset a row at $A002, then the
-.records -- and GUI.LIST.FETCH reads one row at a time, as it is drawn. That
-.is how FILEPICK (SEC 4.20) shows a directory of any length in a program with
-.no room for it. LIST.SORT moves the two-byte offsets and not the records, so
-.a pointer into one stays good afterwards; it reaches the bank through
-.STASH.SELECT, which is what lets the whole module sit inside a GP.BANKED
-.region.
+:GP.SUB PANELOPEN, " READY ", "", 4, 30
+:GP.PRINTAT GUI.INNER.LEFT, GUI.INNER.TOP, "MY OWN ROWS", THEME.CLR(THEME.TEX
+:GP.SUB PANELCLOSE
+.
+.Requires GPB.INC.BL, STASH.INC.BL, THEME.INC.BL, BANKMGR.INC.BL,
+.MENU.INC.BL, LINEINPUT.INC.BL, COMBO.INC.BL and CHECK.INC.BL, and #INCLUDEs
+.none of them. All of them are needed whichever dialog you call: BASLOAD
+.resolves every label in the file, so leaving one out is LABEL NOT FOUND.
+.MENU.INC.BL goes in before GUI.INC.BL, for its #DEFINEs. COMBO.INC.BL and
+.CHECK.INC.BL go in after it. It wants a #SYMFILE, because STASH does.
+.
+.PICKMENU runs the popup slot inside its box. Build the rows with MENU.BEGIN
+.MENU.POPUP and MENU.ITEM first. & hot keys are tinted in GUI.BORDER, and the
+.highlight is as wide as the widest row.
+.
+.Everything the box takes -- three message lines, a title, the style, the
+.placement, the shadow, the frame glyphs, the bank the covered cells go to --
+.is listed in full in GP-BASIC.GLOBALS.md SEC 3. GUI.BANK = 0 does not save
+.the cells, and then the box is still on screen when the call returns.
+.
+.Every control has a focus, and TAB moves it. A dialog states its controls
+.and GUI.FORM runs them. A control is a button, a field, a list, a combo (SEC
+.4.17) or a check box (SEC 4.21); it hands back one of six verdicts -- stay,
+.next, previous, press, default, cancel -- and the dispatcher is one loop
+.whatever the mix.
+.
+.The default button and the focused control are different things. The default
+.is what RETURN presses from anywhere and is drawn <<LIKE THIS>>; the focus
+.is where TAB has got to and is drawn in THEME.FOCUS. INPUTBOX opens with the
+.default on OK and the focus in the field -- which is the point of keeping
+.the two apart, and GUI.DEFAULT sets only the first.
+.
+.The answers are buttons. GUI.BTN.ONE$ and GUI.BTN.TWO$ carry them, and &
+.marks the accelerator: "&CANCEL" lights the C. An accelerator is live only
+.while the focused control does not eat printable keys, so C presses CANCEL
+.from the button row or from inside a list, and types a C in a field.
+.
+.The typing dialog's answer is GUI.TEXT$, and the verb is INPUTBOX. BASLOAD
+.will not have a label and a variable of one name, and the $ does not
+.separate them.
+.
+=Fields on a form
+.
+.  GUI.FORM.ADD.FIELD
+.      IN: LINEINPUT.X .Y .LEN .TEXT$ and the rest of LINEINPUT's inputs
+.      OUT: GUI.CTRL.N -- the field's control number
+.
+:LINEINPUT.X = GUI.INNER.LEFT : LINEINPUT.Y = GUI.INNER.TOP
+:LINEINPUT.LEN = 20 : LINEINPUT.TEXT$ = "UNTITLED"
+:GOSUB GUI.FORM.ADD.FIELD
+:NAME.CTRL = GUI.CTRL.N
+:REM ... run the form ...
+:PRINT GUI.CTRL.TEXT$(NAME.CTRL)
+.
+.The text belongs to the control, in GUI.CTRL.TEXT$(n). LINEINPUT has one
+.buffer, so a field copies its text in when it takes the focus and back out
+.when it leaves. Read GUI.CTRL.TEXT$(n) after GUI.FORM.RUN. That is what lets
+.one form carry several fields.
+.
+.The field is painted as soon as it is added, so a field that never takes the
+.focus is still drawn.
+.
+.Upper case, on the default charset. GP.PRINTAT converts PETSCII and BASLOAD
+.passes literals through as source bytes, so charset 2 lands lower case on
+.the graphics half of the font. ISO mode fixes the text and breaks the frame,
+.GP.BOX's $40-$7D being letters. Upper case with a frame, mixed case without
+.one, or re-order the font and set GUI.GLYPH.
 .
 .Example: GUI.EXP.BL.
 .
@@ -43,10 +102,13 @@
 .
 =SEE ALSO
 .
->41|3.7 Screen -- drawing
->79|4.6 MENU.INC.BL -- menus built a row at a time
->102|4.20 KV.INC.BL -- keys and values in one RAM bank
->92|4.12 GUI-DIALOGS.INC.BL -- every dialog as a verb
->90|4.11 GUI.INC.BL -- the box that puts the screen back, and the form in 
->99|4.17 COMBO.INC.BL -- a drop-down list that folds into one row
->104|4.21 CHECK.INC.BL -- a check box, [X] or [ ]
+>97|4.12 GUI-DIALOGS.INC.BL -- every dialog as a verb
+>30|3. Command reference
+>104|4.17 COMBO.INC.BL -- a drop-down list that folds into one row
+>109|4.21 CHECK.INC.BL -- a check box, [X] or [ ]
+>95|4.11 GUI.INC.BL -- the box that puts the screen back, and the form in 
+>117|STASH.INC.BL -- save a text rectangle, and put it back.
+>71|4.1 THEME.INC.BL -- named colour roles
+>100|4.13 BANKMGR.INC.BL -- who owns which RAM bank
+>84|4.6 MENU.INC.BL -- menus built a row at a time
+>82|4.4 LINEINPUT.INC.BL -- a positioned entry field

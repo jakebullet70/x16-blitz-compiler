@@ -1,41 +1,47 @@
-@4.24 GPBMODS -- the harness that drives every module (2)
-=The text is in a bank
+@4.23 MEM.INC.BL -- a block copied, a block filled
 .
-.542 strings in 72 named groups, 11,776 bytes across two pools, none of it in
-.low RAM. Every string the shell says sits in a GP.BANKEDSTR block in front
-.of the routine that says it and is read back with GP.BSTR. Two pools,
-.because one pool is a hard 8,192 bytes and BStrPoolWrite stops the compile
-.when one fills. Which pool a group is in costs the call site nothing, so
-.moving a group is the whole of the answer to a full one.
+=4.23 MEM.INC.BL -- A BLOCK COPIED, A BLOCK FILLED
 .
-.Every menu is a block of its own, index 0 the menu's title and 1 upwards the
-.rows. A loop to GP.BSTRCOUNT passes each row to MENU.ITEM, so a row is added
-.by adding a line to the block, and no other menu moves.
+=DESCRIPTION
 .
-.The numbers under ABOUT / BANK MEMORY and ABOUT / MODULE SIZES are typed
-.into GP.BANKEDSTR blocks, so they are only true of the build they were taken
-.from.
+.  MEM.COPY
+.      IN: MEM.SOURCE MEM.TARGET MEM.COUNT
+.      OUT: MEM.OK
 .
-=The room it runs in
+.  MEM.FILL
+.      IN: MEM.TARGET MEM.COUNT MEM.VALUE
+.      OUT: MEM.OK
 .
-.The workspace is what is left between the program's own p-code and the
-.resident runtime: $4000 to $6600, 9,728 bytes. The first p-code opcode is
-..varspace and its operand is what the scalars take -- 3,292 here, leaving
-.about 6,436 for the string arrays and the whole string heap.
+:#INCLUDE "GPB.INC.BL"
+:#INCLUDE "MEM.INC.BL"
+:
+:MEM.TARGET = 4096 : MEM.COUNT = 1000 : MEM.VALUE = 32
+:GOSUB MEM.FILL
+:IF MEM.OK = 0 THEN PRINT "REFUSED"
 .
-.Moving code into a bank moves no scalars. A banked routine's variables are
-.the same workspace variables low memory sees, so .varspace grows as panels
-.are added whatever bank they run from.
+.The KERNAL's memory_copy and memory_fill. The verbs are MEM.BLOCKCOPY and
+.MEM.BLOCKFILL, and the two routines share MEM.TARGET, MEM.COUNT and MEM.OK.
 .
-.GPC-BASIC/ inside the sample folder is the library working copy and it is
-.ahead of the root copy. A module is proved here and copied whole into root.
-.GPB.INC.BL runs the other way: root is upstream for it, and the build copies
-.root's over this folder's every time.
+.MEM.COUNT is 1 to 65535. Anything outside that is refused and MEM.OK comes
+.back 0, never truncated. A longer block goes a chunk at a time; a chunk size
+.above $4000 cannot be a #DEFINE, which is signed. STASHVRAMGC.INC.BL (SEC
+.4.19) is the worked example.
+.
+.Regions may overlap with the target below the source.
+.
+.WARNING: both ends are low RAM below $9F00, or a $9F00-$9FFF I/O port. No
+.bank survives the call, so $A000-$BFFF cannot be reached. Move a banked
+.block a window at a time.
+.
+.An address in $9F00-$9FFF is used without being stepped. Point a VERA data
+.port at the start of a run and pass $9F23 or $9F24 to move a whole block in
+.one call. STASHVRAM.INC.BL (SEC 4.18) does that by hand.
+.
+.Either routine brings the GP block in, 1,536 bytes, because GP.CALL lives
+.there.
 .
 =SEE ALSO
 .
->78|4.5 BMX.INC.BL -- a BMX bitmap into VERA
->95|4.13 BANKMGR.INC.BL -- who owns which RAM bank
->57|3.12 Code in a bank
->51|3.10 Text in a bank
->100|4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM
+>106|4.19 STASHVRAMGC.INC.BL -- close the holes in a STASHVRAM store
+>105|4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM
+>111|4.23 MEM.INC.BL -- a block copied, a block filled

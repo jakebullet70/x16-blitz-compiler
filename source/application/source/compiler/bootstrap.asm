@@ -17,8 +17,8 @@
 ;			1. checks the 4-byte magic at RTBASE, and the same 4 bytes at $A000 in bank 1 -- are
 ;			   the shared runtime and its bank code already resident?
 ;			2. if not, LOADs GPB/GPC.RT.nnn.BIN to its own home and GP1.RT.nnn.BIN into bank 1,
-;			   both with secondary address 1 and both from one place, the current directory or
-;			   else the root of the SD card;
+;			   both with secondary address 1 and both from one place: the current directory,
+;			   then /GPC/, then the root of the SD card;
 ;			3. enters the resident runtime at RT_ENTRY, handing it this program's p-code page,
 ;			   workspace start (patched per program) and workspace end, with BASIC's RAM bank
 ;			   selected again.

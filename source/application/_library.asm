@@ -272,8 +272,8 @@ SourceLine: 								; line for source code storage. In the code section, not
 ;			1. checks the 4-byte magic at RTBASE, and the same 4 bytes at $A000 in bank 1 -- are
 ;			   the shared runtime and its bank code already resident?
 ;			2. if not, LOADs GPB/GPC.RT.nnn.BIN to its own home and GP1.RT.nnn.BIN into bank 1,
-;			   both with secondary address 1 and both from one place, the current directory or
-;			   else the root of the SD card;
+;			   both with secondary address 1 and both from one place: the current directory,
+;			   then /GPC/, then the root of the SD card;
 ;			3. enters the resident runtime at RT_ENTRY, handing it this program's p-code page,
 ;			   workspace start (patched per program) and workspace end, with BASIC's RAM bank
 ;			   selected again.
@@ -973,8 +973,9 @@ BootExtEntry = BXEntry 						; the address the bootstrap's jmp is patched to
 ;
 ;		A shorter file reads its missing lines as empty.
 ;
-;		A line ends at CR, at LF, or at anything else below a space, and an empty line is
-;		skipped -- so a control file written on a CRLF host is as good as one written on the X16.
+;		A line ends at CR, at a lone LF, or at any other byte below a space. An LF straight after
+;		a CR is swallowed, so CRLF ends one line. An empty line still advances cfLine, so it keeps
+;		its slot and reads as empty.
 ;
 ;		Lowercase is folded to upper. A name typed in ASCII lowercase is not the PETSCII the
 ;		KERNAL wants, and it is the mistake a caller will actually make; the host filesystems
@@ -1113,7 +1114,7 @@ _RCFFail:
 ;		own labelled line -- the whole of the compiler's startup output. Three short lines so
 ;		nothing wraps in 40 columns.
 ;
-;			GPC SQUEALING... V0.9.113
+;			GPC SQUEALING... V1.1.0
 ;			in:  <source>
 ;			out: <object>
 ;
@@ -1770,14 +1771,15 @@ _PMRLowEnd:
 		ldy 	#SharedText >> 8
 _PMRMode:
 		jsr 	PrintMessage
-		ldx 	#CoreText & $FF
-		ldy 	#CoreText >> 8
 		lda 	gpUsed
 		ldx 	ModeText 					; an EMBEDDED program with a region carries them whether it
 		cpx 	#'S' 						; calls one or not: the p-code run page has to be a constant
 		beq 	_PMRWhich 					; and that is what makes it one -- see PrepareObjectCode.
 		ora 	gpBankActive 				; A shared program patches its bootstrap from gpUsed alone
 _PMRWhich:
+		ldx 	#CoreText & $FF 			; X and Y load after the test, which uses X
+		ldy 	#CoreText >> 8
+		cmp 	#0 							; the cpx above leaves Z set, so test A again
 		beq 	_PMRHandlers
 		ldx 	#GPBasicText & $FF
 		ldy 	#GPBasicText >> 8
@@ -3933,22 +3935,21 @@ NoRuntimeImageText:
 ;
 ;		Write the debug MAP file, if GPC.INPUT gave a third line (its name). The map turns a
 ;		runtime error's "@ $XXXX" back into a source line, which is otherwise a hand decode of
-;		the p-code. One text line per source line, in ascending code order:
+;		the p-code. One text line per source line, in source order:
 ;
 ;			0030 12
+;			14:A043 57
 ;
-;		the 4-digit hex P-CODE OFFSET -- exactly what the runtime prints as "@ $0030" -- then a
-;		space and the DECIMAL BASIC line number that begins there. To place an error, find the
-;		largest offset that is <= the one reported.
+;		The first field is what the runtime prints after the "@" for an error on that line. Low
+;		code is the 4-digit hex P-CODE OFFSET. A line in a GP.BANKED region is the region's bank
+;		in hex, a colon, and the 4-digit hex RUN ADDRESS: every region runs from $A000 in its
+;		own bank and a bank holds one region, so the pair names one byte. A space and the
+;		DECIMAL BASIC line number that begins there follow. To place an error, find the largest
+;		address at or below the one reported, among the records with the same bank.
 ;
-;		ASCENDING CODE ORDER, EXCEPT AFTER A GP.BANKED. The table is walked in the order the
-;		lines were marked, which is source order, and those two were the same thing until
-;		GPBankRelocate started lifting a region out to the end of the object. A program with a
-;		region in it has that region's lines carrying the HIGHEST offsets while still sitting
-;		where they were written. Every entry is still right; the file is simply no longer
-;		sorted, so the "largest offset <= the one reported" rule means reading the whole file
-;		rather than reading down it. Sorting here instead would cost a sort of a 2,048 entry
-;		banked table, and the reader can sort.
+;		SOURCE ORDER IS NOT ADDRESS ORDER. GPBankRelocate lifts each region out to the end of
+;		the object, and the table is walked in the order the lines were marked, so a reader
+;		takes the whole file.
 ;
 ;		It is built straight from the compiler's line-number table (STRMarkLine): 4-byte entries
 ;		[line# lo, line# hi, addr lo, addr hi], growing DOWNWARD from compilerEndHigh:$00 to
@@ -3995,7 +3996,7 @@ _WMFDone:
 		jmp 	IOWriteClose
 
 ;
-;		Write one entry: "<hhhh> <ddddd>",CR. Everything the line needs is pulled out through
+;		Write one entry: "<hhhh> <ddddd>" or "<bb>:<hhhh> <ddddd>", then LF. Everything the line needs is pulled out through
 ;		zTemp0 up front, before any IOWriteByte -- CHROUT to a file is free to trash zero page,
 ;		but mapValue/mapOff are plain RAM and survive it.
 ;
@@ -4025,10 +4026,41 @@ _WMFWriteEntry:
 		sta 	mapOff
 		ldy 	#3
 		lda 	(zTemp0),y
+		sta 	mapLinePage
 		sbc 	#ObjectOrigin >> 8
 		sta 	mapOff+1
 		.storage_release
-		lda 	mapOff+1 					; hex offset, high byte then low.
+		;
+		;		A LINE IN A GP.BANKED REGION is written as its bank and run address. Regions are
+		;		page aligned and run from $A000, so only the page changes. The layout ascends,
+		;		text banks last, and no line is in a text bank, so the first region down from the
+		;		top that starts at or below the line is the one it is in.
+		;
+		stz 	mapBank 					; 0 is low code: bank 0 never holds a region
+		ldx 	layoutCount
+_WMFFindRegion:
+		dex
+		bmi 	_WMFWriteAddress
+		txa
+		asl 	a
+		tay
+		lda 	mapLinePage
+		cmp 	layoutStart+1,y
+		bcc 	_WMFFindRegion
+		sbc 	layoutStart+1,y 			; carry is set: the page within the region
+		clc
+		adc 	#$A0
+		sta 	mapOff+1
+		lda 	gpBankBanks,x 				; code regions come first in the layout, in the same
+		sta 	mapBank 					; order as gpBankBanks
+_WMFWriteAddress:
+		lda 	mapBank
+		beq 	_WMFNoBank
+		jsr 	_WMFHexByte
+		lda 	#':'
+		jsr 	IOWriteByte
+_WMFNoBank:
+		lda 	mapOff+1 					; hex address, high byte then low.
 		jsr 	_WMFHexByte
 		lda 	mapOff
 		jsr 	_WMFHexByte
@@ -4124,8 +4156,12 @@ mapWalk: 									; these too live in the code section, not storage -- they
 		.fill 	2 							; belong to the compiler and are thrown away when the
 mapValue: 									; object is written, so they cost a compiled program
 		.fill 	2 							; nothing. See the note in file-io/read.asm.
-mapOff:
-		.fill 	2
+mapOff: 									; the address the runtime prints for the line: an offset,
+		.fill 	2 							; or a region's run address
+mapLinePage: 								; the line's page in the object buffer
+		.fill 	1
+mapBank: 									; the line's region bank, 0 for low code
+		.fill 	1
 mapTemp:
 		.fill 	2
 mapLead:
@@ -5344,16 +5380,16 @@ symSavedBank: 								; the caller's RAM bank, while one of ours is selected
 ;
 ;	This file is automatically generated by scripts/bumpbuild.py
 ;
-BuildNumber = 127
+BuildNumber = 128
 		.section code
 VersionText:
 		.text	'V1.1.0',13,0
 		.text	'/GPC/'
 RTImageFileText:
-		.text	'GPC.IMG.127.BIN',0
+		.text	'GPC.IMG.128.BIN',0
 		.text	'/GPC/'
 RTBankFileText:
-		.text	'GP1.IMG.127.BIN',0
+		.text	'GP1.IMG.128.BIN',0
 		.send code
 ; ************************************************************************************************
 ; ************************************************************************************************

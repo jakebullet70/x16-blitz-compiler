@@ -1,18 +1,118 @@
-@2. GP.* is keywords, not variables -- and the difference bites
+@1. The prefixes that are taken
 .
-=2. GP.* IS KEYWORDS, NOT VARIABLES -- AND THE DIFFERENCE BITES
+=1. THE PREFIXES THAT ARE TAKEN
 .
-.GPB.INC.BL defines no variables. It is 31 keyword declarations and nothing
-.else. Everything spelled GP.something is a BASIC keyword, so:
+.  GP.
+.      OWNER: GPB.INC.BL
+.      WHAT IT IS: keywords, not variables -- see SEC 2, this one is
+.        different
 .
-:GP.A = 5          <- SYNTAX ERROR. GP.A is a keyword; you cannot assign to i
-:X = GP.A          <- correct. It reads the accumulator after the last GP.CAL
+.  STR.
+.      OWNER: STRINGS.INC.BL
+.      WHAT IT IS: string helpers
 .
-.The value words are GP.A, GP.X, GP.Y and GP.C -- the registers after
-.GP.CALL, and now the whole list of them. They are keywords rather than
-.variables because nothing in the runtime can write a BASIC variable by name,
-.so a command that returns a value has to hand it back through a keyword.
-.X16's own ST, MX and MY exist for the same reason.
+.  STR.USING.
+.      OWNER: STRUSING.INC.BL
+.      WHAT IT IS: a number to a template, kept apart from the rest of STR.
 .
-.The full keyword list lives in GPC-BASIC/GPB.INC.BL.
+.  THEME.
+.      OWNER: THEME.INC.BL
+.      WHAT IT IS: colour roles
+.
+.  APPSYS.
+.      OWNER: APPSYS.INC.BL
+.      WHAT IT IS: screen save/restore, panels to disk
+.
+.  LINEINPUT.
+.      OWNER: LINEINPUT.INC.BL
+.      WHAT IT IS: entry fields
+.
+.  KB.
+.      OWNER: KB.INC.BL
+.      WHAT IT IS: the keyboard drain
+.
+.  MENU.
+.      OWNER: MENU.INC.BL
+.      WHAT IT IS: menus: the row store, the popup and the bar.
+.        MENUPULL.INC.BL's variables too
+.
+.  MENUTO.
+.      OWNER: MENU.INC.BL MENUPULL.INC.BL
+.      WHAT IT IS: the runners, called with GP.FN
+.
+.  MENUPULL.
+.      OWNER: MENUPULL.INC.BL
+.      WHAT IT IS: a dropdown under a bar item: labels and one constant
+.
+.  GUI.
+.      OWNER: GUI.INC.BL
+.      WHAT IT IS: the box the dialogs sit in, and the form and controls
+.        inside it
+.
+.  GUI.LISTBOX.
+.      OWNER: GUI-DIALOGS.INC.BL
+.      WHAT IT IS: the listbox dialog's answer, kept apart from the rest of
+.        GUI.
+.
+.  DLG.
+.      OWNER: GUI-DIALOGS.INC.BL
+.      WHAT IT IS: the dialog verbs: their arguments, and their internals
+.
+.  STASH.
+.      OWNER: STASH.INC.BL
+.      WHAT IT IS: a text rectangle into a RAM bank, and back
+.
+.  STASH.FILE.
+.      OWNER: STASHFILE.INC.BL
+.      WHAT IT IS: the same rectangle through a file, kept apart from the
+.        rest of STASH.
+.
+.  SORT.
+.      OWNER: SORT.INC.BL
+.      WHAT IT IS: shell sort a string array in place
+.
+.  STRCASE.
+.      OWNER: STRCASE.INC.BL
+.      WHAT IT IS: case, rewriting a string in place
+.
+.  BMX.
+.      OWNER: BMX.INC.BL
+.      WHAT IT IS: BMX bitmap loading
+.
+.  BMXK.
+.      OWNER: BMX.INC.BL
+.      WHAT IT IS: its KERNAL/VERA constants, kept apart from its variables
+.
+.  FILE.
+.      OWNER: FILEIO.INC.BL
+.      WHAT IT IS: the drive: status, exists, delete, rename, directories
+.
+.  FILE.DIR.
+.      OWNER: FILEDIR.INC.BL
+.      WHAT IT IS: reading a directory, kept apart from the rest of FILE.
+.
+.  SV.
+.      OWNER: STASHVRAM.INC.BL
+.      WHAT IT IS: the VRAM store. SVGC. is STASHVRAMGC.INC.BL's one constant
+.
+.  KV.
+.      OWNER: KV.INC.BL
+.      WHAT IT IS: keys and values in one RAM bank
+.
+.  MATH.
+.      OWNER: MATH.INC.BL
+.      WHAT IT IS: the smaller and the larger of two numbers
+.
+.  MEM.
+.      OWNER: MEM.INC.BL
+.      WHAT IT IS: a block copied, a block filled, and the two KERNAL
+.        constants
+.
+.Pick anything else for your own program. AIRLIFT., GAME., MAP. -- a prefix
+.costs nothing at runtime because BASLOAD crunches every identifier down to a
+.short BASIC variable, so a long readable name and a two-letter one compile
+.to exactly the same thing.
+.
+.Do not reuse a taken prefix for a name the module has not defined.
+.THEME.MINE looks free today; it is one library update away from not being.
 .

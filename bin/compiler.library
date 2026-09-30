@@ -13761,7 +13761,7 @@ CommandINPUTStream:
 ;		Notes:
 ;			INPUT has an optional prompt ; INPUT# skips this code <string> print.s
 ;			Do the actual input.
-;			Ignore blank lines.
+;			A blank line reads as "" or 0. The ROM keeps the variable's old value instead.
 ; 			Behaves like READ in that it will grab data read , store keep going until have
 ; 			everything, use of , and "" etc.
 ;

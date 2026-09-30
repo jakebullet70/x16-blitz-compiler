@@ -1,116 +1,114 @@
-@4.2 STRINGS.INC.BL -- string helpers
+@4. Module reference -- the BASL library
 .
-=4.2 STRINGS.INC.BL -- STRING HELPERS
+=4. MODULE REFERENCE -- THE BASL LIBRARY
 .
-=WHAT IT COSTS
+.Called with GOSUB. Arguments go into named variables before the call,
+.results come back in named variables after it. Every module is
+.position-independent -- each jumps over itself -- so #INCLUDE it anywhere,
+.including the top of the program.
 .
-.  ASM: GP.INSTR GP.STRPTR GP.COMP
-.    ASM -- machine code in the GP runtime block. One GP keyword pays for the
-.    whole block.
-.  COMPOSITE: GP.CONTAINS GP.ISEMPTY
-.    COMPOSITE -- no machine code. The compiler expands it into keywords that
-.    already exist. Runtime cost is zero.
+.Any of them can run from a RAM bank. Put its #INCLUDE between GP.BANKED and
+.GP.ENDBANKED (SEC 3.12). A call into the region selects its bank, so the
+.GOSUBs in this section read the same either way.
 .
-=DESCRIPTION
+.STASH and STASHFILE are the two that cannot: both execute BANK, and a
+.GP.BANKED region may not contain that statement. STASHVRAM (SEC 4.18) is the
+.one to reach for inside a region. See BANKED-OR-NOT.md and
+.GP-BASIC.GLOBALS.md SEC 4.
 .
-.  STR.PADR
-.      IN: STR.STR$ STR.WIDTH
-.      OUT: STR.STR$ left-justified
+=Low memory or a bank -- what differs
 .
-.  STR.PADL
-.      IN: same
-.      OUT: right-justified
+.A module is one file. #INCLUDE "X.INC.BL" puts it in low memory, and the
+.same line between GP.BANKED and GP.ENDBANKED puts it in a RAM bank. The
+.GOSUB at the call site is the same either way.
 .
-.  STR.PADC
-.      IN: same
-.      OUT: centred (odd gap goes right)
+.Low memory is the one that runs out. A SHARED program has about 17,920 bytes
+.of p-code under the runtime and every #INCLUDE spends it; a region spends
+.8,192 bytes of a RAM bank the program was not using. Bank what you can. A
+.module called inside a loop goes where the loop is: a call between a region
+.and anywhere outside it switches the bank twice.
 .
-.  STR.SPLIT
-.      IN: STR.STR$ STR.DELIM$ STR.MAX
-.      OUT: STR.N, STR.FIELD$(1..N)
+.The banked form works in either build, and both write the same NAME.OVL
+.beside the program. A SHARED program's bootstrap opens it; an EMBEDDED
+.program opens it itself, at startup, before the runtime begins. So the first
+.banked module makes an EMBEDDED program two files: ship the .OVL with the
+..PRG, and a program that cannot find it stops with ?OVL. A program with no
+.region at all has no .OVL and is one file as before. Either way it loads
+.with LOAD and RUN.
 .
-.  STR.REPLACE
-.      IN: STR.STR$ STR.FIND$ STR.REPL$
-.      OUT: STR.STR$, every occurrence replaced
+.The regions are never in the file the loader reads, so nothing caps them but
+.the banks the machine has; a region asking for a bank that is not there
+.stops with ?RAM. A banked embedded program does carry the whole runtime
+.rather than the smaller core, whether or not it calls a GP.BASIC keyword.
 .
-.  STR.PET2SCR
-.      IN: STR.PET
-.      OUT: STR.SCR
+.GPC-BASIC-TOOLS-SRC/GPB-MODS-TESTING/PICKDEMO.BASL is a complete program in
+.this shape, in 99 lines.
 .
-.  STR.SPLICE
-.      IN: STR.STR$ STR.AT STR.CUT STR.SUB$
-.      OUT: STR.STR$, edited at that position
+.Banking a module makes room in either build, and it used to make room in
+.only one. An embedded object once carried its regions appended to the .PRG,
+.so a byte moved into a region was still a byte in the file and the last byte
+.landed where it always had. The regions go in the .OVL now, which the loader
+.never reads, so a banked module leaves low memory and leaves the file with
+.it. Splitting the modules across more regions costs two header bytes a
+.region and nothing else. What a region does not buy is a smaller .OVL: the
+.bytes are still shipped, in the file beside the program rather than inside
+.it.
 .
-.  STR.TRIM
-.      IN: STR.PTR
-.      OUT: (the string itself), spaces off both ends
+.  Include
+.      LOW MEMORY: #INCLUDE "X.INC.BL"
+.      A RAM BANK: the same, inside GP.BANKED
 .
-.  STR.LTRIM
-.      IN: same
-.      OUT: spaces off the leading end
+.  Entry label
+.      LOW MEMORY: THEME.SELECT
+.      A RAM BANK: THEME.SELECT
 .
-.  STR.RTRIM
-.      IN: same
-.      OUT: spaces off the trailing end
+.  Costs per call
+.      LOW MEMORY: one GOSUB; from a region, one byte more and two bank
+.        switches
+.      A RAM BANK: from outside the region, one byte more and two bank
+.        switches
 .
-.The module needs a #SYMFILE, and so does every program that includes it,
-.before the #INCLUDEs and named after the source PRG. The three trims are
-.GP.ASM and reach BASIC's variables through {VAR}; without a symbol file the
-.compile stops with {} NEEDS #SYMFILE.
+.  Low memory used
+.      LOW MEMORY: the whole module
+.      A RAM BANK: none
 .
-=How a routine takes its string
+:#DEFINE MY.GUICODE 4
+:#DEFINE MY.THEMECODE 9
+:GOTO MY.LIBEND
+:GP.BANKED MY.THEMECODE
+:#INCLUDE "THEME.INC.BL"
+:GP.ENDBANKED
+:GP.BANKED MY.GUICODE
+:#INCLUDE "MENU.INC.BANKED.BL"
+:#INCLUDE "MENU.INC.BL"
+:#INCLUDE "LINEINPUT.INC.BL"
+:#INCLUDE "GUI.INC.BL"
+:#INCLUDE "COMBO.INC.BL"
+:#INCLUDE "CHECK.INC.BL"
+:#INCLUDE "GUI-DIALOGS.INC.BL"
+:GP.ENDBANKED
+:MY.LIBEND:
 .
-.The pads, SPLIT, REPLACE and SPLICE take the text by value in STR.STR$ and
-.hand the result back in it. The three trims take an ADDRESS in STR.PTR, from
-.GP.STRPTR (SEC 3.4.5), and rewrite the block in place.
+.A region is 8,192 bytes, and that is the whole of the grouping. The GUI
+.modules fill one, so THEME has its own. THEME comes first because the GUI
+.modules read its #DEFINEs. A call from one region to the other costs the
+.same bank switches as a call from low memory.
 .
-.WARNING: never pass a literal to a trim. GP.STRPTR("hello") is an address
-.inside the p-code.
+.Include a module once. One #INCLUDE in low memory and another in a region is
+.DUPLICATE SYMBOL where the module has no #IFNDEF guard. Where it has one,
+.the module lands at the first #INCLUDE and the second produces nothing.
 .
-=The pads
+.SEC 3.12 has the rules, what a region may not contain, and the .OVL file a
+.banked program ships.
 .
-.STR.WIDTH is the target width. A string already at or past it is returned
-.unchanged: the pads never truncate. Use STR.RTRIM to shorten.
+=SEE ALSO
 .
-=STR.SPLIT
-.
-.Reads STR.STR$ and does not modify it. STR.MAX of 0 means 10. Empty fields
-.are kept, so "A,,C" is three fields and "A," is two. An empty string gives
-.one empty field, never zero. Reaching the limit is not an error: the last
-.field takes the unsplit remainder, delimiters included.
-.
-.STR.FIELD$ is the one array the library does not DIM. Left alone, GPC's
-.implicit DIM gives 0..10. For more, DIM it before the first call and set
-.STR.MAX to match. DIMming an array GPC has already auto-dimensioned is an
-.error, so it is one or the other.
-.
-=STR.REPLACE
-.
-.Swaps every occurrence of STR.FIND$ for STR.REPL$ in STR.STR$. The
-.replacement may be shorter, longer, or "" to delete. It is case sensitive:
-.GP.INSTR (SEC 3.4.1) compares raw bytes. A replacement that contains the
-.search text terminates -- "A" to "AA" doubles the As. An empty STR.FIND$
-.leaves the string unchanged.
-.
-=STR.SPLICE
-.
-.Replaces STR.CUT characters at STR.AT with STR.SUB$, so one routine inserts,
-.overwrites and deletes: STR.CUT of 0 inserts, LEN(STR.SUB$) overwrites, an
-.empty STR.SUB$ deletes. STR.AT is 1-based. Past the end appends, below 1
-.clamps to 1, and a cut running past the end takes the rest of the string.
-.STR.AT and STR.CUT are clamped in place, so read them back after the call.
-.
-=STR.PET2SCR
-.
-.Converts the PETSCII code in STR.PET to the screen code the tile map holds,
-.in STR.SCR, for TILE, TDATA and VPOKE. GP.PRINTAT and GP.FILL do this
-.conversion themselves.
-.
-=Limitation
-.
-.The pads, REPLACE and SPLICE are not length checked. A longer replacement
-.can push the result past 255 characters.
-.
-.Examples: SPLITT.EXP.BL, STRINGS.EXP.BL. Regression test: STRTST.EXP.BL,
-.thirty-three cases.
-.
+>62|3.12 Code in a bank
+>105|4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM
+>71|4.1 THEME.INC.BL -- named colour roles
+>84|4.6 MENU.INC.BL -- menus built a row at a time
+>82|4.4 LINEINPUT.INC.BL -- a positioned entry field
+>95|4.11 GUI.INC.BL -- the box that puts the screen back, and the form in 
+>104|4.17 COMBO.INC.BL -- a drop-down list that folds into one row
+>109|4.21 CHECK.INC.BL -- a check box, [X] or [ ]
+>97|4.12 GUI-DIALOGS.INC.BL -- every dialog as a verb

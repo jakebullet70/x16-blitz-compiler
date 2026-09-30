@@ -1,116 +1,77 @@
-@7. Memory, and what the compiler tells you
+@6. The traps, collected
 .
-=7. MEMORY, AND WHAT THE COMPILER TELLS YOU
+=6. THE TRAPS, COLLECTED
 .
-=What GPC prints when it finishes
+.Each of these has cost a debugging session at least once.
 .
-.One item a line. GPBMODS, built shared:
+.  P AND 255 on a heap or VRAM address
+.      WHAT HAPPENS: AND is 16-bit signed; above 32,767 it raises OUT OF
+.        RANGE instead of masking
+.      DO THIS: H = INT(P/256) : L = P - H*256
 .
-:OK LOW CODE 11520, SHARED GPBASIC
-:LOW FREE 12288, FRAME STACK 2048
-:LINES 3795
-:BANK   7 CODE  4864 USED  3328 FREE
-:BANK   9 CODE   768 USED  7424 FREE
-:BANK   4 CODE  7680 USED   512 FREE
-:BANK  10 CODE   768 USED  7424 FREE
-:BANK   8 CODE  1792 USED  6400 FREE
-:BANK  11 CODE  3072 USED  5120 FREE
-:BANK   5 TEXT  7424 USED   768 FREE
-:BANK   6 TEXT  4352 USED  3840 FREE
-:TOTAL BANKS 8, 30720 USED
+.  an address in an A% variable
+.      WHAT HAPPENS: % is signed 16-bit and truncates without error -- A% =
+.        49152 reads back -16,384
+.      DO THIS: untyped variable, or split into page and offset
 .
-.An embedded build prints a RUNTIME line second. GPCTEST-E:
+.  $0400 for machine code
+.      WHAT HAPPENS: stock BASIC leaves it free, a compiled GPC program does
+.        not -- runtime state lives there, and it is corrupted with no error
+.      DO THIS: banked RAM, $A000-$BFFF
 .
-:OK LOW CODE 969, EMBEDDED GPBASIC
-:RUNTIME 11519
-:LOW FREE 24064, FRAME STACK 2048
+.  INPUT answered with RETURN alone
+.      WHAT HAPPENS: the variable gets "", or 0 for a number, and the program
+.        goes on. Stock BASIC keeps the old value. INPUT# reads an empty line
+.        as ""
+.      DO THIS: IF A$ = "" THEN A$ = DEFAULT$ where the old value mattered
 .
-.  LOW CODE
-.      the p-code in low memory, in bytes. P-code and GP.ASM blocks in a
-.        GP.BANKED region are not in it
+.  PRINT after GP.PRINTAT
+.      WHAT HAPPENS: GP drawing never calls the KERNAL, so the cursor is
+.        wherever it was
+.      DO THIS: LOCATE first, or stay in one world
 .
-.  SHARED EMBEDDED
-.      SHARED loads a resident runtime file at run time. EMBEDDED carries the
-.        runtime in the object
+.  SORT.INC.BL with no #SYMFILE
+.      WHAT HAPPENS: {VAR} cannot resolve a crunched name -- {} NEEDS
+.        #SYMFILE
+.      DO THIS: #SYMFILE "@:PROG.SYM", before the #INCLUDEs
 .
-.  GPBASIC CORE
-.      GPBASIC when a GP. keyword reached the 1,024-byte handler block:
-.        shared, the program loads GPB.RT.nnn.BIN; embedded, the block is in
-.        the object. CORE when none did: shared, it loads GPC.RT.nnn.BIN;
-.        embedded, ScanGPUsage dropped the block
+.  GP.BOX X,Y,W,H,,7
+.      WHAT HAPPENS: optionals cannot be skipped over
+.      DO THIS: GP.BOX X,Y,W,H,0,7
 .
-.  RUNTIME
-.      embedded only. The runtime bytes carried in the object
+.  SCREEN after BMX.PAINT
+.      WHAT HAPPENS: reloads the default palette and throws the image's
+.        colours away
+.      DO THIS: set the mode first
 .
-.  LOW FREE
-.      what is left in low memory for variables, strings and arrays. This is
-.        the number that runs out. It ends at $9F00 embedded, and at the
-.        resident runtime shared
+.  STR.FIELD$ wanted bigger
+.      WHAT HAPPENS: auto-DIMed at 0..10 on first use, and you cannot DIM it
+.        after
+.      DO THIS: DIM it before the first call, set STR.MAX
 .
-.  FRAME STACK
-.      the 2,048 bytes reserved between the p-code and the workspace for
-.        GOSUB and FOR frames. LOW FREE does not include them
+.  #DEFINE X 129536
+.      WHAT HAPPENS: #DEFINE takes an INT16 -- ERROR: INVALID PARAMETER
+.      DO THIS: an ordinary variable
 .
-.  LINES
-.      the source lines compiled, the lines of GP.ASM and GP.BANKEDSTR blocks
-.        included. Lines left out as dead code are not counted
+.  GP.SUB above its GP.DEFPROC
+.      WHAT HAPPENS: the call carries an address, not a line number -- GP.SUB
+.        BEFORE ITS GP.DEFPROC
+.      DO THIS: declare the routine above every caller
 .
-.  DEAD CODE
-.      printed only when dead code is removed: the source lines left out, and
-.        the p-code bytes they would have taken. LOW CODE is already without
-.        them
+.  an array element as a GP.DEFPROC formal
+.      WHAT HAPPENS: GP.DEFPROC FORMAL IS NOT A VARIABLE
+.      DO THIS: plain scalar formals, and set the array before the call
 .
-.  BANK
-.      printed only when the program has a region or banked text. One line a
-.        bank: CODE for a GP.BANKED region, TEXT for GP.BANKEDSTR, then the
-.        bytes used and free of its 8,192. Both are whole pages, so FREE is
-.        room that is certainly there
+.  a GP.DEFPROC body calling its own verb
+.      WHAT HAPPENS: one set of formals, so it writes over the arguments in
+.        use -- wrong answer, no error
+.      DO THIS: recursion needs its own saved copies, or a different shape
 .
-.  TOTAL BANKS
-.      after the BANK lines: how many, and the bytes they use
+.  a variable called LEN, ST, POS, MB or CHAR
+.      WHAT HAPPENS: the name is a reserved word on its own
+.      DO THIS: dot it -- BASLOAD matches the whole identifier, so
+.        LINEINPUT.LEN works
 .
-.Two budgets come off LOW FREE:
+=SEE ALSO
 .
-.  - LOW FREE is the workspace the running program has for its data.
-.  - LOW FREE minus 4,096 is how much more low-memory p-code will fit.
-.    WriteObjectCode refuses to leave less than 4K of workspace, so a build
-.    reporting LOW FREE 4096 is one page from PROGRAM TOO BIG.
-.
-.A program can be comfortable on one and out of room on the other. LOW FREE
-.4096 is 4K to run in and nowhere left to grow; GPBMODS at LOW FREE 12288 has
-.both.
-.
-=What ships with the program
-.
-.nnn in a runtime name is the compiler build, so a runtime file serves only
-.programs from its own build.
-.
-.  EMBEDDED
-.      FILES: NAME.PRG. The runtime and the bank 1 code are in the object
-.
-.    
-.      FILES: NAME.OVL, holding every BANK line's region -- only if the
-.        program has one
-.
-.  SHARED
-.      FILES: NAME.PRG
-.
-.    
-.      FILES: GPB.RT.nnn.BIN when the report says GPBASIC, GPC.RT.nnn.BIN
-.        when it says CORE
-.
-.    
-.      FILES: GP1.RT.nnn.BIN, always
-.
-.    
-.      FILES: NAME.OVL, holding every BANK line's region, beside the .PRG
-.
-.The bootstrap looks for the runtime in the current directory, then at the
-.root of the SD card, so one copy at / serves every program. GP1.RT.nnn.BIN
-.must sit in the same place as the runtime that loaded. A runtime file that
-.is not found prints ?RT, the third letter of its name and the build number:
-.?RTB126 for GPB.RT.126.BIN.
-.
-.GPC.BIN, GPC.IMG.nnn.BIN and GP1.IMG.nnn.BIN are the compiler and its inputs
-.and do not ship.
-.
+>91|4.7 SORT.INC.BL -- shell sort a string array

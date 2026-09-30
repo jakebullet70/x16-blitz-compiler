@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 0ab8399a-fad5-4910-bb84-5b25da13690f
-  modified: 2026-09-03T15:59:19.464Z
+  modified: 2026-09-29T13:24:26.865Z
 ---
 
 **`x16emu -bas FILE -pastewarp` types FILE's text at the READY prompt only.** Once a program is
@@ -25,6 +25,11 @@ This is how the `CRUNCH.INPUT` field format and the chain-load were verified for
 [[basl-cruncher-built]] — and it immediately caught a real bug the engine's own tests could not
 have: the front end writes CR-terminated output, which the engine's sniffer misread
 ([[basl-sources-use-all-three-line-endings]]).
+
+**A program can type for itself.** Queue keys before the `INPUT` or `GET` with the KERNAL's
+`kbdbuf_put`: `POKE 780, CODE : SYS 65219`, once per key. It works the same in ROM BASIC and in a
+compiled program, so one source tests both. The buffer holds 10 keys. This is how the empty-line
+INPUT fix was tested ([[gpc-input-empty-line]]).
 
 Chain-loading is fine in both directions: **a compiled GPC program chain-loads another compiled
 GPC program**, EMBEDDED or SHARED, with `LOAD "NAME"` and no `,8`.

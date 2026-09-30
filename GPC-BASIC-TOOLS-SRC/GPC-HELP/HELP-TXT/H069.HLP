@@ -1,107 +1,78 @@
-@5. Variables
+@STASH.INC.BL -- save a text rectangle, and put it back.
 .
-=5. VARIABLES
+=STASH.INC.BL
 .
-.BASL has one flat namespace. There are no locals, no scoping and no
-.parameters. Every variable in every #INCLUDEd module is visible to your
-.program and the reverse, and nothing warns you: a collision is a wrong
-.answer, not an error.
+.  save a text rectangle, and put it back.
 .
-.The convention is one dotted prefix per module, and nothing writes outside
-.its own prefix.
+=MODULE HEADER
 .
-=Prefixes already taken
+:      STASH.SAVE      copy a rectangle of the screen into a RAM bank
+:      STASH.RESTORE   copy it back, where it was or somewhere else
 .
-.  GP.
-.      OWNER: keywords, not variables -- see below
+.  The same rectangle through a FILE is STASHFILE.INC.BL, built on this.
 .
-.  STR.
-.      OWNER: STRINGS.INC.BL
+.  The program needs a #SYMFILE, before the includes and named after the
+.  source PRG. The assembly reaches BASIC's variables through {VAR} and
+.  BASLOAD crunches every name first; without one the compile stops with "{}
+.  NEEDS #SYMFILE".
 .
-.  THEME.
-.      OWNER: THEME.INC.BL
+:      #SAVEAS "@:MYPROG.PRG"
+:      #SYMFILE "@:MYPROG.SYM"
+:      #INCLUDE "GPB.INC.BL"
+:      #INCLUDE "STASH.INC.BL"
 .
-.  APPSYS.
-.      OWNER: APPSYS.INC.BL
+.  Usage:
+:      STASH.BANK = 8
+:      STASH.X = 10 : STASH.Y = 4 : STASH.W = 30 : STASH.H = 8
+:      GOSUB STASH.SAVE
+:      ... draw over it ...
+:      GOSUB STASH.RESTORE
 .
-.  LINEINPUT.
-.      OWNER: LINEINPUT.INC.BL
+:   in   STASH.BANK     the RAM bank to keep the cells in. 1..255, and
+:                       it is yours: this writes the whole of it
+:        STASH.X  STASH.Y     top left, in CELLS
+:        STASH.W  STASH.H     size, in cells
 .
-.  MENU.
-.      OWNER: MENU.INC.BL, and MENUPULL.INC.BL's variables
+:        STASH.SLOT     byte offset into the bank. Default 0, which is what
+:                       every caller that never heard of it holds
 .
-.  MENUTO.
-.      OWNER: the runners in MENU.INC.BL and MENUPULL.INC.BL
+:   out  STASH.OK       -1 if it fitted and was saved, 0 if not
+:        STASH.NEXT     the offset just past what was written
 .
-.  MENUPULL.
-.      OWNER: MENUPULL.INC.BL's labels
+.  RESTORE needs only the bank: four header bytes go in first -- w, h, x, y
+.  -- so the rectangle describes itself. STASH.MOVE = 1 with STASH.X /
+.  STASH.Y pastes it somewhere else instead.
 .
-.  GUI.
-.      OWNER: GUI.INC.BL
+.  A bank is 8,192 bytes and a cell is two, so 4,094 cells fit -- 63x63, and
+.  NOT a whole 80x60 screen. Too big is refused before the first write, with
+.  STASH.OK = 0.
 .
-.  GUI.LISTBOX.
-.      OWNER: GUI-DIALOGS.INC.BL, kept apart from the rest of GUI.
+=MORE THAN ONE RECTANGLE IN A BANK
 .
-.  DLG.
-.      OWNER: GUI-DIALOGS.INC.BL, the dialog verbs' arguments and internals
+.  Feed STASH.NEXT back in as the next STASH.SLOT and the bank holds a stack
+.  of them, which is what nested dialogs want -- one bank for the lot rather
+.  than one bank a level. That is a bump allocator in two variables, and
+.  release is LIFO by remembering the offset. STASHVRAM.INC.BL allocates the
+.  same way.
 .
-.  STASH. / STASH.FILE.
-.      OWNER: STASH.INC.BL / STASHFILE.INC.BL
+=RESTORE READS THE SLOT IT IS GIVEN
 .
-.  SORT.
-.      OWNER: SORT.INC.BL
+.  Nothing checks that two saves do not overlap and nothing records which is
+.  which: the header describes a rectangle's SIZE, not its identity, so
+.  restoring the wrong offset restores whatever is there. The offsets are the
+.  caller's to keep straight, the same way the bank number already is.
 .
-.  STRCASE.
-.      OWNER: STRCASE.INC.BL
+.  A row's address is worked out in BASIC, once a row, and the row is copied
+.  in assembly. That keeps the assembly free of any pointer needing zero
+.  page: a blob runs with the interpreter live, so codePtr, zTemp0, NSStatus
+.  and the mantissas must survive it. The destination goes into the OPERAND
+.  of the store instead.
 .
-.  BMX. / BMXK.
-.      OWNER: BMX.INC.BL (variables / its KERNAL constants)
-.
-.  KV.
-.      OWNER: KV.INC.BL
-.
-.  MATH.
-.      OWNER: MATH.INC.BL
-.
-.  MEM.
-.      OWNER: MEM.INC.BL, its two KERNAL constants included
-.
-.Use any other prefix for your own program: GAME., MAP., AIRLIFT.. A prefix
-.costs nothing at runtime -- BASLOAD crunches every identifier to a short
-.BASIC variable, so a long readable name and a two-letter one compile to the
-.same thing.
-.
-.Do not reuse a taken prefix for a name the module has not defined.
-.THEME.MINE is free today and is one library update from not being.
-.
-=GP.* is keywords, not variables
-.
-.GPB.INC.BL defines no variables. It is 27 keyword declarations and nothing
-.else.
-.
-:GP.A = 5 : REM SYNTAX ERROR -- GP.A is a keyword
-:X = GP.A : REM correct
-.
-.The value words are GP.A GP.X GP.Y GP.C, the registers after GP.CALL, and
-.that is all of them. They are keywords rather than variables because nothing
-.in the runtime can write a BASIC variable by name, so a command that returns
-.a value must return it through a keyword. X16's own ST, MX and MY work the
-.same way.
-.
-.The complete per-module in / out / internal register is GP-BASIC.GLOBALS.md,
-.with a script in SEC 6 of that file for re-checking it after a change.
+.  #REM 1 is load bearing: without it BASLOAD strips the body and the block
+.  reaches the compiler empty, refused as "block mismatch". #REM 0 restores
+.  the default.
 .
 =SEE ALSO
 .
->159|6. The traps, collected
->67|4.2 STRINGS.INC.BL -- string helpers
->66|4.1 THEME.INC.BL -- named colour roles
->76|4.3 APPSYS.INC.BL -- start politely, leave it as you found it
->77|4.4 LINEINPUT.INC.BL -- a positioned entry field
->79|4.6 MENU.INC.BL -- menus built a row at a time
->88|4.9 MENUPULL.INC.BL -- a dropdown under a bar item
->90|4.11 GUI.INC.BL -- the box that puts the screen back, and the form in 
->92|4.12 GUI-DIALOGS.INC.BL -- every dialog as a verb
->112|STASH.INC.BL -- save a text rectangle, and put it back.
->116|STASHFILE.INC.BL -- a saved text rectangle, through a file.
->86|4.7 SORT.INC.BL -- shell sort a string array
+>121|STASHFILE.INC.BL -- a saved text rectangle, through a file.
+>105|4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM

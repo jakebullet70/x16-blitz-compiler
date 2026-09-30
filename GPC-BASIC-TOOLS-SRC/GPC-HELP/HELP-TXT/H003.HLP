@@ -1,48 +1,73 @@
-@1. What has to be on the drive to compile
+@2. Using it
 .
-=1. WHAT HAS TO BE ON THE DRIVE TO COMPILE
+=2. USING IT
 .
-.These seven files are needed for the compiler to work. Put them beside each
-.other:
+.Every BASL source that uses a GP. keyword must declare the keyword set:
 .
-.  GPC.PRG
-.      the front end you RUN
+:#INCLUDE "GPB.INC.BL"
 .
-.  GPC.BIN
-.      the engine it hands the job to
+.BASLOAD knows only the ROM's keywords. Without that line GP.DO 5 is a syntax
+.error.
 .
-.  GPC.IMG.nnn.BIN
-.      the runtime streamed into a self-contained object
+=Where the library lives
 .
-.  GP1.IMG.nnn.BIN
-.      the bank 1 code streamed in after it
+.Keep GPC-BASIC/ as a folder beside your own sources and include from it by
+.path:
 .
-.  GPB.RT.nnn.BIN
-.      the shared runtime, with GP.BASIC included
+:#INCLUDE "/GPC-BASIC/GPB.INC.BL"
 .
-.  GPC.RT.nnn.BIN
-.      the same runtime without it
+.#INCLUDE accepts a path as well as a bare filename. Verified on R49 for both
+.absolute (/GPC-BASIC/GPB.INC.BL) and relative (GPC-BASIC/GPB.INC.BL) forms.
+.Use the leading slash: it is absolute from the drive root and still resolves
+.when the program sits in a subdirectory. ../ and // are not understood by
+.the filesystem, so a path descends and never rises.
 .
-.  GP1.RT.nnn.BIN
-.      the bank 1 code either shared runtime loads
+.Then BASLOAD and GPC as usual: BASLOAD "MYPROG.BL", then compile the
+.resulting PRG with GPC.PRG.
 .
-.nnn is the runtime build number and it is part of the name on purpose: a
-.stale runtime under a fixed name would still be found, and the mismatch
-.would not show until something ran wrong.
+=A program that uses GP.BASIC is compile-only
 .
-.Both .IMG files are read before the engine writes a byte of a self-contained
-.object. When either one is missing the compiler prints NO RUNTIME IMAGE and
-.leaves no object file at all.
+.One GP.BASIC keyword is enough. BASLOAD encodes them as the byte pairs
+.$CE58-$CE7F and stock BASIC has no handler behind them, so the ROM can
+.neither LIST nor RUN the result. It is compiler input.
 .
-.Both shared runtimes are needed. Which one a program wants is decided when
-.it is compiled, not when it runs, so a drive carrying only one works for
-.half the programs built against it. Every shared program also loads
-.GP1.RT.nnn.BIN, from the same place its runtime loaded from. A program that
-.cannot find a runtime file prints ?RT, the third letter of its name and the
-.build number, such as ?RTB126 for GPB.RT.126.BIN, and stops.
+.Run GPC.PRG on BASLOAD's .PRG, then run the object it writes.
 .
-.The front end needs GPB.RT.nnn.BIN and GP1.RT.nnn.BIN for itself: GPC.PRG is
-.a compiled GP.BASIC program built in shared mode. The compiler front end is
-.written in the language it compiles. The engine behind it, GPC.BIN, is 100%
-.assembly.
+=Numbers, and what a variable holds
 .
+.One numeric type on the evaluation stack: a 4-byte mantissa, a 1-byte
+.exponent and a status byte carrying the sign. Exponent 0 means the value is
+.an exact integer.
+.
+.  A A()
+.      BYTES: 6
+.      HOLDS: mantissa, exponent, status. Exact integers while the exponent
+.        is 0
+.
+.  A% A%()
+.      BYTES: 2
+.      HOLDS: signed 16-bit two's complement, -32,768 to 32,767
+.
+.  A$ A$()
+.      BYTES: 2
+.      HOLDS: a pointer into the string heap
+.
+.% is smaller, not faster, and it truncates without raising an error.
+.WriteInteger stores the low two bytes of the value on the stack; ReadInteger
+.sign-extends the MSB. A% = 49152 reads back as -16,384. Use % for counters,
+.indices and screen coordinates.
+.
+.Do not use % for an address. Main RAM runs to $9F00 (40,704), the string
+.heap is above 32,767 by definition, and a VRAM address is 17 bits (up to
+.131,071). Hold an address in an untyped variable, which represents all three
+.exactly, or split it into page and offset.
+.
+.Numeric literals above 65,535 are accepted. The compiler has a 16-bit fast
+.path for constants; anything wider compiles through the float encoder.
+.Neither wraps.
+.
+.AND and OR are 16-bit signed and raise OUT OF RANGE above 32,767; see SEC 6.
+.
+=SEE ALSO
+.
+>164|6. The traps, collected

@@ -15,7 +15,9 @@ compiler's own size report and is where somebody looks when a program will not f
 
 Two numbers, and they answer different questions.
 
-**The runtime is 10,956 bytes in every program.** Unconditional, no dead-code elimination. See
+**An embedded program carries 10,239 bytes of runtime (CORE) or 11,775 (GP.BASIC)**, plus 2,432
+bytes of bank 1 code. A shared program carries none of it and loads `GPC.RT` or `GPB.RT` plus
+`GP1.RT` at run time. Build 128 figures, from `GPBase $3000` and `ObjectBase $3600`. See
 [[blitz-x16-runtime-footprint]] for the component split.
 
 **Nothing in GPC-BASIC is added automatically.** A module costs what it costs, once, per

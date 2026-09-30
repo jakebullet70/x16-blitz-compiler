@@ -1,99 +1,80 @@
-@3. The modules (5)
-=MENU.INC.BL -- menus built a row at a time
+@3. The modules (3)
+=FILEIO.INC.BL -- the drive: status, files, directories
 .
-.Routines, arguments and examples: SEC 4.6.
+.Routines, arguments and examples: SEC 4.15.
 .
-.  verbs
-.      MENU.BEGIN MENU.ITEM MENU.ITEMX MENU.SELECTED MENU.DRAWBAR, called
-.        with GP.SUB
-.      MENUTO.VERT MENUTO.BAR, called with GP.FN
+.Needs a #SYMFILE -- FILE.TOPET is a GP.ASM blob.
 .
 .  in
-.      MENU.ATTR -- the rows, packed attribute
-.      MENU.HIATTR -- the highlighted row; 0 inverts MENU.ATTR
-.      MENU.HOTATTR -- the hot key letter; 0 leaves it untinted
-.      MENU.DISATTR -- a disabled row; 0 is MENU.ATTR
-.      MENU.SEPATTR -- separators and the frame; 0 is MENU.ATTR
-.      MENU.SEPCHR -- the separator glyph; 0 is MENU.LINE
-.      MENU.FLAGS -- the popup's flags
-.      MENU.BARFLAGS -- the bar's flags
-.      MENU.GAP -- cells between bar items
-.      MENU.HINTX MENU.HINTY MENU.HINTW MENU.HINTATTR -- the hint field;
-.        MENU.HINTW 0 is off
-.      MENU.MARKED -- the bar item MENU.DRAWBAR lights
+.      FILE.NAME$ -- the file every routine acts on
+.      FILE.NEW$ -- the second name, RENAME and COPY
+.      FILE.DEVICE -- the drive; 0 means 8
+.      FILE.ISO -- non-zero converts names to PETSCII on the way out
+.      FILE.ROWS -- rows to write, SAVEARRAY
+.      FILE.MAX.ROWS -- rows that will fit, LOADARRAY; 0 means 10
+.      FILE.LINE$() -- the rows; the caller owns the DIM
 .
 .  out
-.      MENU.EXITKEY -- the key that ended the run
-.      MENU.BARNUM -- the bar's row count
-.      MENU.SELX MENU.SELW -- the chosen bar item's column and width
-.      MENU.MARKED -- the bar item left lit
-.      MENU.OK -- 0 if bank MENU.TEXTBANK was already claimed
-.
-.  formals
-.      MENU.SLOT MENU.SEL MENU.ROWTEXT$ MENU.ROWHINT$ MENU.ROWON MENU.RUNROW
-.        MENU.RUNCOL MENU.STYLE MENU.CHOSEN
-.
-.  arrays
-.      MENU.FLAG$() MENU.HOTKEY$() MENU.HOTCOL$() -- DIMmed by the module on
-.        the first MENU.BEGIN
-.
-.  banked groups
-.      MENU.TEXTS MENU.HINTS, in MENU.INC.BANKED.BL
+.      FILE.ERR FILE.MSG$ FILE.TRK FILE.SEC -- the command channel
+.      FILE.OK -- FILE.EXISTS
+.      FILE.ROWS -- rows read, LOADARRAY
+.      FILE.PATH$ -- FILE.CURDIR
 .
 .  internal
-.      MENU.ATCOL MENU.ATROW MENU.BARX MENU.BARY MENU.BASE MENU.BOXH
-.        MENU.BOXW MENU.CAP MENU.CODE MENU.COUNT MENU.CUR MENU.DONE
-.        MENU.DRAWN MENU.DRAWX MENU.DRAWY MENU.EACH MENU.EXITBIT MENU.FRAME
-.        MENU.GLYPH MENU.HAVE MENU.HILITE MENU.HINTAT MENU.HOTAT MENU.HOTCH$
-.        MENU.HOTHIT MENU.INKEY$ MENU.LEFTW MENU.MOVE MENU.PADHELD
-.        MENU.PADNEW MENU.PADNOW MENU.PADRAW MENU.PAINT MENU.READY MENU.ROW
-.        MENU.ROWFLAG$ MENU.ROWIS$ MENU.ROWW MENU.RUNBASE MENU.RUNFLAGS
-.        MENU.RUNSLOT MENU.SCAN MENU.SHOW$ MENU.SKIPS MENU.SPAN MENU.STEP
-.        MENU.TEXTW MENU.TINTAT MENU.USE MENU.WANT MENU.WAS MENU.WIDE
+.      FILE.CMDSTR$ FILE.OUT$ FILE.RAW$ FILE.ROW$ FILE.ST FILE.KEEP FILE.I
+.        FILE.PETP%
 .
 .  constants
-.      MENU.TEXTBANK MENU.BAR MENU.POPUP MENU.BAR.MAX MENU.POPUP.MAX MENU.ON
-.        MENU.OFF
-.      MENU.SOLID MENU.THIN MENU.ROUND MENU.THICK MENU.NOBOX
-.      MENU.MUSTSEL MENU.KEEPMARK MENU.NOWRAP MENU.GAMEPAD MENU.DOWNEXIT
-.        MENU.UPEXIT MENU.KEYEXIT MENU.HINTMID
-.      MENU.DOWN MENU.UP MENU.LEFT MENU.RIGHT MENU.ENTER MENU.ESC MENU.STOP
-.        MENU.LINE
-.      MENU.PORT MENU.PAD.UP MENU.PAD.DOWN MENU.PAD.LEFT MENU.PAD.RIGHT
-.        MENU.PAD.B MENU.PAD.START
+.      FILE.OKMAX FILE.NOTFOUND FILE.EXISTSERR FILE.PROTECTED FILE.CHAN
 .
-.The formals are the verbs' arguments. GP.DEFPROC formals are ordinary shared
-.variables (SEC 3.11), so a formal holds the last value passed until the next
-.call.
+.This module is the missing DS and DS$. FILE.ERR is DS and FILE.MSG$ is DS$.
+.ST is not a disk status -- it is the KERNAL's serial bus status and cannot
+.report FILE NOT FOUND.
 .
-.GUI.INC.BL sets MENU.RUNSLOT, reads MENU.READY, MENU.COUNT and MENU.WIDE,
-.and calls MENU.MEASURE. A program of your own should not.
+.FILE.ROWS is both an input and an output, the way KV.SLOT is. FILE.LINE$()
+.is the caller's DIM, like GUI.LIST.ITEM$ and unlike THEME.CLR.
 .
-=MENUPULL.INC.BL -- a dropdown under a bar item
+=FILEDIR.INC.BL -- a directory, into a bank or into low RAM
 .
-.Routines, arguments and examples: SEC 4.9. Its variables use the MENU.
-.prefix; MENUPULL. is its labels and one constant.
+.Routines, arguments and examples: SEC 4.16.
 .
-.  verbs
-.      MENUTO.PULLDOWN, called with GP.FN
+.Needs FILEIO.INC.BL, and a #SYMFILE -- it is two GP.ASM blobs.
+.
+.It executes no BANK statement, which is what lets it live in a GP.BANKED
+.region: the two blobs take the data bank at entry and put the caller's back
+.at every exit, so no BASIC line here ever runs with a foreign bank selected.
+.Both blobs write $00, so both are GP.ASM LOW and run from low memory when
+.the module is in a region. FILE.DIR.BNK% carries the bank number to the
+.assembly -- {FILE.DIR.BANK} would read a float's mantissa, and FILE.DIR.WAS%
+.is the blobs' save slot.
 .
 .  in
-.      MENU.STASHBANK -- the bank the covered cells go to; 0 takes one from
-.        BANKMGR on the first call
+.      FILE.DIR.BANK -- the bank to read into, or 0 for low RAM
+.      FILE.DIR.PTR FILE.DIR.CAP -- the low-RAM buffer, when BANK is 0
+.      FILE.DIR.PATTERN$ -- a name pattern, or empty
+.      FILE.DIR.ONLY -- FILE.DIR.ALL, .FILES or .DIRS
 .
 .  out
-.      MENU.NEXTBAR -- the bar item LEFT or RIGHT walks to, or 0
-.      MENU.EXITKEY MENU.BARNUM MENU.SELX MENU.SELW MENU.MARKED, as for
-.        MENU.INC.BL
-.
-.  formals
-.      MENU.PULLAT MENU.STYLE MENU.CHOSEN
+.      FILE.DIR.GOT -- bytes read
+.      FILE.DIR.FULL -- the buffer filled before the listing ended
+.      FILE.DIR.MORE -- -1 while NEXT produced an entry
+.      FILE.NAME$ FILE.BLOCKS FILE.TYPE$ -- the entry itself
 .
 .  internal
-.      MENU.COLS MENU.EDGE MENU.LEFTOF MENU.RIGHTOF MENU.STASHED, and
-.        STASH.BANK STASH.SLOT STASH.MOVE STASH.X STASH.Y STASH.W STASH.H,
-.        which it sets
+.      FILE.DIR.AT FILE.DIR.ASK$ FILE.DIR.ADDR% FILE.DIR.ROOM% FILE.DIR.OFF%
+.        FILE.DIR.BYTES% FILE.DIR.CNT% FILE.DIR.BLK% FILE.DIR.OK%
+.        FILE.DIR.SLOW% FILE.DIR.LFN% FILE.DIR.NAMEA% FILE.DIR.TYPEA%
+.        FILE.DIR.WAS% FILE.DIR.BNK%
 .
 .  constants
-.      MENUPULL.SCRMODE
+.      FILE.DIR.ALL FILE.DIR.FILES FILE.DIR.DIRS FILE.DIR.NAMEMAX
+.        FILE.DIR.BANKROOM FILE.DIR.BANKBASE
+.
+.FILE.DIR.INIT must run once before anything else: it sizes FILE.NAME$ and
+.FILE.TYPE$ for the assembly to write into, and creates every {VAR} slot. Do
+.not assign FILE.NAME$ or FILE.TYPE$ afterwards -- an assignment reallocates
+.and the block the assembly holds goes stale.
+.
+.FILE.NAME$ is shared with FILEIO on purpose: the name a picker chose is the
+.name FILE.EXISTS and FILE.DELETE want.
 .

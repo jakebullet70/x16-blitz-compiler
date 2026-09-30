@@ -1,17 +1,18 @@
 # GPC-HELP
 
-The GP.BASIC and BASL reference that `GPB.HELP.PRG` shows on the X16, in one file you can read on a PC.
+The GP.BASIC and BASL reference that `GPC.HELP.PRG` shows on the X16, in one file you can read on a PC.
 
 **Generated. Do not edit.** `MKHELP.PY` builds it and the `.HLP` files together from `GPC-BASIC/` -- the manual, the name register and the module banner headers. Fix anything wrong at the source and rebuild:
 
 ```
-python GPC-BASIC-TOOLS-SRC/GPC-HELP/MKHELP.PY
+python MKHELP.PY
 ```
 
 ## Contents
 
 - **GETTING STARTED**
   - [1. What GP.BASIC is](#1-what-gpbasic-is)
+  - [1. What GP.BASIC is (2)](#1-what-gpbasic-is-2)
   - [2. Using it](#2-using-it)
 - **WHAT IS IN GPC**
   - [1. What has to be on the drive to compile](#1-what-has-to-be-on-the-drive-to-compile)
@@ -42,6 +43,7 @@ python GPC-BASIC-TOOLS-SRC/GPC-HELP/MKHELP.PY
   - [3.9 Inline assembly](#39-inline-assembly)
   - [3.9 Inline assembly (2)](#39-inline-assembly-2)
   - [3.10 Text in a bank](#310-text-in-a-bank)
+  - [3.10 Text in a bank (2)](#310-text-in-a-bank-2)
   - [3.11 Calling a routine in one statement](#311-calling-a-routine-in-one-statement)
   - [3.11.1 GP.DEFPROC -- declare a verb and its arguments](#3111-gpdefproc----declare-a-verb-and-its-arguments)
   - [3.11.2 GP.SUB -- call a verb](#3112-gpsub----call-a-verb)
@@ -115,13 +117,24 @@ python GPC-BASIC-TOOLS-SRC/GPC-HELP/MKHELP.PY
 
 #### 1. What GP.BASIC is
 
-GP.BASIC (GPB) is the keyword extension GPC compiles on top of BASL: 39 `GP.*` keywords and a
-library of BASL modules built on them. `#INCLUDE "GPB.INC.BL"` declares the keyword set; §2 has the
-rest of the setup.
+##### Overview
 
-##### Core keywords
+GP.BASIC (GPB) is the keyword extension GPC compiles with BASLOAD-formatted X16 BASIC: 40 `GP.*`
+keywords and a library of BASL modules written on them.
 
-29 keywords compile to p-code and are handled by assembly in the runtime.
+The keywords are not a preprocessor pass. `GPB.INC.BL` declares the 40 names to BASLOAD with
+`#TOKEN`, plus `RETURNS` for `GP.FN`'s clause. BASLOAD encodes them as byte pairs and GPC
+compiles them to p-code. BASLOAD knows only the ROM's keywords, so a source without
+`#INCLUDE "GPB.INC.BL"` fails on the first `GP.` line. §2 has the setup.
+
+The library is separate. A module is ordinary BASL source that uses the keywords, `#INCLUDE`d by
+name. Including one costs p-code in the including program and nothing in the keyword runtime.
+
+##### Architecture
+
+The 40 keywords split by whether they need a runtime handler.
+
+**Core: 30 keywords.** These compile to p-code and are handled by assembly in the runtime.
 
     GP.DO GP.LOOP GP.EXITDO
     GP.IF GP.ELSEIF GP.ELSE GP.ENDIF
@@ -130,45 +143,58 @@ rest of the setup.
     GP.BOX GP.FILL GP.PRINTAT
     GP.CALL GP.A GP.X GP.Y GP.C
     GP.FN
-    GP.BANKEDSTR GP.ENDBANKEDSTR GP.BSTR
+    GP.BANKEDSTR GP.ENDBANKEDSTR GP.BSTR GP.BSTRSET
     GP.BANKED GP.ENDBANKED
 
-Their handlers are one block, `GPBase $2F00` to `ObjectBase $3500`: 1,536 bytes, page aligned, all
-or nothing. `ScanGPUsage` walks the finished p-code and drops the block from the object when nothing
-in it is reached. The compile report says `GP IN` or `CORE`.
+Their handlers are one block, `GPBase $3000` to `ObjectBase $3600`: 1,536 bytes, page aligned, all
+or nothing. `ScanGPUsage` walks the finished p-code and drops the block from the object when
+nothing in it is reached.
 
-##### Composite keywords
-
-10 keywords expand into opcodes that already exist. They take no handler and no vector slot.
+**Composite: 10 keywords.** These expand into opcodes that already exist. They take no handler and
+no vector slot.
 
     GP.ASM GP.ENDASM GP.CHAR GP.CONTAINS GP.ISEMPTY
     GP.HIBYTE GP.LOBYTE GP.BSTRCOUNT GP.DEFPROC GP.SUB
 
-Whether the block comes in is the expansion's business. `GP.CHAR` runs `GP.FILL`'s handler and
-brings it in. `GP.ASM`, `GP.ENDASM`, `GP.DEFPROC` and `GP.SUB` leave it out, and a program whose
-only GP.BASIC keywords are those reports `CORE`.
+Whether the block comes in is the expansion's business, and the edge case is `GP.CHAR`: it runs
+`GP.FILL`'s handler, so it pulls the block in. `GP.ASM`, `GP.ENDASM`, `GP.DEFPROC` and `GP.SUB`
+leave it out.
 
-##### What the block costs
+The compile report names the outcome in its last word. `GPBASIC` means the block is linked, `CORE`
+means it is not. A program whose only GP.BASIC keywords are composite ones that leave the block out
+reports `CORE`. §7 reads the whole report.
 
-Maximum low p-code, in bytes:
+##### Requirements
 
-| mode | CORE | GP IN |
-|---|---|---|
-| embedded | 22,528 | 20,992 |
-| shared | 22,016 | 19,968 |
+| Needs | When |
+|---|---|
+| `#INCLUDE "GPB.INC.BL"` | every source using a `GP.` keyword |
+| `GPB.RT.nnn.BIN` beside the object | shared build, report says `GPBASIC` |
+| `GPC.RT.nnn.BIN` beside the object | shared build, report says `CORE` |
+| nothing further | embedded build: the runtime is in the object |
 
-A shared program with a banked region loses a further 256: 19,712. `LOW FREE` in the compile report,
-less 4,096, is how much more p-code will fit.
+`nnn` is the compiler build number. An embedded build carries the runtime and needs no `.BIN`.
 
-##### The library
+A source that uses a `GP.` keyword is compiler input only. BASLOAD encodes the keywords as byte
+pairs the ROM has no handler for, so stock BASIC can neither `LIST` nor `RUN` BASLOAD's output.
+§2 covers the consequence.
 
-`GPC-BASIC/` holds 26 `.INC.BL` modules and 29 `.EXP.BL` examples: menus, bars and dropdowns, panels,
-themes, entry fields, check boxes, combo boxes, in-place case, trim and splice, `PRINT USING`, shell
-sort, a screen rectangle to a RAM bank or a file, BMX images into VERA.
+##### Components
 
-A module is ordinary BASL. `#INCLUDE` it by name and call it with `GOSUB`, or with a `GP.SUB` /
-`GP.FN` verb where it offers one. It costs its own p-code in the programs that include it and
-nothing in the GP block.
+`GPC-BASIC/` holds 31 `.INC.BL` modules, 28 `.EXP.BL` examples, and `GPB.INC.BL`, which is the
+keyword declaration rather than a module. The modules cover menus, bars and dropdowns, panels,
+themes, entry fields, check boxes, combo boxes, in-place case, trim and splice, `PRINT USING`,
+shell sort, a screen rectangle to a RAM bank or a file, and BMX images into VERA.
+
+Call a module with `GOSUB`, or with a `GP.SUB` / `GP.FN` verb where it offers one.
+
+`STASH.INC.BL`, `SORT.INC.BL`, `STRCASE.INC.BL` and `STRINGS.INC.BL` are written in `GP.ASM`. They
+are modules rather than keywords, so their bytes land in the including program and not in the
+block.
+
+§4 documents each module. §5 lists the names they take.
+
+##### Usage
 
 ```basic
 #INCLUDE "GPB.INC.BL"
@@ -180,16 +206,28 @@ PRINT A$
 END
 ```
 
-`STASH.INC.BL`, `SORT.INC.BL`, `STRCASE.INC.BL` and `STRINGS.INC.BL` are written in `GP.ASM` and are
-modules rather than keywords: their bytes land in the including program, not in the block.
+##### Limits
 
-A program short of low memory can put a module's `#INCLUDE` inside a `GP.BANKED` region and run it
-from a RAM bank, with no change to its callers. §3.12 has the rules.
+Maximum low p-code, in bytes:
+
+| mode | CORE | GPBASIC |
+|---|---|---|
+| embedded | 22,528 | 20,992 |
+| shared | 22,016 | 19,968 |
+
+A shared program with a banked region loses a further 256: 19,712. `LOW FREE` in the compile
+report, less 4,096, is how much more p-code will fit.
+
+Low memory is what runs out. A program short of it can put a module's `#INCLUDE` inside a
+`GP.BANKED` region and run it from a RAM bank, with no change to its callers. §3.12 has the rules.
 
 ---
 
 
-*See also: 2. Using it, 3.12 Code in a bank, 4.8 STRCASE.INC.BL -- case, in place, STASH.INC.BL -- save a text rectangle, and put it back., 4.7 SORT.INC.BL -- shell sort a string array, 4.2 STRINGS.INC.BL -- string helpers*
+## 1. What GP.BASIC is (2)
+
+
+*See also: 2. Using it, 7. Memory, and what the compiler tells you, 4. Module reference -- the BASL library, 5. Variables, 3.12 Code in a bank, STASH.INC.BL -- save a text rectangle, and put it back., 4.7 SORT.INC.BL -- shell sort a string array, 4.8 STRCASE.INC.BL -- case, in place, 4.2 STRINGS.INC.BL -- string helpers*
 
 ## 2. Using it
 
@@ -286,7 +324,7 @@ Both shared runtimes are needed. Which one a program wants is decided when it is
 it runs, so a drive carrying only one works for half the programs built against it. Every shared
 program also loads `GP1.RT.nnn.BIN`, from the same place its runtime loaded from. A program that
 cannot find a runtime file prints `?RT`, the third letter of its name and the build number, such as
-`?RTB126` for `GPB.RT.126.BIN`, and stops.
+`?RTB128` for `GPB.RT.128.BIN`, and stops.
 
 The front end needs `GPB.RT.nnn.BIN` and `GP1.RT.nnn.BIN` for itself: `GPC.PRG` is a compiled
 GP.BASIC program built in shared mode. The compiler front end is written in the language it
@@ -364,6 +402,29 @@ front end asks for a source file, hands it to the engine, prints what comes back
 empty answer quits. It is plain X16 BASIC rather than GP.BASIC, because it has to run from `READY.`
 with nothing on the disk but itself and the engine.
 
+##### `.BASLOAD.NEXT` runs after a clean tokenise
+
+The engine chains when the run's return code would be 0. A failed tokenise never chains. The engine
+looks for `.BASLOAD.NEXT` on the source's device, the device passed in the ABI.
+
+When the file is there the engine prints `RUNNING .BASLOAD.NEXT`, loads it at the start of BASIC,
+and runs it the way a `LOAD` inside a running BASIC program does. The `SYS` that started the engine
+does not return. `.BASLOAD.NEXT` is an ordinary BASIC PRG. The file is not deleted, so it runs
+after every clean tokenise in that folder. When there is no such file the `SYS` returns as before,
+with R1, R2 and the message unchanged.
+
+Every caller of the engine's ABI gets this, not only the front end. `test/runtest.py` and
+`source/gpc/build_basl.py` both call the engine direct and both chain.
+
+The front end holds its re-entry guard byte at `$0400` down to 0 across the `SYS`. A chained
+program is free to load over the engine at `$6000`, and the next run of the front end loads the
+engine again.
+
+The BASIC entry points the chain uses are pinned to ROM R49.
+
+**WARNING:** a load that fails part way raises BASIC's `?LOAD ERROR`. The caller's program text is
+already overwritten by then, so there is nothing to return to.
+
 ##### A failed run deletes its own output
 
 Streaming created one failure the ROM never had. A run that died partway through pass 2 still wrote
@@ -404,12 +465,13 @@ fork.
 
 #### 4. The tools
 
-`GPC.ERR.PRG` turns a runtime error's `@ $XXXX` into a source line, using the debug map the
-compiler writes when `MAKE A DEBUG MAP?` is answered yes. Without the map the address cannot be
-resolved.
+`GPC.ERR.PRG` turns the address a runtime error prints into a source line. The address is `$027E`
+in low memory, or `$0C:AAF4` in a `GP.BANKED` region: the bank, a colon, and the run address. It
+reads the debug map the compiler writes when `MAKE A DEBUG MAP?` is answered yes. Without the map
+the address cannot be resolved.
 
-`GPB.HELP.PRG` is this reference, on the machine. It reads `HELP-TXT/` beside it — `GPB.HELP.IDX`
-and one `.HLP` per topic — and shows 74 topics at 80x30. Arrows, `PgUp` / `PgDn`, `HOME` and `END`
+`GPC.HELP.PRG` is this reference, on the machine. It reads `HELP-TXT/` beside it — `GPC.HELP.IDX`
+and one `.HLP` per topic — and shows 90 topics at 80x30. Arrows, `PgUp` / `PgDn`, `HOME` and `END`
 move. `RETURN` opens the highlighted index row. `/` finds and `N` repeats the search. `L` follows a
 topic's cross references, `X` writes its code out as a `.BL` where it has any, `T` cycles the colour
 themes, `?` is the about box. `ESC` goes back a step, and quits from the index.
@@ -528,7 +590,7 @@ works both in the repository and in an unzipped release.
 
 #### 3. Command reference
 
-38 keywords, encoded `$CE7F` down to `$CE50` and allocated downward. Ten of the forty-eight slots
+40 keywords, encoded `$CE7F` down to `$CE4D` and allocated downward. Eleven of the fifty-one slots
 are holes and stay holes: the byte values are the ABI and are never renumbered.
 
 ##### At a glance — where each part comes from
@@ -536,7 +598,7 @@ are holes and stay holes: the byte values are the ABI and are never renumbered.
 Three implementations, and what each costs:
 
 - **ASM** — a keyword run by machine code in the runtime. Costs runtime bytes, and one GP keyword
-  anywhere in a program pays for the whole 1,024-byte block. Documented in §3.
+  anywhere in a program pays for the whole 1,536-byte block. Documented in §3.
 - **BASIC** — a `.INC.BL` module of ordinary BASL, called with `GOSUB`. Costs nothing unless
   `#INCLUDE`d, and then only its own p-code. Documented in §4.
 - **COMPOSITE** — a keyword with no machine code of its own; the compiler expands it into keywords
@@ -553,7 +615,7 @@ Three implementations, and what each costs:
 | **Strings** | COMPOSITE | `GP.CONTAINS` `GP.ISEMPTY` — free, see §3.4 |
 | **Addresses** | COMPOSITE | `GP.HIBYTE` `GP.LOBYTE` — free, see §3.3.1 |
 | **Arrays** | ASM | `GP.ARRPTR` |
-| **Banked text** | ASM | `GP.BANKEDSTR` `GP.ENDBANKEDSTR` `GP.BSTR` · `GP.BSTRCOUNT` is COMPOSITE — see §3.10 |
+| **Banked text** | ASM | `GP.BANKEDSTR` `GP.ENDBANKEDSTR` `GP.BSTR` `GP.BSTRSET` · `GP.BSTRCOUNT` is COMPOSITE — see §3.10 |
 | **Routine calls** | COMPOSITE | `GP.DEFPROC` `GP.SUB` — free, and leaves the block out, see §3.11 |
 | **Routine calls** | ASM | `GP.FN` — the same call as a value, and it brings the GP block in |
 | **Screen** | ASM | `GP.BOX` `GP.FILL` `GP.PRINTAT` |
@@ -562,7 +624,7 @@ Three implementations, and what each costs:
 | **String helpers** | BASIC+ASM | `STRINGS.INC.BL` — `PADR` `PADL` `PADC` `SPLIT` `REPLACE` `SPLICE` `PET2SCR` `TRIM` `LTRIM` `RTRIM` · §4.2 |
 | **Screen etiquette, panels** | BASIC | `APPSYS.INC.BL` — `STARTUP` `RESTORE` `PANEL.SAVE/LOAD/PUT` `ISEMU` · §4.3 |
 | **Entry fields** | BASIC | `LINEINPUT.INC.BL` — `LINEINPUT.GET`, `LINEINPUT.ASK` · §4.4 |
-| **Bitmaps** | BASIC | `BMX.INC.BL` — `BMX.SHOW`, `BMX.RESTORE` · §4.5 |
+| **Bitmaps** | BASIC+ASM | `BMX.INC.BL` — `BMX.OPEN` `PAINT` `SHOW` `CLOSE` `RESTORE`, `BMX.LOAD` a verb · §4.5 |
 | **Menus** | BASIC | `MENU.INC.BL` — `MENU.BEGIN` `ITEM` `ITEMX` `SELECTED` `DRAWBAR`, `MENUTO.VERT` `MENUTO.BAR` · §4.6 |
 | **Menus** | BASIC | `MENUPULL.INC.BL` — `MENUTO.PULLDOWN`, a dropdown under a bar item · §4.9 |
 | **Dialogs** | BASIC | `GUI.INC.BL` — `GUI.SAY` `GUI.YN` `GUI.MENU` `GUI.INPUT` `GUI.OPEN` `GUI.CLOSE` · §4.11 |
@@ -900,9 +962,8 @@ Example: [`STRINGS.EXP.BL`](STRINGS.EXP.BL)
 GP.ARRPTR(a())
 ```
 
-Sorting is `SORT.INC.BL` (§4.7) rather than a keyword: 408 bytes of the all-or-nothing GP block,
-carried by every program whether or not it sorts. `GP.ARRPTR` is a keyword because the module needs
-it — a BASL subroutine cannot be passed an array, so an address is the only interface.
+Sorting a string array is `SORT.INC.BL` (§4.7). It takes the address `GP.ARRPTR` returns, because
+a BASL subroutine cannot be passed an array.
 
 `GP.ARRPTR` returns the address of element zero; the header is already skipped. Machine code called
 through `GP.CALL` can then work on the array in bulk. Add the stride yourself: 2 bytes per element
@@ -921,10 +982,9 @@ Example: [`ARRAYS.EXP.BL`](ARRAYS.EXP.BL)
 
 ##### 3.6 Screen — stash and restore
 
-Stashing a rectangle is `STASH.INC.BL`, written in `GP.ASM`, rather than a keyword. It writes a
-4-byte self-describing header and holds at most 4,094 cells: a bank is 8K and a cell is two bytes,
-so a full 80x60 screen at 9,600 bytes does not fit. As keywords it would take 329 bytes of the
-all-or-nothing GP block in every program, stashing or not.
+Stashing a rectangle is `STASH.INC.BL`, written in `GP.ASM`. It writes a 4-byte self-describing
+header and holds at most 4,094 cells: a bank is 8K and a cell is two bytes, so a full 80x60 screen
+at 9,600 bytes does not fit.
 
 ```
 #SYMFILE "@:MYPROG.SYM"
@@ -1112,8 +1172,8 @@ GP.ENDASM
 
 It costs no runtime bytes. A block is five bytes of p-code plus the assembled instructions, and
 every handler it uses is already in every compiled program. A program whose only GP.BASIC keyword is
-`GP.ASM` compiles without the 1 KB block: measured `EMBEDDED CORE` and `RUNTIME 12031`, the same as
-a program using no GP keyword.
+`GP.ASM` compiles without the 1.5 KB block: measured `EMBEDDED CORE` and `RUNTIME 12031`, the same
+as a program using no GP keyword.
 
 ###### `#REM 1` is required
 
@@ -1231,7 +1291,7 @@ decimal under 256 is zero page. Every 65C02 addressing mode is available, includ
 
 Registers come back through `GP.A` / `GP.X` / `GP.Y` / `GP.C` as they do from `GP.CALL`; a block
 uses the same `$030C`–`$030F` slots. Those four are GP block keywords, so reading one pulls in the
-1 KB block that `GP.ASM` alone avoids. `{VAR}` does not.
+1.5 KB block that `GP.ASM` alone avoids. `{VAR}` does not.
 
 A body can come from a file. `#INCLUDE` splices it in verbatim, and BASLOAD's `REM #nn-mm`
 attribution makes an error inside it name the file:
@@ -1260,10 +1320,12 @@ Example: [`ASM.EXP.BL`](ASM.EXP.BL)
 GP.BANKEDSTR <bank> <NAME>
   "first"
   "second"
+  SPC(20)
 GP.ENDBANKEDSTR
 
   A$ = GP.BSTR(<NAME>, n)
   N  = GP.BSTRCOUNT(<NAME>)
+  GP.BSTRSET <NAME>, n, A$
 ```
 
 Moves a program's literal text out of low RAM and into a RAM bank, at compile time. A string
@@ -1273,8 +1335,10 @@ of a menu-driven program's own code is usually literal text, and text is the one
 program with no reason to be resident: it is never executed, never indexed, and read one item at a
 time.
 
-**The body is bare quoted lines.** One string a line, nothing else on the line, and they pass
-through byte for byte — case, leading spaces and trailing spaces included. They are not `REM`
+**The body is quoted lines and `SPC(n)`.** One item a line, nothing else on the line. A quoted
+line passes through byte for byte, with its case, leading spaces and trailing spaces kept. `SPC(n)`
+declares an empty slot of capacity `n`, and `n` is a decimal constant of 0 to 255. Both kinds count
+as body lines, so a block of nothing but `SPC(n)` is not an empty block. Body lines are not `REM`
 lines and must not be: BASLOAD upper-cases `REM` text.
 
 **Blocks are named, and you may write as many as you like.** Each is indexed from zero within
@@ -1332,6 +1396,16 @@ text.
 program does can produce one out of range, so an index past the end of a group reads whatever
 follows it. That is the same bargain the array fast path makes.
 
+**`GP.BSTRSET <NAME>, n, A$` writes a slot.** It takes the same name and index pair as
+`GP.BSTR(<NAME>, n)`, with no bracket. A record in the bank is
+`[capacity][length][capacity bytes]`, and the capacity is fixed at compile time. A quoted body
+line's capacity is its own length, so a quoted line can only ever be overwritten by something the
+same length or shorter. `SPC(n)` is the way to get a slot with room in it.
+
+**The write is cut to fit.** A string longer than the slot keeps its first `capacity` characters.
+No error is raised. The next record is never touched. An index not below the bank's string count
+writes nothing and raises nothing, and a slot whose bank is not present writes nothing.
+
 **A program may have more than one text bank.** Sixteen of them, which is the range of the slot
 field a group carries and the length of the table at `$07F0` — `BSTR_MAX_BANKS` in
 `source/common-source/source/common.inc`. That matters when a library already owns one: `MENU`
@@ -1342,13 +1416,17 @@ program and 4,096 strings a bank.
 Each text bank is a region, so it counts toward the 127 regions (§3.12) and no two regions may
 share a bank.
 
-`GP.BSTR` is an ordinary GP keyword, so it pulls in the 1 KB GP block; the two block keywords do
-not, and neither does `GP.BSTRCOUNT`.
+`GP.BSTR` and `GP.BSTRSET` are ordinary GP keywords, so they pull in the 1.5 KB GP block; the two
+block keywords do not, and neither does `GP.BSTRCOUNT`.
 
 Reading it from inside a `GP.BANKED` region works: the handler puts the caller's bank back before
-it returns.
+it returns. Writing from inside one works too. The compiler copies a string literal out of the
+region first, because the text bank is the one at `$A000` while the write runs.
 
 ---
+
+
+## 3.10 Text in a bank (2)
 
 
 *See also: 3.12 Code in a bank*
@@ -1642,6 +1720,10 @@ instead. A plain `GOSUB` makes the banked call.
 **A call between a region and anywhere outside it costs a byte and two bank switches.** `.bgosub` is
 a `GOSUB` with the bank after the address. Put a module called inside a tight loop in the same place
 as the loop.
+
+**A runtime error inside a region names its bank.** It prints the bank in hex, a colon, and the
+address the p-code runs at: `DIVIDE BY ZERO @ $14:A048`. The debug map lists the region's lines in
+the same form, and `GPC.ERR.PRG` reads both.
 
 ###### The overlay file
 
@@ -2036,6 +2118,17 @@ Example: [`FORM.EXP.BL`](FORM.EXP.BL) — three fields, one masked and one digit
 
 `BMX.ERROR$` empty means it worked.
 
+`BMX.LOAD` is `BMX.OPEN` as a verb. It is declared with `GP.DEFPROC`, takes the file name and
+returns the error string, so the open is one statement:
+`IF GP.FN(BMX.LOAD, F$) <> "" THEN GOTO COMPLAIN`. Everything else in the table is a plain `GOSUB`.
+
+**The `#SYMFILE` is required, above the program's `#INCLUDE`s**, and named after the source PRG.
+The compiler derives the name it expects from the PRG it compiles, so the directive must match it.
+`BMX.MOVE` is `GP.ASM` and reaches BASIC's variables through `{VAR}`. Without a symbol file the
+compile stops with `{} NEEDS #SYMFILE @ <line>`, then falls out to BASIC with a
+`?STRING TOO LONG ERROR` that names neither the file nor the cause. A `#SYMFILE` after the
+`#INCLUDE`s stops BASLOAD with `SYMFILE NOT ALLOWED IN <file>:<line>`.
+
 ```basic
 BMX.FILE$ = "TITLE.BMX"
 SCREEN 128
@@ -2078,8 +2171,9 @@ restores the machine's own palette rather than the previous image's.
 
 `BMX.STASH` is the VRAM address they go to, `$13000` by default, which is free above the 320x240
 framebuffer in the mode this module paints into. A caller using tiles, sprites or a second bitmap
-there must move it or switch it off with `BMX.STASH = -1`. The address is checked: a stash inside the
-bitmap or overlapping the PSG registers is reported and nothing is painted.
+there must move it or switch it off with `BMX.STASH = -1`. The address is checked. A stash inside
+the bitmap reports `"BMX.STASH IS INSIDE THE BITMAP"`, one overlapping the PSG registers reports
+`"BMX.STASH RUNS INTO THE PSG REGISTERS"`, and neither paints.
 
 Use `-1` to switch it off, not `0`. Zero is what the variable holds before it is set, and `BMX.INIT`
 runs at the first `BMX.OPEN`, after a caller would have set it, so `0` has to keep meaning unset.
@@ -2088,10 +2182,18 @@ The module handles 8 bits per pixel, uncompressed, which is what `SCREEN 128` di
 decompressor. Anything else is reported rather than attempted. The image is centred, and anything
 larger than 320x240 is clipped.
 
-Examples: [`BMXVIEW.EXP.BL`](BMXVIEW.EXP.BL), and [`BMXPAL.EXP.BL`](BMXPAL.EXP.BL) for the palette
+**It can run from a RAM bank.** Put its `#INCLUDE` between `GP.BANKED` and `GP.ENDBANKED` (§3.12).
+A call from outside the region selects the region's bank and `RETURN` puts the caller's back, so a
+caller is written the same either way. Its `MACPTR` reads land in VRAM and in low-memory string
+blocks, never in `$A000-$BFFF`, so `MACPTR`'s own bank stepping cannot reach a banked copy of the
+code. See [BANKED-OR-NOT.md](BANKED-OR-NOT.md).
+
+Examples: [`BMXVIEW.EXP.BL`](BMXVIEW.EXP.BL) is a viewer, [`BMXPAL.EXP.BL`](BMXPAL.EXP.BL) answers
+the palette question, and [`BMXSPD.EXP.BL`](BMXSPD.EXP.BL) times both paths, the one-block path and
+the centred row-at-a-time path.
 
 
-*See also: 4.5 BMX.INC.BL -- a BMX bitmap into VERA*
+*See also: 3.12 Code in a bank, 4.5 BMX.INC.BL -- a BMX bitmap into VERA*
 
 ## 4.6 MENU.INC.BL -- menus built a row at a time
 
@@ -3224,13 +3326,10 @@ AVAILABLE)` inside an expression.
 
 Floats and integers both, and no range check. Equal arguments answer `MATH.FIRST`.
 
-A module rather than a keyword because choosing between two values needs a branch, and a composite
-cannot have one (§1).
-
 ---
 
 
-*See also: 1. What GP.BASIC is, 4.22 MATH.INC.BL -- the smaller and the larger of two numbers*
+*See also: 4.22 MATH.INC.BL -- the smaller and the larger of two numbers*
 
 ## 4.23 MEM.INC.BL -- a block copied, a block filled
 
@@ -4204,6 +4303,7 @@ Each of these has cost a debugging session at least once.
 | `P AND 255` on a heap or VRAM address | `AND` is 16-bit signed; above 32,767 it raises `OUT OF RANGE` instead of masking | `H = INT(P/256) : L = P - H*256` |
 | an address in an `A%` variable | `%` is signed 16-bit and truncates without error — `A% = 49152` reads back -16,384 | untyped variable, or split into page and offset |
 | `$0400` for machine code | stock BASIC leaves it free, a compiled GPC program does not — runtime state lives there, and it is corrupted with no error | banked RAM, `$A000`–`$BFFF` |
+| `INPUT` answered with RETURN alone | the variable gets `""`, or 0 for a number, and the program goes on. Stock BASIC keeps the old value. `INPUT#` reads an empty line as `""` | `IF A$ = "" THEN A$ = DEFAULT$` where the old value mattered |
 | `PRINT` after `GP.PRINTAT` | GP drawing never calls the KERNAL, so the cursor is wherever it was | `LOCATE` first, or stay in one world |
 | `SORT.INC.BL` with no `#SYMFILE` | `{VAR}` cannot resolve a crunched name — `{} NEEDS #SYMFILE` | `#SYMFILE "@:PROG.SYM"`, before the `#INCLUDE`s |
 | `GP.BOX X,Y,W,H,,7` | optionals cannot be skipped over | `GP.BOX X,Y,W,H,0,7` |
@@ -4332,15 +4432,15 @@ An embedded build prints a `RUNTIME` line second. `GPCTEST-E`:
 
 ```
 OK LOW CODE 969, EMBEDDED GPBASIC
-RUNTIME 11519
-LOW FREE 24064, FRAME STACK 2048
+RUNTIME 11775
+LOW FREE 23808, FRAME STACK 2048
 ```
 
 | | |
 |---|---|
 | `LOW CODE` | the p-code in low memory, in bytes. P-code and `GP.ASM` blocks in a `GP.BANKED` region are not in it |
 | `SHARED` `EMBEDDED` | `SHARED` loads a resident runtime file at run time. `EMBEDDED` carries the runtime in the object |
-| `GPBASIC` `CORE` | `GPBASIC` when a `GP.` keyword reached the 1,024-byte handler block: shared, the program loads `GPB.RT.nnn.BIN`; embedded, the block is in the object. `CORE` when none did: shared, it loads `GPC.RT.nnn.BIN`; embedded, `ScanGPUsage` dropped the block |
+| `GPBASIC` `CORE` | `GPBASIC` when a `GP.` keyword reached the 1,536-byte handler block: shared, the program loads `GPB.RT.nnn.BIN`; embedded, the block is in the object. `CORE` when none did: shared, it loads `GPC.RT.nnn.BIN`; embedded, `ScanGPUsage` dropped the block |
 | `RUNTIME` | embedded only. The runtime bytes carried in the object |
 | `LOW FREE` | what is left in low memory for variables, strings and arrays. **This is the number that runs out.** It ends at `$9F00` embedded, and at the resident runtime shared |
 | `FRAME STACK` | the 2,048 bytes reserved between the p-code and the workspace for `GOSUB` and `FOR` frames. `LOW FREE` does not include them |
@@ -4376,7 +4476,7 @@ build.
 The bootstrap looks for the runtime in the current directory, then at the root of the SD card, so
 one copy at `/` serves every program. `GP1.RT.nnn.BIN` must sit in the same place as the runtime
 that loaded. A runtime file that is not found prints `?RT`, the third letter of its name and the
-build number: `?RTB126` for `GPB.RT.126.BIN`.
+build number: `?RTB128` for `GPB.RT.128.BIN`.
 
 `GPC.BIN`, `GPC.IMG.nnn.BIN` and `GP1.IMG.nnn.BIN` are the compiler and its inputs and do not ship.
 

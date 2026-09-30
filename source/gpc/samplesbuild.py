@@ -18,59 +18,54 @@
 import os, re, shutil, subprocess, sys, threading, time
 
 ROOT    = r"C:\dev\CmdrX16\dos_tools\x16-blitz-compiler"
-TESTING = os.path.join(ROOT, "source", "drive")
 GPCDIR  = os.path.join(ROOT, "source", "gpc")
-ROOTLIB = os.path.join(ROOT, "GPC-BASIC")
+GPCHOME = os.path.join(ROOT, "GPC-BASIC-TOOLS-SRC", "GPC")
+ROOTABI = os.path.join(ROOT, "GPC-BASIC", "GPB.INC.BL")
 
 #
-#   One entry per program.
+#   One entry per program. Each builds in its src folder, which is the drive: its
+#   #INCLUDEs name GPC-BASIC/, and the folder needs GPC.BIN beside the master.
 #
 #       src      the folder the master lives in, and its file name
-#       lib      the module folder that is upstream for this program's .INC.BL files
-#       extras   further sources included inline, which BASLOAD resolves off the drive
 #       shared   True compiles SHARED (needs GPB/GPC.RT.nnn.BIN at run time), False EMBEDDED
-#       install  where the object goes and under what name -- None leaves it in source\drive\,
-#                which is already the drive its demo bat mounts
+#       install  where the object goes and under what name -- None leaves it in the src
+#                folder, which is already the drive its demo bat mounts
 #       data     further files the install folder needs beside the object
-#       inplace  build in the src folder, which is the drive: its #INCLUDEs name GPC-BASIC/,
-#                so nothing is staged into source\drive\ (the folder needs GPC.BIN beside it)
 #
 PROGRAMS = [
+    #   EMBEDDED, so the object and its .OVL run with no runtime file beside them.
     dict(name="GPBMODS",
          src=("GPC-BASIC-TOOLS-SRC/GPB-MODS-TESTING", "GPBMODS.BASL"),
-         lib="GPC-BASIC-TOOLS-SRC/GPB-MODS-TESTING/GPC-BASIC",
-         extras=["GPB-MENUS.BASL"], shared=True, install=None, data=[]),
+         shared=False, install=None, data=[]),
 
-    dict(name="GPB.HELP",
-         src=("GPC-BASIC-TOOLS-SRC/GPC-HELP", "GPB.HELP.BASL"),
-         lib="GPC-BASIC-TOOLS-SRC/GPC-HELP/GPC-BASIC",
-         extras=[], shared=True, inplace=True,
-         install=("GPC-BASIC-TOOLS-SRC/GPC-HELP", "GPB.HELP.PRG"), data=["runtimes"]),
+    dict(name="GPC.HELP",
+         src=("GPC-BASIC-TOOLS-SRC/GPC-HELP", "GPC.HELP.BASL"),
+         shared=True,
+         install=("GPC-BASIC-TOOLS-SRC/GPC-HELP", "GPC.HELP.PRG"), data=["runtimes"]),
 
     #   EMBEDDED: the theme editor keeps its rows in scalars, so there is no
     #   GP.BANKEDSTR and no SHARED. It builds in the sample folder, which is the
     #   drive, and its modules are the GPC-BASIC copy sitting there.
     dict(name="COLORTST",
          src=("GPC-BASIC-TOOLS-SRC/color-test", "COLORTST.BASL"),
-         lib="GPC-BASIC-TOOLS-SRC/color-test/GPC-BASIC",
-         extras=[], shared=False, inplace=True,
+         shared=False,
          install=None, data=[]),
 
-    #   The GP.BASIC viewer, whose master is in the library rather than in a sample folder.
-    #   EMBEDDED: bmx-demo.bat mounts source\scratch\demo\, which carries no runtime and never has.
+    #   EMBEDDED. The BMX images land in the sample folder, which is the drive bmx-demo.bat
+    #   mounts.
+    #   GPC-BASIC/BMXVIEW.EXP.BL is the downstream library copy of this master. Port a change
+    #   into it by hand, with the GPC-BASIC/ include prefix dropped.
     dict(name="BMXVIEW",
-         src=("GPC-BASIC", "BMXVIEW.EXP.BL"),
-         lib="GPC-BASIC",
-         extras=[], shared=False,
-         install=("source/scratch/demo", "C.BMXVIEW.PRG"), data=["bmx"]),
+         src=("GPC-BASIC-TOOLS-SRC/BMXVIEWER", "BMXVIEW.BASL"),
+         shared=False,
+         install=("GPC-BASIC-TOOLS-SRC/BMXVIEWER", "BMXVIEW.PRG"), data=["bmx"]),
 
     #   SHARED, and built in the sample folder: its #INCLUDEs name GPC-BASIC/ and the
     #   runtime and GPC.BIN are already beside it.  install=None leaves the object on
     #   that same drive, which is where its own bat mounts it from.
     dict(name="GPC.GUI",
          src=("GPC-BASIC-TOOLS-SRC/GPC-GUI-HELPER", "GPC.GUI.BASL"),
-         lib="GPC-BASIC-TOOLS-SRC/GPC-GUI-HELPER/GPC-BASIC",
-         extras=["GG.FILE.PICKER.INC.BL", "GG.PROGRAM.EDIT.INC.BL"], shared=True, inplace=True,
+         shared=True,
          install=None, data=[]),
 
     #   EMBEDDED: the forked menus keep their rows in ordinary string arrays, so there is
@@ -78,22 +73,17 @@ PROGRAMS = [
     #   and its GPB.INC.BL is the copy sitting there.
     dict(name="EDIT",
          src=("GPC-BASIC-TOOLS-SRC/edit", "EDIT.BASL"),
-         lib="GPC-BASIC",
-         extras=["ED-FONT.BASL", "ED-MISC.BASL", "ED-MENUS.BASL", "ED-DIALOG.BASL", "ED-STORE.BASL",
-                 "ED-UNDO.BASL"],
-         shared=False, inplace=True,
+         shared=False,
          install=None, data=[]),
 
     #   SHARED, and built in the sample folder, which is the drive. The object is the
-    #   helper you run beside a crashed program, so it installs into the GPB.HELP folder
+    #   helper you run beside a crashed program, so it installs into the GPC.HELP folder
     #   under the name that folder's documentation already gives it.
     #
-    #   NO "runtimes": GPB.HELP owns them there and is built against an older one, and
-    #   that entry clears every .RT. file in the folder before it copies its own in.
+    #   NO "runtimes": the GPC.HELP entry puts them in that folder.
     dict(name="GPC.ERR",
          src=("GPC-BASIC-TOOLS-SRC/GPC.ERR", "GPC.ERR.BASL"),
-         lib="GPC-BASIC-TOOLS-SRC/GPC.ERR/GPC-BASIC",
-         extras=[], shared=True, inplace=True,
+         shared=True,
          install=("GPC-BASIC-TOOLS-SRC/GPC-HELP", "GPC.ERR.PRG"), data=[]),
 ]
 
@@ -150,25 +140,22 @@ def run(cmd, tag, watch):
         return p.wait()
 
 
-def stage_sources(prog):
-    #   the program's own module folder is upstream for every .INC.BL it holds...
-    lib = os.path.join(ROOT, *prog["lib"].split("/"))
-    for f in os.listdir(lib):
-        if f.endswith(".INC.BL"):
-            shutil.copy(os.path.join(lib, f), os.path.join(TESTING, f))
-    #   ...and the keyword file is ROOT's, always -- a sample copy silently downgrades it
-    shutil.copy(os.path.join(ROOTLIB, "GPB.INC.BL"), os.path.join(TESTING, "GPB.INC.BL"))
-
-    srcdir = os.path.join(ROOT, *prog["src"][0].split("/"))
-    shutil.copy(os.path.join(srcdir, prog["src"][1]), os.path.join(TESTING, prog["src"][1]))
-    for extra in prog["extras"]:
-        shutil.copy(os.path.join(srcdir, extra), os.path.join(TESTING, extra))
+def check_abi(drive):
+    #   GPB.INC.BL is the keyword ABI and root's copy is upstream. The build reads the
+    #   sample folder's copy, and a stale one downgrades the build without an error.
+    local = os.path.join(drive, "GPC-BASIC", "GPB.INC.BL")
+    if not os.path.exists(local):
+        return
+    text = lambda path: open(path, "rb").read().replace(b"\r\n", b"\n").replace(b"\r", b"\n")
+    if text(local) != text(ROOTABI):
+        print("   WARNING: GPC-BASIC/GPB.INC.BL here differs from root's. Copy root's over it.",
+              flush=True)
 
 
 def install(prog, stem, drive):
     #   No install folder means the object already sits on the drive its demo bat mounts.
     if not prog["install"]:
-        print("   stays in source\drive\\", flush=True)
+        print("   stays in", prog["src"][0], flush=True)
         return
 
     folder, asname = prog["install"]
@@ -187,11 +174,15 @@ def install(prog, stem, drive):
             print("   installed:", os.path.join(folder, f), flush=True)
 
     if "runtimes" in prog["data"]:
-        #   A SHARED object finds its runtime in /GPC/, the tool home (make install).  A copy
-        #   in the folder is searched first, so an old one here would shadow it: clear them.
+        #   The folder is its demo bat's whole drive, so /GPC/ is out of reach there.  The
+        #   runtimes come from the tool home (make install) and replace any older build's.
         for old in os.listdir(dest):
             if old.endswith(".BIN") and (".RT." in old or ".RC." in old):
                 os.remove(os.path.join(dest, old))
+        for runtime in sorted(os.listdir(GPCHOME)):
+            if runtime.endswith(".BIN") and ".RT." in runtime:
+                shutil.copy(os.path.join(GPCHOME, runtime), os.path.join(dest, runtime))
+                print("   installed:", os.path.join(folder, runtime), flush=True)
 
     if "bmx" in prog["data"]:
         count = 0
@@ -208,7 +199,7 @@ SUFFIXES = (".EXP.BL", ".INC.BL", ".BASL", ".BL")
 
 def stem_of(filename):
     #   The master's name with its source suffix removed.  NOT splitext twice: counting dots
-    #   reduces GPB.HELP.BASL to GPB, the compiler is then asked for GPB.SRC.PRG, and the
+    #   reduces GPC.HELP.BASL to GPC, the compiler is then asked for GPC.SRC.PRG, and the
     #   stage dies on an input the tokeniser never wrote.
     for suffix in SUFFIXES:
         if filename.upper().endswith(suffix):
@@ -248,11 +239,8 @@ def build(prog):
     print("==", name, "(%s)" % ("SHARED" if prog["shared"] else "EMBEDDED"), flush=True)
 
     stamp_buildnum(prog)
-    if prog.get("inplace"):
-        drive = os.path.join(ROOT, *prog["src"][0].split("/"))
-    else:
-        drive = TESTING
-        stage_sources(prog)
+    drive = os.path.join(ROOT, *prog["src"][0].split("/"))
+    check_abi(drive)
     #   a changed .INC.BL is invisible to build_basl.py's up-to-date check
     for junk in (stem + ".SRC.PRG", stem + ".PRG", stem + ".MAP", stem + ".SRC.SYM"):
         p = os.path.join(drive, junk)

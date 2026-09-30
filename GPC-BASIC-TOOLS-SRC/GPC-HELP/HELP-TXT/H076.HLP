@@ -1,86 +1,121 @@
-@3. The modules (4)
-=STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM
+@3. The modules (2)
+=STRUSING.INC.BL -- a number to a template
 .
-.Routines, arguments and examples: SEC 4.18.
-.
-.Needs GPB.INC.BL, and no #SYMFILE -- there is no GP.ASM in it. The cells
-.never leave VRAM: one data port reads, the other writes, and memory_copy
-.moves between them without stepping either.
-.
-.It executes no BANK, so it can live in a GP.BANKED region -- measured,
-.work/stashvram/SVB.BASL. That is the difference from STASH.INC.BL, which
-.cannot.
+.Routines, arguments and examples: SEC 4.10.
 .
 .  in
-.      SV.BASE SV.TOP -- the VRAM window in bytes. Default $04000/$1AFFF
-.      SV.MAX -- how many handles. The caller DIMs SV.PAGE% and SV.PAGES% to
-.        it
-.      SV.X SV.Y SV.W SV.H -- the rectangle, for SV.SAVE
-.      SV.MOVE -- non-zero restores at SV.X SV.Y rather than where it came
-.        from
-.      SV.ADDR SV.LEN -- low RAM address and count, for SV.PUT and SV.GET
-.      SV.HND -- the handle, for RESTORE, GET and FREE
+.      STR.USING.NUM -- the value, both routines
+.      STR.USING.MASK$ -- the template, STR.USING
+.      STR.USING.DP -- decimal places, STR.USING.FIX
 .
 .  out
-.      SV.HND -- 1..SV.MAX, or 0 if it did not fit
-.      SV.OK -- -1 done, 0 refused
-.      SV.ERROR$ -- why, when something is refused
-.      SV.MOVED -- SV.COMPACT only: how many blocks moved
-.
-.  arrays
-.      SV.PAGE%() SV.PAGES%() -- the handle table, DIMmed by the caller
+.      STR.USING.STR$ -- the result: a field from STR.USING, digits from
+.        STR.USING.FIX
+.      STR.USING.OVR -- -1 when the value scaled past 1e9 and the digits are
+.        unusable
+.      STR.USING.SGN -- -1 when the ROUNDED value is negative
 .
 .  internal
-.      SV.READY SV.NEXT SV.BASEPG SV.TOPPG SV.I SV.PG SV.NP SV.N SV.BYTES
-.        SV.MAPW SV.MAPBASE SV.STRIDE SV.ROW SV.CELL SV.SRC SV.DST SV.VA
-.        SV.ADR SV.BNK SV.REST SV.MID SV.LO SV.MODE SV.RX SV.RY
-.      SV.COMPACT adds SV.PICK SV.BEST SV.J SV.TO SV.GCS SV.GCD SV.LEFT SV.CH
+.      STR.USING.INT$ STR.USING.FRC$ STR.USING.SIGN$ STR.USING.OUT$
+.        STR.USING.C$
+.      STR.USING.IW STR.USING.ZW STR.USING.Z STR.USING.W STR.USING.F
+.      STR.USING.GRP STR.USING.PT STR.USING.I STR.USING.V
 .
-.  constants
-.      SV.VLO SV.VMID SV.VHI SV.DATA SV.VCTRL SV.LCONFIG SV.LMAPBASE
-.        SV.PORTLO SV.PORTLO.B SV.PORTHI SV.MEMCOPY SV.UP SV.HEADER
-.        SVGC.CHUNK
+.STR.USING.DP is an output of STR.USING and an input to STR.USING.FIX. The
+.mask carries the decimal count, so STR.USING overwrites whatever was there.
+.A program alternating the two routines must set STR.USING.DP again before
+.every FIX.
 .
-.SV.INIT must run once before anything else, and the two arrays must be
-.DIMmed before it.
+.STR.USING.INT$ and STR.USING.FRC$ survive a call and are the two halves of
+.the digits, without sign, point or field. They are listed internal because
+.their width is the routine's business, not the caller's -- read
+.STR.USING.STR$.
 .
-.Blocks are whole 256-byte pages, which is what lets a handle's address live
-.in an ordinary %: a page number reaches 511 where a VRAM address is 17 bits
-.and would not.
+.The prefix is STR.USING., a sub-prefix of STRINGS.INC.BL's STR., on the same
+.footing as FILE.DIR. inside FILE.. Nothing here is written by STRINGS.INC.BL
+.and nothing there is written by this module, so either can be included
+.alone.
 .
-.WARNING: BMX.STASH defaults to $13000, inside the default window. A program
-.using both must move one of them. There is one allocator and no collision
-.check.
+=KB.INC.BL -- the keyboard buffer, emptied
 .
-=KV.INC.BL -- keys and values in one RAM bank
+.Routines, arguments and examples: SEC 4.14.
 .
-.Routines, arguments and examples: SEC 4.20.
+.  out
+.      --
 .
-.Plain BASL: no GP.* keyword and no GP.ASM, so it needs neither GPB.INC.BL
-.nor a #SYMFILE.
+.  internal
+.      KB.K$
+.
+.One routine, KB.CLEARKB, and one variable it drains into. Nothing else is in
+.the prefix.
+.
+=LINEINPUT.INC.BL -- a positioned entry field
+.
+.Routines, arguments and examples: SEC 4.4.
 .
 .  in
-.      KV.KEY$ -- the key, for FIND GET PUT DEL
-.      KV.VALUE$ -- the value, for PUT
-.      KV.SLOT -- the slot, for AT
-.      KV.FNAME$ -- the file, for SAVE and LOAD
-.      KV.HOMEBANK -- the bank every routine selects on its way out. The
-.        first KV.INIT sets 1
+.      LINEINPUT.X LINEINPUT.Y -- top left of the field
+.      LINEINPUT.LEN -- how many characters fit
+.      LINEINPUT.ATTR -- packed attribute
+.      LINEINPUT.TEXT$ -- the starting value
+.      LINEINPUT.MASK -- non-zero shows asterisks
+.      LINEINPUT.ALLOW$ -- the only characters accepted
+.      LINEINPUT.DENY$ -- characters refused
+.      LINEINPUT.LABEL$ -- LINEINPUT.ASK only
 .
 .  out
-.      KV.OK -- -1 done, 0 refused
-.      KV.SLOT -- the slot FIND, GET and PUT found, 0 if none
-.      KV.VALUE$ -- GET and AT
-.      KV.KEY$ -- AT, without its padding
+.      LINEINPUT.TEXT$ -- what was typed
+.      LINEINPUT.KEY -- the key that ended it
 .
 .  internal
-.      KV.READY KV.CODE%() KV.HIT KV.ADDR KV.INDEX KV.PADDED$ KV.LENGTH
-.        KV.BYTE KV.MAGIC$ KV.ERR KV.MSG$ KV.TRACK KV.SECTOR
+.      LINEINPUT.SHOW$ LINEINPUT.WAS$ LINEINPUT.K$ LINEINPUT.CELL$
+.        LINEINPUT.CODE LINEINPUT.CX LINEINPUT.CA LINEINPUT.INV LINEINPUT.LIT
+.        LINEINPUT.TICK LINEINPUT.DONE LINEINPUT.FILLED LINEINPUT.HOME
+.        LINEINPUT.BAR
 .
 .  constants
-.      KV.BANK KV.BASE KV.TOP KV.SLOTS KV.SIZE KV.MAXLEN KV.VERSION KV.DEFS
+.      LINEINPUT.RETURN LINEINPUT.DELETE LINEINPUT.ESCAPE LINEINPUT.STOP
+.        LINEINPUT.DOWN LINEINPUT.UP LINEINPUT.TAB LINEINPUT.SPACE
+.        LINEINPUT.STAR LINEINPUT.BLINK
 .
-.KV.SLOT is both an input and an output, the way FILE.ROWS is. KV.AT writes
-.KV.KEY$, so a loop over the slots keeps its own key in a variable of its
-.own.
+.LINEINPUT.SHOW$ is listed internal but is the one exception worth knowing:
+.it holds what the field displayed, which is what you want if you are
+.repainting a masked field yourself. FORM.EXP.BL uses it for exactly that.
+.
+=BMX.INC.BL -- a BMX bitmap into VERA
+.
+.Routines, arguments and examples: SEC 4.5.
+.
+.  in
+.      BMX.FILE$
+.
+.  out
+.      BMX.ERROR$ -- empty means it worked
+.      BMX.WIDTH BMX.HEIGHT BMX.DEPTH BMX.VERSION BMX.PALUSED BMX.PALFIRST
+.        BMX.DATAOFF BMX.PACKED -- the header, readable after BMX.OPEN
+.
+.  in, optional
+.      BMX.STASH -- where BMX.PAINT keeps the machine's palette; VRAM $13000
+.        by default, -1 to keep nothing
+.
+.  internal
+.      BMX.PTR BMX.HEADER$ BMX.SCRATCH BMX.SCRATCH$ BMX.PALBASE BMX.ADDR
+.        BMX.LO BMX.HI BMX.BANK BMX.REST BMX.COUNT BMX.CHUNK BMX.GOT BMX.STEP
+.        BMX.SKIP BMX.ROW BMX.ROWS BMX.X0 BMX.Y0 BMX.BAD BMX.KEPT BMX.SRC
+.        BMX.DST
+.
+.  constants
+.      BMXK.MACPTR BMXK.CHKIN BMXK.CLRCHN BMXK.MEMCOPY BMXK.VCTRL BMXK.VLO
+.        BMXK.VMID BMXK.VHI BMXK.PORTLO BMXK.PORTLO.B BMXK.PORTHI BMXK.LFN
+.
+.BMX.PTR doubles as the "have I initialised" flag -- it is zero until
+.BMX.INIT has run. Zeroing it yourself would leak a string block and
+.re-allocate.
+.
+.BMX.STASH is the one variable here a caller may want to set, and it has to
+.be set before the first BMX.OPEN -- BMX.INIT runs then, and fills in the
+.default only if you have not. That is why -1 rather than 0 switches the
+.stash off: 0 already means "never set". BMX.KEPT is the once-per-run guard
+.that makes a slideshow restore the machine's palette rather than the
+.previous picture's.
 .

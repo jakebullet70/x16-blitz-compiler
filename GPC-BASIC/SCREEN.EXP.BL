@@ -96,13 +96,9 @@ GP.FILL 0, 20, PANEL.W, 4, ASC("X")
 ## ***********************************************************************
 ## **  3. STASH.INC.BL -- draw over the screen and put it back.
 ## **
-## **  THIS WAS GP.STASH AND GP.RESTR until 1st September 2026, when the pair left the
-## **  all-or-nothing GP block for GP.ASM -- 329 bytes paid by every program that never
-## **  saved a rectangle.
-## **
-## **  It still carries a 4-byte header (w, h, x, y), so the restore needs only the bank.
+## **  It carries a 4-byte header (w, h, x, y), so the restore needs only the bank.
 ## **  A bank is 8K and a cell 2 bytes, so 4094 cells fit: stash panels, not whole
-## **  screens -- and unlike the keyword, STASH.SAVE says so in STASH.OK.
+## **  screens. STASH.SAVE says so in STASH.OK.
 ## ***********************************************************************
 
 STASH.BANK = 2

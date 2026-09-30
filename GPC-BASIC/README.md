@@ -86,14 +86,6 @@ All of it needs `#INCLUDE "GPB.INC.BL"`, and nothing else.
 | `BMX.INC.BL` | a BMX bitmap straight into VERA | `BMXVIEW.EXP.BL` |
 | `KV.INC.BL` | keys and values in one RAM bank: `PUT` and `GET` by key, `SAVE` and `LOAD` the whole bank as one file | — |
 
-**Five of those modules are deliberately not keywords.** The menu, the stash, the sort and the five
-in-place string statements would all sit in the GP runtime block, which is **all or nothing**: every
-byte of it is written into the object *and* taken off the bottom of the workspace, for any program
-that uses one GP keyword. A sort nobody calls and a stash nobody uses would be paid for by every GP
-program in the tree. Written in `GP.ASM` and `#INCLUDE`d they cost their own bytes, in the programs
-that ask for them, and nothing at all in the ones that do not — which is what keeps the block at
-1,536 bytes rather than 2,560.
-
 **`STASHFILE.INC.BL` is the file half of `STASH.INC.BL`,** and a separate file on purpose: unless
 the compile removes dead code, everything a module holds is compiled into every program that
 includes it, called or not. `STASH.FILE.SAVE` stashes and `BSAVE`s, `STASH.FILE.LOAD` `BLOAD`s and

@@ -4,6 +4,8 @@ description: "Standing instruction from 2026-09-04: compile SHARED, not --embedd
 metadata:
   node_type: memory
   type: feedback
+  originSessionId: 6cb2a824-c1cb-47e0-8336-85f9918b1083
+  modified: 2026-09-30T12:32:52.603Z
 ---
 
 **Compile SHARED from now on.** Said on 2026-09-04, after a CRUNCH comparison on `HELP.BASL`:
@@ -19,6 +21,10 @@ more thing to have deleted.
 Ask before building embedded, including for the checked-in `GPC-BASIC-TOOLS-SRC/GPC-HELP/HELP.PRG` — that one
 is embedded today and the readme says why, so switching it is a decision, not a default.
 A shared object needs `GPC.RT.nnn.BIN` beside it at run time.
+
+**The release samples are the exception.** On 2026-09-30 the user asked for BMXVIEW, COLORTST, EDIT
+and GPBMODS to ship as standalone PRGs, so `samplesbuild.py` builds all four EMBEDDED. The tools
+(GPC.HELP, GPC.GUI, GPC.ERR) stay SHARED. See [[release-samples-shape]].
 
 See [[no-ship-language-this-is-dev]] (do not build unless asked) and [[basl-cruncher-built]]
 (what CRUNCH is worth: 349 lines and 265 bytes on GPC-HELP, 2.5%).

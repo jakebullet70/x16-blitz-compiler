@@ -45,14 +45,48 @@ CommandInputString: ;; [input$]
 		ply 								; restore Y
 		.exitcmd
 
-CommandInputReset: ;; [input.start]	
-		.entercmd	
-		stz 	InputBuffer
-		.exitcmd	
+; ************************************************************************************************
+;
+;		InputBufferPos holds InputNoLine when no typed line is in hand, and the next read then
+;		prompts for one. An empty line and a used-up line both have a zero at InputBufferPos, so
+;		the buffer itself cannot say which it is.
+;
+; ************************************************************************************************
+
+InputNoLine = $FF
+
+CommandInputReset: ;; [input.start]
+		.entercmd
+		lda 	#InputNoLine
+		sta 	InputBufferPos
+		.exitcmd
+
+; ************************************************************************************************
+;
+;		Read the next INPUT item into ReadBuffer. A line typed empty gives an empty item. The
+;		ROM keeps the variable's old value instead.
+;
+;		The empty line is caught here because GetStringToBuffer cannot see it: a line end at
+;		the start of an item means "go on to the next line" there, which is right for DATA and
+;		would prompt again for INPUT.
+;
+; ************************************************************************************************
 
 InputStringToBuffer:
 		.set16 	ReadBumpNextVec,InputBumpNext
 		.set16 	ReadLookNextVec,InputLookNext
+		lda 	InputBufferPos 				; a line already in hand ?
+		cmp 	#InputNoLine
+		bne 	_ISTBItem
+		jsr 	InputGetNewLine
+		lda 	InputBuffer 				; typed empty ?
+		bne 	_ISTBItem
+		lda 	#InputNoLine 				; the item is empty, and the next one prompts
+		sta 	InputBufferPos
+		stz 	ReadBufferSize
+		stz 	ReadBuffer
+		rts
+_ISTBItem:
 		jmp 	GetStringToBuffer
 
 
@@ -63,24 +97,21 @@ InputStringToBuffer:
 ;
 ; ************************************************************************************************
 
-InputLookNext:		
+InputLookNext:
 		phx
-_ILNRetry:		
-		lda 	InputBuffer 				; do we need to read more (e.g. the buffer is empty)
-		bne 	_ILNNotEmpty
-		jsr 	InputGetNewLine 			; get a new line 
-		stz 	InputBufferPos 				; reset read position.
-		bra 	_ILNRetry
-
-_ILNNotEmpty:		
-		ldx 	InputBufferPos 				; get head available character
-		lda 	InputBuffer,x 				
+		ldx 	InputBufferPos 				; no line in hand: read one
+		cpx 	#InputNoLine
+		bne 	_ILNHaveLine
+		jsr 	InputGetNewLine 			; this sets InputBufferPos to 0
+		ldx 	#0
+_ILNHaveLine:
+		lda 	InputBuffer,x
 		bne 	_ILNExit 					; if not EOS return it with CC.
-_ILNNextLine:		
-		stz 	InputBuffer 				; clear the buffer, indicating new line next time.
-		sec 								; return CS,Zero
+		lda 	#InputNoLine 				; the line is used up, so the next read prompts
+		sta 	InputBufferPos
+		sec 								; return CS, NZ
 		plx
-		lda 	#13 						
+		lda 	#13
 		rts
 _ILNExit:	
 		plx

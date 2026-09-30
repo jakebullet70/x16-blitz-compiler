@@ -10,7 +10,7 @@ Run it:
 gpcerr-demo.bat
 ```
 
-The batch file runs the object out of `GPC-BASIC-TOOLS-SRC/GPC-HELP`, which is where the `GPB.HELP` map, symbol
+The batch file runs the object out of `GPC-BASIC-TOOLS-SRC/GPC-HELP`, which is where the `GPC.HELP` map, symbol
 file and tokenised source already are. The screen is 80x30.
 
 ## Using it
@@ -27,8 +27,9 @@ LEFT and RIGHT walk from one dropdown to the next. ESC closes an open one.
 `LOAD MAP` asks for the name and fills the box in when the drive holds exactly one `.MAP`.
 `BROWSE MAP` opens the file picker on the same list. `QUIT` under FILE is the way out.
 
-`BY ADDRESS` takes the hex address a runtime error prints, `$34A7` or the whole error line; any hex
-number in the text is found. `BY LINE` takes a BASIC line number, which is what the compiler's
+`BY ADDRESS` takes the address a runtime error prints, or the whole error line. The address is
+`$027E` in low memory, or `$0C:AAF4` in a `GP.BANKED` region: the region's bank, a colon, and the
+address it runs at. A banked address is matched only against the map's lines in that bank. `BY LINE` takes a BASIC line number, which is what the compiler's
 `N STATEMENTS NOT COMPILED` line gives. `BY LINE` reads no map, because the number is already the
 merged line a map lookup would answer with. Both need a map loaded first: the map's name is what
 finds the symbol file.
@@ -50,8 +51,10 @@ the names block; a missing tokenised source costs the source window.
 ## What it shows
 
 The address line says where the address landed: on a line's first opcode, so many bytes into it,
-before the first mapped line, or past the last record in the map. A line number at or above 65,024
-is the compiler's own setup code and is reported as that.
+before the first mapped line, or past the last record in the map. A banked address can also land in
+a bank the map holds no region for. An address past a region's last record is counted into that
+record's line, because a region has no end record. A line number at or above 65,024 is the
+compiler's own setup code and is reported as that.
 
 Under it, `BASIC LINE`, `FILE` and `NEAR` — the label at or above the line, with the source line
 it sits on.
@@ -64,11 +67,12 @@ source line each was first seen on. A name the symbol file does not carry gets i
 `NOT A SYMBOL`.
 
 The footer carries the loaded project: source files, source lines, compiled lines. Counting them
-reads the symbol file and the map end to end, 9.4 seconds on the `GPB.HELP` fixture. The file count
+reads the symbol file and the map end to end, 9.4 seconds on the `GPC.HELP` fixture. The file count
 caps at 40 and shows a `+` past that.
 
-On that fixture, `$34A7` answers `GPB.HELP.BASL`, BASIC line 1669, near `HELP.BOOT` at source line
-147, and the names block shows `N6$ = HELP.ROW$, LINE 186`.
+On that fixture, `$0C:AAF4` answers `GPC-BASIC/GUI.INC.BL`, BASIC line 1000, near `GUI.FORM.PAINT`
+at source line 322, and the names block shows `G8% = GUI.CTRL.TYPE%, LINE 147`. `$027E` answers
+`GPC.HELP.BASL`, BASIC line 1669, near `HELP.GUIEND` at source line 61.
 
 ## Build
 
@@ -85,12 +89,12 @@ python source/gpc/samplesbuild.py GPC.ERR
 ```
 
 `samplesbuild.py` runs the same two steps and installs `GPC.ERR.PRG` and `GPC.ERR.OVL` into
-`GPC-BASIC-TOOLS-SRC/GPC-HELP/`. It copies no runtime, in either direction: `GPB.HELP` owns the `.RT.` files in
-that folder. This folder carries build 126 of the three, `GPC.RT.126.BIN`, `GPB.RT.126.BIN` and
-`GP1.RT.126.BIN`.
+`GPC-BASIC-TOOLS-SRC/GPC-HELP/`. It copies no runtime, in either direction: `GPC.HELP` owns the `.RT.` files in
+that folder. This folder carries build 128 of the three, `GPC.RT.128.BIN`, `GPB.RT.128.BIN` and
+`GP1.RT.128.BIN`.
 
 The object is SHARED. It loads `GPB.RT.nnn.BIN` off the drive when it runs, the runtime with the GP
-handlers rather than the core-only `GPC.RT.nnn.BIN`. 10,197 bytes of object against a 22,016 byte
+handlers rather than the core-only `GPC.RT.nnn.BIN`. 10,552 bytes of object against a 22,016 byte
 ceiling.
 
 **`GPC.ERR.OVL` travels with `GPC.ERR.PRG`.** It is 28,433 bytes and holds the six code regions and
@@ -126,14 +130,14 @@ that differs.
 | | |
 |---|---|
 | `GPC.ERR.BASL` | the source |
-| `GPC.ERR.PRG` | compiled SHARED, 10,197 bytes |
+| `GPC.ERR.PRG` | compiled SHARED, 10,552 bytes |
 | `GPC.ERR.OVL` | the region overlay, 28,433 bytes |
 | `GPC-BASIC/` | the 22 modules the source includes |
 | `M.GPC.ERR` | a debug map, to try the lookup on |
 | `GPC.BIN` | the compiler's engine, for compiling in this folder on the machine |
 | `GPC.INPUT` | the engine's four lines for this program: source, object, map, `SHARED` |
 | `BASLOAD-GPC.PRG`, `BASLOAD-GPC.BIN` | the tokeniser's front end and engine |
-| `GPB.RT.126.BIN`, `GPC.RT.126.BIN`, `GP1.RT.126.BIN` | the runtimes a shared object loads |
+| `GPB.RT.128.BIN`, `GPC.RT.128.BIN`, `GP1.RT.128.BIN` | the runtimes a shared object loads |
 
 Build outputs: `GPC.ERR.SRC.PRG`, `GPC.ERR.SRC.SYM` and `GPC.ERR.MAP`. Nothing under `GPC-BASIC-TOOLS-SRC/` is
 git-ignored, so the object and the overlay are ordinary tracked files.

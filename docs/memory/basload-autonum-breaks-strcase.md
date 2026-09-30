@@ -27,7 +27,7 @@ and its ordinal position are the same number, which is why nothing shows until t
 gets refused a step later, so look in `CMP.LOG`, not `TOK.LOG`.
 
 `GPC.BASL` uses `#AUTONUM 5` happily with only `GPB.INC.BL`, so the directive is not broken on its
-own — it is the combination. **`GPB.HELP.BASL` and `CRUNCHER.BASL` carry no `#AUTONUM` and a
+own — it is the combination. **`GPC.HELP.BASL` and `CRUNCHER.BASL` carry no `#AUTONUM` and a
 comment saying why**, and take the default step.
 
 Found while building [[basl-cruncher-built]], whose engine includes STRCASE for its in-place

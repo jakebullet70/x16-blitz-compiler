@@ -1,27 +1,61 @@
-@3.11.2 GP.SUB -- call a verb
+@3.11 Calling a routine in one statement
 .
-=3.11.2 GP.SUB
+=3.11 CALLING A ROUTINE IN ONE STATEMENT
 .
-.  Syntax    GP.SUB verb [, expression ...]
-.  Does      Assigns each expression to the matching formal, in order,
-.            then calls the routine.
-.  Kind      COMPOSITE. Expands to an assignment per formal and a
-.            GOSUB.
-.  Notes     The count and the types must match the declaration. For
-.            the same call inside an expression use GP.FN (SEC 3.11.3).
-.            A call into a GP.BANKED region selects its bank. A call
-.            into or out of a region comes back with the caller's
-.            bank selected.
-.  WARNING   The call must sit below its GP.DEFPROC (SEC 3.11.1). It
-.            carries an address and not a line number, so a forward
-.            call is refused rather than compiled.
-.  Example
+=DESCRIPTION
 .
-:            GP.SUB DBSELECT, 1
-:            GP.SUB DBFIND, PRICE, "ACME", TRUE
-:            GP.SUB DBWRITE
+.Three keywords. GP.DEFPROC names a GOSUB target and the variables its
+.callers fill in, GP.SUB fills them and calls it in one statement, and GP.FN
+.does the same from inside an expression and gives back a value.
 .
-=SEE ALSO
+:    DB.A = 1 : GOSUB DB.SELECT
+:
+:    GP.SUB DBSELECT, 1
 .
->56|3.11.3 GP.FN -- call a verb from inside an expression
->54|3.11.1 GP.DEFPROC -- declare a verb and its arguments
+.The two lines compile to the same p-code: an assignment per formal, then the
+.call. A call site costs what the long spelling costs. A declaration on a
+.line of its own costs one byte, the line marker every source line emits.
+.Folded onto the routine's own first statement it costs nothing. A bare label
+.is not a line, so folding onto one costs the byte anyway.
+.
+.GP.DEFPROC and GP.SUB have no machine code of their own, so a program whose
+.only GP.BASIC keywords are those two stays GP OUT and carries none of the GP
+.block. GP.FN has two runtime opcodes and brings the block in.
+.
+=IN THIS SECTION
+.
+>59|3.11.1 GP.DEFPROC -- declare a verb and its arguments
+>60|3.11.2 GP.SUB -- call a verb
+>61|3.11.3 GP.FN -- call a verb from inside an expression
+.
+=The formals are ordinary variables
+.
+.A verb's formals and its RETURNS variable are plain variables in the
+.program's one variable list. Every call writes the same ones, and the body
+.can read and write them like any other. That is what makes the call cost
+.nothing, and it is also the whole of the rule about nesting:
+.
+.  - A verb may appear inside its own argument list. GP.FN(AREA, 2,
+.    GP.FN(AREA, 3, 4)) is correct, because a call list is evaluated in full
+.    before any of it is stored into a formal. The inner call runs and
+.    finishes before the outer writes A.W. The values wait on the frame stack
+.    while the rest of the list is read, so neither the number of arguments
+.    nor the depth of any one of them is a limit.
+.  - A verb's body may not call the verb. There is one set of formals, so a
+.    routine that calls itself -- directly, or round through another verb --
+.    writes over the arguments it is still using. Nothing detects this: it
+.    compiles, both passes agree, and the answer is wrong.
+.
+.The refusals, all at compile time:
+.
+:    GP.DEFPROC VERB IS NOT A PLAIN NAME     a $, % or subscript on the verb
+:    GP.DEFPROC VERB ALREADY DECLARED        a second declaration of that ver
+:    GP.DEFPROC FORMAL IS NOT A VARIABLE     an array, or something that is n
+:    GP.DEFPROC RETURNS IS NOT A VARIABLE    an array element or a literal af
+:    TOO MANY GP.DEFPROC FORMALS             a thirteenth formal
+:    GP.SUB BEFORE ITS GP.DEFPROC            the call sits above the declarat
+:    GP.SUB DOES NOT MATCH ITS GP.DEFPROC    the wrong number of arguments
+:    GP.FN BEFORE ITS GP.DEFPROC             the call sits above the declarat
+:    GP.FN NEEDS A VERB DECLARED RETURNS     the verb has no result variable
+:    ARGUMENTS DO NOT MATCH THE GP.DEFPROC   the wrong number of arguments
+:    TYPE MISMATCH                           a string for a number, or a numb

@@ -9,7 +9,7 @@ rem
 rem ---------------------------------------------------------------------------
 setlocal
 for %%I in ("%~dp0..") do set "ROOT=%%~fI\"
-set "DRIVE=%ROOT%source\drive"
+set "DRIVE=%ROOT%GPC-BASIC-TOOLS-SRC\GPB-MODS-TESTING"
 set "X16EMU=%ROOT%bin\x16emu\x16emu.exe"
 set "ROM=%ROOT%bin\x16emu\rom.bin"
 
@@ -23,10 +23,8 @@ if not exist "%ROM%" (
 )
 if not exist "%DRIVE%\GPBMODS.PRG" (
 	echo.
-	echo   source\drive\GPBMODS.PRG is not built. From the project root:
-	echo     python source\gpc\build_basl.py GPBMODS.BASL GPBMODS.SRC.PRG
-	echo     python source\gpc\compile_shared.py GPBMODS.SRC.PRG GPBMODS.PRG GPBMODS.MAP
-	echo   with GPBMODS.BASL and GPC-BASIC\*.INC.BL copied into source\drive\ first.
+	echo   GPC-BASIC-TOOLS-SRC\GPB-MODS-TESTING\GPBMODS.PRG is not built. From the project root:
+	echo     python source\gpc\samplesbuild.py GPBMODS
 	echo.
 	exit /b 1
 )

@@ -104,7 +104,7 @@ own `GPC-BASIC/` modules, `GPC.BIN` and runtimes. Neither needs Java or prog8.
 
 `GPC.SRC.PRG` is compile-only — nothing in BASIC sits behind the GP tokens, so the ROM can neither
 `LIST` nor `RUN` it. Only the compiled `GPC.PRG` can be launched, and being shared it needs
-`GPB.RT.<n>.BIN` (the runtime **with** the GP handlers) beside it or it prints `?RTB` and the build number, such as `?RTB126`, and stops.
+`GPB.RT.<n>.BIN` (the runtime **with** the GP handlers) beside it or it prints `?RTB` and the build number, such as `?RTB128`, and stops.
 
 `make -C source/gpc` on its own builds `GPC.PRG` and the runtime it needs. The `release` target
 also builds `GPC.ERR` in `GPC-BASIC-TOOLS-SRC/GPC.ERR/`, where the compile writes `GPC.ERR.OVL` beside the

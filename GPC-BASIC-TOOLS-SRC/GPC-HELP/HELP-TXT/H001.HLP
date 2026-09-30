@@ -2,62 +2,90 @@
 .
 =1. WHAT GP.BASIC IS
 .
-.GP.BASIC (GPB) is the keyword extension GPC compiles on top of BASL: 39 GP.*
-.keywords and a library of BASL modules built on them. #INCLUDE "GPB.INC.BL"
-.declares the keyword set; SEC 2 has the rest of the setup.
+=Overview
 .
-=Core keywords
+.GP.BASIC (GPB) is the keyword extension GPC compiles with BASLOAD-formatted
+.X16 BASIC: 40 GP.* keywords and a library of BASL modules written on them.
 .
-.29 keywords compile to p-code and are handled by assembly in the runtime.
+.The keywords are not a preprocessor pass. GPB.INC.BL declares the 40 names
+.to BASLOAD with #TOKEN, plus RETURNS for GP.FN's clause. BASLOAD encodes
+.them as byte pairs and GPC compiles them to p-code. BASLOAD knows only the
+.ROM's keywords, so a source without #INCLUDE "GPB.INC.BL" fails on the first
+.GP. line. SEC 2 has the setup.
+.
+.The library is separate. A module is ordinary BASL source that uses the
+.keywords, #INCLUDEd by name. Including one costs p-code in the including
+.program and nothing in the keyword runtime.
+.
+=Architecture
+.
+.The 40 keywords split by whether they need a runtime handler.
+.
+.Core: 30 keywords. These compile to p-code and are handled by assembly in
+.the runtime.
 .
 .GP.DO GP.LOOP GP.EXITDO GP.IF GP.ELSEIF GP.ELSE GP.ENDIF GP.SELECT GP.CASE
 .GP.OTHER GP.ENDSEL GP.INSTR GP.COMP GP.STRPTR GP.ARRPTR GP.BOX GP.FILL
 .GP.PRINTAT GP.CALL GP.A GP.X GP.Y GP.C GP.FN GP.BANKEDSTR GP.ENDBANKEDSTR
-.GP.BSTR GP.BANKED GP.ENDBANKED
+.GP.BSTR GP.BSTRSET GP.BANKED GP.ENDBANKED
 .
-.Their handlers are one block, GPBase $2F00 to ObjectBase $3500: 1,536 bytes,
+.Their handlers are one block, GPBase $3000 to ObjectBase $3600: 1,536 bytes,
 .page aligned, all or nothing. ScanGPUsage walks the finished p-code and
-.drops the block from the object when nothing in it is reached. The compile
-.report says GP IN or CORE.
+.drops the block from the object when nothing in it is reached.
 .
-=Composite keywords
-.
-.10 keywords expand into opcodes that already exist. They take no handler and
-.no vector slot.
+.Composite: 10 keywords. These expand into opcodes that already exist. They
+.take no handler and no vector slot.
 .
 .GP.ASM GP.ENDASM GP.CHAR GP.CONTAINS GP.ISEMPTY GP.HIBYTE GP.LOBYTE
 .GP.BSTRCOUNT GP.DEFPROC GP.SUB
 .
-.Whether the block comes in is the expansion's business. GP.CHAR runs
-.GP.FILL's handler and brings it in. GP.ASM, GP.ENDASM, GP.DEFPROC and GP.SUB
-.leave it out, and a program whose only GP.BASIC keywords are those reports
-.CORE.
+.Whether the block comes in is the expansion's business, and the edge case is
+.GP.CHAR: it runs GP.FILL's handler, so it pulls the block in. GP.ASM,
+.GP.ENDASM, GP.DEFPROC and GP.SUB leave it out.
 .
-=What the block costs
+.The compile report names the outcome in its last word. GPBASIC means the
+.block is linked, CORE means it is not. A program whose only GP.BASIC
+.keywords are composite ones that leave the block out reports CORE. SEC 7
+.reads the whole report.
 .
-.Maximum low p-code, in bytes:
+=Requirements
 .
-.  embedded
-.      CORE: 22,528
-.      GP IN: 20,992
+.  #INCLUDE "GPB.INC.BL"
+.      WHEN: every source using a GP. keyword
 .
-.  shared
-.      CORE: 22,016
-.      GP IN: 19,968
+.  GPB.RT.nnn.BIN beside the object
+.      WHEN: shared build, report says GPBASIC
 .
-.A shared program with a banked region loses a further 256: 19,712. LOW FREE
-.in the compile report, less 4,096, is how much more p-code will fit.
+.  GPC.RT.nnn.BIN beside the object
+.      WHEN: shared build, report says CORE
 .
-=The library
+.  nothing further
+.      WHEN: embedded build: the runtime is in the object
 .
-.GPC-BASIC/ holds 26 .INC.BL modules and 29 .EXP.BL examples: menus, bars and
-.dropdowns, panels, themes, entry fields, check boxes, combo boxes, in-place
-.case, trim and splice, PRINT USING, shell sort, a screen rectangle to a RAM
-.bank or a file, BMX images into VERA.
+.nnn is the compiler build number. An embedded build carries the runtime and
+.needs no .BIN.
 .
-.A module is ordinary BASL. #INCLUDE it by name and call it with GOSUB, or
-.with a GP.SUB / GP.FN verb where it offers one. It costs its own p-code in
-.the programs that include it and nothing in the GP block.
+.A source that uses a GP. keyword is compiler input only. BASLOAD encodes the
+.keywords as byte pairs the ROM has no handler for, so stock BASIC can
+.neither LIST nor RUN BASLOAD's output. SEC 2 covers the consequence.
+.
+=Components
+.
+.GPC-BASIC/ holds 31 .INC.BL modules, 28 .EXP.BL examples, and GPB.INC.BL,
+.which is the keyword declaration rather than a module. The modules cover
+.menus, bars and dropdowns, panels, themes, entry fields, check boxes, combo
+.boxes, in-place case, trim and splice, PRINT USING, shell sort, a screen
+.rectangle to a RAM bank or a file, and BMX images into VERA.
+.
+.Call a module with GOSUB, or with a GP.SUB / GP.FN verb where it offers one.
+.
+.STASH.INC.BL, SORT.INC.BL, STRCASE.INC.BL and STRINGS.INC.BL are written in
+.GP.ASM. They are modules rather than keywords, so their bytes land in the
+.including program and not in the block.
+.
+.SEC 4 documents each module. SEC 5 lists the names they take.
+.
+=Usage
 .
 :#INCLUDE "GPB.INC.BL"
 :#INCLUDE "STRCASE.INC.BL"
@@ -67,19 +95,22 @@
 :PRINT A$
 :END
 .
-.STASH.INC.BL, SORT.INC.BL, STRCASE.INC.BL and STRINGS.INC.BL are written in
-.GP.ASM and are modules rather than keywords: their bytes land in the
-.including program, not in the block.
+=Limits
 .
-.A program short of low memory can put a module's #INCLUDE inside a GP.BANKED
-.region and run it from a RAM bank, with no change to its callers. SEC 3.12
-.has the rules.
+.Maximum low p-code, in bytes:
 .
-=SEE ALSO
+.  embedded
+.      CORE: 22,528
+.      GPBASIC: 20,992
 .
->7|2. Using it
->57|3.12 Code in a bank
->87|4.8 STRCASE.INC.BL -- case, in place
->112|STASH.INC.BL -- save a text rectangle, and put it back.
->86|4.7 SORT.INC.BL -- shell sort a string array
->67|4.2 STRINGS.INC.BL -- string helpers
+.  shared
+.      CORE: 22,016
+.      GPBASIC: 19,968
+.
+.A shared program with a banked region loses a further 256: 19,712. LOW FREE
+.in the compile report, less 4,096, is how much more p-code will fit.
+.
+.Low memory is what runs out. A program short of it can put a module's
+.#INCLUDE inside a GP.BANKED region and run it from a RAM bank, with no
+.change to its callers. SEC 3.12 has the rules.
+.

@@ -8,7 +8,7 @@ metadata:
   modified: 2026-09-12T21:04:50.527Z
 ---
 
-The library's untyped numeric scalars are to take `%` where they fit, then root, XBASE and GPB.HELP
+The library's untyped numeric scalars are to take `%` where they fit, then root, XBASE and GPC.HELP
 follow. Nothing was converted as of 2026-09-13.
 
 Handoff: `GPC-BASIC-TOOLS-SRC/GPB-MODS-TESTING/INT16-HANDOFF.md`. Tool: `source/gpc/int16scan.py`

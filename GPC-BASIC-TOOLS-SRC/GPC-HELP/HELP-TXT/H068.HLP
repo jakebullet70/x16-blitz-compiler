@@ -1,37 +1,41 @@
-@STASHFILE.INC.BL -- a saved text rectangle, through a file.
+@4.24 GPBMODS -- the harness that drives every module (2)
+=The text is in a bank
 .
-=STASHFILE.INC.BL
+.542 strings in 72 named groups, 11,776 bytes across two pools, none of it in
+.low RAM. Every string the shell says sits in a GP.BANKEDSTR block in front
+.of the routine that says it and is read back with GP.BSTR. Two pools,
+.because one pool is a hard 8,192 bytes and BStrPoolWrite stops the compile
+.when one fills. Which pool a group is in costs the call site nothing, so
+.moving a group is the whole of the answer to a full one.
 .
-.  a saved text rectangle, through a file.
+.Every menu is a block of its own, index 0 the menu's title and 1 upwards the
+.rows. A loop to GP.BSTRCOUNT passes each row to MENU.ITEM, so a row is added
+.by adding a line to the block, and no other menu moves.
 .
-=MODULE HEADER
+.The numbers under ABOUT / BANK MEMORY and ABOUT / MODULE SIZES are typed
+.into GP.BANKEDSTR blocks, so they are only true of the build they were taken
+.from.
 .
-:      STASH.FILE.SAVE   a rectangle of the screen, out to a file
-:      STASH.FILE.LOAD   a saved file, back where it came from
-:      STASH.FILE.PUT    a saved file, pasted somewhere else
+=The room it runs in
 .
-.  Requires, and does not #INCLUDE for you:
-:      GPB.INC.BL      GP.ASM
-:      STASH.INC.BL    which does the copying, and wants a #SYMFILE
+.The workspace is what is left between the program's own p-code and the
+.resident runtime: $4000 to $6600, 9,728 bytes. The first p-code opcode is
+..varspace and its operand is what the scalars take -- 3,292 here, leaving
+.about 6,436 for the string arrays and the whole string heap.
 .
-.  Usage:
-:      STASH.BANK = 8 : STASH.FILE$ = "PANEL.BIN"
-:      STASH.X = 10 : STASH.Y = 4 : STASH.W = 30 : STASH.H = 8
-:      GOSUB STASH.FILE.SAVE
-:      ...
-:      GOSUB STASH.FILE.LOAD
+.Moving code into a bank moves no scalars. A banked routine's variables are
+.the same workspace variables low memory sees, so .varspace grows as panels
+.are added whatever bank they run from.
 .
-:   in   STASH.FILE$    the name
-:        STASH.DEV      the device. 0 means 8
-:        STASH.BANK     the bank to stage through
-:        and, for SAVE, the geometry STASH.SAVE wants
-.
-.  The four header bytes go out with the cells, so loading one back needs
-.  nothing but the name.
-.
-.  BSAVE's end address is EXCLUSIVE, so this writes the header and the cells
-.  and no padding. The length is w h 2 + 4.
+.GPC-BASIC/ inside the sample folder is the library working copy and it is
+.ahead of the root copy. A module is proved here and copied whole into root.
+.GPB.INC.BL runs the other way: root is upstream for it, and the build copies
+.root's over this folder's every time.
 .
 =SEE ALSO
 .
->112|STASH.INC.BL -- save a text rectangle, and put it back.
+>83|4.5 BMX.INC.BL -- a BMX bitmap into VERA
+>100|4.13 BANKMGR.INC.BL -- who owns which RAM bank
+>62|3.12 Code in a bank
+>55|3.10 Text in a bank
+>105|4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM

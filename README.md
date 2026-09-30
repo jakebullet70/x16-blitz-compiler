@@ -2,281 +2,432 @@
 
 > Code name… Greased Piglet!
 
-A Blitz-style compiler that turns tokenised Commander X16 BASIC into a **standalone
-65C02 machine-code program**. There is no runtime interpreter in the output: a compiled
-program is native code plus a small support library, and it runs with no BASIC in memory.
+GPC compiles tokenised Commander X16 BASIC to p-code, and GPC's runtime executes the p-code. A
+compiled program either carries the runtime or loads it from a file. At run time there is no BASIC
+program in memory and no BASIC interpreter.
 
-The compiler itself is a 6502 program — it runs **on the X16** (or an emulator), reads a
-tokenised BASIC file, and writes a compiled `.PRG`.
+GPC runs on the X16 or in an emulator. It reads a tokenised BASIC `.PRG` and writes a compiled
+`.PRG`.
+
+GP.BASIC adds `GP.*` keywords to the language, and `GPC-BASIC/` holds a library of modules built on
+them. [GPC-BASIC/GP-BASIC.md](GPC-BASIC/GP-BASIC.md) is the manual.
 
 Forked from Paul Robson's original: <https://github.com/paulscottrobson/blitz-compiler>
 
+## What is in the zip
+
+`128` is the runtime build number. Every file that carries it comes from the same build.
+
+| | |
+| --- | --- |
+| `GPC.PRG` | the compiler front end, the program you run |
+| `GPC.BIN` | the compiler engine, which `GPC.PRG` loads |
+| `GPC.IMG.128.BIN` | the runtime a self-contained program carries |
+| `GP1.IMG.128.BIN` | the bank 1 code a self-contained program carries |
+| `GPB.RT.128.BIN` | the shared runtime with the GP handlers |
+| `GPC.RT.128.BIN` | the shared runtime without the GP handlers |
+| `GP1.RT.128.BIN` | the bank 1 code both shared runtimes load |
+| `GPC.ERR.PRG` | turns a runtime error address into a source line |
+| `GPC.ERR.OVL` | the banked code of `GPC.ERR.PRG` |
+| `GPC.HELP.PRG` | the GPC reference, on the X16 |
+| `GPC.HELP.OVL` | the banked code of `GPC.HELP.PRG` |
+| `BASLOAD-GPC.PRG` | the streaming tokeniser, the program you run |
+| `BASLOAD-GPC.BIN` | the streaming tokeniser's engine |
+| `README.md` | this file |
+| `LICENSE` | the MIT licence |
+| `HELP-TXT/` | the index and topic files `GPC.HELP.PRG` reads |
+| `GPC-BASIC/` | the GP.BASIC library: the modules, `GP-BASIC.md` (the manual), `GP-BASIC.GLOBALS.md` (every name each module owns), `GP-BASIC.FILES.md` (what each file is for) and `README.md` |
+| `SRC/` | the source of `GPC.PRG`, GPC.ERR, GPC.HELP and BASLOAD-GPC, in `GPC/`, `GPC-ERROR/`, `GPC-HELP/` and `GPC-BASLOAD/`. `SRC/README.TXT` says how to rebuild them. Nothing in it is needed to run GPC |
+| `SAMPLES/` | `GPBMODS/`, `EDITOR/`, `BMXVIEW/` and `COLORTST/`: compiled programs with their source |
+
+The samples are there to be read and run. They cannot be rebuilt where they sit: their `#INCLUDE`
+lines need a `GPC-BASIC/` folder beside the source, and a sample folder has none.
+
+`GPBMODS` and `BMXVIEW` are shared programs. Run from their own folder, they find the runtime files
+only in `/GPC/` or at the root of the drive (see
+[where the runtime files go](#where-the-runtime-files-go)). `EDITOR` and `COLORTST` carry their own
+runtime. `GPBMODS.PRG` reads `GPBMODS.OVL` from beside it, and `EDIT.PRG` reads `EDIT.OVL`.
+
 ## Compiling a program
+
+### Tokenise the source
+
+GPC compiles a tokenised BASIC `.PRG`, not `.BASL` text. Tokenise the source with BASLOAD, which is
+in the R49 ROM, or with [BASLOAD-GPC](#basload-gpc-the-streaming-tokeniser).
+
+A source that uses a `GP.` keyword tokenises to a `.PRG` the ROM can neither `LIST` nor `RUN`. It is
+input for GPC.
 
 ### Run `GPC.PRG`
 
-`GPC.PRG` is the front end. Put it on the drive beside the engine `GPC.BIN`, its runtime image
-`GPC.IMG.<n>.BIN` and the shared runtime `GPB.RT.<n>.BIN`, load it, and answer four questions:
-
-> The front end is itself a compiled GP.BASIC program, built in shared mode, which is why
-> `GPB.RT.<n>.BIN` has to be there — without it you get `?RTB` and the build number, such as `?RTB126`, and nothing else. The release zip
-> ships all of them.
+Run it from the folder the zip unpacked to. Every file it needs is there.
 
 ```text
-LOAD "GPC.PRG",8 : RUN
+LOAD "GPC.PRG",8
+RUN
 
 GPC... A BLITZ INSPIRED X16 COMPILER
-           V0.9 - SUMMER 2026
+           V1.1 - SUMMER 2026
 
 INPUT  FILE: DIR.PRG
 OUTPUT FILE:
 MAKE A DEBUG MAP? YES
 SHARED RUNTIME? NO
+REMOVE DEAD CODE? NO
 ```
 
 | Prompt | A bare RETURN means |
 | --- | --- |
-| `INPUT  FILE:` | **quit** (`BYE, EXITING`) — the one prompt where RETURN backs out |
-| `OUTPUT FILE:` | `C.` + the source name, so `DIR.PRG` → `C.DIR.PRG` |
-| `MAKE A DEBUG MAP?` | no. `Y` names the map `M.` + source (`M.DIR.PRG`) — see [below](#the-debug-map-line-3) |
-| `SHARED RUNTIME?` | no, the default self-contained build. `Y` selects the [shared runtime](#the-shared-runtime-line-4--shared) |
+| `INPUT  FILE:` | quit, with `BYE, EXITING` |
+| `OUTPUT FILE:` | `C.` and the source name: `DIR.PRG` gives `C.DIR.PRG` |
+| `MAKE A DEBUG MAP?` | no. `Y` writes a [debug map](#the-debug-map) named after the source, with `.PRG` and then `.SRC` taken off the end and `.MAP` added: `DIR.PRG` gives `DIR.MAP` |
+| `SHARED RUNTIME?` | no: the program carries its own runtime. `Y` compiles it [shared](#shared) |
+| `REMOVE DEAD CODE?` | no. `Y` leaves out every line nothing reaches, and writes their numbers to `D.` and the source name. `GPC-BASIC/GP-BASIC.md` §7 has the rules |
 
-Both yes/no prompts take `Y` or `N` in either case. The source must already exist — a name that is
-not on the drive stops with `INPUT FILE NOT FOUND` before anything is written or deleted.
+The yes/no prompts take `Y` or `N` in either case. A file name holds up to 39 characters.
 
-It then scratches last time's object and map (CMDR-DOS will not overwrite a file, so a leftover
-object would fail the save), writes your answers to `GPC.INPUT`, and chain-loads the engine, which
-prints its own version and compiles.
+`GPC.PRG` checks the input file before it asks for the output name. A name not on the drive stops
+with `INPUT FILE NOT FOUND`. A file that does not load at `$0801` stops with `NOT A BASIC PRG FILE`
+and `COMPILE THE .PRG, NOT THE .BASL SOURCE.`
 
-On success `C.DIR.PRG` is a standalone program you can `LOAD"C.DIR.PRG"` / `RUN`. `LIST` it and it
-identifies itself — the BASIC stub reads `SYS 2069 : REM GPC!`. On failure the compiler prints the
-error and the offending line, e.g. `SYNTAX ERROR @ 610` or `NOT IMPLEMENTED @ 2400`.
+It then scratches the object, map and dead-code list from the last run, writes the answers to
+`GPC.INPUT`, and loads the engine: `GPC.BIN` from the current folder, or `/GPC/GPC.BIN` when the
+current folder has none. A shared compile first prints
+`** SHARED RUNTIME SELECTED, REMEMBER TO INCLUDE IT **`.
 
-### Scripted — write `GPC.INPUT` yourself
+`GPC.PRG` is itself a shared program that uses the GP handlers. It needs `GPB.RT.128.BIN` and
+`GP1.RT.128.BIN` (see [where the runtime files go](#where-the-runtime-files-go)).
 
-Writing that control file is the *only* thing `GPC.PRG` does. The engine **`GPC.BIN`** takes
-its whole job from **`GPC.INPUT`** and asks nothing, so writing the file directly is what lets one
-program drive another — it is how this repo's own test harness compiles. Up to four text lines:
+### What the compiler prints
 
-| Line | Contents | |
-| --- | --- | --- |
-| 1 | the tokenised BASIC `.PRG` to compile | required |
-| 2 | the compiled `.PRG` to write | required |
-| 3 | a debug map to write (see below), or empty for none | optional |
-| 4 | the compile **mode** — `shared` (first byte `S`) selects the shared runtime; empty/anything else = the default self-contained build | optional |
+The engine prints its name and version, then the two file names:
+
+```text
+GPC SQUEALING... V1.1.0
+IN:  DIR.PRG
+OUT: C.DIR.PRG
+```
+
+Each pass prints `PASS 1` or `PASS 2`, and a dot for every 64 source lines. With dead-code removal
+on, `PASS 0` comes first.
+
+A compile that succeeds prints `OK` and a report of what the program costs.
+`GPC-BASIC/GP-BASIC.md` §7 explains each item. The report says `GPBASIC` when the program uses the
+GP handlers and `CORE` when it does not. Some GP keywords compile to core p-code and need no handler.
+`LOW FREE` is the workspace left for variables, strings and arrays.
+
+The object runs as it is: `LOAD "C.DIR.PRG"` and `RUN`. `LIST` shows `10 SYS 2069:REM GPC!`.
+
+A statement that fails with `SYNTAX ERROR` does not stop the compile. The compiler puts a stub in
+place of the statement and the rest of its line, and the stub raises `SYNTAX ERROR` if the program
+reaches it. The line numbers are listed above the `OK`:
+
+```text
+2 STATEMENTS NOT COMPILED: 1669 1702
+```
+
+Any other error stops the compile. The compiler prints the message and the BASIC line, as in
+`NOT IMPLEMENTED @ 2400`, and leaves no output files.
+
+### The debug map
+
+The map is a text file with one line per compiled BASIC line: an address, a space, and the decimal
+line number that starts there. The address has one of two forms.
+
+- A line in low memory has the four-digit hex p-code offset.
+- A line in a `GP.BANKED` region has the region's bank in hex, a colon, and the four-digit hex
+  address it runs at. Every region runs from `$A000` in its own bank.
+
+```text
+0030 12
+14:A043 57
+```
+
+A runtime error prints the address, not the line: `DIVIDE BY ZERO @ $0030`, or
+`DIVIDE BY ZERO @ $14:A048` for an error in the region in bank `$14`. The line is the one with the
+largest address not above the reported value, among the lines in the same bank. So `$0030` is line
+12 and `$14:A048` is line 57. `GPC.ERR.PRG` does the lookup (see
+[GPC.ERR](#gpcerr-a-runtime-address-back-to-a-source-line)).
+
+- The map is in source order, not address order, so check every line.
+- Lines 65024 and 65535 are the compiler's setup code, not source lines.
+- A compile error prints its line in decimal. Only the `$` form needs the map.
+
+### Driving `GPC.BIN` directly
+
+`GPC.BIN` asks nothing. It takes its job from `GPC.INPUT` in the current folder, and writing that
+file is all `GPC.PRG` does. Write the file yourself to compile from another program or a script.
+
+| Line | Contents |
+| --- | --- |
+| 1 | the tokenised `.PRG` to compile. Required |
+| 2 | the object to write. Required |
+| 3 | the debug map to write, or empty for none |
+| 4 | `SHARED` for a shared program. Empty, or anything not starting with `S`, for a self-contained one |
+| 5 | the dead-code list to write, or empty. A name turns dead-code removal on |
 
 ```text
 DIR.PRG
 C.DIR.PRG
-M.DIR.PRG
-shared
+DIR.MAP
+SHARED
+D.DIR.PRG
 ```
 
-Then run the engine — it carries its own BASIC stub, so `LOAD"GPC.BIN",8 : RUN` is enough.
-`GPC.IMG.<n>.BIN` has to be on the drive too: it is the runtime the engine copies into every
-self-contained object, and without it the compile stops with `NO RUNTIME IMAGE` rather than
-writing a program that cannot run. `<n>` is the runtime build number, so the engine will not
-pick up an image from a different release by mistake.
+Then `LOAD "GPC.BIN",8` and `RUN`.
 
-A line ends at a CR, an LF, or any control byte, and blank lines are skipped — so a `GPC.INPUT`
-typed on a CRLF host drives the X16 compiler unchanged. An empty line 3 (no map) still holds its
-slot, so line 4 is read as the mode either way. Names may be lowercase; the compiler folds
-them to the uppercase PETSCII the KERNAL wants in a filename. With the source or object line missing
-the compiler prints `NO GPC.INPUT FILE` and stops, rather than guess at what to build. Line 4 is
-optional and is not checked — omit it for the default build.
+- A line ends at CR, at LF, or at any other byte below a space. CR followed by LF ends one line, so a
+  file written on a PC works.
+- An empty line keeps its place. An empty line 3 leaves line 4 as the mode.
+- Lines missing from the end read as empty.
+- Lower case is folded to upper case.
+- A line holds 63 characters. The rest is dropped.
+- With no readable `GPC.INPUT`, or with line 1 or line 2 empty, the engine prints
+  `NO GPC.INPUT FILE` and stops.
+- Before it compiles, the engine scratches the files lines 2, 3 and 5 name, and the object's `.OVL`.
+- A source it cannot read stops with `SOURCE NOT FOUND OR EMPTY`. One that does not load at `$0801`
+  stops with `NOT A BASIC PRG FILE`.
+- A self-contained compile reads `GPC.IMG.128.BIN` and `GP1.IMG.128.BIN` from the current folder, or
+  from `/GPC/`. Without them it prints `NO RUNTIME IMAGE` and writes nothing. A shared compile does
+  not read them.
 
-**Delete a previous object and map yourself.** The engine opens the object with `,S,W` and no `@:`
-overwrite prefix, and CMDR-DOS refuses to overwrite — so a leftover file from the last run fails the
-save. `GPC.PRG` scratches them for you; driving the engine directly, you have to do it yourself —
-`OPEN15,8,15,"S:C.DIR.PRG"` on the X16, or an ordinary file delete if you are scripting an emulator.
+## Self-contained and shared programs
 
-### The debug map (line 3)
+### Self-contained
 
-Name a third file and the compiler writes a **line-number map** beside the object — one line per
-source line, in code order: a 4-digit hex **p-code offset** and the decimal BASIC line that begins
-there.
+This is the default. The object carries the runtime ahead of its p-code: 10,239 bytes when the
+report says `CORE`, 11,775 bytes when it says `GPBASIC`. The report prints this figure as `RUNTIME`.
+After the p-code, from the next page boundary, come 2,432 bytes of bank code, which the program
+copies to RAM bank 1 as it starts.
 
-```text
-0030 12
-```
+A self-contained program needs no other file, except its `.OVL` when it has a `GP.BANKED` region.
 
-It exists for *runtime* errors, which report a p-code offset, not a line — `DIVIDE BY ZERO @ $0030`.
-To place one, find the largest offset in the map that is `<=` the reported value: `$0030` is line 12.
-(Two synthetic entries, lines 65024 and 65535, are the implicit-`DIM` prologue's own code, not yours.)
+### Shared
 
-To get a tokenised `SOURCE.PRG` from a text listing without a running X16, use the host
-tokeniser (`bin/tokenise.zip`, stdlib Python) — the test harness does exactly this.
+A shared object carries no runtime. It is a 255-byte bootstrap at `$0801`, then the p-code from
+`$0900`. A program with a `GP.BANKED` region carries one more page, and its p-code starts at `$0A00`.
 
-### GPC.ERR — turning `@ $XXXX` back into a line number
+When the program runs, the bootstrap uses a runtime already in memory if it is from a compatible
+build. Otherwise it loads one:
 
-Doing that lookup by hand gets old, so the release ships a helper that does it on the X16. Run it,
-give it the map file, then paste the whole error line — it accepts `DIVIDE BY ZERO @ $0030`, or just
-`$0030`, or `0030`:
+| File | Loads at | Loaded for |
+| --- | --- | --- |
+| `GPB.RT.128.BIN` | `$6F00` | a `GPBASIC` program: the GP handlers and the core |
+| `GPC.RT.128.BIN` | `$7700` (`RTBASE`) | a `CORE` program: the core only |
+| `GP1.RT.128.BIN` | `$A000` in RAM bank 1 | every shared program: the bank 1 code |
 
-```text
-LOAD "GPC.ERR.PRG",8 : RUN
-MAP FILE (E.G. M.MYPROG): M.SOURCE
-ERROR ADDRESS: DIVIDE BY ZERO @ $0030
-$0030 IS ON BASIC LINE 12
-```
+The compiler chooses between the first two at compile time, and an edit to the program can change
+the choice. Keep all three files available.
 
-It distinguishes an exact hit (`IS ON BASIC LINE 12`, the address is a line's first byte) from a
-landing inside a line (`IS ON/NEAR BASIC LINE 12`), and it recognises the two synthetic entries —
-an address in the implicit-`DIM` prologue reports `IS IN COMPILER SETUP CODE, NOT A LINE` rather
-than blaming the nearest real line, and an address below the first entry reports `IS BEFORE THE
-FIRST MAPPED LINE`. A bare RETURN at either prompt quits.
+A shared program's workspace ends where the runtime starts: `$6F00` for `GPBASIC`, `$7700` for
+`CORE`. A `CORE` program uses the memory the GP handlers occupied, so the next `GPBASIC` program
+loads `GPB.RT.128.BIN` again.
 
-The shipped `GPC.ERR.PRG` is **compiled**, in `shared` mode — so it needs `GPC.RT.<build>.BIN`
-beside it or at the card root, which the release puts there anyway. In the source tree the same file
-is called `C.GPC.ERR.PRG`, because the compiler's input there is the interpreted `GPC.ERR.PRG` and
-the two need distinct names; the release drops the `C.` prefix so there is only one name to know.
+#### Where the runtime files go
 
-If the runtime is missing or is a different ABI — which may be the very thing you are diagnosing —
-rebuild the interpreted version instead: `BASLOAD "SRC/GPC.ERR.BASL"`. It is slower but needs no
-runtime at all. Note that its `#SAVEAS` writes `GPC.ERR.PRG`, overwriting the compiled helper, so
-re-extract from the zip when you want the fast one back.
+The bootstrap looks in three places, in order: the current folder, `/GPC/`, then the root of the
+drive. It loads `GP1.RT.128.BIN` from the place the runtime came from.
 
-**A runtime address is a p-code offset, not a line number, and the two look alike.** A compile-time
-error already names its line in decimal (`SYNTAX ERROR @ 120` — that *is* line 120, and GPC.ERR is
-the wrong tool for it). Only the `$` hex form needs decoding.
+A file that is not found prints `?RT`, the third letter of its name and the build number, then
+returns to BASIC: `?RTB128` for `GPB.RT.128.BIN`, `?RTC128` for `GPC.RT.128.BIN`, `?RT1128` for
+`GP1.RT.128.BIN`.
 
-### How big a program can it compile?
+A shared object carries the file name of the runtime it was compiled against, so a runtime from
+another build is not found. Recompile every shared program for a new runtime build.
 
-**About 1,400 BASIC lines.** The limit is on the *p-code*, not the source, and it is a hard number
-that depends on which runtime the object carries:
+## How big a program can be
 
-| | max p-code |
+The limit is on the p-code that stays in low memory, which the report prints as `LOW CODE`. The
+compiler rounds it up to whole pages. Above it there must be room for the 2,048-byte frame stack and
+at least 4,096 bytes of workspace, below `$9F00` for a self-contained program and below the runtime
+for a shared one.
+
+| Build | Largest `LOW CODE` |
 | --- | --- |
-| default (self-contained), no `GP.` keyword | **22,528 bytes** |
-| `shared`, no `GP.` keyword | **22,016 bytes** |
-| default (self-contained), using `GP.` | **20,992 bytes** |
-| `shared`, using `GP.` | **19,968 bytes**, 19,712 with a `GP.BANKED` region |
+| self-contained, `CORE` | 22,272 bytes |
+| self-contained, `GPBASIC` | 20,736 bytes |
+| shared, `CORE` | 22,016 bytes |
+| shared, `GPBASIC` | 19,968 bytes |
 
-P-code runs about two thirds the size of the tokenised `.PRG` and averages ~14 bytes per BASIC
-line, so a 30 KB tokenised source is roughly the ceiling. What binds is the *run* side: the object,
-a 2K FOR/GOSUB frame stack and a 4K minimum workspace all have to fit below `$9F00`, and a program
-using any `GP.` keyword carries 1,536 more bytes of runtime to leave room for.
+A shared program with a `GP.BANKED` region has 256 bytes less. A self-contained program with one is
+always `GPBASIC`.
 
-The compiler's own build buffer is **23,296 bytes**, comfortably above all four, so it is not what
-stops you. That was not true until the runtime moved out of the compiler's memory and into
-`GPC.IMG.nnn.BIN`: the buffer was 12,800 bytes, and there was a band of programs that would have
-run perfectly but could not be built.
+A program over the limit stops with `PROGRAM TOO BIG` and no line number, and no object is written.
+`LOW FREE` minus 4,096 is how much more p-code fits, in whole pages.
 
-Go over and the compiler stops with **`PROGRAM TOO BIG`**, naming the line the budget ran out on.
-It is worth saying plainly that this used to be silent: past 12,032 bytes the object code grew into
-the compiler's own variable table and every variable reference after that point quietly became a
-*new* variable, so the compile said `OK` and the tail of the program misbehaved. If you have a
-large program that was built with an engine older than build 114, recompile it.
+### Code in RAM banks
 
-### The shared runtime (line 4 = `shared`)
+`GP.BANKED` puts code in a RAM bank, where it does not count against `LOW CODE`. The compiler writes
+every region to one file beside the object, named after it with `.OVL` in place of its extension:
+`C.DIR.PRG` has `C.DIR.OVL`. The program reads it as it starts. `GPC-BASIC/GP-BASIC.md` §3.12
+covers regions.
 
-By default every object is **self-contained**: the ~11 KB runtime is copied in ahead of the
-program's own code (see [Runtime footprint](#runtime-footprint)). That is ideal for shipping one
-program, but wasteful when several compiled programs load one after another — each carries its own
-copy of the same runtime.
+- Keep the `.OVL` beside its program, under the name the compiler gave it. The program reads it by
+  that name.
+- A missing or short `.OVL` prints `?OVL` and the program stops. A region in a bank the machine does
+  not have prints `?RAM`.
+- A region holds at most 32 pages, 8K. A larger one stops the compile with
+  `GP.BANKED REGION OVER 8K`.
+- Regions go in banks 2 to 255. `GP.BANKED 1` stops the compile with `BANK 1 IS RESERVED`.
+- A program holds at most 127 regions. More stops the compile with `TOO MANY GP.BANKED REGIONS`.
 
-The **shared** mode factors that runtime out into a single resident copy. A program compiled with
-line 4 = `shared` (first byte `S`) carries **no embedded runtime**: the compiler streams a 255-byte
-bootstrap at `$0801` followed by the p-code, and the object is just that — bootstrap plus p-code.
-The runtime lives once, on the drive, as a standalone binary **`GPC.RT.<build>.BIN`** that loads at
-`RTBASE` (`$6800`) — `GPC.RT.152.BIN` for engine build 152, the number `GPC.BIN` prints at
-startup. It is **not tracked in the repo**, precisely because the name changes on every engine
-build; produce the one matching your checkout with `make -C source/runtime gpc-rt`. The
-name carries the build, so a compiled program asks for the exact runtime it was built against *by
-name*: one of a different vintage sitting on the card is simply not found, rather than loaded and
-jumped into. **The build number bumps on every engine build, so shared programs must be recompiled
-whenever the engine is** — the pairing is deliberately exact. A release ships exactly one runtime,
-the one matching the `GPC.BIN` beside it.
+### Other limits
 
-On `RUN`, the bootstrap checks for the magic `GPC2` at `$7000`. That magic is the *ABI* ordinal
-(`RT_ABI` in `common.inc`), not the build number: it answers only "is a runtime resident that I can
-safely enter?", so a resident runtime from another build of the same ABI is reused. If none is
-resident it `LOAD`s `GPC.RT.<build>.BIN` once (device 8, secondary 1, so the file's own load address
-is honoured) — first from the current directory, then from the **root of the SD card**
-(`/GPC.RT.<build>.BIN`) if it isn't alongside the program. It then enters the runtime and runs the
-p-code. So the first shared program to run pays the load cost, and every shared program after it
-starts instantly and shares the one resident runtime — the payoff for a suite of programs that hand
-off to each other.
+- 4,096 BASIC lines. `PROGRAM TOO BIG @` and a line number means a compiler table filled at that
+  line.
+- 4,096 bytes of scalar variables: 6 bytes for each numeric variable without a suffix, 2 for each
+  `%` or `$` variable. More stops the compile with `TOO MANY VARIABLES`.
 
-Requirements and limits:
+## GPC.ERR: a runtime address back to a source line
 
-- **`GPC.RT.<build>.BIN` must be on the drive** — either alongside the shared objects or in the card's
-  root directory, so a card full of program folders needs only one ~11K copy. It is built by the
-  runtime makefile (`make -C source/runtime gpc-rt`) and ships in `source/drive/`.
-- Programs mixing shared and self-contained builds are fine; a shared object simply needs the
-  resident runtime present when it runs.
-- Shared mode's ceiling is *lower* than the default build's — 22,016 bytes of p-code against
-  22,528, or 19,968 against 20,992 using `GP.` — because the p-code and its work area both have to
-  fit below the resident runtime, at `RTBASE` (`$7700`), or `RTGPBASE` (`$6F00`) with the `GP.`
-  handlers. Either way the compiler stops with `PROGRAM TOO BIG` rather than overrunning; see
-  [How big a program can it compile?](#how-big-a-program-can-it-compile).
+`GPC.ERR.PRG` takes a debug map and an address from a runtime error. It answers with the BASIC line,
+the source file the line came from, and the nearest label above it.
 
-The regression test lives in `source/unit-tests/shared-runtime/` — it compiles a program shared,
-checks the object layout, and proves a cold start (fresh machine loads the runtime), the root
-fallback (program run from a subdirectory with no local runtime reaches the one at the root), and a
-warm start (runtime already resident, and provably reused rather than reloaded).
+It is a shared program that uses the GP handlers, so it needs `GPB.RT.128.BIN` and `GP1.RT.128.BIN`.
+It needs `GPC.ERR.OVL` beside it. It runs on an 80x30 screen.
+
+| Menu | Items |
+| --- | --- |
+| `FILE` | `LOAD MAP`, `BROWSE MAP`, `QUIT` |
+| `SEARCH` | `BY ADDRESS`, `BY LINE` |
+| `HELP` | `HOW TO`, `ABOUT` |
+
+ESC opens the menu bar. ALT and an item's marked letter opens that item's dropdown. LEFT and RIGHT
+move from one dropdown to the next, and ESC closes an open one.
+
+- `LOAD MAP` asks for the map's name, and fills it in when the drive holds exactly one `.MAP`.
+  `BROWSE MAP` opens a file picker on the same list.
+- `BY ADDRESS` takes the address a runtime error prints, `$027E` or `$0C:AAF4`, or the whole error
+  line.
+- `BY LINE` takes a BASIC line number, such as one from `STATEMENTS NOT COMPILED`.
+- Both searches need a map loaded first.
+
+It reads three files, found from the map's name:
+
+| | |
+| --- | --- |
+| the map | `NAME.MAP` or `M.NAME` |
+| the symbol file | `NAME.SRC.SYM`, or `NAME.SYM` when that is not there |
+| the tokenised source | `NAME.SRC.PRG`, or `NAME.PRG` when that is not there |
+
+Without the symbol file it shows no file name, label or names. Without the tokenised source it shows
+no source lines.
+
+The answer says where the address landed: on a line's first byte, a number of bytes into a line,
+before the first mapped line, or past the last one. A line number at or above 65,024 is reported as
+compiler setup code. Below that it shows:
+
+- `BASIC LINE`, `FILE` and `NEAR`, the label at or above the line.
+- `SOURCE`: up to seven lines of the tokenised source, with the line looked up marked `>`.
+- `NAMES`: up to six of the crunched names in those lines, turned back into the names in the source.
+
+## GPC.HELP: the reference on the X16
+
+`GPC.HELP.PRG` shows the GP.BASIC manual, the name register, the file list and a page for each
+library module, on an 80x30 screen.
+
+It reads `GPC.HELP.IDX` and the topic files from `HELP-TXT/` beside it, or from `/GPC/HELP-TXT/` when
+there is none beside it. The folder name `HELP-TXT` is fixed. When the index does not load it prints
+`GPC.HELP: HELP-TXT/GPC.HELP.IDX WOULD NOT LOAD.` and ends.
+
+It is a shared program that uses the GP handlers, so it needs `GPB.RT.128.BIN` and `GP1.RT.128.BIN`.
+It needs `GPC.HELP.OVL` beside it.
+
+On the index:
+
+| Key | Does |
+| --- | --- |
+| UP, DOWN, PgUp, PgDn, HOME, END | move the highlight |
+| RETURN | open the highlighted topic |
+| `/` or `F` | find |
+| `N` | find the next match |
+| `T` | the next colour theme |
+| `?` or `H` | the about box |
+| ESC | asks whether to quit |
+
+In a topic:
+
+| Key | Does |
+| --- | --- |
+| UP, DOWN, PgUp, PgDn, SPACE, HOME, END | scroll |
+| `L` | list the topic's cross references, and open the one chosen |
+| `X` | write the topic's code out as a `.BL` file, when it has code |
+| `T` | the next colour theme |
+| ESC | back one step |
+
+## BASLOAD-GPC: the streaming tokeniser
+
+`BASLOAD-GPC.PRG` tokenises a `.BASL` source as the ROM's BASLOAD does, and writes each line to the
+output file as it finishes it. BASIC RAM does not bound the source. The ROM's BASLOAD builds the
+program in BASIC RAM and stops at 38,655 bytes.
+
+`BASLOAD-GPC.PRG` is the front end and `BASLOAD-GPC.BIN` the engine. The front end loads the engine
+from the current folder, or from `/GPC/`. It is plain X16 BASIC and needs no runtime.
+
+```text
+LOAD "BASLOAD-GPC.PRG",8
+RUN
+
+BASLOAD --> BASIC SOURCE TO TOKENISED PRG (GPC VERSION)
+BASLOAD-GPC.BIN WAS BUILT FROM GIT SOURCE, SEPT 2026
+BASLOAD IS (C)2021-2023, STEFAN JAKOBSSON
+
+SOURCE FILE: HELLO.BASL
+
+TOKENISING HELLO.BASL ...
+```
+
+- An empty answer ends without tokenising.
+- The output name is the source's `#SAVEAS`. Prefix it `@:` to overwrite an existing file. Without
+  `#SAVEAS` the run fails with `FILENAME NOT SPECIFIED`.
+- The device is 8.
+- A run that fails deletes the output file it created.
+- After a clean run, when `.BASLOAD.NEXT` is on the source's drive, the engine prints
+  `RUNNING .BASLOAD.NEXT`, then loads and runs it. The file is not deleted, so it runs after every
+  clean tokenise in that folder.
+
+`SRC/GPC-BASLOAD/` holds its documents and its source.
 
 ## Status
 
-- Targets **ROM revision R49**.
-- **63 of the X16's 81 extended keywords compile**; the remaining 18 are deliberate rejections
-  (keywords that act on the BASIC *environment*, which a standalone binary doesn't have).
-  `POINTER` and `STRPTR` are recognised but rejected with `NOT IMPLEMENTED`, because they expose
-  the interpreter's internal variable layout, which the compiled runtime stores differently.
-- See [`TODO.md`](TODO.md) for the full keyword-by-keyword status, decoded against the R49 ROM.
+- Targets X16 ROM R49.
+- 63 of the 81 extended keywords compile. The other 18 act on the BASIC environment, which a compiled
+  program does not have, and are rejected.
+- `POINTER` and `STRPTR` stop the compile with `NOT IMPLEMENTED`. GPC lays variables out differently
+  from the interpreter. `GP.STRPTR` returns the address of a GPC string block
+  (`GPC-BASIC/GP-BASIC.md` §3.4).
+
+## License
+
+MIT. See [`LICENSE`](LICENSE). © 2023 paulscottrobson and contributors.
+
+<!-- release: the rest is for the source tree -->
 
 ## Repository layout
 
-[`MAP.md`](MAP.md) is the one-page guide to where things are.
+[`MAP.md`](MAP.md) is the one-page guide to where things are. [`TODO.md`](TODO.md) holds the
+keyword-by-keyword status against the R49 ROM and the open work, including
+[shrinking the runtime](TODO.md#shrinking-the-runtime).
 
 | Path | What it is |
 | --- | --- |
-| `source/compiler` | the compiler front end (parsing, code generation) |
+| `source/compiler` | the compiler library: parsing and code generation |
 | `source/runtime` | the runtime support library linked into every compiled program |
 | `source/ifloat32` | the 32-bit float / integer math library |
 | `source/polynomials` | polynomial approximations (`SIN`, `COS`, `LOG`, …) |
 | `source/common-source` / `common-scripts` | shared assembly + Python build tooling |
 | `source/tools` | host-side helpers (tokeniser, detokeniser) |
 | `source/unit-tests` | the randomised compiler-runtime regression suites |
-| `source/application` | packages the release |
-| `source/gpc` | the interactive front end `GPC.PRG` — BASLOAD source `GPC.BASL`, written in GP.BASIC, tokenised by `build_basl.py` and then compiled by `compile_shared.py` (no Java/Prog8) |
-| `bin/` | `x16emu/` (test emulator + ROM) and `box16/` (debugger) |
-| `source/drive/` | the built compiler, the shared runtime `GPC.RT.<build>.BIN`, and sample programs, ready to run (also the scratch `prg-batch/`/`archive/` test inputs) |
+| `source/application` | the engine `GPC.BIN`: file I/O, the object writer and the bootstraps; and the runtime images `GPC.IMG.<n>.BIN` and `GP1.IMG.<n>.BIN` |
+| `source/gpc` | the front end `GPC.PRG`: BASLOAD source `GPC.BASL`, written in GP.BASIC, tokenised by `build_basl.py` and compiled by `compile_shared.py`. `samplesbuild.py` builds the sample programs |
+| `bin/` | the built `*.library` files, `tokenise.zip` (the host tokeniser, stdlib Python), `x16emu/` (test emulator + ROM) and `box16/` (debugger) |
+| `source/drive/` | the built compiler, the runtime images, the shared runtimes `GPB/GPC/GP1.RT.<n>.BIN`, and sample programs, ready to run |
+| `BASLOAD-GPC/` | the streaming tokeniser: its source, build script and tests |
+| `GPC-BASIC/` | the GP.BASIC library master and its manuals |
 | `docs/` | [`BUILDING.md`](docs/BUILDING.md), the build-and-test walkthrough |
 | `GPC-BASIC-TOOLS-SRC/` | complete example programs with their sources and documentation |
-| `x16emu.bat` / `box16.bat` | project-root launchers that boot the emulators with `source/drive/` as the drive |
-
-## Runtime footprint
-
-By default every compiled program carries the same support runtime — the P-code VM, all command handlers,
-and the math libraries — copied in ahead of its own code. Measured at build 114 it is **11,775 bytes**
-(`$0801`–`$3600`, then padded to the page boundary at `ObjectBase`):
-
-| Component | Span | Bytes |
-| --- | --- | ---: |
-| `runtime` — the VM plus all the command handlers | `$082D`–`$25DA` | 7,597 |
-| `common` — error vectors, the BASIC stub, shared tables | `$25FB`–`$279F` | 420 |
-| `ifloat32` — 32-bit float and integer math | `$27AD`–`$31EB` | 2,622 |
-| `polynomials` — `SIN`, `COS`, `LOG`, … | `$31F4`–`$3600` | 1,036 |
-
-(A program can instead **share** one resident copy of this runtime — see
-[the shared runtime](#the-shared-runtime-line-4--shared) — so its object is just a bootstrap plus p-code.)
-
-Because that is a fixed cost, small programs are almost all runtime: the sample `DIR.PRG` compiles to
-12,278 bytes of which only **245** are its own p-code.
-
-For comparison, the vintage **C64 Blitz!** runtime (in `demo-c64/`) is roughly **half** ours — its compiled `DIR`
-is 6.2 KB against our 12.0 KB build of the same program, an estimated ~5.8 KB of runtime. The difference
-is two design choices, not overhead: (Note: Blitz for the Commodore 128 is about the same size as GPC)
-
-- **Our own floating point.** We bundle a 32-bit float + transcendental library (`ifloat32` +
-  `polynomials`, 3.6K) by design (a 32-bit format, not the ROM's 40-bit); C64 Blitz calls the C64 ROM's
-40-bit BASIC floats instead.
-- **X16 hardware.** ~2K of handlers for `SPRITE`, `MOVSPR`, VERA graphics, `TILE`, `MOUSE`, FM/PSG sound,
-  `BLOAD`/`BSAVE` — none of which exist as C64 BASIC V2 keywords.
-
-Those two (~5.6K) account for essentially the whole gap. [`TODO.md`](TODO.md#shrinking-the-runtime) covers
-how a program that uses less could ship less.
+| `USER-RUNS/` | Windows launchers: `x16emu.bat` and `box16.bat` boot the emulators with `source/drive/` as the drive, `release.bat` runs `release.sh`, and a `*-demo.bat` runs each sample |
+| `release/` | where `release.sh` stages the release (`release/TMP`) and writes the zip |
 
 ## Building
 
@@ -286,24 +437,29 @@ forces `SHELL := sh` accordingly. Per-machine tool paths go in an untracked
 `source/local.make`.
 
 ```sh
-./release.sh     # full build, then package release/gpc-release-<n>.zip
+./release.sh          # full build, then package release/gpc-release-<version>.zip
+./release.sh stage    # stage release/TMP from the current build: no rebuild, no zip
+./release.sh zip      # zip release/TMP as it stands
 ```
 
-That is the one to use. It runs the four steps in the order that keeps them consistent:
+That is the one to use. It runs the five steps in the order that keeps them consistent:
 
 ```sh
-make libs                       # the bin/*.library files + the engine GPC.BIN
-                                # (this also BUMPS source/application/buildnum.txt)
-make release                    # stage the engine, GPC.INPUT and the samples into source/drive/
-make -C source/runtime gpc-rt   # the shared runtime, source/drive/GPC.RT.<build>.BIN
-make -C source/gpc release      # GPC.PRG and GPC.ERR: both tokenised, then compiled SHARED
-                                # (this target builds gpc-rt itself, so the line above it is
-                                #  only needed if you want the runtime on its own)
+make libs                          # the bin/*.library files + the engine GPC.BIN
+make release                       # stage the engine, GPC.INPUT and the samples into source/drive/
+make -C source/runtime gpc-rt      # the shared runtimes, source/drive/GPB/GPC/GP1.RT.<n>.BIN
+make -C source/gpc release         # GPC.PRG and GPC.ERR: both tokenised, then compiled SHARED
+                                   # (this target builds gpc-rt itself, so the line above it is
+                                   #  only needed if you want the runtime on its own)
+python source/gpc/samplesbuild.py  # the sample programs, each tokenised then compiled
 ```
 
-Order matters more than it looks: `GPC.ERR` is compiled in shared mode, so it names the runtime it
-was built against *inside itself*. Rebuild the engine without rebuilding `GPC.ERR` and the shipped
-helper goes looking for a `GPC.RT.<old>.BIN` that is no longer there.
+The zip's `README.md` is this file, cut at the release marker above Repository layout.
+
+`<version>` is `source/application/buildnum.txt`, which `GPC.BIN` prints and which is edited by
+hand. The runtime build number, the `<n>` in every `.RT.` and `.IMG.` file name, is
+`source/application/rtbuild.txt`. Nothing bumps either. A shared object carries its runtime's file
+name, so after a change to `rtbuild.txt` every shared program must be recompiled.
 
 `make latest` downloads and installs the matching x16emu + ROM into `bin/x16emu/`.
 
@@ -318,8 +474,8 @@ Two emulators live in `bin/`, each in its own directory because they need incomp
 `SDL2.dll` versions:
 
 - **`bin/x16emu/`** — runs the automated test suites and is the correct emulator for anything
-  that reads hardware (e.g. VERA sprite collision). Launch with **`x16emu.bat`** (project root).
-- **`bin/box16/`** — the debugger. Launch with **`box16.bat`** (project root).
+  that reads hardware (e.g. VERA sprite collision). Launch with **`USER-RUNS/x16emu.bat`**.
+- **`bin/box16/`** — the debugger. Launch with **`USER-RUNS/box16.bat`**.
 
 The launch conventions differ (`-fsroot` vs `-hypercall_path`, `-run` vs an issued `RUN`), so
 prefer the `.bat` wrappers, which get this right. Box16 does **not** emulate sprite collision —
@@ -368,7 +524,3 @@ PY
 It cannot tell **in** from **out** from **internal** — that is a judgement call and lives in each
 module's header comment. What it will catch is a variable that has appeared and is not written down
 here.
-
-## License
-
-MIT — see [`LICENSE`](LICENSE). © 2023 paulscottrobson and contributors.

@@ -1,49 +1,5 @@
-@3.11.1 GP.DEFPROC -- declare a verb and its arguments
-.
-=3.11.1 GP.DEFPROC
-.
-.  Syntax    GP.DEFPROC verb [, formal ...] [RETURNS variable]
-.  Does      Names the routine that follows it, the variables a caller
-.            fills in, and the one its result comes back in. Emits no
-.            code.
-.  Kind      COMPOSITE. Records a position, a formal list and a result
-.            variable at compile time.
-.  Notes     The routine starts at the next statement, on the same
-.            line or on the line below. GOSUB to its label still
-.            works.
-.            A verb is a bare name: no $, no %, no subscript. Verbs
-.            are their own namespace, so a verb and a variable may
-.            share a name. One verb costs one variable record.
-.            A formal is a plain scalar variable, numeric or string.
-.            Up to 12 of them.
-.            RETURNS names a plain scalar variable too, and it is what
-.            GP.FN (SEC 3.11.3) reads after the call. Its type is the
-.            type of the call. Without it the verb is callable with
-.            GP.SUB (SEC 3.11.2) only.
-.            Call the verb with GP.SUB as a statement, or with GP.FN
-.            inside an expression. Every call sits below the
-.            GP.DEFPROC that declares it.
-.  WARNING   An array or an array element cannot be a formal, and it
-.            cannot be the RETURNS variable either. A module whose
-.            arguments are array elements takes the verb and no
-.            formals, and its caller sets the array first.
-.  Example
-.
-:            DB.SELECT:
-:              GP.DEFPROC DBSELECT, DB.A
-:              DB.ROW = DB.A : GOSUB DB.READ
-:              RETURN
-:
-:            AREA:
-:              GP.DEFPROC AREA, A.W, A.H RETURNS A.R
-:              A.R = A.W * A.H
-:              RETURN
-:
-:            REM calling them, anywhere below the declarations
-:              GP.SUB DBSELECT, 1
-:              PRINT "AREA "; GP.FN(AREA, 3, 4)
+@3.10 Text in a bank (2)
 .
 =SEE ALSO
 .
->56|3.11.3 GP.FN -- call a verb from inside an expression
->55|3.11.2 GP.SUB -- call a verb
+>62|3.12 Code in a bank

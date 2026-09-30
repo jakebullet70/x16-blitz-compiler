@@ -1,8 +1,11 @@
 ---
 name: gpcerr-builds-in-its-sample-folder
-description: GPC.ERR builds in GPC-BASIC-TOOLS-SRC/GPC.ERR/, which is its own emulator drive, and is always compiled SHARED against GPB.RT; a standalone build of it is the wrong artifact
+description: "GPC.ERR builds in GPC-BASIC-TOOLS-SRC/GPC.ERR/, which is its own emulator drive, and is always compiled SHARED against GPB.RT; a standalone build of it is the wrong artifact"
 metadata:
+  node_type: memory
   type: project
+  originSessionId: 6cb2a824-c1cb-47e0-8336-85f9918b1083
+  modified: 2026-09-29T19:32:51.441Z
 ---
 
 `GPC.ERR` turns a runtime `<MSG> @ $XXXX` back into a BASIC line by reading a `M.<source>` debug map.
@@ -23,19 +26,20 @@ program, it is the wrong one. `scratchpad/edbuild.py` builds standalone, so noth
 be copied over the object.
 
 It compiles against `GPB.RT.nnn.BIN`, the runtime with the GP handlers, not the core-only
-`GPC.RT.nnn.BIN`. The folder carries build 126 of all three: `GPC.RT.126.BIN`, `GPB.RT.126.BIN` and
-`GP1.RT.126.BIN`.
+`GPC.RT.nnn.BIN`. As of 2026-09-30 the folder carries build 128 of all three: `GPC.RT.128.BIN`, `GPB.RT.128.BIN` and
+`GP1.RT.128.BIN`.
 
 **The names carry no prefix.** Tokenised source `GPC.ERR.SRC.PRG`, symbol file `GPC.ERR.SRC.SYM`,
 object `GPC.ERR.PRG`, overlay `GPC.ERR.OVL`, map `GPC.ERR.MAP`. The compiler bakes the object's own
 name into the object and the bootstrap reads `<object name>.OVL` from it, so the object name and the
-overlay name have to agree. `GPB.HELP` in `GPC-BASIC-TOOLS-SRC/GPC-HELP/` is the same shape.
+overlay name have to agree. `GPC.HELP` in `GPC-BASIC-TOOLS-SRC/GPC-HELP/` is the same shape.
 
 **`GPC.ERR.OVL` has to travel with the `.PRG`.** It is 28,433 bytes and holds the six code regions
 and the two text banks. Without it the program prints `?OVL` and stops. Both files are ordinary
 tracked files in `GPC-BASIC-TOOLS-SRC/`, which git does not ignore.
 
-**The object is 10,197 bytes after the GUI refactor (2026-09-25), against a 22,016 byte ceiling.**
+**The object is 10,552 bytes at build 128 (2026-09-30), against a 22,016 byte ceiling.** The
+`GPC.ERR.OVL` beside it is 28,433 bytes.
 The library runs from banked regions, so the resident p-code is the shell and the resolvers. See
 `docs/blitz/GPC-ERR-GUI.PLAN.md` and [[gpc-shared-pcode-cap-is-rtbase]].
 

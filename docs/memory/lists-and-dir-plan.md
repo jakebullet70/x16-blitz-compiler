@@ -48,7 +48,7 @@ nobody reads the result row at the bottom while a wait is happening.
   GPC.GUI is in samplesbuild.py now. All six samples COMPILE; none but GPBMODS has been RUN.
   Follows [[gui-only-through-verbs]], [[test-in-gpbmods-before-spreading]],
   [[library-working-copy-then-root]].
-- STILL OWED: run the five non-GPBMODS samples on the machine, and regenerate the GPB.HELP topics
+- STILL OWED: run the five non-GPBMODS samples on the machine, and regenerate the GPC.HELP topics
   from the rewritten GP-BASIC.md §4.11/§4.12 -- see [[hlp-files-carry-hand-edits]] before running
   MKHELP.PY. GG.PICK.RUN in GPC-GUI-HELPER still GOSUBs GUI.OPEN and GUI.FORM.* directly, against
   [[gui-only-through-verbs]].

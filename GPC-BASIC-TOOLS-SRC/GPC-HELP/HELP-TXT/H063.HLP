@@ -1,42 +1,17 @@
-@4.22 MATH.INC.BL -- the smaller and the larger of two numbers
+@4.20 KV.INC.BL -- keys and values in one RAM bank (2)
+:+8        the value's length, 0-119
+:+9..      the value
+:slot 0    "*KVSTORE", 2, the version (1), the slot count (64)
 .
-=4.22 MATH.INC.BL -- THE SMALLER AND THE LARGER OF TWO NUMBERS
+.KV.EXP.BL, in GPC-BASIC-TOOLS-SRC/GPB-MODS-TESTING/GPC-BASIC/, calls every
+.routine.
 .
-=WHAT IT COSTS
+=EXAMPLE PROGRAM
 .
-.    BASIC -- ordinary BASL in a .INC.BL, called with GOSUB. Free unless you
-.    #INCLUDE it.
-.
-=DESCRIPTION
-.
-.  MATH.MIN
-.      IN: MATH.FIRST MATH.SECOND
-.      OUT: MATH.RESULT
-.
-.  MATH.MAX
-.      IN: MATH.FIRST MATH.SECOND
-.      OUT: MATH.RESULT
-.
-:#INCLUDE "GPB.INC.BL"
-:#INCLUDE "MATH.INC.BL"
-:
-:MATH.FIRST = WANTED : MATH.SECOND = AVAILABLE
-:GOSUB MATH.MIN
-:ROWS = MATH.RESULT
-.
-.Both routines share all three variables. The verbs are MATH.MINOF and
-.MATH.MAXOF, so the same answer comes back from GP.SUB MATH.MINOF, WANTED,
-.AVAILABLE or from GP.FN(MATH.MINOF, WANTED, AVAILABLE) inside an expression.
-.
-.GP.FN brings the GP block in, 1,536 bytes. GOSUB and GP.SUB leave it out.
-.
-.Floats and integers both, and no range check. Equal arguments answer
-.MATH.FIRST.
-.
-.A module rather than a keyword because choosing between two values needs a
-.branch, and a composite cannot have one (SEC 1).
+.  KV.EXP.BL -- runnable, in the GPC-BASIC folder
 .
 =SEE ALSO
 .
->2|1. What GP.BASIC is
->105|4.22 MATH.INC.BL -- the smaller and the larger of two numbers
+>62|3.12 Code in a bank
+>100|4.13 BANKMGR.INC.BL -- who owns which RAM bank
+>107|4.20 KV.INC.BL -- keys and values in one RAM bank

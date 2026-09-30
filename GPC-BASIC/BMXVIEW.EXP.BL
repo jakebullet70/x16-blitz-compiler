@@ -58,6 +58,9 @@ VIEW.MAIN:
     SCREEN VIEW.MODE
     GOSUB BMX.PAINT
     GOSUB VIEW.ANYKEY
+## ---- The picture's palette is borrowed, not taken. Nothing on the X16
+## ---- puts it back, so text mode returns unreadable without this line.
+    GOSUB BMX.RESTORE
     SCREEN APPSYS.MODE
     IF BMX.ERROR$ <> "" THEN GOTO VIEW.COMPLAIN
     GOTO VIEW.MAIN

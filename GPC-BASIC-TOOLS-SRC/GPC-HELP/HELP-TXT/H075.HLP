@@ -1,80 +1,97 @@
-@3. The modules (3)
-=FILEIO.INC.BL -- the drive: status, files, directories
+@3. The modules
 .
-.Routines, arguments and examples: SEC 4.15.
+=3. THE MODULES
 .
-.Needs a #SYMFILE -- FILE.TOPET is a GP.ASM blob.
+.Each table is in (set before the GOSUB), out (read after it), and internal
+.(do not read, do not write, do not rely on).
 .
-.  in
-.      FILE.NAME$ -- the file every routine acts on
-.      FILE.NEW$ -- the second name, RENAME and COPY
-.      FILE.DEVICE -- the drive; 0 means 8
-.      FILE.ISO -- non-zero converts names to PETSCII on the way out
-.      FILE.ROWS -- rows to write, SAVEARRAY
-.      FILE.MAX.ROWS -- rows that will fit, LOADARRAY; 0 means 10
-.      FILE.LINE$() -- the rows; the caller owns the DIM
+=THEME.INC.BL -- named colour roles
 .
-.  out
-.      FILE.ERR FILE.MSG$ FILE.TRK FILE.SEC -- the command channel
-.      FILE.OK -- FILE.EXISTS
-.      FILE.ROWS -- rows read, LOADARRAY
-.      FILE.PATH$ -- FILE.CURDIR
-.
-.  internal
-.      FILE.CMDSTR$ FILE.OUT$ FILE.RAW$ FILE.ROW$ FILE.ST FILE.KEEP FILE.I
-.        FILE.PETP%
-.
-.  constants
-.      FILE.OKMAX FILE.NOTFOUND FILE.EXISTSERR FILE.PROTECTED FILE.CHAN
-.
-.This module is the missing DS and DS$. FILE.ERR is DS and FILE.MSG$ is DS$.
-.ST is not a disk status -- it is the KERNAL's serial bus status and cannot
-.report FILE NOT FOUND.
-.
-.FILE.ROWS is both an input and an output, the way KV.SLOT is. FILE.LINE$()
-.is the caller's DIM, like GUI.LIST.ITEM$ and unlike THEME.CLR.
-.
-=FILEDIR.INC.BL -- a directory, into a bank or into low RAM
-.
-.Routines, arguments and examples: SEC 4.16.
-.
-.Needs FILEIO.INC.BL, and a #SYMFILE -- it is two GP.ASM blobs.
-.
-.It executes no BANK statement, which is what lets it live in a GP.BANKED
-.region: the two blobs take the data bank at entry and put the caller's back
-.at every exit, so no BASIC line here ever runs with a foreign bank selected.
-.Both blobs write $00, so both are GP.ASM LOW and run from low memory when
-.the module is in a region. FILE.DIR.BNK% carries the bank number to the
-.assembly -- {FILE.DIR.BANK} would read a float's mantissa, and FILE.DIR.WAS%
-.is the blobs' save slot.
+.Routines, arguments and examples: SEC 4.1.
 .
 .  in
-.      FILE.DIR.BANK -- the bank to read into, or 0 for low RAM
-.      FILE.DIR.PTR FILE.DIR.CAP -- the low-RAM buffer, when BANK is 0
-.      FILE.DIR.PATTERN$ -- a name pattern, or empty
-.      FILE.DIR.ONLY -- FILE.DIR.ALL, .FILES or .DIRS
+.      THEME.ID% -- 0 x16, 1 dark, 2 light, 3 gray, 4 custom, read by
+.        THEME.SELECT
+.      THEME.ATTR% -- a packed attribute, for THEME.SET and THEME.HI
 .
 .  out
-.      FILE.DIR.GOT -- bytes read
-.      FILE.DIR.FULL -- the buffer filled before the listing ended
-.      FILE.DIR.MORE -- -1 while NEXT produced an entry
-.      FILE.NAME$ FILE.BLOCKS FILE.TYPE$ -- the entry itself
+.      THEME.CLR(role) -- the colour array, DIMmed to THEME.SLOTS - 1
+.      THEME.INV% -- the inverse attribute, from THEME.HI
 .
 .  internal
-.      FILE.DIR.AT FILE.DIR.ASK$ FILE.DIR.ADDR% FILE.DIR.ROOM% FILE.DIR.OFF%
-.        FILE.DIR.BYTES% FILE.DIR.CNT% FILE.DIR.BLK% FILE.DIR.OK%
-.        FILE.DIR.SLOW% FILE.DIR.LFN% FILE.DIR.NAMEA% FILE.DIR.TYPEA%
-.        FILE.DIR.WAS% FILE.DIR.BNK%
+.      THEME.READY% THEME.FIRST%
 .
 .  constants
-.      FILE.DIR.ALL FILE.DIR.FILES FILE.DIR.DIRS FILE.DIR.NAMEMAX
-.        FILE.DIR.BANKROOM FILE.DIR.BANKBASE
+.      THEME.PAGE THEME.TEXT THEME.TITLE THEME.BORDER THEME.HILITE
+.        THEME.DIMMED THEME.WARN THEME.FOCUS THEME.BAR THEME.SHADOW
+.        THEME.SLOTS THEME.COUNT
 .
-.FILE.DIR.INIT must run once before anything else: it sizes FILE.NAME$ and
-.FILE.TYPE$ for the assembly to write into, and creates every {VAR} slot. Do
-.not assign FILE.NAME$ or FILE.TYPE$ afterwards -- an assignment reallocates
-.and the block the assembly holds goes stale.
+.To use it: set THEME.ID%, GOSUB THEME.SELECT, then index THEME.CLR() with a
+.role wherever a drawing routine wants an attribute. SEC 4.1 is the module's
+.own entry, with the five themes and the other four routines.
 .
-.FILE.NAME$ is shared with FILEIO on purpose: the name a picker chose is the
-.name FILE.EXISTS and FILE.DELETE want.
+:THEME.ID% = 1 : GOSUB THEME.SELECT
+:GP.PRINTAT 2, 2, "READY", THEME.CLR(THEME.TEXT)
+.
+.THEME.CLR is the array this module DIMs. Do not DIM it yourself -- the
+.module owns it, and DIMming an array GPC has already dimensioned is an
+.error.
+.
+.THEME.FOCUS is the eighth role: the attribute a focused control wears while
+.GUI.FORM has the keyboard. THEME.BAR and THEME.SHADOW are the ninth and
+.tenth, so THEME.SLOTS is 10, and THEME.COUNT stays 5 -- the first is how
+.many roles there are, the second how many themes.
+.
+=APPSYS.INC.BL -- start politely, leave it as you found it
+.
+.Routines, arguments and examples: SEC 4.3.
+.
+.  in
+.      APPSYS.FILE$ APPSYS.BANK APPSYS.X APPSYS.Y APPSYS.W APPSYS.H
+.        APPSYS.DEV -- the panel routines
+.
+.  out
+.      APPSYS.MODE APPSYS.COLS APPSYS.ROWS APPSYS.COLOUR -- set by
+.        APPSYS.STARTUP
+.      APPSYS.IS.EMULATOR -- set by APPSYS.ISEMU
+.
+.  internal
+.      APPSYS.LAST
+.
+.  constants
+.      APPSYS.SCRMODE APPSYS.COLREG APPSYS.SETCHR APPSYS.CHRREG APPSYS.EMUSIG
+.
+.Lay the screen out from APPSYS.COLS and APPSYS.ROWS. Do not assume 80x60 --
+.the X16 boots there but SCREEN 0 is 40x30, and someone who prefers larger
+.text is running one.
+.
+=STRINGS.INC.BL -- string helpers
+.
+.Routines, arguments and examples: SEC 4.2.
+.
+.  in
+.      STR.STR$ -- the string, in and out
+.      STR.WIDTH -- field width, the pad routines
+.      STR.DELIM$ STR.MAX -- SPLIT (MAX 0 means 10)
+.      STR.FIND$ STR.REPL$ -- REPLACE
+.      STR.PET -- a PETSCII code, PET2SCR
+.      STR.AT STR.CUT STR.SUB$ -- SPLICE, and AT/CUT are CLAMPED in place
+.      STR.PTR -- GP.STRPTR of the string, the three trims
+.
+.  out
+.      STR.STR$ -- padded, or replaced, in place
+.      STR.N -- how many fields SPLIT found, always >= 1
+.      STR.FIELD$(1..N) -- the fields themselves
+.      STR.SCR -- the screen code from PET2SCR
+.      STR.STR$ -- spliced, when it was SPLICE that was called
+.
+.  internal
+.      STR.GAP STR.HALF STR.REST$ STR.AT STR.LIM STR.OUT$
+.      STR.ADDR% STR.OP% STR.KEEP% -- the {VAR} slots the trim blob reads
+.
+.STR.FIELD$ is the one array the library does not DIM. Left alone, GPC's
+.implicit DIM gives 0..10. For more, DIM it before the first call and set
+.STR.MAX to match -- DIMming an array GPC has already auto-dimensioned is an
+.error, so it is one or the other. This is the opposite of THEME.CLR, which
+.the module owns outright; the two are worth keeping straight.
 .
