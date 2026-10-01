@@ -1,7 +1,7 @@
 # BASLOAD-GPC
 
 BASLOAD, built from upstream source, as a **RAM-resident PRG** that streams
-its output to a file — instead of a ROM bank that builds it in BASIC RAM.
+its output to a file - instead of a ROM bank that builds it in BASIC RAM.
 
 `RESEARCH.md` is why. This file is how.
 
@@ -9,17 +9,17 @@ its output to a file — instead of a ROM bank that builds it in BASIC RAM.
 
 BASLOAD is the tokeniser every GPC build runs first, and it is a bank of the
 X16 ROM. It built the tokenised program in BASIC RAM, so **38,655 bytes was
-the ceiling on a `.BASL` plus every `#INCLUDE` it pulls in** — and
+the ceiling on a `.BASL` plus every `#INCLUDE` it pulls in** - and
 `samples/GPB-MODS-TESTING/GPBMODS.BASL` is 783 bytes under it. The two-pass
 compiler moved GPC's size wall; this one was then in front of it.
 
 Changing that means changing BASLOAD, and changing BASLOAD meant shipping a
 custom `rom.bin` and flashing real hardware. **It does not.** The upstream
-source builds and runs as an ordinary PRG with no source changes at all — only
+source builds and runs as an ordinary PRG with no source changes at all - only
 a linker config. That is what made the rest of this possible.
 
 **The ceiling is gone.** The fork writes each line to an open file as it
-finishes it, so one line — 260 bytes of staging buffer — is all that is ever
+finishes it, so one line - 260 bytes of staging buffer - is all that is ever
 resident, and the output is bounded by the disk. A source that died at
 38,421 bytes with `ERROR: BASIC RAM FULL` now tokenises to 47,765 and
 compiles. See [The fork](#the-fork).
@@ -29,7 +29,7 @@ both files into `drive/` beside `GPC.BIN`.
 
 ## Build
 
-Needs **cc65**, not 64tass — BASLOAD is a cc65 project. Installed at
+Needs **cc65**, not 64tass - BASLOAD is a cc65 project. Installed at
 `C:\8bitProgramming\cc65` (`cl65 V2.19 - Git e11fb5c`, the official Windows
 snapshot); override with `CC65_HOME`.
 
@@ -40,19 +40,19 @@ python BASLOAD-GPC/build.py all     # or: rom | prg | front
 - `rom`, from `upstream/conf/basload-rom.cfg`: `build/basload-rom.bin`,
   16,384 B, $c000 in ROM bank 15
 - `prg`, from `conf/basload-prg.cfg`: `build/BASLOAD-GPC.BIN`, 9,003 B, loads
-  $6000 — **the engine**
-- `front`, from `frontend/BASLOAD-GPC.BASL`: `build/BASLOAD-GPC.PRG`, 971 B —
+  $6000 - **the engine**
+- `front`, from `frontend/BASLOAD-GPC.BASL`: `build/BASLOAD-GPC.PRG`, 971 B -
   **the front end you launch**
 
 **`BASLOAD-GPC.BIN`, not `BASLOAD-GPC.PRG`.** The engine's only interface is
-an ABI, so the name a person types belongs to the front end — the same
+an ABI, so the name a person types belongs to the front end - the same
 division as `GPC.PRG` and `GPC.BIN`. Only `front` needs the emulator; the
 other two need only cc65.
 
 **The `rom` target exists to be checked, not shipped.** It rebuilds the bank
 and diffs it against bank 15 of `bin/x16emu/rom.bin`, which answers *"is the
 vendored source what is actually running?"* Seven bytes at `$FFF0-$FFF6` is
-the right answer — the signature string, lowercase `basload` in the shipped
+the right answer - the signature string, lowercase `basload` in the shipped
 ROM and upper case in the source. **Anything else means upstream has moved.**
 Re-run it after every pull.
 
@@ -82,7 +82,7 @@ AND... BYE!
 It **loads `BASLOAD-GPC.BIN` itself**, so both files have to be on the drive,
 and nothing else does.
 
-**Plain X16 BASIC, not GP.BASIC** — `frontend/BASLOAD-GPC.BASL`, tokenised
+**Plain X16 BASIC, not GP.BASIC** - `frontend/BASLOAD-GPC.BASL`, tokenised
 like any other `.BASL`. It has to run from `READY.` with nothing on the disk
 but itself and the engine, so it cannot want `GPC.BIN` or a runtime. The key
 reader is `GPC.BASL`'s, written out in plain BASIC, and `INPUT` is not used on
@@ -114,8 +114,8 @@ python BASLOAD-GPC/test/runtest.py      # the engine: ROM vs RAM
 python BASLOAD-GPC/test/runfront.py     # the front end, end to end
 ```
 
-`runtest.py` tokenises `test/HELLO.BASL` twice — once through the ROM BASLOAD,
-once through the PRG — and compares. That is the only claim worth testing: a
+`runtest.py` tokenises `test/HELLO.BASL` twice - once through the ROM BASLOAD,
+once through the PRG - and compares. That is the only claim worth testing: a
 RAM build that runs but tokenises *differently* is worse than one that does
 not run.
 
@@ -124,7 +124,7 @@ not run.
 ```
 
 **The RAM build's file is two bytes shorter, and that is the fork working.**
-The ROM build SAVEs up to `line_code`, four bytes past the last line — two of
+The ROM build SAVEs up to `line_code`, four bytes past the last line - two of
 them the zero link that ends a program, two whatever was in RAM, and those two
 differ run to run. `source/gpc/build_basl.py` documents the same thing and
 skips its up-to-date check because of it. The streaming build writes the zero
@@ -132,8 +132,8 @@ link itself at close and stops there, so the compare is `rom[:-2]` against the
 whole of the PRG's output.
 
 `runfront.py` drives the front end. **An interactive program cannot be pasted
-at** — `x16emu -bas` types at the `READY.` prompt only, and once a program is
-running the rest is dropped, not queued — so it generates a **fixed-answer
+at** - `x16emu -bas` types at the `READY.` prompt only, and once a program is
+running the rest is dropped, not queued - so it generates a **fixed-answer
 variant from the real source**, asserting on every substitution. Only the key
 reader goes untested. It boots four times, one answer each: a **missing file,
 a file whose include is missing, a good one, and nothing**. The driver POKEs
@@ -142,7 +142,8 @@ rather than the output file: a run that fails partway still writes a complete,
 valid, wrong program.
 
 ```
-  PASS -- the front end loaded the engine, tokenised HELLO.BASL to 34 bytes, and quit
+  PASS -- the front end loaded the engine, tokenised HELLO.BASL to 34 bytes,
+          and quit
 ```
 
 **The raw bytes in `RUN.LOG` are not on the screen.** `-echo` hooks CHROUT, so
@@ -158,8 +159,8 @@ same way. Load `BASLOAD-GPC.BIN` at $6000, then:
 - device: `R0H`, `$03`
 - call: `SYS $6000`
 - return code: `R1L`, `$04`. 0 is OK
-- message: `$BF00` onward, bank 0 — it overwrites the name you passed
-- source line: `R1H`..`R2H`, `$05`-`$07`, 24 bits — **0 when the fault has no
+- message: `$BF00` onward, bank 0 - it overwrites the name you passed
+- source line: `R1H`..`R2H`, `$05`-`$07`, 24 bits - **0 when the fault has no
   line to name**
 
 A message that ends in a colon is the one expecting that number after it;
@@ -181,7 +182,7 @@ every `PEEK` and `POKE`, so `POKE 0,0` selects nothing and the name lands in
 whichever bank was live. The symptom is silent: `SYS` returns cleanly, no file
 is written, and `$BF00` still reads back what you poked.
 
-`test/runtest.py` has a working driver, including the re-entry guard — `LOAD`
+`test/runtest.py` has a working driver, including the re-entry guard - `LOAD`
 inside a BASIC program restarts it *and* clears variables, so the guard is a
 POKEd byte, not a variable.
 
@@ -201,7 +202,7 @@ diff BASLOAD-GPC/upstream/line.inc BASLOAD-GPC/src/line.inc
 
 is the fork, in full, with no tooling and nothing to apply. Every changed hunk
 also sits inside a `;=== GPC begin ===` / `;=== GPC end ===` banner, so it is
-greppable from inside the file — which is the question that actually gets
+greppable from inside the file - which is the question that actually gets
 asked six months later, in a 24 KB file nobody here wrote.
 
 Each build copies `upstream/` to `build/work/`, drops `src/` over it, and
@@ -216,13 +217,13 @@ tree dirty.
 - `loader.inc`: opens the file before pass 2, closes it at exit and deletes it
   if the run failed; the `SAVE` at the end is gone, and with it the
   `VARTAB`/`ARYTAB`/`STREND` stores
-- `option.inc`: one directive, `#GPC` — see below
+- `option.inc`: one directive, `#GPC` - see below
 - `response.inc`: one word: message 15 was `SYMFILE IO ERR`, so a stock
   BASLOAD reports the wrong error for a `#SAVEAS` with no argument
 
 **Nothing downstream can tell the program was never in RAM.** GPC reads the
 two-byte line link, ORs its halves, tests for zero and never dereferences it
-(`compiler/api.asm:166`) — so a link is an opaque non-zero marker, the 16-bit
+(`compiler/api.asm:166`) - so a link is an opaque non-zero marker, the 16-bit
 address space it names bounds nothing, and one flat streamed file needs no
 compiler change at all.
 
@@ -238,8 +239,8 @@ end-of-program link and closed the file, so what stayed on disk was a
 structurally perfect BASIC program that stopped where the error did. Nothing
 downstream could tell it from a whole one, and on 11th Sep 2026 the compiler
 was handed one and died on the first forward reference past the cut.
-`out_scratch` sends `S:` plus the bare name — the `@:` overwrite prefix comes
-off, because `@` is not valid in that command — and `loader_run` calls it at
+`out_scratch` sends `S:` plus the bare name - the `@:` overwrite prefix comes
+off, because `@` is not valid in that command - and `loader_run` calls it at
 `exit:` whenever `KERNAL_R1` is non-zero, which is exactly when something
 called `response_set`. Two things it deliberately does not do: it never runs
 unless `out_created` says *this* run created the file, so a `FILE EXISTS`
@@ -248,7 +249,7 @@ status afterwards, because that would replace
 `LABEL NOT FOUND IN DB.INC.BL:459` with a generic file error and lose the only
 useful thing the run produced.
 
-## `#GPC` — a directive channel BASLOAD never has to understand
+## `#GPC` - a directive channel BASLOAD never has to understand
 
 One table entry buys the compiler an unlimited directive namespace. `#GPC`
 passes the rest of its line through into the tokenised program as a `REM`,
@@ -261,8 +262,8 @@ verbatim, and BASLOAD never learns what any of it means:
 
 **The `#` is kept, and there is no space after the `REM` token.** That is what
 a reader matches on: `$8f` then `#GPC`, which no ordinary comment produces by
-accident. GPC already consumes REM-carried payload — `GP.ASM` blocks are
-written as `REM` lines and read back by `commands/gpasm.asm` — so this is that
+accident. GPC already consumes REM-carried payload - `GP.ASM` blocks are
+written as `REM` lines and read back by `commands/gpasm.asm` - so this is that
 mechanism made first-class. Every future compiler directive is then a GPC-side
 change alone.
 
@@ -278,7 +279,7 @@ Three things it does that are easy to get wrong:
 - **A hidden `#IFDEF` block emits nothing**, the same test `#DEFINE` already
   makes.
 
-It costs a line number and the bytes of the text. Nothing reads these yet —
+It costs a line number and the bytes of the text. Nothing reads these yet -
 the channel ships before its first caller, deliberately, because adding it
 later would mean another BASLOAD build.
 
@@ -297,10 +298,10 @@ build/     output, not tracked. work/ is the fork's tree, stock/ the canary's
 
 ## Licence
 
-`upstream/` is BASLOAD, © 2021-2023 Stefan Jakobsson, BSD 2-Clause — see
+`upstream/` is BASLOAD, (c) 2021-2023 Stefan Jakobsson, BSD 2-Clause - see
 `upstream/LICENSE`, which every source file also carries in full. Permissive:
 fork, modify and ship, keeping the notice and the disclaimer. Two repos exist
 and this is the live one; `stefan-b-jakobsson/basload` is the deprecated
-standalone PRG and is **not** a shortcut — it predates `#TOKEN`, `#SAVEAS`,
+standalone PRG and is **not** a shortcut - it predates `#TOKEN`, `#SAVEAS`,
 `#SYMFILE`, `#DEFINE`, `#IFDEF` and `#INCLUDE`, and GP-BASIC is built on
 `#TOKEN`.

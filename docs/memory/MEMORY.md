@@ -20,7 +20,7 @@ again. See [memory-is-git-tracked](memory-is-git-tracked.md).
 - [Library working copy, then root](library-working-copy-then-root.md) — edit in GPC-BASIC-TOOLS-SRC/GPB-MODS-TESTING/GPC-BASIC/, drift runs BOTH ways; [test in GPBMODS first](test-in-gpbmods-before-spreading.md); [samples build in place](samples-build-in-place.md), never staged into source/drive/
 - [GUI only through verbs](gui-only-through-verbs.md) — no GOSUB GUI.* in a program; forms and pickers become verbs like MENU
 - [No ship language, no unasked builds](no-ship-language-this-is-dev.md) — [run builds in the background](run-builds-in-background.md), a typed message cancels an in-flight tool; [build, report, hand it back](build-report-dont-investigate.md)
-- [Compile shared, not embedded](compile-shared-not-embedded.md) — SHARED is the p-code number; [release samples are the exception](release-samples-shape.md), own BASL plus a standalone EMBEDDED PRG
+- [Compile shared, not embedded](compile-shared-not-embedded.md) — SHARED is the p-code number; [release samples are the exception](release-samples-shape.md), own BASL plus a standalone EMBEDDED PRG; [shipped readmes fit 78 columns](release-readmes-fit-78-columns.md), they are read on the X16
 - [The compiler is GPC](name-the-compiler-gpc.md) — "Blitz" is a heritage nod; and [concurrent agents run here](user-runs-concurrent-agents-here.md), so re-read before any write
 - [Compact early, not at the end](compact-early-not-at-the-end.md) — remind the user to /compact at the end of EVERY turn that lands a step; cost is context size x turns
 
@@ -83,6 +83,7 @@ again. See [memory-is-git-tracked](memory-is-git-tracked.md).
 ## The CUA GUI library
 - [LISTS and DIR plan](lists-and-dir-plan.md) — lists read GP.BSTR-layout banks at run time; LIST.BANK and FILEPICK tested, LIST.SORT written and awaiting its run
 - [GUI-CUA phase 5 state](gui-cua-phase5-state.md) — written not verified; what is owed and what still drifts
+- [Demo project options](demo-project-options.md) — the six showcase ideas; #1 MANDELBROT-SPEED built and in release, Ledger is the next pick
 
 ## The BASL cruncher
 - [Folding onto a label line saves nothing](folding-onto-a-label-line-saves-nothing.md) — a bare label is not a BASIC line
