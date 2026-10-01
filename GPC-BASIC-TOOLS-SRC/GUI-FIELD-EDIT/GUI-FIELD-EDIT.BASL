@@ -39,6 +39,15 @@
 #DEFINE GFE.RIGHTLABEL 9
 #DEFINE GFE.VALUEWIDTH 12
 
+## ---- The lines between the columns and the sections, in PETSCII: GP.FILL
+## ---- turns them into screen codes. The divider is the blank column between
+## ---- the left column's widest field and GFE.RIGHTCOLUMN.
+#DEFINE GFE.DIVIDER 35
+#DEFINE GFE.HLINE 192
+#DEFINE GFE.VLINE 221
+#DEFINE GFE.JOINLEFT 179
+#DEFINE GFE.JOINRIGHT 171
+
 ## ---- The controls in the order the form adds them, which is their numbers.
 ## ---- GFE.TEXT$() and GFE.CHOICE%() keep each one's answer under the same
 ## ---- number, and the form is built from them again.
@@ -108,24 +117,14 @@ GP.ENDBANKED
 
 GFE.LIBEND:
 
-DIM GFE.TEXT$(GFE.C.COUNT)
-DIM GFE.CHOICE%(GFE.C.COUNT)
+DIM GFE.TEXT$(GFE.C.COUNT) : DIM GFE.CHOICE%(GFE.C.COUNT)
 
 ## ---- The price list. A title costs its format's base for one night; three
 ## ---- nights cost 1.5 of that and seven 2.5. A member level takes a percent off.
-DIM GFE.BASE(3)
-DIM GFE.STRETCH(3)
-DIM GFE.PERCENT(4)
-GFE.BASE(1) = 2.99
-GFE.BASE(2) = 1.99
-GFE.BASE(3) = 3.99
-GFE.STRETCH(1) = 1
-GFE.STRETCH(2) = 1.5
-GFE.STRETCH(3) = 2.5
-GFE.PERCENT(1) = 0
-GFE.PERCENT(2) = 5
-GFE.PERCENT(3) = 10
-GFE.PERCENT(4) = 20
+DIM GFE.BASE(3) : DIM GFE.STRETCH(3) : DIM GFE.PERCENT(4)
+GFE.BASE(1) = 2.99 : GFE.BASE(2) = 1.99 : GFE.BASE(3) = 3.99
+GFE.STRETCH(1) = 1 : GFE.STRETCH(2) = 1.5 : GFE.STRETCH(3) = 2.5
+GFE.PERCENT(1) = 0 : GFE.PERCENT(2) = 5 : GFE.PERCENT(3) = 10 : GFE.PERCENT(4) = 20
 GFE.TAXRATE = 8.25
 GFE.COUPONOFF = 1
 
@@ -134,14 +133,13 @@ GFE.COUPONOFF = 1
 GOSUB APPSYS.STARTUP
 SCREEN GFE.MODE
 GP.CALL APPSYS.SCRMODE, 0, 0, 0, 1
-GFE.SCREENCOLS% = GP.X
-GFE.SCREENROWS% = GP.Y
-THEME.ID% = 0
-GOSUB THEME.SELECT
+GFE.SCREENCOLS% = GP.X : GFE.SCREENROWS% = GP.Y
+THEME.ID% = 0 : GOSUB THEME.SELECT
 
 ## ---- The claims, then a MENU.BEGIN, then the free banks: the first MENU.BEGIN
 ## ---- claims MENU.TEXTBANK, and GET.FREE.BANK must not hand it out.
 GOSUB GFE.CLAIM.BANKS
+
 GP.SUB MENU.BEGIN, MENU.POPUP
 GOSUB BANKMGR.GET.FREE.BANK
 GP.SUB DLGRESET, BANKMGR.BANK
@@ -151,8 +149,7 @@ GFE.ITEMBANK% = BANKMGR.BANK
 GOSUB GFE.RESET.RENTAL
 
 GFE.SERVE:
-    GOSUB GFE.DRAW.PAGE
-    GOSUB GFE.RUN.FORM
+    GOSUB GFE.DRAW.PAGE : GOSUB GFE.RUN.FORM
     IF GFE.ANSWER% = 0 THEN GOTO GFE.ASK.CLOSE
     GOSUB GFE.CHECK.RENTAL
     GP.IF GFE.PROBLEM$ <> "" THEN
@@ -225,17 +222,16 @@ GFE.DRAW.PAGE:
 ## **  typed in and left with RETURN changes and ends the form on one key.
 ## ***********************************************************************
 GFE.RUN.FORM:
-    GOSUB GFE.BUILD.FORM
-    GOSUB GFE.PRICE.RENTAL
+    GOSUB GFE.BUILD.FORM : GOSUB GFE.PRICE.RENTAL
     GP.DO
         GFE.ANSWER% = GP.FN(FORMTO.EVENT)
         IF GFE.ANSWER% < 1 THEN GP.EXITDO
         GOSUB GFE.PRICE.RENTAL
     GP.LOOP
-    GOSUB GFE.PRICE.RENTAL
-    GOSUB GFE.TAKE.FORM
+    GOSUB GFE.PRICE.RENTAL : GOSUB GFE.TAKE.FORM
     GP.SUB FORM.END
     RETURN
+
 
 
 ## ***********************************************************************
@@ -299,7 +295,51 @@ GFE.BUILD.FORM:
 
     ## ---- the list's marks go in once a control after it has sealed it
     IF GFE.TEXT$(GFE.C.TITLES) <> "" THEN GP.SUB FORM.SETTEXT, GFE.C.TITLES, GFE.TEXT$(GFE.C.TITLES)
+    GOSUB GFE.DRAW.LINES
     RETURN
+
+
+## ***********************************************************************
+## **  GFE.DRAW.LINES -- a line down between the columns, and a line across
+## **  each blank row between two sections, joined to it.
+## **
+## **  Rows and columns count from the first cell inside the box, where
+## **  FORM.BEGIN left GUI.INNER.LEFT and GUI.INNER.TOP. Every line is in a
+## **  blank cell, so no control draws over it.
+## ***********************************************************************
+GFE.DRAW.LINES:
+    GFE.LINELEFT% = GUI.INNER.LEFT
+    GFE.LINETOP% = GUI.INNER.TOP
+    GFE.LINEATTR = THEME.CLR(THEME.BORDER)
+    GP.FILL GFE.LINELEFT% + GFE.DIVIDER, GFE.LINETOP%, 1, GFE.FORMROWS, GFE.VLINE, GFE.LINEATTR
+    GFE.RULEROW = 8
+    GOSUB GFE.RULE.LEFT
+    GFE.RULEROW = 13
+    GOSUB GFE.RULE.LEFT
+    GFE.RULEROW = 17
+    GOSUB GFE.RULE.LEFT
+    GFE.RULEROW = 20
+    GOSUB GFE.RULE.LEFT
+    GFE.RULEROW = 10
+    GOSUB GFE.RULE.RIGHT
+    GFE.RULEROW = 14
+    GOSUB GFE.RULE.RIGHT
+    GFE.RULEROW = 16
+    GOSUB GFE.RULE.RIGHT
+    RETURN
+
+## ---- a line across the left column on row GFE.RULEROW, into the divider
+GFE.RULE.LEFT:
+    GP.FILL GFE.LINELEFT%, GFE.LINETOP% + GFE.RULEROW, GFE.DIVIDER, 1, GFE.HLINE, GFE.LINEATTR
+    GP.FILL GFE.LINELEFT% + GFE.DIVIDER, GFE.LINETOP% + GFE.RULEROW, 1, 1, GFE.JOINLEFT, GFE.LINEATTR
+    RETURN
+
+## ---- a line across the right column on row GFE.RULEROW, out of the divider
+GFE.RULE.RIGHT:
+    GP.FILL GFE.LINELEFT% + GFE.DIVIDER, GFE.LINETOP% + GFE.RULEROW, 1, 1, GFE.JOINRIGHT, GFE.LINEATTR
+    GP.FILL GFE.LINELEFT% + GFE.DIVIDER + 1, GFE.LINETOP% + GFE.RULEROW, GFE.FORMWIDTH - GFE.DIVIDER - 1, 1, GFE.HLINE, GFE.LINEATTR
+    RETURN
+
 
 
 ## ***********************************************************************

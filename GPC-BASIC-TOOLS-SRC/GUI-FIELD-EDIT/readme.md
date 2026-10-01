@@ -55,6 +55,9 @@ The form fills the screen. Its title is
 `REWIND CITY VIDEO - THE RENTAL COUNTER`. The buttons `RENT` and `CANCEL` are
 under the controls, and `RENT` is the default.
 
+A line runs down between the two columns. A line across each column
+separates its sections, and joins the line down.
+
 The left column holds the member.
 
 | Label | Control | Size or items |
@@ -374,7 +377,7 @@ python source\gpc\samplesbuild.py GUI-FIELD-EDIT
 
 | File | Written by | Bytes | Ships |
 |---|---|---|---|
-| `GUI-FIELD-EDIT.SRC.PRG` | BASLOAD | 38,548 | No |
+| `GUI-FIELD-EDIT.SRC.PRG` | BASLOAD | 38,911 | No |
 | `GUI-FIELD-EDIT.SRC.SYM` | BASLOAD | | No |
 | `GUI-FIELD-EDIT.PRG` | GPC | 18,305 | Yes |
 | `GUI-FIELD-EDIT.MAP` | GPC | | No |
