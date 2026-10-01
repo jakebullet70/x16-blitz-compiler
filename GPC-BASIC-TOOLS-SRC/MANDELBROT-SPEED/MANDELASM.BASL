@@ -1,0 +1,290 @@
+## ***********************************************************************
+## **
+## **  MANDELASM.BASL -- MANDEL.BASL with its inner loop in GP.ASM.
+## **
+## **  BASIC keeps the screen, the rows and columns and the colours.
+## **  MANDEL.ESCAPE.COUNT iterates one point in 4.12 fixed point, 4096
+## **  to 1.0, with a shift-and-add multiply. Compile-only: ROM BASIC
+## **  cannot run a GP keyword.
+## **
+## ***********************************************************************
+
+#SAVEAS "@:MANDELASM.SRC.PRG"
+#SYMFILE "@:MANDELASM.SRC.SYM"
+
+#INCLUDE "GPC-BASIC/GPB.INC.BL"
+#INCLUDE "GPC-BASIC/APPSYS.INC.BL"
+
+MANDEL.RUNNER$ = "GPC + GP.ASM"
+GOSUB APPSYS.STARTUP
+
+SCREEN 3
+MANDEL.COLUMNS = 40
+MANDEL.ROWS = 28
+MANDEL.MOST.ITERATIONS% = 32
+MANDEL.REAL.LEFT = -2.2
+MANDEL.REAL.STEP = 3 / MANDEL.COLUMNS
+MANDEL.IMAGINARY.TOP = -1.05
+MANDEL.IMAGINARY.STEP = 2.1 / MANDEL.ROWS
+
+## The slots MANDEL.ESCAPE.COUNT reads and writes.
+MANDEL.C.REAL% = 0
+MANDEL.C.IMAGINARY% = 0
+MANDEL.COUNT% = 0
+
+## Layer 1's map: L1_MAPBASE holds address bits 16-9, L1_CONFIG bits 4-5 the width.
+MANDEL.CELL.ADDRESS = PEEK($9F35) * 512
+MANDEL.MAP.BANK = INT(MANDEL.CELL.ADDRESS / 65536)
+MANDEL.MAP.ADDRESS = MANDEL.CELL.ADDRESS - MANDEL.MAP.BANK * 65536
+MANDEL.ROW.BYTES = 64 * 2 ^ ((PEEK($9F34) / 16) AND 3)
+
+DIM MANDEL.PALETTE(12)
+FOR MANDEL.COLUMN = 0 TO 12
+    READ MANDEL.PALETTE(MANDEL.COLUMN)
+NEXT
+DATA 6,14,3,13,5,7,8,2,10,4,12,15,1
+
+## A colour byte per count, background in the high nibble. Index MOST.ITERATIONS stays 0, black.
+DIM MANDEL.SHADE(MANDEL.MOST.ITERATIONS%)
+FOR MANDEL.COLUMN = 0 TO MANDEL.MOST.ITERATIONS% - 1
+    MANDEL.SHADE(MANDEL.COLUMN) = 16 * MANDEL.PALETTE(MANDEL.COLUMN - 13 * INT(MANDEL.COLUMN / 13))
+NEXT
+
+## Each column's real part, 4.12, worked out once.
+DIM MANDEL.COLUMN.REAL%(MANDEL.COLUMNS - 1)
+FOR MANDEL.COLUMN = 0 TO MANDEL.COLUMNS - 1
+    MANDEL.COLUMN.REAL%(MANDEL.COLUMN) = INT((MANDEL.REAL.LEFT + MANDEL.COLUMN * MANDEL.REAL.STEP) * 4096)
+NEXT
+
+PRINT
+PRINT " MANDELBROT SPEED DUEL"
+PRINT
+PRINT MANDEL.COLUMNS; "X"; MANDEL.ROWS; "CELLS, UP TO"; MANDEL.MOST.ITERATIONS%; "ITERATIONS."
+PRINT " ONE PICTURE, THREE WAYS TO RUN IT:"
+PRINT
+PRINT "   MANDEL.SRC.PRG   ROM BASIC"
+PRINT "   MANDEL.PRG       GPC COMPILED"
+PRINT "   MANDELASM.PRG    GPC + GP.ASM"
+PRINT
+PRINT " THIS RUN: "; MANDEL.RUNNER$
+PRINT
+PRINT " PRESS A KEY TO START."
+GOSUB MANDEL.WAIT.KEY
+CLS
+
+MANDEL.START.TIME = TI
+FOR MANDEL.ROW = 0 TO MANDEL.ROWS - 1
+    MANDEL.C.IMAGINARY% = INT((MANDEL.IMAGINARY.TOP + MANDEL.ROW * MANDEL.IMAGINARY.STEP) * 4096)
+    MANDEL.CELL.ADDRESS = MANDEL.MAP.ADDRESS + MANDEL.ROW * MANDEL.ROW.BYTES + 1
+    FOR MANDEL.COLUMN = 0 TO MANDEL.COLUMNS - 1
+        MANDEL.C.REAL% = MANDEL.COLUMN.REAL%(MANDEL.COLUMN)
+        GOSUB MANDEL.ESCAPE.COUNT
+        VPOKE MANDEL.MAP.BANK, MANDEL.CELL.ADDRESS, MANDEL.SHADE(MANDEL.COUNT%)
+        MANDEL.CELL.ADDRESS = MANDEL.CELL.ADDRESS + 2
+    NEXT
+NEXT
+MANDEL.JIFFIES = TI - MANDEL.START.TIME
+
+LOCATE 29, 1
+PRINT MANDEL.RUNNER$; ":"; MANDEL.JIFFIES; "JIFFIES ="; INT(MANDEL.JIFFIES / 6 + 0.5) / 10; "S";
+LOCATE 30, 1
+PRINT "PRESS A KEY TO EXIT.";
+GOSUB MANDEL.WAIT.KEY
+GOSUB APPSYS.RESTORE
+END
+
+MANDEL.WAIT.KEY:
+GET MANDEL.KEY$
+IF MANDEL.KEY$ = "" THEN GOTO MANDEL.WAIT.KEY
+RETURN
+
+## MANDEL.ESCAPE.COUNT -- iterate z = z * z + c from z = 0 until |z| passes 2.
+##
+##   in   MANDEL.C.REAL%  MANDEL.C.IMAGINARY%   c, 4.12
+##        MANDEL.MOST.ITERATIONS%               the cap, under 256
+##   out  MANDEL.COUNT%   the iterations taken, or MOST.ITERATIONS% when z never escaped
+##
+## Zero page: $02-$10 holds z, c, the squares, the count, the cap and a sign, and
+## zTemp0-2 ($2C-$31) hold the multiply. $02-$21 are the KERNAL's r0-r15, which
+## any KERNAL call may change, so no caller keeps a value there across a block.
+##
+##   $02/$03 z real   $06/$07 c real        $0A/$0B real squared        $0E count
+##   $04/$05 z imag   $08/$09 c imaginary   $0C/$0D imaginary squared   $0F sign   $10 cap
+MANDEL.ESCAPE.COUNT:
+    #REM 1
+    GP.ASM
+    REM CLD                      ; SYS enters with the caller's flags
+    REM LDY #1
+    REM LDA {MANDEL.C.REAL%}
+    REM STA $06
+    REM LDA {MANDEL.C.REAL%},Y
+    REM STA $07
+    REM LDA {MANDEL.C.IMAGINARY%}
+    REM STA $08
+    REM LDA {MANDEL.C.IMAGINARY%},Y
+    REM STA $09
+    REM LDA {MANDEL.MOST.ITERATIONS%}
+    REM STA $10
+    REM STZ $02
+    REM STZ $03
+    REM STZ $04
+    REM STZ $05
+    REM STZ $0E
+    REM ; ---- real squared; |z real| over 2.0 has escaped ----
+    REM ITER: LDA $02
+    REM LDX $03
+    REM JSR MAGN
+    REM BCC RSQ
+    REM JMP DONE
+    REM RSQ: STA $2C
+    REM STA $2E
+    REM STX $2D
+    REM STX $2F
+    REM JSR MUL
+    REM LDX #4                   ; 8.24 product down to 4.12
+    REM JSR SHR
+    REM LDA $2F
+    REM STA $0A
+    REM LDA $30
+    REM STA $0B
+    REM ; ---- imaginary squared ----
+    REM LDA $04
+    REM LDX $05
+    REM JSR MAGN
+    REM BCC ISQ
+    REM JMP DONE
+    REM ISQ: STA $2C
+    REM STA $2E
+    REM STX $2D
+    REM STX $2F
+    REM JSR MUL
+    REM LDX #4
+    REM JSR SHR
+    REM LDA $2F
+    REM STA $0C
+    REM LDA $30
+    REM STA $0D
+    REM ; ---- the sum of the squares over 4.0, $4000, has escaped ----
+    REM CLC
+    REM LDA $0A
+    REM ADC $0C
+    REM TAY
+    REM LDA $0B
+    REM ADC $0D
+    REM CMP #$40
+    REM BCC STEP
+    REM BNE ESCD
+    REM CPY #0
+    REM BEQ STEP
+    REM ESCD: JMP DONE
+    REM ; ---- z imaginary = 2 * z real * z imaginary + c imaginary ----
+    REM STEP: LDA $03
+    REM EOR $05
+    REM STA $0F                  ; bit 7 is the product's sign
+    REM LDA $02
+    REM LDX $03
+    REM JSR MAGN
+    REM STA $2C
+    REM STX $2D
+    REM LDA $04
+    REM LDX $05
+    REM JSR MAGN
+    REM STA $2E
+    REM STX $2F
+    REM JSR MUL
+    REM LDX #3                   ; one shift fewer doubles it
+    REM JSR SHR
+    REM BIT $0F
+    REM BPL CROSS
+    REM SEC
+    REM LDA #0
+    REM SBC $2F
+    REM STA $2F
+    REM LDA #0
+    REM SBC $30
+    REM STA $30
+    REM CROSS: CLC
+    REM LDA $2F
+    REM ADC $08
+    REM STA $04
+    REM LDA $30
+    REM ADC $09
+    REM STA $05
+    REM ; ---- z real = real squared - imaginary squared + c real ----
+    REM SEC
+    REM LDA $0A
+    REM SBC $0C
+    REM TAY
+    REM LDA $0B
+    REM SBC $0D
+    REM TAX
+    REM CLC
+    REM TYA
+    REM ADC $06
+    REM STA $02
+    REM TXA
+    REM ADC $07
+    REM STA $03
+    REM INC $0E
+    REM LDA $0E
+    REM CMP $10
+    REM BCS DONE
+    REM JMP ITER
+    REM DONE: LDA $0E
+    REM STA {MANDEL.COUNT%}
+    REM LDA #0
+    REM LDY #1
+    REM STA {MANDEL.COUNT%},Y
+    REM RTS
+    REM ; ---- MAGN: |A lo, X hi| back in A/X. Carry set when it is over 2.0, $2000 ----
+    REM MAGN: CPX #$80
+    REM BCC MAGTST
+    REM EOR #$FF
+    REM CLC
+    REM ADC #1
+    REM PHA
+    REM TXA
+    REM EOR #$FF
+    REM ADC #0
+    REM TAX
+    REM PLA
+    REM MAGTST: CPX #$20
+    REM BCC MAGOK
+    REM BNE MAGOUT
+    REM CMP #0
+    REM BEQ MAGOK
+    REM MAGOUT: SEC
+    REM RTS
+    REM MAGOK: CLC
+    REM RTS
+    REM ; ---- MUL: $2C/$2D times $2E/$2F, unsigned, into $2E-$31 low to high ----
+    REM MUL: STZ $30
+    REM STZ $31
+    REM LDX #16
+    REM LSR $2F
+    REM ROR $2E
+    REM MULBIT: BCC MULSH
+    REM CLC
+    REM LDA $30
+    REM ADC $2C
+    REM STA $30
+    REM LDA $31
+    REM ADC $2D
+    REM STA $31
+    REM MULSH: ROR $31
+    REM ROR $30
+    REM ROR $2F
+    REM ROR $2E
+    REM DEX
+    REM BNE MULBIT
+    REM RTS
+    REM ; ---- SHR: $2F-$31 right X places; the result is $2F/$30 ----
+    REM SHR: LSR $31
+    REM ROR $30
+    REM ROR $2F
+    REM DEX
+    REM BNE SHR
+    REM RTS
+    GP.ENDASM
+    #REM 0
+    RETURN

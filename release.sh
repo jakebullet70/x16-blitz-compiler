@@ -19,8 +19,8 @@
 #     make release                     stage the engine + samples into source/drive/
 #     make -C source/runtime gpc-rt    both shared runtimes and their bank code, GPB/GPC/GP1.RT.nnn.BIN
 #     make -C source/gpc release       GPC.PRG + GPC.ERR (tokenised, then compiled)
-#     source/gpc/samplesbuild.py       the seven sample programs, each tokenised
-#                                      then compiled
+#     source/gpc/samplesbuild.py       the sample programs, each tokenised then
+#                                      compiled
 #
 #  THE SAMPLE BUILD COMES LAST because GPC.HELP and the others are compiled SHARED and
 #  want the runtime that gpc-rt has just written. It is also the slow half: each program
@@ -58,7 +58,7 @@ if [ "$DO_BUILD" = 1 ]; then
     make -C source/runtime gpc-rt
     echo "== make -C source/gpc release  (GPC.PRG + GPC.ERR, tokenised and compiled) =="
     make -C source/gpc release
-    echo "== samplesbuild.py  (GPBMODS, GPC.HELP, COLORTST, BMXVIEW, GPC.GUI, EDIT, GPC.ERR, GUI-LITE) =="
+    echo "== samplesbuild.py  (GPBMODS, GPC.HELP, COLORTST, BMXVIEW, GPC.GUI, EDIT, GPC.ERR, GUI-LITE, MANDEL, MANDELASM) =="
     python source/gpc/samplesbuild.py
 fi
 
@@ -188,8 +188,9 @@ ROOTFILES = [
     ("LICENSE",                             "LICENSE"),
 ]
 
-# README.md serves the repo and the release. Everything from this line on is for the source
-# tree, and the staged copy stops above it.
+# A shipped readme serves the repo and the release. Everything from this line on is for the
+# source tree, and the staged copy stops above it. The root README.md and the MANDELBROT-SPEED
+# readme carry one.
 README_CUT = "<!-- release: the rest is for the source tree -->"
 
 # The GP.BASIC library ships whole, straight from the repo master rather than from source/drive/ --
@@ -284,6 +285,17 @@ SAMPLES = [
                   ("GPC-BASIC-TOOLS-SRC/GUI-LITE/GUI-LITE.BASL",         "GUI-LITE.BASL")],
         "globs": [],
         "fake":  "GUI-LITE.PRG",
+    },
+    {
+        "dir":   "MANDELBROT-SPEED",
+        "files": [("GPC-BASIC-TOOLS-SRC/MANDELBROT-SPEED/MANDEL.SRC.PRG",  "MANDEL.SRC.PRG"),
+                  ("GPC-BASIC-TOOLS-SRC/MANDELBROT-SPEED/MANDEL.PRG",      "MANDEL.PRG"),
+                  ("GPC-BASIC-TOOLS-SRC/MANDELBROT-SPEED/MANDELASM.PRG",   "MANDELASM.PRG"),
+                  ("GPC-BASIC-TOOLS-SRC/MANDELBROT-SPEED/MANDEL.BASL",     "MANDEL.BASL"),
+                  ("GPC-BASIC-TOOLS-SRC/MANDELBROT-SPEED/MANDELASM.BASL",  "MANDELASM.BASL"),
+                  ("GPC-BASIC-TOOLS-SRC/MANDELBROT-SPEED/readme.md",       "README.md")],
+        "globs": [],
+        "fake":  "MANDELASM.PRG",
     },
 ]
 
@@ -445,6 +457,19 @@ def put_tree(src_dir_rel, dst_dir_rel):
     return n
 
 
+def cut_readme(dst_rel):
+    """Stop a staged readme at README_CUT. False if it has no cut line."""
+    readme = os.path.join(TMP, *dst_rel.split("/"))
+    with open(readme, encoding="utf-8", newline="") as f:
+        text = f.read()
+    cut = text.find(README_CUT)
+    if cut < 0:
+        return False
+    with open(readme, "w", encoding="utf-8", newline="") as f:
+        f.write(text[:cut].rstrip() + ("\r\n" if "\r\n" in text else "\n"))
+    return True
+
+
 if do_stage:
     if os.path.isdir(TMP):
         print("release: wiping release/TMP")
@@ -458,16 +483,8 @@ if do_stage:
             else:
                 missing.append(src_rel)
 
-    readme = os.path.join(TMP, "README.md")
-    if os.path.isfile(readme):
-        with open(readme, encoding="utf-8", newline="") as f:
-            text = f.read()
-        cut = text.find(README_CUT)
-        if cut < 0:
-            print("release: WARNING -- README.md has no cut line, so it ships whole")
-        else:
-            with open(readme, "w", encoding="utf-8", newline="") as f:
-                f.write(text[:cut].rstrip() + ("\r\n" if "\r\n" in text else "\n"))
+    if os.path.isfile(os.path.join(TMP, "README.md")) and not cut_readme("README.md"):
+        print("release: WARNING -- README.md has no cut line, so it ships whole")
 
     for src_dir_rel, dst_dir_rel in TREES:
         print("release: %-12s -- %d files" % (dst_dir_rel + "/", put_tree(src_dir_rel, dst_dir_rel)))
@@ -516,6 +533,8 @@ if do_stage:
                     stub(base + "/" + name)
                 else:
                     missing.append(src_rel)
+            elif name == "README.md":
+                cut_readme(base + "/" + name)
         for folder, keep in prog["globs"]:
             full_dir = os.path.join(root, *folder.split("/"))
             if not os.path.isdir(full_dir):

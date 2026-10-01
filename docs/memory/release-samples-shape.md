@@ -5,20 +5,24 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: 6cb2a824-c1cb-47e0-8336-85f9918b1083
-  modified: 2026-09-30T15:12:37.518Z
+  modified: 2026-10-01T10:25:53.974Z
 ---
 
 Each `release/TMP/SAMPLES/<PROG>/` folder holds the program's own sources and a PRG that runs on its
-own. The four are `BMXVIEW`, `COLORTST`, `EDIT` and `GPBMODS`, all built in their
-`GPC-BASIC-TOOLS-SRC` folders and copied by `release.sh` (the `SAMPLES` table).
+own. The five are `GPBMODS`, `BMXVIEW`, `COLORTST`, `GUI-LITE` and `MANDELBROT-SPEED`, all built
+in their `GPC-BASIC-TOOLS-SRC` folders and copied by `release.sh` (the `SAMPLES` table).
+`MANDELBROT-SPEED` also ships `MANDEL.SRC.PRG`, the tokenised source that ROM BASIC runs, because
+the sample is a timing race against it.
 
 - **Sources:** every file the compile needs that is not a `GPC-BASIC` library module, so
   `GPB-MENUS.BASL` beside `GPBMODS.BASL`, and the ten `ED-*.BASL` beside `EDIT.BASL`. The library
   modules are never copied into a sample folder.
 - **Object:** EMBEDDED, so no `.RT.` file is needed. A banked program's `.OVL` ships beside it.
   BMXVIEW ships as `BMXVIEW.PRG` (no `C.` prefix), with its eight `.BMX` images.
-- `EDIT` also ships `TEST.MD`, a file to open in the editor. The user wants more work on EDIT before
-  a release.
+- `EDIT` is out of the release. The user wants more work on it first.
+- A folder `readme.md` stays in the source tree, except MANDELBROT-SPEED's. It ships as
+  `README.md`, cut at `README_CUT` like the root README, so its build and demo-bat notes stay
+  behind (user's ask, 2026-10-01).
 
 **Why:** the user's spec, 2026-09-30: "bare src code (just BASL - not the needed GPC-BASIC) and
 compiled standalone runnable prg", and "if a file is not included in GPC-BASIC but is needed to

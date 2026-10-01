@@ -92,6 +92,19 @@ PROGRAMS = [
          src=("GPC-BASIC-TOOLS-SRC/GUI-LITE", "GUI-LITE.BASL"),
          shared=False,
          install=None, data=[], overlay=False),
+
+    #   EMBEDDED, and plain X16 BASIC: MANDEL.SRC.PRG runs in ROM BASIC beside the compiled
+    #   MANDEL.PRG, so the source may not use a GP keyword.
+    dict(name="MANDEL",
+         src=("GPC-BASIC-TOOLS-SRC/MANDELBROT-SPEED", "MANDEL.BASL"),
+         shared=False,
+         install=None, data=[], overlay=False),
+
+    #   EMBEDDED. The same picture with its inner loop in GP.ASM, beside MANDEL.
+    dict(name="MANDELASM",
+         src=("GPC-BASIC-TOOLS-SRC/MANDELBROT-SPEED", "MANDELASM.BASL"),
+         shared=False,
+         install=None, data=[], overlay=False),
 ]
 
 BMX_SRC = os.path.join(ROOT, "GPC-BASIC-TOOLS-SRC", "BMXVIEWER", "SAMPLES")
