@@ -58,7 +58,7 @@ if [ "$DO_BUILD" = 1 ]; then
     make -C source/runtime gpc-rt
     echo "== make -C source/gpc release  (GPC.PRG + GPC.ERR, tokenised and compiled) =="
     make -C source/gpc release
-    echo "== samplesbuild.py  (GPBMODS, GPC.HELP, COLORTST, BMXVIEW, GPC.GUI, EDIT, GPC.ERR, GUI-LITE, MANDEL, MANDELASM) =="
+    echo "== samplesbuild.py  (GPBMODS, GPC.HELP, COLORTST, BMXVIEW, GPC.GUI, EDIT, GPC.ERR, GUI-LITE, MANDEL, MANDELASM, GUI-FIELD-EDIT) =="
     python source/gpc/samplesbuild.py
 fi
 
@@ -296,6 +296,16 @@ SAMPLES = [
                   ("GPC-BASIC-TOOLS-SRC/MANDELBROT-SPEED/readme.md",       "README.md")],
         "globs": [],
         "fake":  "MANDELASM.PRG",
+    },
+    {
+        "dir":   "GUI-FIELD-EDIT",
+        "files": [("GPC-BASIC-TOOLS-SRC/GUI-FIELD-EDIT/GUI-FIELD-EDIT.PRG",  "GUI-FIELD-EDIT.PRG"),
+                  ("GPC-BASIC-TOOLS-SRC/GUI-FIELD-EDIT/GUI-FIELD-EDIT.OVL",  "GUI-FIELD-EDIT.OVL"),
+                  ("GPC-BASIC-TOOLS-SRC/GUI-FIELD-EDIT/GUI-FIELD-EDIT.BASL", "GUI-FIELD-EDIT.BASL"),
+                  ("GPC-BASIC-TOOLS-SRC/GUI-FIELD-EDIT/GFE.TEXT.INC.BL",     "GFE.TEXT.INC.BL"),
+                  ("GPC-BASIC-TOOLS-SRC/GUI-FIELD-EDIT/readme.md",           "README.md")],
+        "globs": [],
+        "fake":  "GUI-FIELD-EDIT.PRG",
     },
 ]
 

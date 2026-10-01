@@ -105,6 +105,13 @@ PROGRAMS = [
          src=("GPC-BASIC-TOOLS-SRC/MANDELBROT-SPEED", "MANDELASM.BASL"),
          shared=False,
          install=None, data=[], overlay=False),
+
+    #   EMBEDDED, and banked: the library runs from GP.BANKED regions, so the object
+    #   ships with its .OVL beside it.
+    dict(name="GUI-FIELD-EDIT",
+         src=("GPC-BASIC-TOOLS-SRC/GUI-FIELD-EDIT", "GUI-FIELD-EDIT.BASL"),
+         shared=False,
+         install=None, data=[]),
 ]
 
 BMX_SRC = os.path.join(ROOT, "GPC-BASIC-TOOLS-SRC", "BMXVIEWER", "SAMPLES")

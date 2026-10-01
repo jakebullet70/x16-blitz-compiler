@@ -127,11 +127,12 @@ ED.FILEEND:
 ## compiler says when they are put in one anyway.
 ##
 ## The engine is the first region. LINEINPUT is the field, GUI.INC.BL the box and the form
-## loop over it. COMBO and CHECK are here because GUI.INC.BL names their painters whether or
-## not a form has one of them, and a name with no module behind it does not compile.
+## loop over it.
 ##
-## The verbs are the second, with the editor's own adapter beside them: ED-DIALOG.BASL calls
-## both the verbs and the engine, and this is the half it calls more of.
+## The controls and the verbs are the second, with the editor's own adapter beside them:
+## ED-DIALOG.BASL calls both the verbs and the engine, and this is the half it calls more of.
+## COMBO and CHECK are included whether or not a form has one of them, because GUI.INC.BL
+## names their painters and a name with no module behind it does not compile.
 ##
 ## STASH stays where it is, above: GUI.OPEN saves the cells a box covers through it, and the
 ## call out of the region to low memory is what makes that legal.
@@ -139,10 +140,10 @@ GOTO ED.GUIEND
 GP.BANKED ED.GUICODE
 #INCLUDE "GPC-BASIC/LINEINPUT.INC.BL"
 #INCLUDE "GPC-BASIC/GUI.INC.BL"
-#INCLUDE "GPC-BASIC/COMBO.INC.BL"
-#INCLUDE "GPC-BASIC/CHECK.INC.BL"
 GP.ENDBANKED
 GP.BANKED ED.DLGCODE
+#INCLUDE "GPC-BASIC/COMBO.INC.BL"
+#INCLUDE "GPC-BASIC/CHECK.INC.BL"
 #INCLUDE "GPC-BASIC/GUI-DIALOGS.INC.BL"
 #INCLUDE "ED-DIALOG.BASL"
 GP.ENDBANKED

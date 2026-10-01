@@ -1,0 +1,404 @@
+#SAVEAS "@:GUI-FIELD-EDIT.SRC.PRG"
+#SYMFILE "@:GUI-FIELD-EDIT.SRC.SYM"
+#INCLUDE "GPC-BASIC/GPB.INC.BL"
+#INCLUDE "GPC-BASIC/STASH.INC.BL"
+
+## ***********************************************************************
+## **
+## **  GUI-FIELD-EDIT.BASL -- the rental counter of a video store that never
+## **  was, on one full-screen form.
+## **
+## **  Twenty-eight controls in two columns: fields, combos, check boxes,
+## **  radio groups, a multi-select list, read-only values and two buttons.
+## **  The values under the list are the bill, worked out again after every
+## **  change through FORMTO.EVENT. RENT checks the rental and shows it in a
+## **  box; CANCEL asks before the store closes.
+## **
+## **  Every library module that can be banked runs from a GP.BANKED region,
+## **  and the program's text is in a GP.BANKEDSTR bank. STASH holds a BANK
+## **  statement and stays in low RAM.
+## **
+## ***********************************************************************
+
+## ---- The banks. All here, above the regions: BASLOAD resolves a #DEFINE only
+## ---- once it has read it. A new bank needs a claim in GFE.CLAIM.BANKS.
+#DEFINE GFE.UTILCODE 4
+#DEFINE GFE.MENUCODE 5
+#DEFINE GFE.GUICODE 6
+#DEFINE GFE.FORMCODE 7
+#DEFINE GFE.TEXTBANK 8
+
+## ---- SCREEN 1 is 80x30, and the form fills it: 24 rows of controls, a
+## ---- spacer and the buttons, inside the frame and its padding.
+#DEFINE GFE.MODE 1
+#DEFINE GFE.SPACE 32
+#DEFINE GFE.FORMROWS 24
+#DEFINE GFE.FORMWIDTH 74
+#DEFINE GFE.RIGHTCOLUMN 37
+#DEFINE GFE.LEFTLABEL 11
+#DEFINE GFE.RIGHTLABEL 9
+#DEFINE GFE.VALUEWIDTH 12
+
+## ---- The controls in the order the form adds them, which is their numbers.
+## ---- GFE.TEXT$() and GFE.CHOICE%() keep each one's answer under the same
+## ---- number, and the form is built from them again.
+#DEFINE GFE.C.MEMBER 1
+#DEFINE GFE.C.FIRST 2
+#DEFINE GFE.C.LAST 3
+#DEFINE GFE.C.PHONE 4
+#DEFINE GFE.C.STREET 5
+#DEFINE GFE.C.CITY 6
+#DEFINE GFE.C.STATE 7
+#DEFINE GFE.C.ZIP 8
+#DEFINE GFE.C.LEVEL 9
+#DEFINE GFE.C.IDCHECKED 10
+#DEFINE GFE.C.ADULT 11
+#DEFINE GFE.C.MAILING 12
+#DEFINE GFE.C.NIGHTS 13
+#DEFINE GFE.C.PAYMENT 14
+#DEFINE GFE.C.CLERK 15
+#DEFINE GFE.C.COUPON 16
+#DEFINE GFE.C.NOTES 17
+#DEFINE GFE.C.TITLES 18
+#DEFINE GFE.C.FORMAT 19
+#DEFINE GFE.C.PLEDGE 20
+#DEFINE GFE.C.RATE 21
+#DEFINE GFE.C.QUANTITY 22
+#DEFINE GFE.C.SUBTOTAL 23
+#DEFINE GFE.C.DISCOUNT 24
+#DEFINE GFE.C.TAX 25
+#DEFINE GFE.C.TOTAL 26
+#DEFINE GFE.C.COUNT 26
+
+## ---- The program starts below the regions and the text. This line is also
+## ---- where STASH's closing GOTO lands: a GOTO onto a GP.BANKED line is refused.
+GOTO GFE.LIBEND
+
+## ---- The library. APPSYS, BANKMGR, THEME and STRUSING first: the regions
+## ---- after read their #DEFINEs.
+GP.BANKED GFE.UTILCODE
+#INCLUDE "GPC-BASIC/APPSYS.INC.BL"
+#INCLUDE "GPC-BASIC/BANKMGR.INC.BL"
+#INCLUDE "GPC-BASIC/STASHVRAM.INC.BL"
+#INCLUDE "GPC-BASIC/THEME.INC.BL"
+#INCLUDE "GPC-BASIC/STRUSING.INC.BL"
+GP.ENDBANKED
+
+## ---- The menu builder: a combo's dropdown is its popup slot.
+GP.BANKED GFE.MENUCODE
+#INCLUDE "GPC-BASIC/MENU.INC.BANKED.BL"
+#INCLUDE "GPC-BASIC/MENU.INC.BL"
+#INCLUDE "GPC-BASIC/MENUPULL.INC.BL"
+GP.ENDBANKED
+
+GP.BANKED GFE.GUICODE
+#INCLUDE "GPC-BASIC/LINEINPUT.INC.BL"
+#INCLUDE "GPC-BASIC/GUI.INC.BL"
+GP.ENDBANKED
+
+## ---- The form's controls and the dialog verbs. After the GUI, whose #DEFINEs
+## ---- they read.
+GP.BANKED GFE.FORMCODE
+#INCLUDE "GPC-BASIC/COMBO.INC.BL"
+#INCLUDE "GPC-BASIC/CHECK.INC.BL"
+#INCLUDE "GPC-BASIC/GUI-DIALOGS.INC.BL"
+GP.ENDBANKED
+
+#INCLUDE "GFE.TEXT.INC.BL"
+
+GFE.LIBEND:
+
+DIM GFE.TEXT$(GFE.C.COUNT)
+DIM GFE.CHOICE%(GFE.C.COUNT)
+
+## ---- The price list. A title costs its format's base for one night; three
+## ---- nights cost 1.5 of that and seven 2.5. A member level takes a percent off.
+DIM GFE.BASE(3)
+DIM GFE.STRETCH(3)
+DIM GFE.PERCENT(4)
+GFE.BASE(1) = 2.99
+GFE.BASE(2) = 1.99
+GFE.BASE(3) = 3.99
+GFE.STRETCH(1) = 1
+GFE.STRETCH(2) = 1.5
+GFE.STRETCH(3) = 2.5
+GFE.PERCENT(1) = 0
+GFE.PERCENT(2) = 5
+GFE.PERCENT(3) = 10
+GFE.PERCENT(4) = 20
+GFE.TAXRATE = 8.25
+GFE.COUPONOFF = 1
+
+## ---- APPSYS.STARTUP before the SCREEN: it records the screen APPSYS.RESTORE
+## ---- puts back. The size is asked after the mode change.
+GOSUB APPSYS.STARTUP
+SCREEN GFE.MODE
+GP.CALL APPSYS.SCRMODE, 0, 0, 0, 1
+GFE.SCREENCOLS% = GP.X
+GFE.SCREENROWS% = GP.Y
+THEME.ID% = 0
+GOSUB THEME.SELECT
+
+## ---- The claims, then a MENU.BEGIN, then the free banks: the first MENU.BEGIN
+## ---- claims MENU.TEXTBANK, and GET.FREE.BANK must not hand it out.
+GOSUB GFE.CLAIM.BANKS
+GP.SUB MENU.BEGIN, MENU.POPUP
+GOSUB BANKMGR.GET.FREE.BANK
+GP.SUB DLGRESET, BANKMGR.BANK
+GOSUB BANKMGR.GET.FREE.BANK
+GFE.ITEMBANK% = BANKMGR.BANK
+
+GOSUB GFE.RESET.RENTAL
+
+GFE.SERVE:
+    GOSUB GFE.DRAW.PAGE
+    GOSUB GFE.RUN.FORM
+    IF GFE.ANSWER% = 0 THEN GOTO GFE.ASK.CLOSE
+    GOSUB GFE.CHECK.RENTAL
+    GP.IF GFE.PROBLEM$ <> "" THEN
+        GP.SUB MSGBOX, GFE.PROBLEM$
+        GOTO GFE.SERVE
+    GP.ENDIF
+    GOSUB GFE.SHOW.SUMMARY
+    IF GP.FN(ASKYN, GP.BSTR(GFE.TEXT.SAY, 3)) = 0 THEN GOTO GFE.CLOSE
+    GOSUB GFE.RESET.RENTAL
+    GOTO GFE.SERVE
+
+GFE.ASK.CLOSE:
+    IF GP.FN(ASKYN, GP.BSTR(GFE.TEXT.SAY, 4)) = 0 THEN GOTO GFE.SERVE
+
+GFE.CLOSE:
+    GOSUB APPSYS.RESTORE
+    END
+
+
+## ***********************************************************************
+## **  GFE.CLAIM.BANKS -- every bank named in this source, told to BANKMGR.
+## ***********************************************************************
+GFE.CLAIM.BANKS:
+    GOSUB BANKMGR.INIT
+    GP.SUB BANKMGR.CLAIM.BANK, GFE.UTILCODE
+    GP.SUB BANKMGR.CLAIM.BANK, GFE.MENUCODE
+    GP.SUB BANKMGR.CLAIM.BANK, GFE.GUICODE
+    GP.SUB BANKMGR.CLAIM.BANK, GFE.FORMCODE
+    GP.SUB BANKMGR.CLAIM.BANK, GFE.TEXTBANK
+    RETURN
+
+
+## ***********************************************************************
+## **  GFE.RESET.RENTAL -- an empty rental: no text, the first row of each
+## **  combo, three nights on VHS, no box ticked but the pledge.
+## ***********************************************************************
+GFE.RESET.RENTAL:
+    FOR GFE.CTRL = 1 TO GFE.C.COUNT
+        GFE.TEXT$(GFE.CTRL) = ""
+        GFE.CHOICE%(GFE.CTRL) = 1
+    NEXT GFE.CTRL
+    GFE.CHOICE%(GFE.C.NIGHTS) = 2
+    GFE.CHOICE%(GFE.C.IDCHECKED) = 0
+    GFE.CHOICE%(GFE.C.ADULT) = 0
+    GFE.CHOICE%(GFE.C.MAILING) = 0
+    GFE.CHOICE%(GFE.C.PLEDGE) = -1
+    RETURN
+
+
+## ***********************************************************************
+## **  GFE.DRAW.PAGE -- the screen behind the form, which the boxes after it
+## **  stand on.
+## ***********************************************************************
+GFE.DRAW.PAGE:
+    GP.FILL 0, 0, GFE.SCREENCOLS%, GFE.SCREENROWS%, GFE.SPACE, THEME.CLR(THEME.PAGE)
+    GFE.LINE$ = GP.BSTR(GFE.TEXT.PAGE, 0)
+    GP.PRINTAT INT((GFE.SCREENCOLS% - LEN(GFE.LINE$)) / 2), 2, GFE.LINE$, THEME.CLR(THEME.TITLE)
+    GFE.LINE$ = GP.BSTR(GFE.TEXT.PAGE, 1)
+    GP.PRINTAT INT((GFE.SCREENCOLS% - LEN(GFE.LINE$)) / 2), 3, GFE.LINE$, THEME.CLR(THEME.DIMMED)
+    RETURN
+
+
+## ***********************************************************************
+## **  GFE.RUN.FORM -- build the form, run it, keep its answers.
+## **
+## **   out  GFE.ANSWER%   -1 RENT, 0 CANCEL or ESC
+## **
+## **  FORMTO.EVENT comes back on every change, and the bill is worked out
+## **  again. It is worked out once more after the run, because a field
+## **  typed in and left with RETURN changes and ends the form on one key.
+## ***********************************************************************
+GFE.RUN.FORM:
+    GOSUB GFE.BUILD.FORM
+    GOSUB GFE.PRICE.RENTAL
+    GP.DO
+        GFE.ANSWER% = GP.FN(FORMTO.EVENT)
+        IF GFE.ANSWER% < 1 THEN GP.EXITDO
+        GOSUB GFE.PRICE.RENTAL
+    GP.LOOP
+    GOSUB GFE.PRICE.RENTAL
+    GOSUB GFE.TAKE.FORM
+    GP.SUB FORM.END
+    RETURN
+
+
+## ***********************************************************************
+## **  GFE.BUILD.FORM -- every control, from GFE.TEXT$() and GFE.CHOICE%().
+## **
+## **  The order here is the GFE.C.* numbering. The left column is the
+## **  member, the right the rental and its bill.
+## ***********************************************************************
+GFE.BUILD.FORM:
+    GP.SUB FORM.BEGIN, GP.BSTR(GFE.TEXT.FORM, 0), "", "", GFE.FORMROWS, GFE.FORMWIDTH, GP.BSTR(GFE.TEXT.FORM, 1), GP.BSTR(GFE.TEXT.FORM, 2)
+    GP.SUB FORM.ITEMS, GFE.ITEMBANK%
+
+    GP.SUB FORM.FIELD, 0, GP.BSTR(GFE.TEXT.LABELS, 0), GFE.LEFTLABEL, 6, GFE.TEXT$(GFE.C.MEMBER)
+    GP.SUB FORM.FIELD, 1, GP.BSTR(GFE.TEXT.LABELS, 1), GFE.LEFTLABEL, 16, GFE.TEXT$(GFE.C.FIRST)
+    GP.SUB FORM.FIELD, 2, GP.BSTR(GFE.TEXT.LABELS, 2), GFE.LEFTLABEL, 16, GFE.TEXT$(GFE.C.LAST)
+    GP.SUB FORM.FIELD, 3, GP.BSTR(GFE.TEXT.LABELS, 3), GFE.LEFTLABEL, 12, GFE.TEXT$(GFE.C.PHONE)
+    GP.SUB FORM.FIELD, 4, GP.BSTR(GFE.TEXT.LABELS, 4), GFE.LEFTLABEL, 22, GFE.TEXT$(GFE.C.STREET)
+    GP.SUB FORM.FIELD, 5, GP.BSTR(GFE.TEXT.LABELS, 5), GFE.LEFTLABEL, 16, GFE.TEXT$(GFE.C.CITY)
+    GP.SUB FORM.COMBO, 6, GP.BSTR(GFE.TEXT.LABELS, 6), GFE.LEFTLABEL, 7, GFE.CHOICE%(GFE.C.STATE)
+    FOR GFE.INDEX = 0 TO GP.BSTRCOUNT(GFE.TEXT.STATES) - 1
+        GP.SUB FORM.ITEM, " " + GP.BSTR(GFE.TEXT.STATES, GFE.INDEX)
+    NEXT GFE.INDEX
+    GP.SUB FORM.FIELD, 7, GP.BSTR(GFE.TEXT.LABELS, 7), GFE.LEFTLABEL, 5, GFE.TEXT$(GFE.C.ZIP)
+
+    GP.SUB FORM.COMBO, 9, GP.BSTR(GFE.TEXT.LABELS, 8), GFE.LEFTLABEL, 12, GFE.CHOICE%(GFE.C.LEVEL)
+    FOR GFE.INDEX = 0 TO GP.BSTRCOUNT(GFE.TEXT.LEVELS) - 1
+        GP.SUB FORM.ITEM, " " + GP.BSTR(GFE.TEXT.LEVELS, GFE.INDEX)
+    NEXT GFE.INDEX
+    GP.SUB FORM.CHECK, 10, GP.BSTR(GFE.TEXT.CHECKS, 0), GFE.CHOICE%(GFE.C.IDCHECKED)
+    GP.SUB FORM.CHECK, 11, GP.BSTR(GFE.TEXT.CHECKS, 1), GFE.CHOICE%(GFE.C.ADULT)
+    GP.SUB FORM.CHECK, 12, GP.BSTR(GFE.TEXT.CHECKS, 2), GFE.CHOICE%(GFE.C.MAILING)
+    GP.SUB FORM.RADIO, 14, GP.BSTR(GFE.TEXT.LABELS, 9), GFE.LEFTLABEL, GFE.CHOICE%(GFE.C.NIGHTS)
+    FOR GFE.INDEX = 0 TO GP.BSTRCOUNT(GFE.TEXT.NIGHTS) - 1
+        GP.SUB FORM.ITEM, GP.BSTR(GFE.TEXT.NIGHTS, GFE.INDEX)
+    NEXT GFE.INDEX
+    GP.SUB FORM.COMBO, 18, GP.BSTR(GFE.TEXT.LABELS, 10), GFE.LEFTLABEL, 16, GFE.CHOICE%(GFE.C.PAYMENT)
+    FOR GFE.INDEX = 0 TO GP.BSTRCOUNT(GFE.TEXT.PAYMENTS) - 1
+        GP.SUB FORM.ITEM, " " + GP.BSTR(GFE.TEXT.PAYMENTS, GFE.INDEX)
+    NEXT GFE.INDEX
+    GP.SUB FORM.COMBO, 19, GP.BSTR(GFE.TEXT.LABELS, 11), GFE.LEFTLABEL, 10, GFE.CHOICE%(GFE.C.CLERK)
+    FOR GFE.INDEX = 0 TO GP.BSTRCOUNT(GFE.TEXT.CLERKS) - 1
+        GP.SUB FORM.ITEM, " " + GP.BSTR(GFE.TEXT.CLERKS, GFE.INDEX)
+    NEXT GFE.INDEX
+    GP.SUB FORM.FIELD, 21, GP.BSTR(GFE.TEXT.LABELS, 12), GFE.LEFTLABEL, 8, GFE.TEXT$(GFE.C.COUPON)
+    GP.SUB FORM.FIELD, 22, GP.BSTR(GFE.TEXT.LABELS, 13), GFE.LEFTLABEL, 22, GFE.TEXT$(GFE.C.NOTES)
+
+    GP.SUB FORM.COLUMN, GFE.RIGHTCOLUMN
+    GP.SUB FORM.LIST, 0, GP.BSTR(GFE.TEXT.LABELS, 14), GFE.RIGHTLABEL, 27, 10, 1, -1
+    FOR GFE.INDEX = 0 TO GP.BSTRCOUNT(GFE.TEXT.TITLES) - 1
+        GP.SUB FORM.ITEM, GP.BSTR(GFE.TEXT.TITLES, GFE.INDEX)
+    NEXT GFE.INDEX
+    GP.SUB FORM.RADIO, 11, GP.BSTR(GFE.TEXT.LABELS, 15), GFE.RIGHTLABEL, GFE.CHOICE%(GFE.C.FORMAT)
+    FOR GFE.INDEX = 0 TO GP.BSTRCOUNT(GFE.TEXT.FORMATS) - 1
+        GP.SUB FORM.ITEM, GP.BSTR(GFE.TEXT.FORMATS, GFE.INDEX)
+    NEXT GFE.INDEX
+    GP.SUB FORM.CHECK, 15, GP.BSTR(GFE.TEXT.CHECKS, 3), GFE.CHOICE%(GFE.C.PLEDGE)
+
+    FOR GFE.INDEX = 0 TO GFE.C.TOTAL - GFE.C.RATE
+        GP.SUB FORM.VALUE, 17 + GFE.INDEX, GP.BSTR(GFE.TEXT.LABELS, 16 + GFE.INDEX), GFE.RIGHTLABEL, GFE.VALUEWIDTH, ""
+    NEXT GFE.INDEX
+
+    ## ---- the list's marks go in once a control after it has sealed it
+    IF GFE.TEXT$(GFE.C.TITLES) <> "" THEN GP.SUB FORM.SETTEXT, GFE.C.TITLES, GFE.TEXT$(GFE.C.TITLES)
+    RETURN
+
+
+## ***********************************************************************
+## **  GFE.PRICE.RENTAL -- the bill, from the form as it stands, into the
+## **  six values.
+## **
+## **   out  GFE.QUANTITY%  titles marked
+## **        GFE.TOTAL      what is due
+## ***********************************************************************
+GFE.PRICE.RENTAL:
+    GFE.MARKS$ = GP.FN(FORM.TEXT, GFE.C.TITLES)
+    GFE.QUANTITY% = 0
+    FOR GFE.INDEX = 1 TO LEN(GFE.MARKS$)
+        IF MID$(GFE.MARKS$, GFE.INDEX, 1) = "1" THEN GFE.QUANTITY% = GFE.QUANTITY% + 1
+    NEXT GFE.INDEX
+
+    GFE.RATE = GFE.BASE(GP.FN(FORM.SEL, GFE.C.FORMAT)) * GFE.STRETCH(GP.FN(FORM.SEL, GFE.C.NIGHTS))
+    GFE.RATE = INT(GFE.RATE * 100 + 0.5) / 100
+    GFE.SUBTOTAL = GFE.RATE * GFE.QUANTITY%
+    GFE.DISCOUNT = INT(GFE.SUBTOTAL * GFE.PERCENT(GP.FN(FORM.SEL, GFE.C.LEVEL)) + 0.5) / 100
+    IF GP.FN(FORM.TEXT, GFE.C.COUPON) = GP.BSTR(GFE.TEXT.COUPON, 0) THEN GFE.DISCOUNT = GFE.DISCOUNT + GFE.COUPONOFF
+    IF GFE.DISCOUNT > GFE.SUBTOTAL THEN GFE.DISCOUNT = GFE.SUBTOTAL
+    GFE.TAX = INT((GFE.SUBTOTAL - GFE.DISCOUNT) * GFE.TAXRATE + 0.5) / 100
+    GFE.TOTAL = GFE.SUBTOTAL - GFE.DISCOUNT + GFE.TAX
+
+    GFE.MONEY = GFE.RATE
+    GOSUB GFE.SHOW.MONEY
+    GP.SUB FORM.SETTEXT, GFE.C.RATE, GFE.MONEY$
+    GP.SUB FORM.SETTEXT, GFE.C.QUANTITY, MID$(STR$(GFE.QUANTITY%), 2)
+    GFE.MONEY = GFE.SUBTOTAL
+    GOSUB GFE.SHOW.MONEY
+    GP.SUB FORM.SETTEXT, GFE.C.SUBTOTAL, GFE.MONEY$
+    GFE.MONEY = GFE.DISCOUNT
+    GOSUB GFE.SHOW.MONEY
+    GP.SUB FORM.SETTEXT, GFE.C.DISCOUNT, GFE.MONEY$
+    GFE.MONEY = GFE.TAX
+    GOSUB GFE.SHOW.MONEY
+    GP.SUB FORM.SETTEXT, GFE.C.TAX, GFE.MONEY$
+    GFE.MONEY = GFE.TOTAL
+    GOSUB GFE.SHOW.MONEY
+    GP.SUB FORM.SETTEXT, GFE.C.TOTAL, GFE.MONEY$
+    RETURN
+
+## ---- GFE.MONEY as "$" and six cells lined up on the point, through STRUSING
+GFE.SHOW.MONEY:
+    GFE.MONEY$ = "$" + GP.FN(USING, GFE.MONEY, "##0.00")
+    RETURN
+
+
+## ***********************************************************************
+## **  GFE.TAKE.FORM -- every control's answer under its own number. Read
+## **  before FORM.END.
+## **
+## **  FORM.SEL of a check box is not its tick, so the four boxes are read
+## **  again with FORM.CHECKED.
+## ***********************************************************************
+GFE.TAKE.FORM:
+    FOR GFE.CTRL = 1 TO GFE.C.COUNT
+        GFE.TEXT$(GFE.CTRL) = GP.FN(FORM.TEXT, GFE.CTRL)
+        GFE.CHOICE%(GFE.CTRL) = GP.FN(FORM.SEL, GFE.CTRL)
+    NEXT GFE.CTRL
+    GFE.CHOICE%(GFE.C.IDCHECKED) = GP.FN(FORM.CHECKED, GFE.C.IDCHECKED)
+    GFE.CHOICE%(GFE.C.ADULT) = GP.FN(FORM.CHECKED, GFE.C.ADULT)
+    GFE.CHOICE%(GFE.C.MAILING) = GP.FN(FORM.CHECKED, GFE.C.MAILING)
+    GFE.CHOICE%(GFE.C.PLEDGE) = GP.FN(FORM.CHECKED, GFE.C.PLEDGE)
+    RETURN
+
+
+## ***********************************************************************
+## **  GFE.CHECK.RENTAL -- what stops this rental, or "".
+## **
+## **   out  GFE.PROBLEM$
+## ***********************************************************************
+GFE.CHECK.RENTAL:
+    GFE.PROBLEM$ = ""
+    IF GFE.CHOICE%(GFE.C.IDCHECKED) = 0 THEN GFE.PROBLEM$ = GP.BSTR(GFE.TEXT.SAY, 2)
+    IF GFE.TEXT$(GFE.C.LAST) = "" THEN GFE.PROBLEM$ = GP.BSTR(GFE.TEXT.SAY, 1)
+    IF GFE.QUANTITY% = 0 THEN GFE.PROBLEM$ = GP.BSTR(GFE.TEXT.SAY, 0)
+    RETURN
+
+
+## ***********************************************************************
+## **  GFE.SHOW.SUMMARY -- the rental in a box: who, what, and what it cost.
+## ***********************************************************************
+GFE.SHOW.SUMMARY:
+    GFE.LINE$ = GP.BSTR(GFE.TEXT.SAY, 6) + GFE.TEXT$(GFE.C.MEMBER) + "  " + GFE.TEXT$(GFE.C.FIRST) + " " + GFE.TEXT$(GFE.C.LAST)
+    GFE.ITEMS$ = GP.BSTR(GFE.TEXT.SAY, 7)
+    IF GFE.QUANTITY% = 1 THEN GFE.ITEMS$ = GP.BSTR(GFE.TEXT.SAY, 11)
+    GFE.ITEMS$ = MID$(STR$(GFE.QUANTITY%), 2) + GFE.ITEMS$ + GP.BSTR(GFE.TEXT.FORMATS, GFE.CHOICE%(GFE.C.FORMAT) - 1)
+    GFE.ITEMS$ = GFE.ITEMS$ + GP.BSTR(GFE.TEXT.SAY, 8) + GP.BSTR(GFE.TEXT.NIGHTS, GFE.CHOICE%(GFE.C.NIGHTS) - 1)
+    GFE.MONEY$ = GP.FN(USING, GFE.TOTAL, "#,##0.00")
+    GOSUB GFE.TRIM.MONEY
+    GFE.BILL$ = GP.BSTR(GFE.TEXT.SAY, 9) + GFE.MONEY$
+    GFE.BILL$ = GFE.BILL$ + GP.BSTR(GFE.TEXT.SAY, 10) + GP.BSTR(GFE.TEXT.PAYMENTS, GFE.CHOICE%(GFE.C.PAYMENT) - 1)
+    GP.SUB MSGBOXEX, GP.BSTR(GFE.TEXT.SAY, 5), GFE.LINE$, GFE.ITEMS$, GFE.BILL$, ""
+    RETURN
+
+## ---- GFE.MONEY$ without the spaces STRUSING right-justifies it with
+GFE.TRIM.MONEY:
+    IF LEFT$(GFE.MONEY$, 1) <> " " THEN RETURN
+    GFE.MONEY$ = MID$(GFE.MONEY$, 2)
+    GOTO GFE.TRIM.MONEY

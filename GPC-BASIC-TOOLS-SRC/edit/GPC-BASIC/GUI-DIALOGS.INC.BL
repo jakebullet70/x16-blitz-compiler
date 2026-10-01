@@ -64,8 +64,9 @@
 ## **  PANELOPEN t$, m$, rows, width       an empty box for the caller's own
 ## **                                      rows, at GUI.INNER.LEFT and .TOP
 ## **  PANELCLOSE                          and the screen put back
-## **  FORM.BEGIN ... FORM.END             a box of fields, check boxes and a
-## **                                      combo; its own section below
+## **  FORM.BEGIN ... FORM.END             a box of fields, check boxes,
+## **                                      combos, lists, radio groups and
+## **                                      values; its own section below
 ## **
 ## **  THE ROWS ARE FILLED FIRST, because an array cannot be an argument.
 ## **  PICKMENU reads the menu builder's popup slot:
@@ -425,15 +426,12 @@ DLG.INTERNAL.LIST:
         IF GUI.LIST.LEN > DLG.TEXTW% THEN DLG.TEXTW% = GUI.LIST.LEN
     NEXT DLG.I
 
-## ---- multi select: COUNT "0"s, toggled in place through GP.STRPTR, so a
-## ---- list caps at 250 items. The pointer is what tells the control and
-## ---- GUI.LIST.MEASURE there is a mark column, two cells wide.
-    GUI.LIST.MARKP = 0 : DLG.MARKOFF% = 0
-    GP.IF DLG.MULTI <> 0 THEN
-        GUI.LISTBOX.MARKS$ = RPT$(48, GUI.LIST.COUNT)
-        GUI.LIST.MARKP = GP.STRPTR(GUI.LISTBOX.MARKS$)
-        DLG.MARKOFF% = 2
-    GP.ENDIF
+## ---- multi select: the control keeps COUNT "0"s and toggles them in place
+## ---- through GP.STRPTR, so a list caps at 250 items. The mark column is
+## ---- two cells wide.
+    GUI.LIST.MULTI = DLG.MULTI
+    DLG.MARKOFF% = 0
+    IF DLG.MULTI <> 0 THEN DLG.MARKOFF% = 2
 
     GUI.BTN.ONE$ = "&OK" : GUI.BTN.TWO$ = "&CANCEL"
     GUI.DEFAULT = 1 : GOSUB GUI.BUTTON.SIZE : GOSUB GUI.LIST.MEASURE
@@ -452,7 +450,8 @@ DLG.INTERNAL.LIST:
     GOSUB GUI.BUTTON.ROW : GUI.FOCUS = 1 : GOSUB GUI.FORM.RUN
 
 ## ---- a cancel is GUI.FORM.HIT 0, whose flags are never set.
-    GUI.LISTBOX.SEL = GUI.LIST.SEL : GUI.LISTBOX.MARKED = GUI.LIST.MARKED
+    GUI.LISTBOX.SEL = GUI.CTRL.SEL%(GUI.LIST.CTRL) : GUI.LISTBOX.MARKED = GUI.LIST.MARKED
+    IF DLG.MULTI <> 0 THEN GUI.LISTBOX.MARKS$ = GUI.CTRL.TEXT$(GUI.LIST.CTRL)
     GUI.KEY = GUI.RETURN
     GP.IF (GUI.CTRL.FLAGS%(GUI.FORM.HIT) AND GUI.CF.DEFAULT) = 0 THEN
         GUI.LISTBOX.SEL = 0 : GUI.KEY = GUI.ESCAPE
@@ -624,38 +623,68 @@ DLG.PANELCLOSE:
 ## ***********************************************************************
 ## **  FORM -- a box of controls and an OK / CANCEL row, built like a menu.
 ## **
-## **      COMBO.ITEM$(1) = "TEXAS" ...                the combo's rows first
-## **      GP.SUB FORM.BEGIN, "TITLE", "MSG", "", 4, 28, "&OK", "&CANCEL"
-## **      GP.SUB FORM.CHECK, 0, "SHOW HIDDEN", -1
-## **      GP.SUB FORM.COMBO, 3, "STATE", 12, 4, 1
+## **      GP.SUB FORM.BEGIN, "TITLE", "MSG", "", 6, 40, "&OK", "&CANCEL"
+## **      GP.SUB FORM.ITEMS, MYBANK
+## **      HIDE = GP.FN(FORM.CHECK, 0, "SHOW HIDDEN", -1)
+## **      STATE = GP.FN(FORM.COMBO, 1, "STATE", 6, 12, 1)
+## **      GP.SUB FORM.ITEM, "TEXAS"
+## **      GP.SUB FORM.ITEM, "OHIO"
+## **      GP.SUB FORM.COLUMN, 22
+## **      DAYS = GP.FN(FORM.RADIO, 0, "DAYS", 5, 2)
+## **      GP.SUB FORM.ITEM, "1 NIGHT"
+## **      GP.SUB FORM.ITEM, "3 NIGHTS"
 ## **      IF GP.FN(FORMTO.RUN) THEN <OK>
-## **      ON = GP.FN(FORM.CHECKED, 1)
-## **      SEL = GP.FN(FORM.COMBOSEL)
+## **      ON = GP.FN(FORM.CHECKED, HIDE)
+## **      SEL = GP.FN(FORM.SEL, STATE)
 ## **      GP.SUB FORM.END
 ## **
 ## **  FORM.BEGIN t$, m$, m2$, rows, width, btn1$, btn2$
-## **                              rows the controls use; a spacer and the
-## **                              button row go under them. btn2$ "" is one
-## **                              button. width grows to fit the buttons
+## **                          rows the controls use; a spacer and the
+## **                          button row go under them. btn2$ "" is one
+## **                          button. width grows to fit the buttons
+## **  FORM.ITEMS bank         an empty item store in bank, which the
+## **                          caller owns. Before the first combo, list
+## **                          or radio
+## **  FORM.COLUMN col         the controls after it start col cells in
+## **                          from the box's left edge. 0 at FORM.BEGIN
 ## **  FORM.FIELD row, label$, labw, w, text$
-## **                              label$ at the left, then a field w wide.
-## **                              labw is the column the fields line up in,
-## **                              0 to fit this label. Read it back with
-## **                              FORM.TEXT
-## **  FORM.CHECK row, text$, on   RETURNS its control number, 1 up in the
-## **                              order added
-## **  FORM.COMBO row, label$, w, count, sel
-## **                              label$ at the left, the combo after it.
-## **                              One combo a form
-## **  FORMTO.RUN                  RETURNS -1 on the first button, 0 on the
-## **                              second or ESC
-## **  FORM.TEXT n                 RETURNS what was typed in field control n
-## **  FORM.CHECKED n              RETURNS -1 if check control n is ticked
-## **  FORM.COMBOSEL               RETURNS the combo's row
-## **  FORM.END                    puts the screen back
+## **                          label$, then a field w wide. labw is the
+## **                          column the fields line up in, 0 to fit
+## **                          this label. Read it back with FORM.TEXT
+## **  FORM.CHECK row, text$, on
+## **  FORM.COMBO row, label$, labw, w, sel
+## **  FORM.LIST row, label$, labw, w, rows, sel, multi
+## **                          multi non-zero marks rows with SPACE, in
+## **                          the first 2 of the w cells
+## **  FORM.RADIO row, label$, labw, sel
+## **                          one row an item
+## **  FORM.ITEM text$         an item of the last combo, list or radio
+## **  FORM.VALUE row, label$, labw, w, text$
+## **                          text the user cannot change or reach
 ## **
-## **  A row counts from the first line inside the box, 0 up. The answers are
-## **  read after FORMTO.RUN and before FORM.END.
+## **  Every control verb RETURNS the control's number, 1 up in the order
+## **  added. A combo, list or radio has one item at least, its
+## **  items follow it, and the next control verb draws it. A combo opens to
+## **  32 items at most.
+## **
+## **  FORMTO.RUN              RETURNS -1 on the first button, 0 on the
+## **                          second or ESC
+## **  FORMTO.EVENT            the same, or n when control n changed.
+## **                          Call it again to go on with the form
+## **  FORM.TEXT n             RETURNS a field's or a value's text, or a
+## **                          multi list's marks, "0" or "1" a row
+## **  FORM.SETTEXT n, text$   a field's or a value's text, or a multi
+## **                          list's marks once the next control is in.
+## **                          Redrawn
+## **  FORM.CHECKED n          RETURNS -1 if check box n is ticked
+## **  FORM.SEL n              RETURNS the row chosen in combo, list or
+## **                          radio n, 1 up
+## **  FORM.END                puts the screen back
+## **
+## **  A row counts from the first line inside the box, 0 up. A form holds 32
+## **  controls, its buttons included. Control 1 takes the focus first, so it
+## **  is not a value. The answers are read after the run and before
+## **  FORM.END. A field changes when the focus leaves it.
 ## ***********************************************************************
 
 DLG.FORMBEGIN:
@@ -667,13 +696,37 @@ DLG.FORMBEGIN:
     DLG.FORMROWS = DLG.ROWS : GUI.BODY.ROWS = DLG.ROWS + 2 : GUI.BODY.WIDTH = DLG.WIDTH
     IF GUI.BTN.TOTAL > GUI.BODY.WIDTH THEN GUI.BODY.WIDTH = GUI.BTN.TOTAL
     GOSUB GUI.OPEN : GOSUB GUI.FORM.BEGIN
+    DLG.COLUMN = 0
+    RETURN
+
+DLG.FORMITEMS:
+    GP.DEFPROC FORM.ITEMS, GUI.ITEM.BANK
+    GOSUB GUI.ITEM.BEGIN
+    RETURN
+
+DLG.FORMITEM:
+    GP.DEFPROC FORM.ITEM, GUI.LIST.TEXT$
+    GOSUB GUI.ITEM.ADD
+    RETURN
+
+DLG.FORMCOLUMN:
+    GP.DEFPROC FORM.COLUMN, DLG.COLUMN
+    RETURN
+
+## ---- label$ at the row's left edge, and DLG.CONTROL.X% where the control after it
+## ---- starts: labw past the edge, or the edge itself for no label and no labw.
+DLG.FORMLABEL:
+    DLG.CONTROL.X% = GUI.INNER.LEFT + DLG.COLUMN
+    IF DLG.LABW% < LEN(DLG.LABEL$) THEN DLG.LABW% = LEN(DLG.LABEL$)
+    IF DLG.LABEL$ <> "" THEN GP.PRINTAT DLG.CONTROL.X%, GUI.INNER.TOP + DLG.ROW, DLG.LABEL$, GUI.PANEL
+    IF DLG.LABW% > 0 THEN DLG.CONTROL.X% = DLG.CONTROL.X% + DLG.LABW% + 1
     RETURN
 
 DLG.FORMFIELD:
-    GP.DEFPROC FORM.FIELD, DLG.ROW, DLG.LABEL$, DLG.LABW%, DLG.WIDTH, DLG.TEXT$
-    IF DLG.LABW% < LEN(DLG.LABEL$) THEN DLG.LABW% = LEN(DLG.LABEL$)
-    GP.PRINTAT GUI.INNER.LEFT, GUI.INNER.TOP + DLG.ROW, DLG.LABEL$, GUI.PANEL
-    LINEINPUT.X = GUI.INNER.LEFT + DLG.LABW% + 1
+    GP.DEFPROC FORM.FIELD, DLG.ROW, DLG.LABEL$, DLG.LABW%, DLG.WIDTH, DLG.TEXT$ RETURNS GUI.CTRL.N
+    GOSUB GUI.ITEM.SEAL
+    GOSUB DLG.FORMLABEL
+    LINEINPUT.X = DLG.CONTROL.X%
     LINEINPUT.Y = GUI.INNER.TOP + DLG.ROW
     LINEINPUT.LEN = DLG.WIDTH : LINEINPUT.TEXT$ = DLG.TEXT$
     LINEINPUT.ATTR = THEME.CLR(THEME.HILITE) : LINEINPUT.MASK = 0
@@ -685,27 +738,99 @@ DLG.FORMTEXT:
     DLG.TEXT$ = GUI.CTRL.TEXT$(DLG.N)
     RETURN
 
+DLG.FORMSETTEXT:
+    GP.DEFPROC FORM.SETTEXT, DLG.N, DLG.TEXT$
+    GUI.CTRL.TEXT$(DLG.N) = DLG.TEXT$
+    GUI.PAINT.N = DLG.N
+    GOSUB GUI.FORM.PAINT
+    RETURN
+
 DLG.FORMCHECK:
     GP.DEFPROC FORM.CHECK, DLG.ROW, DLG.TEXT$, DLG.ON RETURNS CHECK.CTRL
-    CHECK.X = GUI.INNER.LEFT : CHECK.Y = GUI.INNER.TOP + DLG.ROW
+    GOSUB GUI.ITEM.SEAL
+    CHECK.X = GUI.INNER.LEFT + DLG.COLUMN : CHECK.Y = GUI.INNER.TOP + DLG.ROW
     CHECK.TEXT$ = DLG.TEXT$ : CHECK.ON = DLG.ON
     GOSUB CHECK.ADD
     RETURN
 
 DLG.FORMCOMBO:
-    GP.DEFPROC FORM.COMBO, DLG.ROW, DLG.LABEL$, DLG.WIDTH, DLG.COUNT, DLG.SEL
-    GP.PRINTAT GUI.INNER.LEFT, GUI.INNER.TOP + DLG.ROW, DLG.LABEL$, GUI.PANEL
-    COMBO.X = GUI.INNER.LEFT + LEN(DLG.LABEL$) + 1
+    GP.DEFPROC FORM.COMBO, DLG.ROW, DLG.LABEL$, DLG.LABW%, DLG.WIDTH, DLG.SEL RETURNS COMBO.CTRL
+    GOSUB DLG.FORMLABEL
+    COMBO.X = DLG.CONTROL.X%
     COMBO.Y = GUI.INNER.TOP + DLG.ROW
-    COMBO.W = DLG.WIDTH : COMBO.COUNT = DLG.COUNT
-    COMBO.SEL = DLG.SEL : COMBO.BANK = 0
+    COMBO.W = DLG.WIDTH
+    COMBO.SEL = DLG.SEL
+    COMBO.BANK = 0
     GOSUB COMBO.ADD
+    GOSUB GUI.ITEM.CLAIM
+    RETURN
+
+DLG.FORMLIST:
+    GP.DEFPROC FORM.LIST, DLG.ROW, DLG.LABEL$, DLG.LABW%, DLG.WIDTH, DLG.ROWS, DLG.SEL, DLG.MULTI RETURNS GUI.LIST.CTRL
+    GOSUB DLG.FORMLABEL
+    DLG.MARKOFF% = 0
+    IF DLG.MULTI <> 0 THEN DLG.MARKOFF% = 2
+    GUI.LIST.X = DLG.CONTROL.X% + DLG.MARKOFF%
+    GUI.LIST.Y = GUI.INNER.TOP + DLG.ROW
+    GUI.LIST.W = DLG.WIDTH - DLG.MARKOFF%
+    GUI.LIST.ROWS = DLG.ROWS
+    GUI.LIST.COUNT = 0
+    GUI.LIST.FIRST = GUI.ITEM.COUNT
+    GUI.LIST.SEL = DLG.SEL
+    GUI.LIST.BANK = GUI.ITEM.BANK
+    GUI.LIST.MULTI = DLG.MULTI
+    GUI.LIST.NOTEW = 0
+    GOSUB GUI.FORM.ADD.LIST
+    GOSUB GUI.ITEM.CLAIM
+    RETURN
+
+DLG.FORMRADIO:
+    GP.DEFPROC FORM.RADIO, DLG.ROW, DLG.LABEL$, DLG.LABW%, DLG.SEL RETURNS CHECK.CTRL
+    GOSUB DLG.FORMLABEL
+    CHECK.X = DLG.CONTROL.X%
+    CHECK.Y = GUI.INNER.TOP + DLG.ROW
+    RADIO.SEL = DLG.SEL
+    GOSUB RADIO.ADD
+    GOSUB GUI.ITEM.CLAIM
+    RETURN
+
+DLG.FORMVALUE:
+    GP.DEFPROC FORM.VALUE, DLG.ROW, DLG.LABEL$, DLG.LABW%, DLG.WIDTH, DLG.TEXT$ RETURNS GUI.VALUE.CTRL
+    GOSUB GUI.ITEM.SEAL
+    GOSUB DLG.FORMLABEL
+    LINEINPUT.X = DLG.CONTROL.X%
+    LINEINPUT.Y = GUI.INNER.TOP + DLG.ROW
+    LINEINPUT.LEN = DLG.WIDTH
+    LINEINPUT.TEXT$ = DLG.TEXT$
+    GOSUB GUI.FORM.ADD.VALUE
     RETURN
 
 DLG.FORMRUN:
     GP.DEFPROC FORMTO.RUN RETURNS DLG.ANSWER%
+    GOSUB DLG.FORMSTART
+    GOSUB GUI.FORM.RUN
+    GOSUB DLG.FORMANSWER
+    RETURN
+
+DLG.FORMEVENT:
+    GP.DEFPROC FORMTO.EVENT RETURNS DLG.ANSWER%
+    IF GUI.FORM.RESUME = 0 THEN GOSUB DLG.FORMSTART
+    GUI.FORM.WATCH = -1
+    GOSUB GUI.FORM.RUN
+    DLG.ANSWER% = GUI.FORM.CHANGED
+    IF GUI.FORM.DONE <> 0 THEN GOSUB DLG.FORMANSWER
+    RETURN
+
+## ---- the last combo, list or radio drawn, the buttons placed, control 1 focused
+DLG.FORMSTART:
+    GOSUB GUI.ITEM.SEAL
     GUI.BTN.Y = GUI.INNER.TOP + DLG.FORMROWS + 1
-    GOSUB GUI.BUTTON.ROW : GUI.FOCUS = 1 : GOSUB GUI.FORM.RUN
+    GOSUB GUI.BUTTON.ROW
+    GUI.FOCUS = 1
+    RETURN
+
+## ---- a cancel is GUI.FORM.HIT 0, whose flags are never set
+DLG.FORMANSWER:
     DLG.ANSWER% = 0
     IF (GUI.CTRL.FLAGS%(GUI.FORM.HIT) AND GUI.CF.DEFAULT) <> 0 THEN DLG.ANSWER% = -1
     RETURN
@@ -716,8 +841,9 @@ DLG.FORMCHECKED:
     IF (GUI.CTRL.FLAGS%(DLG.N) AND GUI.CF.CHECKED) <> 0 THEN DLG.ON = -1
     RETURN
 
-DLG.FORMCOMBOSEL:
-    GP.DEFPROC FORM.COMBOSEL RETURNS COMBO.SEL
+DLG.FORMSEL:
+    GP.DEFPROC FORM.SEL, DLG.N RETURNS DLG.SEL
+    DLG.SEL = GUI.CTRL.SEL%(DLG.N)
     RETURN
 
 DLG.FORMEND:

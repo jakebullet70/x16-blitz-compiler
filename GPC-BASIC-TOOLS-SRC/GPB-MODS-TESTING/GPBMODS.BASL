@@ -208,7 +208,6 @@ GM.LIBEND:
 ## The caller owns the DIM: the twenty-four rows GUI.LISTBOX is shown with.
 ## Do not also leave it implicit.
 DIM GUI.LIST.ITEM$(24)
-DIM COMBO.ITEM$(4)
 
 ## STR.SPLIT's fields. Nothing here calls STR.SPLIT any more -- the panel uses
 ## STR.SCAN, which DIMs its own STR.POS% -- but STRINGS.INC.BL still compiles the
@@ -376,7 +375,7 @@ GMX.QUIT:
 GP.BANKEDSTR GM.TEXTBANK BS.CHROME
   "GPB-MODS-TESTING -- A DEVELOPMENT HARNESS FOR THE GPC-BASIC LIBRARY"
   "ALT / ESC  MENU   <- ->  NEXT MENU   RETURN  CHOOSE   TAB  FOCUS"
-  "BUILD 016"
+  "BUILD 019"
 GP.ENDBANKEDSTR
 GP.BANKEDSTR GM.TEXTBANK BS.HEAP
   "HEAP  FRE(0) "
@@ -853,50 +852,115 @@ GMX.D.FOCUS:
 
 
 ## ***********************************************************************
-## **  GMX.D.FORM -- three check boxes and a combo on one GUI.FORM.
+## **  GMX.D.FORM -- every FORM control on one form, in two columns.
 ## **
-## **  The controls are added in order, so the boxes are controls 1 to 3 and
-## **  their states are read back from those three flags.
+## **  The left column is three check boxes, two combos and a radio group, the
+## **  right a multi-select list, a field and a value. FORMTO.EVENT hands back
+## **  each change, and the value is rewritten from the combos, the radio
+## **  group and the list.
 ## ***********************************************************************
 
 
 GP.BANKEDSTR GM.TEXTBANKB BS.D.FORM
-  " CHECK BOX + COMBO "
-  "SPACE FLIPS A BOX, X TICKS IT, DEL CLEARS IT."
-  "RETURN ON THE STATE OPENS ITS LIST."
+  " EVERY FORM CONTROL "
+  "TAB MOVES ON. SPACE TICKS A BOX AND MARKS A ROW."
+  "RETURN OPENS A COMBO. UP AND DOWN PICK A DAY."
   "SHOW HIDDEN FILES"
   "SORT BY NAME"
-  "CONFIRM EVERY DELETE"
+  "CONFIRM DELETES"
   "STATE"
   " TEXAS"
   " OHIO"
   " MAINE"
   " IDAHO"
-  "FORM OK "
-  "  BOXES "
-  "  STATE "
+  "SIZE"
+  " SMALL"
+  " MEDIUM"
+  " LARGE"
+  "DAYS"
+  "1 NIGHT"
+  "3 NIGHTS"
+  "7 NIGHTS"
+  "PICK"
+  "APPLES"
+  "BREAD"
+  "CHEESE"
+  "DATES"
+  "EGGS"
+  "FLOUR"
+  "GRAPES"
+  "NAME"
+  "SUM"
+  "FORM "
+  " BOX "
+  " SUM "
+  " NAME "
 GP.ENDBANKEDSTR
+
+## ---- The controls in the order they are added, which is their numbers.
+## ---- BASLOAD has a short name for about 950 variables and GPBMODS is at
+## ---- the edge, so the test names them with constants.
+#DEFINE GM.FORM.STATE 4
+#DEFINE GM.FORM.SIZE 5
+#DEFINE GM.FORM.DAYS 6
+#DEFINE GM.FORM.PICK 7
+#DEFINE GM.FORM.NAME 8
+#DEFINE GM.FORM.SUM 9
+
+## ---- The item store borrows the file picker's bank. The two never run at once.
 GMX.D.FORM:
-  COMBO.ITEM$(1) = GP.BSTR(BS.D.FORM, 7)
-  COMBO.ITEM$(2) = GP.BSTR(BS.D.FORM, 8)
-  COMBO.ITEM$(3) = GP.BSTR(BS.D.FORM, 9)
-  COMBO.ITEM$(4) = GP.BSTR(BS.D.FORM, 10)
-  GP.SUB FORM.BEGIN, GP.BSTR(BS.D.FORM, 0), GP.BSTR(BS.D.FORM, 1), GP.BSTR(BS.D.FORM, 2), 4, 28, "&OK", "&CANCEL"
+  GP.SUB FORM.BEGIN, GP.BSTR(BS.D.FORM, 0), GP.BSTR(BS.D.FORM, 1), GP.BSTR(BS.D.FORM, 2), 8, 56, "&OK", "&CANCEL"
+  GP.SUB FORM.ITEMS, GM.PICKBANK%
   GP.SUB FORM.CHECK, 0, GP.BSTR(BS.D.FORM, 3), -1
   GP.SUB FORM.CHECK, 1, GP.BSTR(BS.D.FORM, 4), 0
   GP.SUB FORM.CHECK, 2, GP.BSTR(BS.D.FORM, 5), -1
-  GP.SUB FORM.COMBO, 3, GP.BSTR(BS.D.FORM, 6), 12, 4, 1
+  GP.SUB FORM.COMBO, 3, GP.BSTR(BS.D.FORM, 6), 6, 12, 1
+  FOR GM.I = 7 TO 10
+    GP.SUB FORM.ITEM, GP.BSTR(BS.D.FORM, GM.I)
+  NEXT GM.I
+  GP.SUB FORM.COMBO, 4, GP.BSTR(BS.D.FORM, 11), 6, 12, 2
+  FOR GM.I = 12 TO 14
+    GP.SUB FORM.ITEM, GP.BSTR(BS.D.FORM, GM.I)
+  NEXT GM.I
+  GP.SUB FORM.RADIO, 5, GP.BSTR(BS.D.FORM, 15), 6, 2
+  FOR GM.I = 16 TO 18
+    GP.SUB FORM.ITEM, GP.BSTR(BS.D.FORM, GM.I)
+  NEXT GM.I
+  GP.SUB FORM.COLUMN, 28
+  GP.SUB FORM.LIST, 0, GP.BSTR(BS.D.FORM, 19), 5, 20, 5, 1, -1
+  FOR GM.I = 20 TO 26
+    GP.SUB FORM.ITEM, GP.BSTR(BS.D.FORM, GM.I)
+  NEXT GM.I
+  GP.SUB FORM.FIELD, 6, GP.BSTR(BS.D.FORM, 27), 5, 14, ""
+  GP.SUB FORM.VALUE, 7, GP.BSTR(BS.D.FORM, 28), 5, 20, ""
+  GOSUB GMX.D.FORM.SUM
 
-  GM.NUM% = GP.FN(FORMTO.RUN)
+  GP.DO
+    GM.NUM% = GP.FN(FORMTO.EVENT)
+    IF GM.NUM% < 1 THEN GP.EXITDO
+    GOSUB GMX.D.FORM.SUM
+  GP.LOOP
+
   GOSUB GMX.SIGNED
-  GM.RESULT$ = GP.BSTR(BS.D.FORM, 11) + GM.NUM$ + GP.BSTR(BS.D.FORM, 12)
+  GM.RESULT$ = GP.BSTR(BS.D.FORM, 29) + GM.NUM$ + GP.BSTR(BS.D.FORM, 30)
   FOR GM.I = 1 TO 3
     GM.TICK$ = "-"
     IF GP.FN(FORM.CHECKED, GM.I) THEN GM.TICK$ = "X"
     GM.RESULT$ = GM.RESULT$ + GM.TICK$
   NEXT GM.I
-  GM.RESULT$ = GM.RESULT$ + GP.BSTR(BS.D.FORM, 13) + MID$(STR$(GP.FN(FORM.COMBOSEL)), 2)
+  GOSUB GMX.D.FORM.SUM
+  GM.RESULT$ = GM.RESULT$ + GP.BSTR(BS.D.FORM, 31) + GM.TICK$
+  GM.RESULT$ = GM.RESULT$ + GP.BSTR(BS.D.FORM, 32) + GP.FN(FORM.TEXT, GM.FORM.NAME)
   GP.SUB FORM.END
+  RETURN
+
+## ---- the value: the combos', the radio's and the list's answers
+GMX.D.FORM.SUM:
+  GM.TICK$ = MID$(STR$(GP.FN(FORM.SEL, GM.FORM.STATE)), 2)
+  GM.TICK$ = GM.TICK$ + MID$(STR$(GP.FN(FORM.SEL, GM.FORM.SIZE)), 2)
+  GM.TICK$ = GM.TICK$ + MID$(STR$(GP.FN(FORM.SEL, GM.FORM.DAYS)), 2)
+  GM.TICK$ = GM.TICK$ + " " + GP.FN(FORM.TEXT, GM.FORM.PICK)
+  GP.SUB FORM.SETTEXT, GM.FORM.SUM, GM.TICK$
   RETURN
 
 

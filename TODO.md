@@ -278,6 +278,37 @@ Two decisions to take at the keyboard:
 
 ## Bugs
 
+### BASLOAD runs out of short variable names at about 950 — OPEN, raised 2026-10-01
+
+BASLOAD gives every variable a one- or two-character name: `A` to `Z`, then each letter with `0`
+to `9` and `A` to `Z`, less the reserved pairs. That is about 950 names. GPC reads two
+significant characters, as CBM BASIC does, and GP.ASM `{VAR}` relies on crunched names of one or
+two characters, so longer names are not the way out.
+
+One pool serves every type. A symbol is keyed by its name without the suffix, so `GUI.MSG` and
+`GUI.MSG$` are one symbol with one short name. A float name and a string name are never the same
+short name, although CBM BASIC keeps `A`, `A%` and `A$` apart.
+
+Running out is silent. The check in `BASLOAD-GPC/upstream/symbol.inc`, under "Check variable name
+availability" in `symbol_add`, branches `bne` on `type = SYMBOLTYPE_LABEL`, so it runs for labels
+and not for variables. The next variables get `[`, `[0`, `[1` and on. GPC then stops with
+`SYNTAX ERROR` on the first line that uses one, which is a line with nothing wrong in it.
+
+GPBMODS hit it on 2026-10-01 at 986 names, 36 over, when the FORM controls for GUI-FIELD-EDIT
+went in. The error named a `GP.BANKEDSTR` line. The library reuses scratch names and the GPBMODS
+form test names its controls with `#DEFINE`s to stay under. To count a build's names:
+
+    tr '\r' '\n' < GPBMODS.SRC.SYM | awk '/^VARIABLES/{f=1} f' | grep -c "="
+
+and any `=[` in the same listing is a name past the end.
+
+The fix is asm in BASLOAD-GPC, not agreed yet:
+
+1. Make the check run for variables, and stop with an error that names the symbol.
+2. A pool per type. Key the symbol by its name and suffix, and draw float, `%` and `$` names from
+   three counters, about 2,850 names. GP.ASM's `#SYMFILE` reader then sees names with the suffix
+   and needs checking. A label and a variable that differ only by the `$` stop colliding too.
+
 ### `SLEEP 0` returns at once, where stock X16 BASIC waits a frame
 
 GPC does not call the ROM's `SLEEP`. `XCommandSleep`

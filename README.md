@@ -50,20 +50,25 @@ same build.
 - `SRC/` holds the four sources in `GPC/`, `GPC-ERROR/`, `GPC-HELP/` and
   `GPC-BASLOAD/`. `SRC/README.TXT` says how to rebuild them. Nothing in
   `SRC/` is needed to run GPC.
-- `SAMPLES/` holds `GPBMODS/`, `BMXVIEW/`, `COLORTST/`, `GUI-LITE/` and
-  `MANDELBROT-SPEED/`.
+- `SAMPLES/` holds `GPBMODS/`, `BMXVIEW/`, `COLORTST/`, `GUI-LITE/`,
+  `MANDELBROT-SPEED/` and `GUI-FIELD-EDIT/`.
 
 The samples are there to be read and run. They cannot be rebuilt where they
 sit: their `#INCLUDE` lines need a `GPC-BASIC/` folder beside the source, and
 a sample folder has none.
 
 Every sample carries its own runtime, so it runs from its own folder with
-nothing else on the drive. `GPBMODS.PRG` reads `GPBMODS.OVL` from beside it.
+nothing else on the drive. `GPBMODS.PRG` reads `GPBMODS.OVL` from beside it,
+and `GUI-FIELD-EDIT.PRG` reads `GUI-FIELD-EDIT.OVL`.
 
 `MANDELBROT-SPEED` draws one Mandelbrot picture three ways and times each.
 `MANDEL.SRC.PRG` runs in ROM BASIC, `MANDEL.PRG` is the same source compiled,
 and `MANDELASM.PRG` has its inner loop in `GP.ASM`. Measured on x16emu R49:
 6,048 jiffies, 3,075 jiffies and 284 jiffies.
+
+`GUI-FIELD-EDIT` is a video rental store checkout: one 80x30 form of 26
+controls and two buttons, with text fields, combos, a list box, check boxes,
+radio groups and read-only values. Its library code runs from banked regions.
 
 ## Compiling a program
 
