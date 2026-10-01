@@ -1,6 +1,6 @@
 ---
 name: write-readable-code-user-crunches
-description: "Write BASL expanded and readable; the user crunches lines himself, and dense code blocks his review"
+description: "Write BASL expanded and readable; the user crunches lines themselves, and dense code blocks their review"
 metadata: 
   node_type: memory
   type: feedback
@@ -18,7 +18,7 @@ Three specifics settled at the same time:
 2. **A single-statement conditional is a plain `IF ... THEN <statement>`**, not a
    `GP.IF` / `GP.ENDIF` block. Blocks are for multi-statement bodies.
 3. **NEVER put a statement on a label's line** — `BANKMGR.INIT: IF ...` is out. The user saw the
-   idiom in the crunch program, dislikes it, and may still apply it himself in a final review.
+   idiom in the crunch program, dislikes it, and may still apply it themselves in a final review.
    Nothing in the shipped library does it; every module gives a label its own line.
 4. **Long, descriptive variable names.** BASLOAD maps long names down, so a short name saves
    nothing in the PRG. Raised 2026-09-15 on `KV.INC.BL`: *"what are KV.K$ & KV.V$, you can make
@@ -27,16 +27,16 @@ Three specifics settled at the same time:
    public in/out names. A long variable can collide with a label (`KV.KEY$` against `KV.KEY:`), so
    rename the label to a verb (`KV.ENCODE`) — see [[basload-label-and-variable-collide]].
 
-**Why:** dense lines are what he reads to review the logic, and crunching is a separate, later,
-deliberate pass that belongs to him. Line-joining is also nearly free in p-code — the `BANKMGR`
+**Why:** dense lines are what the user reads to review the logic, and crunching is a separate, later,
+deliberate pass that belongs to the user. Line-joining is also nearly free in p-code — the `BANKMGR`
 crunch was 17 lines for 18 bytes — so it buys little and costs review.
 
 **How to apply:** write it expanded, say what it measured, and leave the crunching alone. If a
-program genuinely will not fit, say so and let him decide, rather than crunching pre-emptively.
+program genuinely will not fit, say so and let the user decide, rather than crunching pre-emptively.
 See [[comments-light-code-should-flow]] and [[prose-style-is-flat-reference]] for the prose half,
 and [[basl-cruncher-built]] for what a crunch pass is actually worth.
 
-## Reviewing a crunch he hands back
+## Reviewing a crunch the user hands back
 
 **Check every merged line for an `IF` that is not LAST on it.** A false `IF` skips the WHOLE line,
 so a statement joined after the THEN-clause silently becomes conditional. The `STRUSING` crunch was
@@ -53,10 +53,15 @@ diff the lists: same count, same order means only the grouping moved. That settl
 
 **Check it for line crunching, and if that is all it is, carry on without a word.** Standing note,
 2026-09-09. The user crunches sources between turns, and a working copy that moved underneath a
-session is his pass, not a conflict or a lost edit. Diff it the mechanical way above — same
+session is the user's pass, not a conflict or a lost edit. Diff it the mechanical way above — same
 statements, same order, fewer lines — and keep going.
 
-**Why:** stopping to report "this file changed" on every crunch is noise, and re-expanding it would
-undo his work. Only a difference that is NOT a crunch — a statement gone, an order changed, an `IF`
-no longer last on its line — is worth raising. See [[user-runs-concurrent-agents-here]] for the case
+**Why:** stopping to report "this file changed" on every crunch is noise, and re-expanding it would undo the user's work. Only a difference that is NOT a crunch — a statement gone, an order changed, an `IF`
+no longer last on its line — is worth raising.
+
+**A crunch carries no functional change, by the user's own rule** (restated 2026-10-01: *"in
+crunching there should be NO functional changes, just cleanups. If you see those do not worry. If
+there is functional then ask"*). A `GP.IF` block folded into one `IF ... THEN a : b` line is still a
+crunch. So a cleanup-only diff gets no comment at all. A diff that changes behaviour gets a question
+to the user before anything else happens: do not fix it, revert it or build on top of it first. See [[user-runs-concurrent-agents-here]] for the case
 where the change came from another agent instead.

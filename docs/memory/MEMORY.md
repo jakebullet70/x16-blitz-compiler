@@ -10,7 +10,8 @@ again. See [memory-is-git-tracked](memory-is-git-tracked.md).
 - [Review findings must be reachable](review-findings-must-be-reachable.md) — drop anything only invalid source or a typo triggers
 - [Tech doc structure spec](tech-doc-structure-spec.md) — named sections, document inputs/outputs/errors, never invent a detail
 - [Prose style is flat reference](prose-style-is-flat-reference.md) — five settled rules, `doc-style` owns them; [help topics are current behaviour only](help-topic-writing-rules.md); [HLP files carry hand edits](hlp-files-carry-hand-edits.md), so patch the render delta
-- [Write readable code, user crunches](write-readable-code-user-crunches.md) — one statement a line, an unexplained SRC edit is his crunch pass; [comments light](comments-light-code-should-flow.md), heavy REMs mean bad naming
+- [Write readable code, user crunches](write-readable-code-user-crunches.md) — one statement a line, an unexplained SRC edit is the user's crunch pass, ask only if it changes behaviour; [comments light](comments-light-code-should-flow.md), heavy REMs mean bad naming
+- [Bounds checks are a luxury](bounds-checks-are-a-luxury.md) — no range checks in library routines; the contract states the limit, the caller keeps it
 - [Ask before writing asm](ask-before-writing-asm.md) — standing order: agree GP.ASM or 64tass first
 - [Keep Claude's files off the root](keep-claude-files-off-the-root.md) — source/drive and source/scratch are Claude's; the root is the user's
 - [Commit to main directly](commit-to-main-directly.md) — solo repo, no branch; [never commit OASIS](never-commit-oasis.md), stage by name

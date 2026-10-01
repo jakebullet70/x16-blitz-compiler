@@ -1,0 +1,150 @@
+## ***********************************************************************
+## **
+## **  GUI-LITE.BASL -- a message box and a menu in one low-memory PRG.
+## **
+## **  A themed page with a menu on it. ABOUT opens a message box with one
+## **  button, and TWO BUTTONS and QUIT open one with two. THEME opens a
+## **  second menu over the first, and DISK opens one with a message box over
+## **  it. A menu stays on the screen until the program closes it.
+## **  The boxes come from GPC-BASIC/GUI-LITE.INC.BL as the verbs PICKMENU,
+## **  MSGBOX and CLOSEBOX. DISK asks the drive with DOSX.EXISTS and DISK
+## **  STATUS with DOSX, both from GPC-BASIC/DOS.INC.BL. Compiled EMBEDDED,
+## **  and nothing is banked, so the program is one PRG with no .OVL.
+## **
+## ***********************************************************************
+
+#SAVEAS "@:GUI-LITE.SRC.PRG"
+#SYMFILE "@:GUI-LITE.SRC.SYM"
+
+#INCLUDE "GPC-BASIC/GPB.INC.BL"
+#INCLUDE "GPC-BASIC/APPSYS.INC.BL"
+#INCLUDE "GPC-BASIC/THEME.INC.BL"
+#INCLUDE "GPC-BASIC/GUI-LITE.INC.BL"
+#INCLUDE "GPC-BASIC/DOS.INC.BL"
+
+## 80x30.
+#DEFINE LITE.SCREEN.MODE 1
+#DEFINE LITE.COLUMNS 80
+#DEFINE LITE.ROWS 30
+
+## The menu's items, as PICKMENU numbers them.
+#DEFINE LITE.CHOICE.ABOUT 1
+#DEFINE LITE.CHOICE.TWO.BUTTONS 2
+#DEFINE LITE.CHOICE.THEME 3
+#DEFINE LITE.CHOICE.DISK 4
+#DEFINE LITE.CHOICE.DISK.STATUS 5
+#DEFINE LITE.CHOICE.QUIT 6
+
+## APPSYS.STARTUP first, before any SCREEN of our own: it records the screen
+## the user had, and that is what APPSYS.RESTORE puts back.
+GOSUB APPSYS.STARTUP
+SCREEN LITE.SCREEN.MODE
+
+## Each list is a submenu's items and a table of names in one. The items are
+## padded to one width, so item N starts at (N - 1) * (width + 1) + 1.
+LITE.THEME.NAMES$ = "X16  ,DARK ,LIGHT,GRAY "
+LITE.FILE.NAMES$ = "GUI-LITE.PRG,GUI-LITE.MAP,NO-SUCH.FILE"
+
+THEME.ID% = 0
+GOSUB THEME.SELECT : GOSUB DRAW.MAIN.SCRN
+
+LITE.QUITTING% = 0
+GP.DO
+    GOSUB LITE.SHOW.FREE
+    LITE.CHOICE% = GP.FN(PICKMENU, 4, 4, "MENU", "ABOUT,TWO BUTTONS,THEME,DISK,DISK STATUS,QUIT")
+    GOSUB LITE.SHOW.CHOICE
+    GP.SELECT LITE.CHOICE%
+        GP.CASE LITE.CHOICE.ABOUT       : GOSUB LITE.ABOUT
+        GP.CASE LITE.CHOICE.TWO.BUTTONS : GOSUB LITE.TWO.BUTTONS
+        GP.CASE LITE.CHOICE.THEME       : GOSUB LITE.PICK.THEME
+        GP.CASE LITE.CHOICE.DISK        : GOSUB LITE.DISK
+        GP.CASE LITE.CHOICE.DISK.STATUS : GOSUB LITE.DISK.STATUS
+        GP.CASE LITE.CHOICE.QUIT, 0     : GOSUB LITE.ASK.QUIT
+    GP.ENDSEL
+    ## ---- The menu stays open under each box. THEME repaints after the
+    ## ---- close, because CLOSEBOX puts back the page as it was.
+    GP.SUB CLOSEBOX
+    IF LITE.CHOICE% = LITE.CHOICE.THEME THEN GOSUB LITE.REPAINT
+    IF LITE.QUITTING% <> 0 THEN GP.EXITDO
+GP.LOOP
+
+GOSUB APPSYS.RESTORE
+END
+
+## ***********************************************************************
+## **  DRAW.MAIN.SCRN -- the page, with the program's name at the top and the
+## **  keys at the bottom.
+## ***********************************************************************
+
+DRAW.MAIN.SCRN:
+    GP.FILL 0, 0, LITE.COLUMNS, LITE.ROWS, 32, THEME.CLR(THEME.PAGE)
+    GP.PRINTAT 2, 1, "GUI-LITE", THEME.CLR(THEME.TITLE)
+    GP.PRINTAT 12, 1, "BUILD 022", THEME.CLR(THEME.DIMMED)
+    GP.PRINTAT 23, 1, "THEME " + MID$(LITE.THEME.NAMES$, THEME.ID% * 6 + 1, 5), THEME.CLR(THEME.DIMMED)
+    GP.PRINTAT 2, LITE.ROWS - 2, "UP DOWN LEFT RIGHT TAB  MOVE    RETURN  CHOOSE    ESC  BACK", THEME.CLR(THEME.DIMMED)
+    RETURN
+
+## ---- FRE(0) is the string heap. The trailing spaces clear a longer number.
+LITE.SHOW.FREE:
+    GP.PRINTAT 2, LITE.ROWS - 1, "BYTES FREE " + MID$(STR$(FRE(0)), 2) + "     ", THEME.CLR(THEME.DIMMED)
+    RETURN
+
+## ---- What PICKMENU gave back for the main menu, 0 for ESC.
+LITE.SHOW.CHOICE:
+    GP.PRINTAT 24, LITE.ROWS - 1, "MENU RETURNED " + MID$(STR$(LITE.CHOICE%), 2), THEME.CLR(THEME.DIMMED)
+    RETURN
+
+## ---- The page in the new theme, and the status it covered.
+LITE.REPAINT:
+    GOSUB DRAW.MAIN.SCRN
+    GOSUB LITE.SHOW.CHOICE
+    RETURN
+
+LITE.ABOUT:
+    GP.SUB MSGBOX, "ABOUT", "A MESSAGE BOX AND A MENU, BOTH VERBS.", "", "NOTHING IS BANKED:", "ONE PRG IN LOW MEMORY, NO OVL FILE.", "OK", ""
+    RETURN
+
+## MSGBOX returns 1 for the first button and 2 for the second. ESC answers
+## DISCARD.
+LITE.TWO.BUTTONS:
+    LITE.BUTTON% = GP.FN(MSGBOX, "TWO BUTTONS", "SAVE THE CHANGES?", "", "", "", "SAVE", "DISCARD")
+    LITE.ANSWER$ = "SAVE"
+    IF LITE.BUTTON% = 2 THEN LITE.ANSWER$ = "DISCARD"
+    GP.SUB MSGBOX, "ANSWER", "MSGBOX RETURNED " + MID$(STR$(LITE.BUTTON%), 2) + ", " + LITE.ANSWER$ + ".", "", "", "", "OK", ""
+    RETURN
+
+## The submenu opens beside THEME, over the main menu. THEME.ID% counts from
+## 0 and the menu from 1. ESC keeps the theme.
+LITE.PICK.THEME:
+    LITE.THEME.CHOICE% = GP.FN(PICKMENU, 18, 6, "THEME", LITE.THEME.NAMES$)
+    GP.SUB CLOSEBOX
+    IF LITE.THEME.CHOICE% <> 0 THEN THEME.ID% = LITE.THEME.CHOICE% - 1
+    GOSUB THEME.SELECT
+    RETURN
+
+## The submenu opens beside DISK, and the answer over the submenu: three
+## boxes open at once.
+LITE.DISK:
+    LITE.FILE.CHOICE% = GP.FN(PICKMENU, 18, 7, "CHECK FILE", LITE.FILE.NAMES$)
+    IF LITE.FILE.CHOICE% <> 0 THEN GOSUB LITE.CHECK.FILE
+    GP.SUB CLOSEBOX
+    RETURN
+
+## DOSX.EXISTS leaves the drive's answer in DOS.ERR and DOS.MSG$, found or not.
+LITE.CHECK.FILE:
+    LITE.FILE.NAME$ = MID$(LITE.FILE.NAMES$, (LITE.FILE.CHOICE% - 1) * 13 + 1, 12)
+    LITE.FOUND$ = " IS NOT THERE."
+    IF GP.FN(DOSX.EXISTS, LITE.FILE.NAME$) THEN LITE.FOUND$ = " IS THERE."
+    GP.SUB MSGBOX, "DISK", LITE.FILE.NAME$ + LITE.FOUND$, "", "THE DRIVE SAID", MID$(STR$(DOS.ERR), 2) + ", " + DOS.MSG$, "OK", ""
+    RETURN
+
+## An empty command sends the drive nothing, so DOSX reads its status alone.
+LITE.DISK.STATUS:
+    GP.SUB DOSX, ""
+    GP.SUB MSGBOX, "DISK STATUS", "DRIVE " + MID$(STR$(DOS.DEVICE), 2) + " SAID", "", MID$(STR$(DOS.ERR), 2) + ", " + DOS.MSG$, "", "OK", ""
+    RETURN
+
+## ESC answers NO.
+LITE.ASK.QUIT:
+    LITE.QUITTING% = GP.FN(MSGBOX, "QUIT", "LEAVE GUI-LITE?", "", "", "", "YES", "NO") = 1
+    RETURN

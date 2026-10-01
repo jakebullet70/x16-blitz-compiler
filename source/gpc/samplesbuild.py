@@ -31,6 +31,7 @@ ROOTABI = os.path.join(ROOT, "GPC-BASIC", "GPB.INC.BL")
 #       install  where the object goes and under what name -- None leaves it in the src
 #                folder, which is already the drive its demo bat mounts
 #       data     further files the install folder needs beside the object
+#       overlay  False fails the build when the compile writes a .OVL. Default True
 #
 PROGRAMS = [
     #   EMBEDDED, so the object and its .OVL run with no runtime file beside them.
@@ -85,6 +86,12 @@ PROGRAMS = [
          src=("GPC-BASIC-TOOLS-SRC/GPC.ERR", "GPC.ERR.BASL"),
          shared=True,
          install=("GPC-BASIC-TOOLS-SRC/GPC-HELP", "GPC.ERR.PRG"), data=[]),
+
+    #   EMBEDDED, and one PRG is the point of the sample: nothing in it may be banked.
+    dict(name="GUI-LITE",
+         src=("GPC-BASIC-TOOLS-SRC/GUI-LITE", "GUI-LITE.BASL"),
+         shared=False,
+         install=None, data=[], overlay=False),
 ]
 
 BMX_SRC = os.path.join(ROOT, "GPC-BASIC-TOOLS-SRC", "BMXVIEWER", "SAMPLES")
@@ -242,7 +249,10 @@ def build(prog):
     drive = os.path.join(ROOT, *prog["src"][0].split("/"))
     check_abi(drive)
     #   a changed .INC.BL is invisible to build_basl.py's up-to-date check
-    for junk in (stem + ".SRC.PRG", stem + ".PRG", stem + ".MAP", stem + ".SRC.SYM"):
+    junks = [stem + ".SRC.PRG", stem + ".PRG", stem + ".MAP", stem + ".SRC.SYM"]
+    if not prog.get("overlay", True):
+        junks.append(stem + ".OVL")
+    for junk in junks:
         p = os.path.join(drive, junk)
         if os.path.exists(p):
             os.remove(p)
@@ -276,6 +286,10 @@ def build(prog):
               os.path.join(drive, "GPCCOMP.LOG"), flush=True)
         return False
     print("   compiled:", format(os.path.getsize(obj), ","), "bytes", flush=True)
+    if not prog.get("overlay", True) and os.path.exists(os.path.join(drive, stem + ".OVL")):
+        print("!!", name, "wrote", stem + ".OVL; it must be one PRG with nothing banked",
+              flush=True)
+        return False
 
     #   ONLY the overlay this build wrote.  A failed compile used to report the PREVIOUS
     #   build's overlays as if they were new.  There is one file, stem.OVL, holding every

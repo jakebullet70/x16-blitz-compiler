@@ -1,0 +1,318 @@
+## ***********************************************************************
+## **
+## **  GUI-LITE.INC.BL -- a message box and a menu, as verbs, in low memory.
+## **
+## **      B = GP.FN(MSGBOX, title$, line$, line$, line$, line$, button$, button$)
+## **      C = GP.FN(PICKMENU, x, y, title$, items$)
+## **      GP.SUB CLOSEBOX
+## **
+## **  Each box is as wide as its text and carries a drop shadow. MSGBOX
+## **  closes its box before it returns. PICKMENU leaves its box open, and
+## **  CLOSEBOX takes down the box opened last. The screen under each box goes
+## **  to VRAM above GL.SAVE.AT and comes back when it closes, so up to
+## **  GL.MOST.OPEN boxes stack. The caller keeps every box and its shadow on
+## **  the screen.
+## **
+## **  Colours come from THEME.CLR, so THEME.SELECT runs first.
+## **
+## **  No GP.BANKED, no GP.BANKEDSTR and no BANK, so a program built on this
+## **  writes no .OVL.
+## **
+## **  Requires GPB.INC.BL and THEME.INC.BL, and #INCLUDEs neither.
+## **
+## **  GUI-DIALOGS.INC.BL declares MSGBOX and PICKMENU too, so a program
+## **  includes one or the other.
+## **
+## ***********************************************************************
+
+## The save area, in VRAM bank 0. Each open box saves the screen under it
+## just above the box before. The largest box on an 80x30 screen takes
+## 5,084 bytes, so four of them end at $8F70. The area must end below
+## $10000. Define it before the #INCLUDE to move it.
+## STASHVRAM's window also starts at $04000, so a program with both moves one.
+#IFNDEF GL.SAVE.AT
+#DEFINE GL.SAVE.AT $4000
+#ENDIF
+
+## How many boxes may be open at once, each over the one before.
+#IFNDEF GL.MOST.OPEN
+#DEFINE GL.MOST.OPEN 4
+#ENDIF
+
+#IFNDEF GL.DEFS
+#DEFINE GL.DEFS 1
+
+#DEFINE GL.VERA.LOW $9F20
+#DEFINE GL.VERA.MIDDLE $9F21
+#DEFINE GL.VERA.HIGH $9F22
+#DEFINE GL.VERA.CTRL $9F25
+#DEFINE GL.LAYER.CONFIG $9F34
+#DEFINE GL.LAYER.MAPBASE $9F35
+
+## memory_copy takes the data ports as addresses: $9F23 reaches the screen
+## through ADDR0, $9F24 the save area through ADDR1.
+#DEFINE GL.PORT.SCREEN $23
+#DEFINE GL.PORT.SAVE $24
+#DEFINE GL.PORT.PAGE $9F
+#DEFINE GL.MEMORY.COPY $FEE7
+
+## ADDRH: an auto-increment of one in the top nibble, the bank in bit 0.
+#DEFINE GL.STEP.ONE 16
+
+## screen_mode. Carry set reports: width in .X, height in .Y.
+#DEFINE GL.SCREEN.MODE $FF5F
+
+#DEFINE GL.KEY.TAB 9
+#DEFINE GL.KEY.RETURN 13
+#DEFINE GL.KEY.DOWN 17
+#DEFINE GL.KEY.ESCAPE 27
+#DEFINE GL.KEY.RIGHT 29
+#DEFINE GL.KEY.UP 145
+#DEFINE GL.KEY.LEFT 157
+
+## The boxes open now, the last one at GL.OPEN.COUNT%. GL.OPEN.OFFSET is
+## where in the save area each one's screen went.
+DIM GL.OPEN.X%(GL.MOST.OPEN)
+DIM GL.OPEN.Y%(GL.MOST.OPEN)
+DIM GL.OPEN.W%(GL.MOST.OPEN)
+DIM GL.OPEN.H%(GL.MOST.OPEN)
+DIM GL.OPEN.OFFSET(GL.MOST.OPEN)
+
+GOTO GL.MODULE.END
+
+
+
+## ***********************************************************************
+## **  MSGBOX -- up to four lines over one or two buttons, centred on the
+## **  screen. Returns 1 or 2, the button chosen.
+## **
+## **  A "" line is a blank row, and the box ends at the last line that is
+## **  not "". A "" second button means one button. LEFT, RIGHT and TAB move
+## **  the focus, RETURN chooses, ESC chooses the last button.
+## ***********************************************************************
+GL.MSGBOX:
+    GP.DEFPROC MSGBOX, GL.TITLE$, GL.LINE.ONE$, GL.LINE.TWO$, GL.LINE.THREE$, GL.LINE.FOUR$, GL.BUTTON.ONE$, GL.BUTTON.TWO$ RETURNS GL.CHOSEN%
+    GL.LINES% = 0
+    IF GL.LINE.ONE$ <> "" THEN GL.LINES% = 1
+    IF GL.LINE.TWO$ <> "" THEN GL.LINES% = 2
+    IF GL.LINE.THREE$ <> "" THEN GL.LINES% = 3
+    IF GL.LINE.FOUR$ <> "" THEN GL.LINES% = 4
+
+    ## ---- Each button is drawn with a space either side, two columns apart.
+    GL.BUTTONS% = 1 : GL.BUTTON.ROW.W% = LEN(GL.BUTTON.ONE$) + 2
+    IF GL.BUTTON.TWO$ <> "" THEN GL.BUTTONS% = 2 : GL.BUTTON.ROW.W% = GL.BUTTON.ROW.W% + LEN(GL.BUTTON.TWO$) + 4
+    
+    GL.WIDEST% = GL.BUTTON.ROW.W%
+    IF LEN(GL.TITLE$) > GL.WIDEST% THEN GL.WIDEST% = LEN(GL.TITLE$)
+    IF LEN(GL.LINE.ONE$) > GL.WIDEST% THEN GL.WIDEST% = LEN(GL.LINE.ONE$)
+    IF LEN(GL.LINE.TWO$) > GL.WIDEST% THEN GL.WIDEST% = LEN(GL.LINE.TWO$)
+    IF LEN(GL.LINE.THREE$) > GL.WIDEST% THEN GL.WIDEST% = LEN(GL.LINE.THREE$)
+    IF LEN(GL.LINE.FOUR$) > GL.WIDEST% THEN GL.WIDEST% = LEN(GL.LINE.FOUR$)
+
+    ## ---- Two spaces between the frame and the widest text. A blank row above
+    ## ---- the lines, one above the buttons and one below them.
+    GL.BOX.W% = GL.WIDEST% + 6 : GL.BOX.H% = GL.LINES% + 6
+    GP.CALL GL.SCREEN.MODE, 0, 0, 0, 1
+    GL.BOX.X% = INT((GP.X - GL.BOX.W%) / 2)
+    GL.BOX.Y% = INT((GP.Y - GL.BOX.H%) / 2)
+    GOSUB GL.CREATE.BOX
+
+    GL.TEXT.COLOUR% = THEME.CLR(THEME.TEXT)
+    GP.PRINTAT GL.BOX.X% + INT((GL.BOX.W% - LEN(GL.LINE.ONE$)) / 2), GL.BOX.Y% + 2, GL.LINE.ONE$, GL.TEXT.COLOUR%
+    GP.PRINTAT GL.BOX.X% + INT((GL.BOX.W% - LEN(GL.LINE.TWO$)) / 2), GL.BOX.Y% + 3, GL.LINE.TWO$, GL.TEXT.COLOUR%
+    GP.PRINTAT GL.BOX.X% + INT((GL.BOX.W% - LEN(GL.LINE.THREE$)) / 2), GL.BOX.Y% + 4, GL.LINE.THREE$, GL.TEXT.COLOUR%
+    GP.PRINTAT GL.BOX.X% + INT((GL.BOX.W% - LEN(GL.LINE.FOUR$)) / 2), GL.BOX.Y% + 5, GL.LINE.FOUR$, GL.TEXT.COLOUR%
+
+    GL.BUTTONS.X% = GL.BOX.X% + INT((GL.BOX.W% - GL.BUTTON.ROW.W%) / 2)
+    GL.BUTTONS.Y% = GL.BOX.Y% + GL.LINES% + 3
+    GL.CHOSEN% = 1
+    GOSUB GL.DRAW.BUTTONS
+    GP.DO
+        GOSUB GL.READ.KEY
+        IF GL.KEY.CODE% = GL.KEY.RETURN THEN GP.EXITDO
+        IF GL.KEY.CODE% = GL.KEY.ESCAPE THEN GL.CHOSEN% = GL.BUTTONS%
+        IF GL.KEY.CODE% = GL.KEY.ESCAPE THEN GP.EXITDO
+        IF GL.KEY.CODE% = GL.KEY.LEFT THEN GL.CHOSEN% = 1
+        IF GL.KEY.CODE% = GL.KEY.RIGHT THEN GL.CHOSEN% = GL.BUTTONS%
+        IF GL.KEY.CODE% = GL.KEY.TAB THEN GL.CHOSEN% = GL.BUTTONS% + 1 - GL.CHOSEN%
+        GOSUB GL.DRAW.BUTTONS
+    GP.LOOP
+    GOSUB GL.CLOSEBOX
+    RETURN
+
+## ---- The focused button in THEME.HILITE, the other in THEME.BAR.
+GL.DRAW.BUTTONS:
+    GL.BUTTON.COLOUR% = THEME.CLR(THEME.BAR)
+    IF GL.CHOSEN% = 1 THEN GL.BUTTON.COLOUR% = THEME.CLR(THEME.HILITE)
+    GP.PRINTAT GL.BUTTONS.X%, GL.BUTTONS.Y%, " " + GL.BUTTON.ONE$ + " ", GL.BUTTON.COLOUR%
+    IF GL.BUTTONS% = 1 THEN RETURN
+    GL.BUTTON.COLOUR% = THEME.CLR(THEME.BAR)
+    IF GL.CHOSEN% = 2 THEN GL.BUTTON.COLOUR% = THEME.CLR(THEME.HILITE)
+    GP.PRINTAT GL.BUTTONS.X% + LEN(GL.BUTTON.ONE$) + 4, GL.BUTTONS.Y%, " " + GL.BUTTON.TWO$ + " ", GL.BUTTON.COLOUR%
+    RETURN
+
+
+
+## ***********************************************************************
+## **  PICKMENU -- the comma-separated items, one a row, in a box whose
+## **  top-left corner is x,y. Returns the item chosen, 1 up, or 0 for ESC.
+## **
+## **  The box stays open, so a MSGBOX can open over it, and GP.SUB CLOSEBOX
+## **  takes it down. Repaint the screen under it only after CLOSEBOX, which
+## **  puts back the screen as it was when the box opened.
+## **
+## **  UP and DOWN move the bar and wrap at the ends, RETURN chooses. An item
+## **  cannot hold a comma.
+## ***********************************************************************
+GL.PICKMENU:
+    GP.DEFPROC PICKMENU, GL.BOX.X%, GL.BOX.Y%, GL.TITLE$, GL.ITEMS$ RETURNS GL.CHOSEN%
+    GL.WIDEST% = LEN(GL.TITLE$) : GL.DRAWING% = 0
+    GOSUB GL.WALK.ITEMS
+    GL.BOX.W% = GL.WIDEST% + 6 : GL.BOX.H% = GL.ITEM.COUNT% + 2
+    GOSUB GL.CREATE.BOX
+
+    GL.CHOSEN% = 1 : GL.DRAWING% = -1 : GOSUB GL.WALK.ITEMS
+    GP.DO
+        GOSUB GL.READ.KEY
+        GP.SELECT GL.KEY.CODE%
+            GP.CASE GL.KEY.RETURN : GP.EXITDO
+            GP.CASE GL.KEY.ESCAPE : GL.CHOSEN% = 0 : GP.EXITDO
+            GP.CASE GL.KEY.UP
+                GL.CHOSEN% = GL.CHOSEN% - 1
+                IF GL.CHOSEN% < 1 THEN GL.CHOSEN% = GL.ITEM.COUNT%
+            GP.CASE GL.KEY.DOWN
+                GL.CHOSEN% = GL.CHOSEN% + 1
+                IF GL.CHOSEN% > GL.ITEM.COUNT% THEN GL.CHOSEN% = 1
+        GP.ENDSEL
+        GOSUB GL.WALK.ITEMS
+    GP.LOOP
+    RETURN
+
+## ---- Every item of GL.ITEMS$ in turn. Counts them into GL.ITEM.COUNT%,
+## ---- keeps the longest in GL.WIDEST%, and draws them when GL.DRAWING% is
+## ---- set, GL.CHOSEN% under the bar.
+GL.WALK.ITEMS:
+    GL.ITEM.COUNT% = 0 : GL.ITEM.START% = 1
+    FOR GL.SCAN = 1 TO LEN(GL.ITEMS$)
+        IF MID$(GL.ITEMS$, GL.SCAN, 1) = "," THEN GOSUB GL.TAKE.ITEM
+    NEXT GL.SCAN
+    GL.SCAN = LEN(GL.ITEMS$) + 1 : GOSUB GL.TAKE.ITEM
+    RETURN
+
+## ---- The item that ends before column GL.SCAN.
+GL.TAKE.ITEM:
+    GL.ITEM.COUNT% = GL.ITEM.COUNT% + 1 : GL.ITEM$ = MID$(GL.ITEMS$, GL.ITEM.START%, GL.SCAN - GL.ITEM.START%)
+    GL.ITEM.START% = GL.SCAN + 1
+    IF LEN(GL.ITEM$) > GL.WIDEST% THEN GL.WIDEST% = LEN(GL.ITEM$)
+    IF GL.DRAWING% = 0 THEN RETURN
+    GL.ITEM.COLOUR% = THEME.CLR(THEME.TEXT)
+    IF GL.ITEM.COUNT% = GL.CHOSEN% THEN GL.ITEM.COLOUR% = THEME.CLR(THEME.HILITE)
+    GP.FILL GL.BOX.X% + 1, GL.BOX.Y% + GL.ITEM.COUNT%, GL.BOX.W% - 2, 1, 32, GL.ITEM.COLOUR%
+    GP.PRINTAT GL.BOX.X% + 3, GL.BOX.Y% + GL.ITEM.COUNT%, GL.ITEM$, GL.ITEM.COLOUR%
+    RETURN
+
+
+
+## ***********************************************************************
+## **  CLOSEBOX -- takes down the box opened last and puts back the screen
+## **  under it. PICKMENU's box is the one a program closes.
+## ***********************************************************************
+GL.CLOSEBOX:
+    GP.DEFPROC CLOSEBOX
+    GL.BOX.X% = GL.OPEN.X%(GL.OPEN.COUNT%) : GL.BOX.Y% = GL.OPEN.Y%(GL.OPEN.COUNT%)
+    GL.BOX.W% = GL.OPEN.W%(GL.OPEN.COUNT%) : GL.BOX.H% = GL.OPEN.H%(GL.OPEN.COUNT%)
+    GL.SAVE.USED = GL.OPEN.OFFSET(GL.OPEN.COUNT%)
+    GL.SAVE.ADDRESS = GL.SAVE.AT + GL.SAVE.USED : GL.OPEN.COUNT% = GL.OPEN.COUNT% - 1
+    GL.COPY.FROM% = GL.PORT.SAVE : GL.COPY.TO% = GL.PORT.SCREEN : GOSUB GL.SAVE.RESTORE.ROWS
+    RETURN
+
+
+
+## ***********************************************************************
+## **  The box both verbs draw.
+## ***********************************************************************
+## ---- Waits for a key. GL.KEY.CODE% is its PETSCII code.
+GL.READ.KEY:
+    GET GL.PRESSED$ : IF GL.PRESSED$ = "" THEN GOTO GL.READ.KEY
+    GL.KEY.CODE% = ASC(GL.PRESSED$)
+    RETURN
+
+
+## ---- GL.BOX.X% GL.BOX.Y% GL.BOX.W% GL.BOX.H% under GL.TITLE$, with the
+## ---- shadow two columns right and one row down. What they cover is saved
+## ---- above the boxes already open.
+GL.CREATE.BOX:
+    GL.OPEN.COUNT% = GL.OPEN.COUNT% + 1
+    GL.OPEN.X%(GL.OPEN.COUNT%) = GL.BOX.X%
+    GL.OPEN.Y%(GL.OPEN.COUNT%) = GL.BOX.Y%
+    GL.OPEN.W%(GL.OPEN.COUNT%) = GL.BOX.W%
+    GL.OPEN.H%(GL.OPEN.COUNT%) = GL.BOX.H%
+    GL.OPEN.OFFSET(GL.OPEN.COUNT%) = GL.SAVE.USED
+    GL.SAVE.ADDRESS = GL.SAVE.AT + GL.SAVE.USED
+    GL.SAVE.USED = GL.SAVE.USED + (GL.BOX.W% * 2 + 4) * (GL.BOX.H% + 1)
+    GL.COPY.FROM% = GL.PORT.SCREEN : GL.COPY.TO% = GL.PORT.SAVE : GOSUB GL.SAVE.RESTORE.ROWS
+    GP.FILL GL.BOX.X%, GL.BOX.Y%, GL.BOX.W%, GL.BOX.H%, 32, THEME.CLR(THEME.TEXT)
+    GP.BOX GL.BOX.X%, GL.BOX.Y%, GL.BOX.W%, GL.BOX.H%, 1, THEME.CLR(THEME.BORDER)
+    GP.FILL GL.BOX.X% + GL.BOX.W%, GL.BOX.Y% + 1, 2, GL.BOX.H%, 32, THEME.CLR(THEME.SHADOW)
+    GP.FILL GL.BOX.X% + 2, GL.BOX.Y% + GL.BOX.H%, GL.BOX.W%, 1, 32, THEME.CLR(THEME.SHADOW)
+    IF GL.TITLE$ = "" THEN RETURN
+    GP.PRINTAT GL.BOX.X% + 2, GL.BOX.Y%, " " + GL.TITLE$ + " ", THEME.CLR(THEME.TITLE)
+    RETURN
+
+
+## ---- The box and its shadow, a row at a time, between the screen and
+## ---- GL.SAVE.ADDRESS. memory_copy steps both ports, so the save side runs on
+## ---- from row to row and only the screen side is set each row. The
+## ---- screen address is kept as three bytes, so no row divides.
+## ---- L1_CONFIG bits 5:4 give the map width as 32 << n, and L1_MAPBASE
+## ---- holds address bits 16:9.
+GL.SAVE.RESTORE.ROWS:
+    ## -- This both saves and restores
+    GL.MAP.STRIDE% = 64
+    IF (PEEK(GL.LAYER.CONFIG) AND 16) <> 0 THEN GL.MAP.STRIDE% = 128
+    IF (PEEK(GL.LAYER.CONFIG) AND 32) <> 0 THEN GL.MAP.STRIDE% = GL.MAP.STRIDE% * 4
+    GL.STRIDE.LOW% = GP.LOBYTE(GL.MAP.STRIDE%)
+    GL.STRIDE.HIGH% = GP.HIBYTE(GL.MAP.STRIDE%)
+    GL.ROW.BYTES% = GL.BOX.W% * 2 + 4
+    GL.ROW.BYTES.LOW% = GP.LOBYTE(GL.ROW.BYTES%)
+    GL.ROW.BYTES.HIGH% = GP.HIBYTE(GL.ROW.BYTES%)
+
+    GL.MAP.BASE.PAGE% = PEEK(GL.LAYER.MAPBASE)
+    GL.ROW.BANK% = 0
+    IF GL.MAP.BASE.PAGE% > 127 THEN GL.ROW.BANK% = 1
+    GL.BOX.OFFSET% = GL.BOX.Y% * GL.MAP.STRIDE% + GL.BOX.X% * 2
+    GL.ROW.LOW% = GP.LOBYTE(GL.BOX.OFFSET%)
+    GL.ROW.MIDDLE% = (GL.MAP.BASE.PAGE% AND 127) * 2 + GP.HIBYTE(GL.BOX.OFFSET%)
+    IF GL.ROW.MIDDLE% > 255 THEN GL.ROW.BANK% = GL.ROW.BANK% + 1
+    GL.ROW.MIDDLE% = GL.ROW.MIDDLE% AND 255
+
+    ## ---- WARNING: ADDRSEL must go back to 0, or every later write to $9F20
+    ## ---- programs the save port instead of the screen's.
+    POKE GL.VERA.CTRL, 1
+    POKE GL.VERA.LOW, GP.LOBYTE(GL.SAVE.ADDRESS)
+    POKE GL.VERA.MIDDLE, GP.HIBYTE(GL.SAVE.ADDRESS)
+    POKE GL.VERA.HIGH, GL.STEP.ONE
+    POKE GL.VERA.CTRL, 0
+
+    FOR GL.ROW = 0 TO GL.BOX.H%
+        POKE GL.VERA.LOW, GL.ROW.LOW%
+        POKE GL.VERA.MIDDLE, GL.ROW.MIDDLE%
+        POKE GL.VERA.HIGH, GL.ROW.BANK% + GL.STEP.ONE
+        POKE 2, GL.COPY.FROM%
+        POKE 3, GL.PORT.PAGE
+        POKE 4, GL.COPY.TO%
+        POKE 5, GL.PORT.PAGE
+        POKE 6, GL.ROW.BYTES.LOW%
+        POKE 7, GL.ROW.BYTES.HIGH%
+        GP.CALL GL.MEMORY.COPY
+        GL.ROW.LOW% = GL.ROW.LOW% + GL.STRIDE.LOW%
+        GL.ROW.MIDDLE% = GL.ROW.MIDDLE% + GL.STRIDE.HIGH%
+        IF GL.ROW.LOW% > 255 THEN GL.ROW.MIDDLE% = GL.ROW.MIDDLE% + 1
+        GL.ROW.LOW% = GL.ROW.LOW% AND 255
+        IF GL.ROW.MIDDLE% > 255 THEN GL.ROW.BANK% = GL.ROW.BANK% + 1
+        GL.ROW.MIDDLE% = GL.ROW.MIDDLE% AND 255
+    NEXT GL.ROW
+    RETURN
+
+GL.MODULE.END:
+#ENDIF
