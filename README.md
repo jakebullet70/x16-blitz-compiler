@@ -38,15 +38,15 @@ Forked from Paul Robson's original: <https://github.com/paulscottrobson/blitz-co
 | `HELP-TXT/` | the index and topic files `GPC.HELP.PRG` reads |
 | `GPC-BASIC/` | the GP.BASIC library: the modules, `GP-BASIC.md` (the manual), `GP-BASIC.GLOBALS.md` (every name each module owns), `GP-BASIC.FILES.md` (what each file is for) and `README.md` |
 | `SRC/` | the source of `GPC.PRG`, GPC.ERR, GPC.HELP and BASLOAD-GPC, in `GPC/`, `GPC-ERROR/`, `GPC-HELP/` and `GPC-BASLOAD/`. `SRC/README.TXT` says how to rebuild them. Nothing in it is needed to run GPC |
-| `SAMPLES/` | `GPBMODS/`, `EDITOR/`, `BMXVIEW/`, `COLORTST/` and `GUI-LITE/`: compiled programs with their source |
+| `SAMPLES/` | `GPBMODS/`, `BMXVIEW/`, `COLORTST/` and `GUI-LITE/`: compiled programs with their source |
 
 The samples are there to be read and run. They cannot be rebuilt where they sit: their `#INCLUDE`
 lines need a `GPC-BASIC/` folder beside the source, and a sample folder has none.
 
 `GPBMODS` and `BMXVIEW` are shared programs. Run from their own folder, they find the runtime files
 only in `/GPC/` or at the root of the drive (see
-[where the runtime files go](#where-the-runtime-files-go)). `EDITOR`, `COLORTST` and `GUI-LITE` carry
-their own runtime. `GPBMODS.PRG` reads `GPBMODS.OVL` from beside it, and `EDIT.PRG` reads `EDIT.OVL`.
+[where the runtime files go](#where-the-runtime-files-go)). `COLORTST` and `GUI-LITE` carry their
+own runtime. `GPBMODS.PRG` reads `GPBMODS.OVL` from beside it.
 
 ## Compiling a program
 

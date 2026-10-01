@@ -264,29 +264,6 @@ SAMPLES = [
         "globs": [],
         "fake":  "GPBMODS.PRG",
     },
-    #   WARNING: EDIT.OVL keeps its name. EDIT.PRG reads the overlay by that literal,
-    #   so renaming it here breaks the program. EDIT.BASL #INCLUDEs the ten ED-*.BASL
-    #   files beside it; GPC-BASIC/ is out of reach from a sample folder, so the tree
-    #   ships to be read, not rebuilt.
-    {
-        "dir":   "EDIT",
-        "files": [("GPC-BASIC-TOOLS-SRC/edit/EDIT.PRG",              "EDIT.PRG"),
-                  ("GPC-BASIC-TOOLS-SRC/edit/EDIT.OVL",              "EDIT.OVL"),
-                  ("GPC-BASIC-TOOLS-SRC/edit/EDIT.BASL",             "EDIT.BASL"),
-                  ("GPC-BASIC-TOOLS-SRC/edit/ED-CLIP.BASL",          "ED-CLIP.BASL"),
-                  ("GPC-BASIC-TOOLS-SRC/edit/ED-DIALOG.BASL",        "ED-DIALOG.BASL"),
-                  ("GPC-BASIC-TOOLS-SRC/edit/ED-DOC-CONST.BASL",     "ED-DOC-CONST.BASL"),
-                  ("GPC-BASIC-TOOLS-SRC/edit/ED-FONT.BASL",          "ED-FONT.BASL"),
-                  ("GPC-BASIC-TOOLS-SRC/edit/ED-MENUS.BASL",         "ED-MENUS.BASL"),
-                  ("GPC-BASIC-TOOLS-SRC/edit/ED-MISC.BASL",          "ED-MISC.BASL"),
-                  ("GPC-BASIC-TOOLS-SRC/edit/ED-SEL.BASL",           "ED-SEL.BASL"),
-                  ("GPC-BASIC-TOOLS-SRC/edit/ED-STORE.BASL",         "ED-STORE.BASL"),
-                  ("GPC-BASIC-TOOLS-SRC/edit/ED-STR-CONST.BASL",     "ED-STR-CONST.BASL"),
-                  ("GPC-BASIC-TOOLS-SRC/edit/ED-UNDO.BASL",          "ED-UNDO.BASL"),
-                  ("GPC-BASIC-TOOLS-SRC/edit/TEST.MD",               "TEST.MD")],
-        "globs": [],
-        "fake":  "EDIT.PRG",
-    },
     {
         "dir":   "BMXVIEW",
         "files": [("GPC-BASIC-TOOLS-SRC/BMXVIEWER/BMXVIEW.PRG",      "BMXVIEW.PRG"),
