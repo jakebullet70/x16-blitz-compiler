@@ -78,6 +78,8 @@ All of it needs `#INCLUDE "GPB.INC.BL"`, and nothing else.
 | `LINEINPUT.INC.BL` | a positioned, length-limited entry field — what `INPUT` cannot do on a drawn screen | `FORM.EXP.BL` |
 | `MENU.INC.BL` | menus built a row at a time, run as a popup or a bar: cursor keys, RETURN, ESC, `&` hot keys, disabled rows, hints, SNES pad | `MENUTO.EXP.BL` `MENUBUILD.EXP.BL` |
 | `MENUPULL.INC.BL` | a dropdown under a bar item, with the screen under it put back | `MENUTO.EXP.BL` |
+| `GUI-LITE.INC.BL` | a message box and a menu as the verbs `MSGBOX`, `PICKMENU` and `CLOSEBOX`, nothing banked, for a one-PRG program | the `GUI-LITE` sample |
+| `DOS.INC.BL` | the drive's command channel: `DOSX` sends a command and returns the error, `DOSX.EXISTS` tests for a file. The smaller alternative to `FILEIO.INC.BL`; include one, not both | the `GUI-LITE` sample |
 | `STASH.INC.BL` | a text rectangle to a RAM bank and back, in `GP.ASM` | — |
 | `STASHFILE.INC.BL` | the same rectangle through a **file**, so a panel outlives the program | — |
 | `SORT.INC.BL` | shell sort a string array in place, in `GP.ASM` | `ARRAYS.EXP.BL` |

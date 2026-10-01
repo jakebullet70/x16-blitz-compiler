@@ -107,7 +107,7 @@
 >104|4.17 COMBO.INC.BL -- a drop-down list that folds into one row
 >109|4.21 CHECK.INC.BL -- a check box, [X] or [ ]
 >95|4.11 GUI.INC.BL -- the box that puts the screen back, and the form in 
->117|STASH.INC.BL -- save a text rectangle, and put it back.
+>124|STASH.INC.BL -- save a text rectangle, and put it back.
 >71|4.1 THEME.INC.BL -- named colour roles
 >100|4.13 BANKMGR.INC.BL -- who owns which RAM bank
 >84|4.6 MENU.INC.BL -- menus built a row at a time

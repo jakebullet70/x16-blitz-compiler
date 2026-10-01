@@ -84,9 +84,9 @@ HELP.GUIEND:
 ## that were never generated and GPC stops with UNKNOWN LINE NUMBER.
 ## ============================================================================
 
-## 174 index rows today, against a bank holding 250 records and 6,192
-## characters of text. Rows past the end are dropped.
-#DEFINE HELP.MAXIX 250
+## The index bank holds 210 records and 6,512 characters of text, and rows
+## past either limit are dropped. Change MKHELP.PY's IDX_ROWS with it.
+#DEFINE HELP.MAXIX 210
 
 ## Cross references in one topic, and the deepest chain of them ESC can walk
 ## back along. The largest topic carries 12.

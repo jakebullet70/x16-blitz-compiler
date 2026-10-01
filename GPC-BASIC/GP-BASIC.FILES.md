@@ -169,7 +169,7 @@ reads the debug map the compiler writes when `MAKE A DEBUG MAP?` is answered yes
 the address cannot be resolved.
 
 `GPC.HELP.PRG` is this reference, on the machine. It reads `HELP-TXT/` beside it — `GPC.HELP.IDX`
-and one `.HLP` per topic — and shows 90 topics at 80x30. Arrows, `PgUp` / `PgDn`, `HOME` and `END`
+and one `.HLP` per topic — and shows 98 topics at 80x30. Arrows, `PgUp` / `PgDn`, `HOME` and `END`
 move. `RETURN` opens the highlighted index row. `/` finds and `N` repeats the search. `L` follows a
 topic's cross references, `X` writes its code out as a `.BL` where it has any, `T` cycles the colour
 themes, `?` is the about box. `ESC` goes back a step, and quits from the index.
@@ -198,6 +198,7 @@ removes dead code, including a module costs its whole size whether or not it is 
 | `GUI-DIALOGS.INC.BL` | every dialog as a verb: `MSGBOX`, `ASKYN`, `INPUTBOX`, `PICKMENU`, `LISTBOX`, the `LIST.` verbs and `FORM.`. `#INCLUDE` it after `GUI`, `COMBO` and `CHECK` |
 | `COMBO.INC.BL` | a drop-down list that folds into one row, a `GUI.FORM` control |
 | `CHECK.INC.BL` | a check box, a `GUI.FORM` control |
+| `GUI-LITE.INC.BL` | `MSGBOX`, `PICKMENU` and `CLOSEBOX` in low memory, nothing banked, the screen under the box saved to VRAM. An alternative to `GUI-DIALOGS`, never both |
 | `FILEPICK.INC.BL` | a popup file picker, `PICKBANKS` / `PICKFILE` / `PICKSCAN`: reads the drive into a RAM bank, filters by suffix, answers with a name. Needs `GUI.INC.BL`, `GUI-DIALOGS.INC.BL`, `FILEIO.INC.BL` and `FILEDIR.INC.BL` |
 | `STRINGS.INC.BL` | the string helpers: BASIC where BASIC is enough, assembly where it is not |
 | `STRCASE.INC.BL` | case, rewriting a string in place, in assembly |
@@ -208,7 +209,7 @@ removes dead code, including a module costs its whole size whether or not it is 
 | `KB.INC.BL` | empty the keyboard buffer |
 | `FILEIO.INC.BL` | the drive: status, exists, delete, rename, copy, directories, a string array to a file and back |
 | `FILEDIR.INC.BL` | read a directory, into a RAM bank or into low RAM |
-| `DOS.INC.BL` | a smaller alternative to `FILEIO.INC.BL`: `DOSX` sends a command to the drive and returns the error, `DOS.EXISTS` tests for a file. Include one of the two, not both |
+| `DOS.INC.BL` | a smaller alternative to `FILEIO.INC.BL`: `DOSX` sends a command to the drive and returns the error, `DOSX.EXISTS` tests for a file. Include one of the two, not both |
 | `KV.INC.BL` | strings by key in one RAM bank, saved and loaded as one file. No `GP.ASM`, so no `#SYMFILE` |
 | `MATH.INC.BL` | the smaller and the larger of two numbers, as a `GOSUB` or as a verb |
 | `MEM.INC.BL` | a block copied and a block filled, through the KERNAL. Low RAM and the I/O page only |

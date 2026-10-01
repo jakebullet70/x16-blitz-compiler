@@ -1,99 +1,121 @@
-@3. The modules (5)
-=MENU.INC.BL -- menus built a row at a time
+@1. The prefixes that are taken
 .
-.Routines, arguments and examples: SEC 4.6.
+=1. THE PREFIXES THAT ARE TAKEN
 .
-.  verbs
-.      MENU.BEGIN MENU.ITEM MENU.ITEMX MENU.SELECTED MENU.DRAWBAR, called
-.        with GP.SUB
-.      MENUTO.VERT MENUTO.BAR, called with GP.FN
+.  GP.
+.      OWNER: GPB.INC.BL
+.      WHAT IT IS: keywords, not variables -- see SEC 2, this one is
+.        different
 .
-.  in
-.      MENU.ATTR -- the rows, packed attribute
-.      MENU.HIATTR -- the highlighted row; 0 inverts MENU.ATTR
-.      MENU.HOTATTR -- the hot key letter; 0 leaves it untinted
-.      MENU.DISATTR -- a disabled row; 0 is MENU.ATTR
-.      MENU.SEPATTR -- separators and the frame; 0 is MENU.ATTR
-.      MENU.SEPCHR -- the separator glyph; 0 is MENU.LINE
-.      MENU.FLAGS -- the popup's flags
-.      MENU.BARFLAGS -- the bar's flags
-.      MENU.GAP -- cells between bar items
-.      MENU.HINTX MENU.HINTY MENU.HINTW MENU.HINTATTR -- the hint field;
-.        MENU.HINTW 0 is off
-.      MENU.MARKED -- the bar item MENU.DRAWBAR lights
+.  STR.
+.      OWNER: STRINGS.INC.BL
+.      WHAT IT IS: string helpers
 .
-.  out
-.      MENU.EXITKEY -- the key that ended the run
-.      MENU.BARNUM -- the bar's row count
-.      MENU.SELX MENU.SELW -- the chosen bar item's column and width
-.      MENU.MARKED -- the bar item left lit
-.      MENU.OK -- 0 if bank MENU.TEXTBANK was already claimed
+.  STR.USING.
+.      OWNER: STRUSING.INC.BL
+.      WHAT IT IS: a number to a template, kept apart from the rest of STR.
 .
-.  formals
-.      MENU.SLOT MENU.SEL MENU.ROWTEXT$ MENU.ROWHINT$ MENU.ROWON MENU.RUNROW
-.        MENU.RUNCOL MENU.STYLE MENU.CHOSEN
+.  THEME.
+.      OWNER: THEME.INC.BL
+.      WHAT IT IS: colour roles
 .
-.  arrays
-.      MENU.FLAG$() MENU.HOTKEY$() MENU.HOTCOL$() -- DIMmed by the module on
-.        the first MENU.BEGIN
+.  APPSYS.
+.      OWNER: APPSYS.INC.BL
+.      WHAT IT IS: screen save/restore, panels to disk
 .
-.  banked groups
-.      MENU.TEXTS MENU.HINTS, in MENU.INC.BANKED.BL
+.  LINEINPUT.
+.      OWNER: LINEINPUT.INC.BL
+.      WHAT IT IS: entry fields
 .
-.  internal
-.      MENU.ATCOL MENU.ATROW MENU.BARX MENU.BARY MENU.BASE MENU.BOXH
-.        MENU.BOXW MENU.CAP MENU.CODE MENU.COUNT MENU.CUR MENU.DONE
-.        MENU.DRAWN MENU.DRAWX MENU.DRAWY MENU.EACH MENU.EXITBIT MENU.FRAME
-.        MENU.GLYPH MENU.HAVE MENU.HILITE MENU.HINTAT MENU.HOTAT MENU.HOTCH$
-.        MENU.HOTHIT MENU.INKEY$ MENU.LEFTW MENU.MOVE MENU.PADHELD
-.        MENU.PADNEW MENU.PADNOW MENU.PADRAW MENU.PAINT MENU.READY MENU.ROW
-.        MENU.ROWFLAG$ MENU.ROWIS$ MENU.ROWW MENU.RUNBASE MENU.RUNFLAGS
-.        MENU.RUNSLOT MENU.SCAN MENU.SHOW$ MENU.SKIPS MENU.SPAN MENU.STEP
-.        MENU.TEXTW MENU.TINTAT MENU.USE MENU.WANT MENU.WAS MENU.WIDE
+.  KB.
+.      OWNER: KB.INC.BL
+.      WHAT IT IS: the keyboard drain
 .
-.  constants
-.      MENU.TEXTBANK MENU.BAR MENU.POPUP MENU.BAR.MAX MENU.POPUP.MAX MENU.ON
-.        MENU.OFF
-.      MENU.SOLID MENU.THIN MENU.ROUND MENU.THICK MENU.NOBOX
-.      MENU.MUSTSEL MENU.KEEPMARK MENU.NOWRAP MENU.GAMEPAD MENU.DOWNEXIT
-.        MENU.UPEXIT MENU.KEYEXIT MENU.HINTMID
-.      MENU.DOWN MENU.UP MENU.LEFT MENU.RIGHT MENU.ENTER MENU.ESC MENU.STOP
-.        MENU.LINE
-.      MENU.PORT MENU.PAD.UP MENU.PAD.DOWN MENU.PAD.LEFT MENU.PAD.RIGHT
-.        MENU.PAD.B MENU.PAD.START
+.  MENU.
+.      OWNER: MENU.INC.BL
+.      WHAT IT IS: menus: the row store, the popup and the bar.
+.        MENUPULL.INC.BL's variables too
 .
-.The formals are the verbs' arguments. GP.DEFPROC formals are ordinary shared
-.variables (SEC 3.11), so a formal holds the last value passed until the next
-.call.
+.  MENUTO.
+.      OWNER: MENU.INC.BL MENUPULL.INC.BL
+.      WHAT IT IS: the runners, called with GP.FN
 .
-.GUI.INC.BL sets MENU.RUNSLOT, reads MENU.READY, MENU.COUNT and MENU.WIDE,
-.and calls MENU.MEASURE. A program of your own should not.
+.  MENUPULL.
+.      OWNER: MENUPULL.INC.BL
+.      WHAT IT IS: a dropdown under a bar item: labels and one constant
 .
-=MENUPULL.INC.BL -- a dropdown under a bar item
+.  GUI.
+.      OWNER: GUI.INC.BL
+.      WHAT IT IS: the box the dialogs sit in, and the form and controls
+.        inside it
 .
-.Routines, arguments and examples: SEC 4.9. Its variables use the MENU.
-.prefix; MENUPULL. is its labels and one constant.
+.  GUI.LISTBOX.
+.      OWNER: GUI-DIALOGS.INC.BL
+.      WHAT IT IS: the listbox dialog's answer, kept apart from the rest of
+.        GUI.
 .
-.  verbs
-.      MENUTO.PULLDOWN, called with GP.FN
+.  DLG.
+.      OWNER: GUI-DIALOGS.INC.BL
+.      WHAT IT IS: the dialog verbs: their arguments, and their internals
 .
-.  in
-.      MENU.STASHBANK -- the bank the covered cells go to; 0 takes one from
-.        BANKMGR on the first call
+.  GL.
+.      OWNER: GUI-LITE.INC.BL
+.      WHAT IT IS: the message box and menu verbs: their arguments, the open
+.        boxes, and the VERA and key constants
 .
-.  out
-.      MENU.NEXTBAR -- the bar item LEFT or RIGHT walks to, or 0
-.      MENU.EXITKEY MENU.BARNUM MENU.SELX MENU.SELW MENU.MARKED, as for
-.        MENU.INC.BL
+.  STASH.
+.      OWNER: STASH.INC.BL
+.      WHAT IT IS: a text rectangle into a RAM bank, and back
 .
-.  formals
-.      MENU.PULLAT MENU.STYLE MENU.CHOSEN
+.  STASH.FILE.
+.      OWNER: STASHFILE.INC.BL
+.      WHAT IT IS: the same rectangle through a file, kept apart from the
+.        rest of STASH.
 .
-.  internal
-.      MENU.COLS MENU.EDGE MENU.LEFTOF MENU.RIGHTOF MENU.STASHED, and
-.        STASH.BANK STASH.SLOT STASH.MOVE STASH.X STASH.Y STASH.W STASH.H,
-.        which it sets
+.  SORT.
+.      OWNER: SORT.INC.BL
+.      WHAT IT IS: shell sort a string array in place
 .
-.  constants
-.      MENUPULL.SCRMODE
+.  STRCASE.
+.      OWNER: STRCASE.INC.BL
+.      WHAT IT IS: case, rewriting a string in place
 .
+.  BMX.
+.      OWNER: BMX.INC.BL
+.      WHAT IT IS: BMX bitmap loading
+.
+.  BMXK.
+.      OWNER: BMX.INC.BL
+.      WHAT IT IS: its KERNAL/VERA constants, kept apart from its variables
+.
+.  FILE.
+.      OWNER: FILEIO.INC.BL
+.      WHAT IT IS: the drive: status, exists, delete, rename, directories
+.
+.  FILE.DIR.
+.      OWNER: FILEDIR.INC.BL
+.      WHAT IT IS: reading a directory, kept apart from the rest of FILE.
+.
+.  DOS.
+.      OWNER: DOS.INC.BL
+.      WHAT IT IS: the drive's command channel, the smaller alternative to
+.        FILE.
+.
+.  SV.
+.      OWNER: STASHVRAM.INC.BL
+.      WHAT IT IS: the VRAM store. SVGC. is STASHVRAMGC.INC.BL's one constant
+.
+.  KV.
+.      OWNER: KV.INC.BL
+.      WHAT IT IS: keys and values in one RAM bank
+.
+.  MATH.
+.      OWNER: MATH.INC.BL
+.      WHAT IT IS: the smaller and the larger of two numbers
+.
+.  MEM.
+.      OWNER: MEM.INC.BL
+.      WHAT IT IS: a block copied, a block filled, and the two KERNAL
+.        constants
+.
+.Pick anything else for your own program. AIRLIFT., GAME., MAP. -- a prefix

@@ -1,15 +1,22 @@
-@1. The prefixes that are taken (2)
+@4.25.2 DOSX.EXISTS -- whether a file opens
+.
+=4.25.2 DOSX.EXISTS
+.
+.  Syntax    GP.FN(DOSX.EXISTS, name$)
+.            DOS.NAME$ = name$ : GOSUB DOS.DOS.EXISTS
+.  Returns   -1 if the file opens, 0 if not. DOS.OK holds the same.
+.  Kind      BASIC. A verb in DOS.INC.BL. GP.FN needs the GP block.
+.  Notes     Opens the command channel as logical file 15, then
+.            name$ + ",S,R" as logical file 14, reads the command
+.            channel while the file is open, and closes both.
+.            -1 means DOS.ERR came back under 20.
+.            DOS.ERR and DOS.MSG$ hold the drive's answer, found or
+.            not.
+.  WARNING   Do not call it with logical file 14 or 15 open.
+.  Example
+.
+:            IF GP.FN(DOSX.EXISTS, "SCORES.DAT") THEN GOSUB LOAD.SCORES
+.
 =SEE ALSO
 .
->10|2. Using it
->72|4.2 STRINGS.INC.BL -- string helpers
->94|4.10 STRUSING.INC.BL -- a number to a template
->71|4.1 THEME.INC.BL -- named colour roles
->81|4.3 APPSYS.INC.BL -- start politely, leave it as you found it
->82|4.4 LINEINPUT.INC.BL -- a positioned entry field
->101|4.14 KB.INC.BL -- the keyboard buffer, emptied
->84|4.6 MENU.INC.BL -- menus built a row at a time
->93|4.9 MENUPULL.INC.BL -- a dropdown under a bar item
->95|4.11 GUI.INC.BL -- the box that puts the screen back, and the form in 
->97|4.12 GUI-DIALOGS.INC.BL -- every dialog as a verb
->117|STASH.INC.BL -- save a text rectangle, and put it back.
+>116|4.25 DOS.INC.BL -- a drive command, and a test for a file

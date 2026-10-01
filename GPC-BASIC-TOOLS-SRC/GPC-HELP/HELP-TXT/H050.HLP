@@ -72,4 +72,4 @@
 >84|4.6 MENU.INC.BL -- menus built a row at a time
 >44|3.6 Screen -- stash and restore
 >93|4.9 MENUPULL.INC.BL -- a dropdown under a bar item
->117|STASH.INC.BL -- save a text rectangle, and put it back.
+>124|STASH.INC.BL -- save a text rectangle, and put it back.

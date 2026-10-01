@@ -58,6 +58,11 @@
 .  CHECK.INC.BL
 .      a check box, a GUI.FORM control
 .
+.  GUI-LITE.INC.BL
+.      MSGBOX, PICKMENU and CLOSEBOX in low memory, nothing banked, the
+.        screen under the box saved to VRAM. An alternative to GUI-DIALOGS,
+.        never both
+.
 .  FILEPICK.INC.BL
 .      a popup file picker, PICKBANKS / PICKFILE / PICKSCAN: reads the drive
 .        into a RAM bank, filters by suffix, answers with a name. Needs
@@ -94,7 +99,7 @@
 .
 .  DOS.INC.BL
 .      a smaller alternative to FILEIO.INC.BL: DOSX sends a command to the
-.        drive and returns the error, DOS.EXISTS tests for a file. Include
+.        drive and returns the error, DOSX.EXISTS tests for a file. Include
 .        one of the two, not both
 .
 .  KV.INC.BL

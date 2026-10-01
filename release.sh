@@ -58,7 +58,7 @@ if [ "$DO_BUILD" = 1 ]; then
     make -C source/runtime gpc-rt
     echo "== make -C source/gpc release  (GPC.PRG + GPC.ERR, tokenised and compiled) =="
     make -C source/gpc release
-    echo "== samplesbuild.py  (GPBMODS, GPC.HELP, COLORTST, BMXVIEW, GPC.GUI, EDIT, GPC.ERR) =="
+    echo "== samplesbuild.py  (GPBMODS, GPC.HELP, COLORTST, BMXVIEW, GPC.GUI, EDIT, GPC.ERR, GUI-LITE) =="
     python source/gpc/samplesbuild.py
 fi
 
@@ -300,6 +300,13 @@ SAMPLES = [
                   ("GPC-BASIC-TOOLS-SRC/color-test/COLORTST.BASL",       "COLORTST.BASL")],
         "globs": [],
         "fake":  "COLORTST.PRG",
+    },
+    {
+        "dir":   "GUI-LITE",
+        "files": [("GPC-BASIC-TOOLS-SRC/GUI-LITE/GUI-LITE.PRG",          "GUI-LITE.PRG"),
+                  ("GPC-BASIC-TOOLS-SRC/GUI-LITE/GUI-LITE.BASL",         "GUI-LITE.BASL")],
+        "globs": [],
+        "fake":  "GUI-LITE.PRG",
     },
 ]
 

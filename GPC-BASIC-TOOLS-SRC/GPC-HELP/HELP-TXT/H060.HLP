@@ -72,4 +72,4 @@
 .
 >106|4.19 STASHVRAMGC.INC.BL -- close the holes in a STASHVRAM store
 >105|4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM
->117|STASH.INC.BL -- save a text rectangle, and put it back.
+>124|STASH.INC.BL -- save a text rectangle, and put it back.

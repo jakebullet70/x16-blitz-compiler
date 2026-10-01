@@ -8,6 +8,11 @@
 .      BASIC
 .      CHECK.INC.BL -- CHECK.ADD, a check box, [X] or [ ] - SEC 4.21
 .
+.  Dialogs
+.      BASIC
+.      GUI-LITE.INC.BL -- MSGBOX PICKMENU CLOSEBOX, in low memory, nothing
+.        banked - SEC 4.24
+.
 .  Code in a bank
 .      ASM
 .      GP.BANKED GP.ENDBANKED -- p-code at $A000, out of the low-memory
@@ -35,6 +40,11 @@
 .      BASIC
 .      FILEDIR.INC.BL -- FILE.DIR.INIT OPEN NEXT, into a bank or low RAM -
 .        SEC 4.16
+.
+.  The drive
+.      BASIC
+.      DOS.INC.BL -- DOSX DOSX.EXISTS, the smaller alternative to FILEIO -
+.        SEC 4.25
 .
 .  Screen -- stash
 .      BASIC

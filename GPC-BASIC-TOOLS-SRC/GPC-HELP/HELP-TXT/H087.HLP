@@ -1,93 +1,90 @@
-@8. Known bugs
+@3. The modules (6)
+=GUI.INC.BL -- four dialogs, in a box that puts the screen back
 .
-=8. KNOWN BUGS
+.Routines, arguments and examples: SEC 4.11.
 .
-.Three, all live on 12th September 2026 and all reproducible. Each says what
-.happens, what causes it, and what to do instead. A bug leaves this list when
-.it is fixed, not when it is understood.
+.  in
+.      GUI.MSG$ GUI.MSG2$ GUI.MSG3$ -- up to three message lines. "" for
+.        none, and no gap left behind
+.      GUI.TITLE$ -- a name in the top edge
+.      GUI.BANK -- a spare RAM bank for the covered cells. 0 does not save
+.      GUI.STYLE -- GP.BOX style 0..3
+.      GUI.PANEL.IN GUI.BORDER.IN -- attributes. 0 takes THEME.TEXT and
+.        THEME.BORDER
+.      GUI.GLYPH -- non-zero frames from GUI.EDGE.H GUI.EDGE.V GUI.CORNER.TL
+.        .TR .BL .BR
+.      GUI.PLACE GUI.X GUI.Y GUI.ROW.OFFSET -- where the box goes
+.      GUI.SHADOW GUI.SHADOW.ATTR -- the drop shadow
+.      GUI.BTN.ONE$ GUI.BTN.TWO$ -- the button labels, & marking the
+.        accelerator
+.      GUI.DEFAULT -- which button is the default. 2 is the second, anything
+.        else the first
+.      GUI.FLAGS -- GUI.MENU, over the popup slot of MENU.INC.BL
+.      GUI.LEN GUI.TEXT$ GUI.MASK -- GUI.INPUT
+.      GUI.BODY.ROWS GUI.BODY.WIDTH -- GUI.OPEN, when you call it yourself
 .
-=A string never gives memory back
+.  out
+.      GUI.KEY -- the key that ended it, whichever call
+.      GUI.ANSWER -- GUI.YN
+.      GUI.OK -- GUI.INPUT: -1 accepted, 0 cancelled
+.      GUI.TEXT$ -- what was typed
+.      GUI.SEL -- the row chosen, or 0
+.      GUI.STASHED -- -1 if the covered cells were saved
+.      GUI.LEFT GUI.TOP GUI.WIDTH GUI.HEIGHT -- where the box went
+.      GUI.INNER.LEFT GUI.INNER.TOP GUI.INNER.WIDTH -- the usable area, from
+.        GUI.OPEN
+.      GUI.PANEL GUI.BORDER -- the attributes it settled on
 .
-.A$ = "" frees nothing. A string variable owns its block: the assignment sets
-.the length to zero and keeps the capacity. The heap scavenger reclaims only
-.a block a string outgrew and abandoned, never one a variable still holds. A
-.working buffer that has once held a 250-character line is spoken for until
-.the program ends.
+.  internal
+.      GUI.ADD.W GUI.BOTTOM GUI.BOX.STYLE GUI.CLR.K$ GUI.FIELD.LEFT
+.        GUI.GAP.ROWS GUI.GLYPH$ GUI.HEAD.ROWS GUI.INDEX GUI.MOVE.BY
+.        GUI.MOVE.TRIES GUI.MOVE.WAS GUI.OKCANCEL GUI.PAINT.N GUI.PRESSED$
+.        GUI.RIGHT GUI.SAVE.W GUI.SAVE.H GUI.SCAN GUI.SCREEN.COLS
+.        GUI.SCREEN.ROWS GUI.SH.BW GUI.SH.W GUI.SH.H GUI.STEP.TYPE
+.        GUI.TITLE.LEFT GUI.WAS$
+.      the button row: GUI.BTN.AMP .AT .ATTR .DEF .FOCUSED .HEAD$ .HI .KEY
+.        .KEY.ONE .KEY.TWO .LC .MARK$ .OF .RIGHT .TAIL$ .TEXT$ .TOTAL .UC
+.        .W.ONE .W.TWO .WIDE .X .Y
+.      the form: GUI.CTRL.TYPE% .X% .Y% .W% .FLAGS% .KEY% GUI.CTRL.TEXT$
+.        GUI.CTRL.N GUI.FOCUS GUI.FORM.DIMMED .DONE .HIT .KEY .NAV
+.      the list control: GUI.LIST.ATTR .COUNT .DIGITS .EACH .EDGE$ .HI .I
+.        .MARKED .MARKP .MARKY .NOTE$ .NOTE.LEFT .NOTEW .NUM$ .ROW .ROWS .SEL
+.        .W .WAS .WAS.SCROLL .X .Y
 .
-.So a big temporary cannot be built and then freed. It has to not be built.
+.  constants
+.      GUI.SCRMODE GUI.LINEBOX GUI.MAXCELLS GUI.PADX GUI.PADY GUI.ESCAPE
+.        GUI.STOP GUI.RETURN GUI.SPACE GUI.BTN.GAP GUI.FORM.MAX
+.      GUI.CT.BUTTON GUI.CT.FIELD GUI.CT.LIST -- what a control is
+.      GUI.CF.DEFAULT GUI.CF.NOFOCUS -- what is true of it
+.      GUI.NAV.STAY .NEXT .PREV .PRESS .DEFAULT .CANCEL -- the six verdicts
+.      GUI.K.TAB GUI.K.SHTAB GUI.K.DOWN GUI.K.UP GUI.K.RIGHT GUI.K.LEFT
 .
-.Measured 2026-09-02. The editor's find folded the needle and every line it
-.scanned into new strings and compared with MID$ per position: 579 bytes gone
-.for the rest of the run, from a workspace with 1,489 free, and the GUI
-.dialogs then died on what was left. Rewritten to fold in place through
-.GP.STRPTR with one GP.INSTR per line, a find costs 81 bytes, and the program
-.came out 59 bytes smaller.
+.GUI.DEFAULT and the focus are two different things. The default button is
+.the one RETURN presses from anywhere and the one drawn <<LIKE THIS>>; the
+.focus is where TAB has got to, and it is drawn in THEME.FOCUS. GUI.INPUT
+.opens with the default on OK and the focus in the field, so neither is the
+.other's shorthand.
 .
-.Do this -- PRINT FRE(0) at eight points down the run and read the descent.
-.It is a high-water ceiling, so it only falls, and the step that falls is the
-.culprit.
+.GUI.BTN.DEF is not GUI.DEFAULT. It is internal -- which button
+.GUI.BUTTON.ROW is painting the double brackets on as it draws -- and setting
+.it does nothing, because the row recomputes it from GUI.DEFAULT every time
+.it paints. The near-miss is worth knowing about; the rest of GUI.BTN.* is
+.scratch for one button's text, width and accelerator and is rewritten twice
+.a row.
 .
-=BINPUT# stops at 255 bytes
+.GUI.HINT$ is gone, and it is the one interface the CUA work took away. The
+.dimmed line naming two keys became a real button row, and "the first Y and
+.the first N in the line are lit" has nothing to light when the row is two
+.buttons. Set GUI.BTN.ONE$ and GUI.BTN.TWO$ instead.
 .
-.BINPUT# n, A$, len cannot read more than 255 bytes. Three independent caps
-.land on that one number, so there is no single constant to raise.
+.The typing dialog and its string swapped names. It was GUI.TEXT returning
+.GUI.INPUT$; it is GUI.INPUT returning GUI.TEXT$. BASLOAD will not have a
+.label and a variable of one name and the $ does not separate them, so
+.GUI.INPUT the routine forbids GUI.INPUT$ the variable. A program written
+.against the older library compiles clean and reads the wrong one back --
+.this is the one rename here that fails silently.
 .
-.  the read buffer is 255 bytes
-.      WHERE: ReadBuffer: .fill 255
+.GUI.CTRL.* are the seven parallel arrays that are the control block: one
+.element a control, up to GUI.FORM.MAX. GUI.INC.BL DIMs them. Do not DIM them
+.yourself.
 .
-.  the count argument is 8 bit, and unchecked
-.      WHERE: GetInteger8Bit takes mantissa byte 0 and returns
-.
-.  a BASIC string is 255 characters
-.      WHERE: nowhere to put a longer record in any case
-.
-.The second is the trap. BINPUT# 12, A$, 256 sets the count to 0 and hands
-.back an empty string, silently. 300 gives 44 bytes.
-.
-.It is also not a block read. It is a CHRIN loop, one KERNAL call per byte
-.with an EOF check on top of that. BINPUT# is one statement, not one
-.transfer, so anything costing a BINPUT# per record pays that stride per
-.record.
-.
-.LINPUT# shares the same buffer and stops at 255 too, but runs on to the
-.delimiter afterwards, so the next read starts at a line boundary.
-.
-.Do this -- a record cannot be one string. Make it N strings of 255, or keep
-.it in a bank and copy out the part that is needed.
-.
-=File I/O in a GP.DO key loop
-.
-.A save routine reached from inside a program's own GP.DO key loop writes its
-.file completely and correctly, and then the program stops with
-.
-:INPUT/OUTPUT ERROR @ $005B
-.
-.The address is identical in every failing build, which says a clobbered
-.instruction pointer rather than a real device error.
-.
-.Seven shapes have been compiled and probed. Do not bisect them again.
-.
-.  OPEN/PRINT#/CLOSE at top level
-.      RESULT: passes
-.
-.  four consecutive PRINT#, no PRINT between
-.      RESULT: passes
-.
-.  the same inside GP.DO ... GP.EXITDO
-.      RESULT: passes
-.
-.  the same behind a GOSUB inside a GP.DO
-.      RESULT: passes
-.
-.  the same behind GP.SELECT then GOSUB inside a GP.DO
-.      RESULT: passes
-.
-.  the real routine called from the top level of the same program
-.      RESULT: passes
-.
-.  the real routine reached from the program's own GP.DO key loop
-.      RESULT: fails
-.
-.Do this -- a plain PRINT immediately after the CLOSE makes it pass. Channel
-.0 output runs CLRCHN; a non-zero channel runs CHKOUT and READST instead, so
-.the suspect is channel state left behind rather than the file I/O.

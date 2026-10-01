@@ -57,7 +57,7 @@
 .
 =SEE ALSO
 .
->171|7. Memory, and what the compiler tells you
+>181|7. Memory, and what the compiler tells you
 >105|4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM
 >55|3.10 Text in a bank
 >48|3.9 Inline assembly

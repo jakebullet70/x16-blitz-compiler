@@ -1,92 +1,97 @@
-@3. The modules (8)
-=STRCASE.INC.BL -- case, in place
+@3. The modules
 .
-.Routines, arguments and examples: SEC 4.8.
+=3. THE MODULES
+.
+.Each table is in (set before the GOSUB), out (read after it), and internal
+.(do not read, do not write, do not rely on).
+.
+=THEME.INC.BL -- named colour roles
+.
+.Routines, arguments and examples: SEC 4.1.
 .
 .  in
-.      STRCASE.PTR -- GP.STRPTR of the string
-.      STRCASE.MODE -- STRCASE.UPPER or STRCASE.LOWER
+.      THEME.ID% -- 0 x16, 1 dark, 2 light, 3 gray, 4 custom, read by
+.        THEME.SELECT
+.      THEME.ATTR% -- a packed attribute, for THEME.SET and THEME.HI
 .
 .  out
-.      the string itself, rewritten in place
-.
-.  verbs
-.      STR.UCASE STR.LCASE -- a string in, a cased copy back, through
-.        STRCASE.S$
+.      THEME.CLR(role) -- the colour array, DIMmed to THEME.SLOTS - 1
+.      THEME.INV% -- the inverse attribute, from THEME.HI
 .
 .  internal
-.      STRCASE.ADDR% STRCASE.OP% STRCASE.S$
+.      THEME.READY% THEME.FIRST%
 .
 .  constants
-.      STRCASE.UPPER STRCASE.LOWER
+.      THEME.PAGE THEME.TEXT THEME.TITLE THEME.BORDER THEME.HILITE
+.        THEME.DIMMED THEME.WARN THEME.FOCUS THEME.BAR THEME.SHADOW
+.        THEME.SLOTS THEME.COUNT
 .
-.STR.UCASE and STR.LCASE are the two STR. names this file owns. The rest of
-.STR. is STRINGS.INC.BL's, and the two verbs are named for the module they
-.are to move into.
+.To use it: set THEME.ID%, GOSUB THEME.SELECT, then index THEME.CLR() with a
+.role wherever a drawing routine wants an attribute. SEC 4.1 is the module's
+.own entry, with the five themes and the other four routines.
 .
-.#SYMFILE again. Do not write #AUTONUM in a program that includes this -- it
-.sets the STEP, and only the default 1 survives.
+:THEME.ID% = 1 : GOSUB THEME.SELECT
+:GP.PRINTAT 2, 2, "READY", THEME.CLR(THEME.TEXT)
 .
-=MATH.INC.BL -- the smaller and the larger of two numbers
+.THEME.CLR is the array this module DIMs. Do not DIM it yourself -- the
+.module owns it, and DIMming an array GPC has already dimensioned is an
+.error.
 .
-.Routines, arguments and examples: SEC 4.22.
+.THEME.FOCUS is the eighth role: the attribute a focused control wears while
+.GUI.FORM has the keyboard. THEME.BAR and THEME.SHADOW are the ninth and
+.tenth, so THEME.SLOTS is 10, and THEME.COUNT stays 5 -- the first is how
+.many roles there are, the second how many themes.
 .
-.  in
-.      MATH.FIRST MATH.SECOND -- the two numbers, in either order
+=APPSYS.INC.BL -- start politely, leave it as you found it
 .
-.  out
-.      MATH.RESULT -- the answer, and what GP.FN reads back
-.
-.  verbs
-.      MATH.MINOF MATH.MAXOF -- the same two routines called in one line
-.
-.  internal
-.      --
-.
-.All three names are shared by MATH.MIN and MATH.MAX. The formals of a
-.GP.DEFPROC are ordinary variables, so GP.SUB MATH.MINOF writes MATH.FIRST
-.and MATH.SECOND exactly as a GOSUB caller would.
-.
-=MEM.INC.BL -- a block copied, a block filled
-.
-.Routines, arguments and examples: SEC 4.23.
+.Routines, arguments and examples: SEC 4.3.
 .
 .  in
-.      MEM.SOURCE -- where MEM.COPY reads, 0 to 65535
-.      MEM.TARGET -- where either routine writes
-.      MEM.COUNT -- 1 to 65535, refused outside that
-.      MEM.VALUE -- the byte MEM.FILL writes, 0 to 255
+.      APPSYS.FILE$ APPSYS.BANK APPSYS.X APPSYS.Y APPSYS.W APPSYS.H
+.        APPSYS.DEV -- the panel routines
 .
 .  out
-.      MEM.OK -- -1 done, 0 refused, and what GP.FN reads back
-.
-.  verbs
-.      MEM.BLOCKCOPY MEM.BLOCKFILL
+.      APPSYS.MODE APPSYS.COLS APPSYS.ROWS APPSYS.COLOUR -- set by
+.        APPSYS.STARTUP
+.      APPSYS.IS.EMULATOR -- set by APPSYS.ISEMU
 .
 .  internal
-.      --
+.      APPSYS.LAST
 .
 .  constants
-.      MEM.MEMORYCOPY MEM.MEMORYFILL -- the two KERNAL entry points
+.      APPSYS.SCRMODE APPSYS.COLREG APPSYS.SETCHR APPSYS.CHRREG APPSYS.EMUSIG
 .
-.MEM.TARGET, MEM.COUNT and MEM.OK are shared by both routines, so a fill
-.overwrites the target a copy was set up with.
+.Lay the screen out from APPSYS.COLS and APPSYS.ROWS. Do not assume 80x60 --
+.the X16 boots there but SCREEN 0 is 40x30, and someone who prefers larger
+.text is running one.
 .
-=EXAMPLE PROGRAM
+=STRINGS.INC.BL -- string helpers
 .
-.  FORM.EXP.BL -- runnable, in the GPC-BASIC folder
+.Routines, arguments and examples: SEC 4.2.
 .
-=SEE ALSO
+.  in
+.      STR.STR$ -- the string, in and out
+.      STR.WIDTH -- field width, the pad routines
+.      STR.DELIM$ STR.MAX -- SPLIT (MAX 0 means 10)
+.      STR.FIND$ STR.REPL$ -- REPLACE
+.      STR.PET -- a PETSCII code, PET2SCR
+.      STR.AT STR.CUT STR.SUB$ -- SPLICE, and AT/CUT are CLAMPED in place
+.      STR.PTR -- GP.STRPTR of the string, the three trims
 .
->71|4.1 THEME.INC.BL -- named colour roles
->81|4.3 APPSYS.INC.BL -- start politely, leave it as you found it
->72|4.2 STRINGS.INC.BL -- string helpers
->94|4.10 STRUSING.INC.BL -- a number to a template
->101|4.14 KB.INC.BL -- the keyboard buffer, emptied
->82|4.4 LINEINPUT.INC.BL -- a positioned entry field
->83|4.5 BMX.INC.BL -- a BMX bitmap into VERA
->102|4.15 FILEIO.INC.BL -- the drive: status, files, directories
->103|4.16 FILEDIR.INC.BL -- a directory, into a bank or into low RAM
->105|4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM
->107|4.20 KV.INC.BL -- keys and values in one RAM bank
->84|4.6 MENU.INC.BL -- menus built a row at a time
+.  out
+.      STR.STR$ -- padded, or replaced, in place
+.      STR.N -- how many fields SPLIT found, always >= 1
+.      STR.FIELD$(1..N) -- the fields themselves
+.      STR.SCR -- the screen code from PET2SCR
+.      STR.STR$ -- spliced, when it was SPLICE that was called
+.
+.  internal
+.      STR.GAP STR.HALF STR.REST$ STR.AT STR.LIM STR.OUT$
+.      STR.ADDR% STR.OP% STR.KEEP% -- the {VAR} slots the trim blob reads
+.
+.STR.FIELD$ is the one array the library does not DIM. Left alone, GPC's
+.implicit DIM gives 0..10. For more, DIM it before the first call and set
+.STR.MAX to match -- DIMming an array GPC has already auto-dimensioned is an
+.error, so it is one or the other. This is the opposite of THEME.CLR, which
+.the module owns outright; the two are worth keeping straight.
+.

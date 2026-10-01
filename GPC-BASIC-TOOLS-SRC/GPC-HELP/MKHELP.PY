@@ -82,6 +82,14 @@ WIDTH = 76
 HELPDIR = "HELP-TXT"
 IDXNAME = "GPC.HELP.IDX"
 
+# The viewer's index bank: IDX_ROWS records of IDX_REC bytes at the front, the
+# row text above them, each row's text cut at IDX_WIDE characters. They are
+# HELP.MAXIX, HELP.IXREC and HELP.IXWIDE in GPC.HELP.BASL; change them together.
+IDX_ROWS = 210
+IDX_REC = 8
+IDX_WIDE = 72
+IDX_BANK = 8192
+
 HERE = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_SRC = os.path.normpath(os.path.join(HERE, "..", "..", "GPC-BASIC"))
 
@@ -414,7 +422,7 @@ class Topic(object):
 
 REF_RE = re.compile(r"\u00a7\s*(\d+(?:\.\d+)*)")
 EXP_RE = re.compile(r"\b([A-Z0-9]+\.EXP\.BL)\b")
-MOD_RE = re.compile(r"\b([A-Z0-9]+\.INC\.BL)\b")
+MOD_RE = re.compile(r"\b([A-Z0-9][A-Z0-9-]*\.INC\.BL)\b")
 
 
 def collect_refs(md_text, self_key):
@@ -1254,6 +1262,15 @@ def main():
     cmdline = "python " + " ".join(
         [os.path.relpath(os.path.abspath(__file__)).replace("\\", "/")] +
         sys.argv[1:])
+
+    # WARNING: the viewer drops the index rows its bank cannot hold, and says
+    # nothing. So an index that does not fit is never written.
+    idx_chars = sum(min(len(r[4]), IDX_WIDE) for r in rows)
+    idx_room = IDX_BANK - IDX_ROWS * IDX_REC
+    if not args.md_only and (len(rows) > IDX_ROWS or idx_chars > idx_room):
+        print("  INDEX DOES NOT FIT: %d of %d rows, %d of %d characters. Nothing "
+              "written." % (len(rows), IDX_ROWS, idx_chars, idx_room))
+        return 1
     if not args.md_only:
         write_hlp(out, files)
         write_idx(out, rows)
@@ -1262,15 +1279,11 @@ def main():
     print("")
     print("  %d topics, %d index rows" % (len(topics), len(rows)))
 
-    # WHAT THE VIEWER HAS TO HOLD, which is the only budget that binds. Blitz's
-    # string heap costs about 1.67 bytes a character -- measured, not assumed --
-    # and the viewer holds the whole index plus one whole topic at once.
     if not args.md_only:
-        idx_chars = sum(len(r[4]) for r in rows)
         big = max(len(t.lines) for t in topics)
-        print("  index %d chars, longest topic %d lines" % (idx_chars, big))
-        print("  string heap needed: about %d bytes -- the index, and nothing "
-              "else" % int(idx_chars * 1.67))
+        print("  index bank: %d of %d rows, %d of %d characters" %
+              (len(rows), IDX_ROWS, idx_chars, idx_room))
+        print("  longest topic %d lines" % big)
 
     if DROPPED:
         print("")

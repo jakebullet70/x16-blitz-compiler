@@ -1,107 +1,32 @@
-@5. Variables
+@4.25 DOS.INC.BL -- a drive command, and a test for a file
 .
-=5. VARIABLES
+=4.25 DOS.INC.BL -- A DRIVE COMMAND, AND A TEST FOR A FILE
 .
-.BASL has one flat namespace. There are no locals, no scoping and no
-.parameters. Every variable in every #INCLUDEd module is visible to your
-.program and the reverse, and nothing warns you: a collision is a wrong
-.answer, not an error.
+=DESCRIPTION
 .
-.The convention is one dotted prefix per module, and nothing writes outside
-.its own prefix.
+.Two verbs on the drive's command channel. DOSX sends a command and reads the
+.drive's answer. DOSX.EXISTS tests whether a file opens. Each also has a
+.GOSUB entry that takes its argument in a variable.
 .
-=Prefixes already taken
+.It is the smaller alternative to FILEIO.INC.BL (SEC 4.15). A program
+.includes one or the other, not both. It needs GPB.INC.BL ahead of it and
+.includes nothing.
 .
-.  GP.
-.      OWNER: keywords, not variables -- see below
+.DOS.DEVICE is the drive. A call with it 0 uses 8 and leaves it 8.
 .
-.  STR.
-.      OWNER: STRINGS.INC.BL
+.After either verb, DOS.ERR is the drive's error number and DOS.MSG$ its
+.message. DOS.ERR under DOS.OKMAX, 20, is success.
 .
-.  THEME.
-.      OWNER: THEME.INC.BL
+.Nothing in the module needs the GP block. GP.FN brings it in, 1,536 bytes.
+.GP.SUB and GOSUB leave it out (SEC 3.11).
 .
-.  APPSYS.
-.      OWNER: APPSYS.INC.BL
+=IN THIS SECTION
 .
-.  LINEINPUT.
-.      OWNER: LINEINPUT.INC.BL
-.
-.  MENU.
-.      OWNER: MENU.INC.BL, and MENUPULL.INC.BL's variables
-.
-.  MENUTO.
-.      OWNER: the runners in MENU.INC.BL and MENUPULL.INC.BL
-.
-.  MENUPULL.
-.      OWNER: MENUPULL.INC.BL's labels
-.
-.  GUI.
-.      OWNER: GUI.INC.BL
-.
-.  GUI.LISTBOX.
-.      OWNER: GUI-DIALOGS.INC.BL, kept apart from the rest of GUI.
-.
-.  DLG.
-.      OWNER: GUI-DIALOGS.INC.BL, the dialog verbs' arguments and internals
-.
-.  STASH. / STASH.FILE.
-.      OWNER: STASH.INC.BL / STASHFILE.INC.BL
-.
-.  SORT.
-.      OWNER: SORT.INC.BL
-.
-.  STRCASE.
-.      OWNER: STRCASE.INC.BL
-.
-.  BMX. / BMXK.
-.      OWNER: BMX.INC.BL (variables / its KERNAL constants)
-.
-.  KV.
-.      OWNER: KV.INC.BL
-.
-.  MATH.
-.      OWNER: MATH.INC.BL
-.
-.  MEM.
-.      OWNER: MEM.INC.BL, its two KERNAL constants included
-.
-.Use any other prefix for your own program: GAME., MAP., AIRLIFT.. A prefix
-.costs nothing at runtime -- BASLOAD crunches every identifier to a short
-.BASIC variable, so a long readable name and a two-letter one compile to the
-.same thing.
-.
-.Do not reuse a taken prefix for a name the module has not defined.
-.THEME.MINE is free today and is one library update from not being.
-.
-=GP.* is keywords, not variables
-.
-.GPB.INC.BL defines no variables. It is 27 keyword declarations and nothing
-.else.
-.
-:GP.A = 5 : REM SYNTAX ERROR -- GP.A is a keyword
-:X = GP.A : REM correct
-.
-.The value words are GP.A GP.X GP.Y GP.C, the registers after GP.CALL, and
-.that is all of them. They are keywords rather than variables because nothing
-.in the runtime can write a BASIC variable by name, so a command that returns
-.a value must return it through a keyword. X16's own ST, MX and MY work the
-.same way.
-.
-.The complete per-module in / out / internal register is GP-BASIC.GLOBALS.md,
-.with a script in SEC 6 of that file for re-checking it after a change.
+>117|4.25.1 DOSX -- send a command, read the answer
+>118|4.25.2 DOSX.EXISTS -- whether a file opens
 .
 =SEE ALSO
 .
->164|6. The traps, collected
->72|4.2 STRINGS.INC.BL -- string helpers
->71|4.1 THEME.INC.BL -- named colour roles
->81|4.3 APPSYS.INC.BL -- start politely, leave it as you found it
->82|4.4 LINEINPUT.INC.BL -- a positioned entry field
->84|4.6 MENU.INC.BL -- menus built a row at a time
->93|4.9 MENUPULL.INC.BL -- a dropdown under a bar item
->95|4.11 GUI.INC.BL -- the box that puts the screen back, and the form in 
->97|4.12 GUI-DIALOGS.INC.BL -- every dialog as a verb
->117|STASH.INC.BL -- save a text rectangle, and put it back.
->121|STASHFILE.INC.BL -- a saved text rectangle, through a file.
->91|4.7 SORT.INC.BL -- shell sort a string array
+>102|4.15 FILEIO.INC.BL -- the drive: status, files, directories
+>57|3.11 Calling a routine in one statement
+>116|4.25 DOS.INC.BL -- a drive command, and a test for a file

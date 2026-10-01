@@ -1,22 +1,64 @@
-@7. Memory, and what the compiler tells you (3)
-=Staying inside it
+@3. The modules (9)
+=MATH.INC.BL -- the smaller and the larger of two numbers
 .
-.  - Quote LOW FREE when you change anything. It is one line of the report
-.    and it is the only early warning; PROGRAM TOO BIG arrives once it is
-.    already too late.
-.  - Size a DIM to what is used, not to a round number. The cost is paid on
-.    the first line of the program, forever.
-.  - Put bulk in a RAM bank. A bank is 8,192 bytes that cost the workspace
-.    nothing. Anything held from start to finish and read a row at a time --
-.    a file's worth of text, a table, a screen -- is better in a bank with an
-.    offset table at the front, read back with PEEK under BANK. See SEC 4.5
-.    and STASH.INC.BL for the pattern.
-.  - A big temporary cannot be built and then freed. Freeing is not a thing
-.    that happens on demand: build it in a bank, or in pieces.
+.Routines, arguments and examples: SEC 4.22.
+.
+.  in
+.      MATH.FIRST MATH.SECOND -- the two numbers, in either order
+.
+.  out
+.      MATH.RESULT -- the answer, and what GP.FN reads back
+.
+.  verbs
+.      MATH.MINOF MATH.MAXOF -- the same two routines called in one line
+.
+.  internal
+.      --
+.
+.All three names are shared by MATH.MIN and MATH.MAX. The formals of a
+.GP.DEFPROC are ordinary variables, so GP.SUB MATH.MINOF writes MATH.FIRST
+.and MATH.SECOND exactly as a GOSUB caller would.
+.
+=MEM.INC.BL -- a block copied, a block filled
+.
+.Routines, arguments and examples: SEC 4.23.
+.
+.  in
+.      MEM.SOURCE -- where MEM.COPY reads, 0 to 65535
+.      MEM.TARGET -- where either routine writes
+.      MEM.COUNT -- 1 to 65535, refused outside that
+.      MEM.VALUE -- the byte MEM.FILL writes, 0 to 255
+.
+.  out
+.      MEM.OK -- -1 done, 0 refused, and what GP.FN reads back
+.
+.  verbs
+.      MEM.BLOCKCOPY MEM.BLOCKFILL
+.
+.  internal
+.      --
+.
+.  constants
+.      MEM.MEMORYCOPY MEM.MEMORYFILL -- the two KERNAL entry points
+.
+.MEM.TARGET, MEM.COUNT and MEM.OK are shared by both routines, so a fill
+.overwrites the target a copy was set up with.
+.
+=EXAMPLE PROGRAM
+.
+.  FORM.EXP.BL -- runnable, in the GPC-BASIC folder
 .
 =SEE ALSO
 .
->62|3.12 Code in a bank
->55|3.10 Text in a bank
+>71|4.1 THEME.INC.BL -- named colour roles
+>81|4.3 APPSYS.INC.BL -- start politely, leave it as you found it
+>72|4.2 STRINGS.INC.BL -- string helpers
+>94|4.10 STRUSING.INC.BL -- a number to a template
+>101|4.14 KB.INC.BL -- the keyboard buffer, emptied
+>82|4.4 LINEINPUT.INC.BL -- a positioned entry field
 >83|4.5 BMX.INC.BL -- a BMX bitmap into VERA
->117|STASH.INC.BL -- save a text rectangle, and put it back.
+>102|4.15 FILEIO.INC.BL -- the drive: status, files, directories
+>103|4.16 FILEDIR.INC.BL -- a directory, into a bank or into low RAM
+>116|4.25 DOS.INC.BL -- a drive command, and a test for a file
+>105|4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM
+>107|4.20 KV.INC.BL -- keys and values in one RAM bank

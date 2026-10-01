@@ -80,8 +80,15 @@ python MKHELP.PY
   - [4.21 CHECK.INC.BL -- a check box, [X] or [ ]](#421-checkincbl----a-check-box-x-or)
   - [4.22 MATH.INC.BL -- the smaller and the larger of two numbers](#422-mathincbl----the-smaller-and-the-larger-of-two-numbers)
   - [4.23 MEM.INC.BL -- a block copied, a block filled](#423-memincbl----a-block-copied-a-block-filled)
-  - [4.24 GPBMODS -- the harness that drives every module](#424-gpbmods----the-harness-that-drives-every-module)
-  - [4.24 GPBMODS -- the harness that drives every module (2)](#424-gpbmods----the-harness-that-drives-every-module-2)
+  - [4.24 GUI-LITE.INC.BL -- a message box and a menu, in low memory](#424-gui-liteincbl----a-message-box-and-a-menu-in-low-memory)
+  - [4.24.1 MSGBOX -- lines of text over one or two buttons](#4241-msgbox----lines-of-text-over-one-or-two-buttons)
+  - [4.24.2 PICKMENU -- a menu that stays open](#4242-pickmenu----a-menu-that-stays-open)
+  - [4.24.3 CLOSEBOX -- take down the box opened last](#4243-closebox----take-down-the-box-opened-last)
+  - [4.25 DOS.INC.BL -- a drive command, and a test for a file](#425-dosincbl----a-drive-command-and-a-test-for-a-file)
+  - [4.25.1 DOSX -- send a command, read the answer](#4251-dosx----send-a-command-read-the-answer)
+  - [4.25.2 DOSX.EXISTS -- whether a file opens](#4252-dosxexists----whether-a-file-opens)
+  - [4.26 GPBMODS -- the harness that drives every module](#426-gpbmods----the-harness-that-drives-every-module)
+  - [4.26 GPBMODS -- the harness that drives every module (2)](#426-gpbmods----the-harness-that-drives-every-module-2)
   - [STASH.INC.BL -- save a text rectangle, and put it back.](#stashincbl----save-a-text-rectangle-and-put-it-back)
   - [STASHFILE.INC.BL -- a saved text rectangle, through a file.](#stashfileincbl----a-saved-text-rectangle-through-a-file)
 - **GLOBALS AND NAMING**
@@ -97,6 +104,7 @@ python MKHELP.PY
   - [3. The modules (6)](#3-the-modules-6)
   - [3. The modules (7)](#3-the-modules-7)
   - [3. The modules (8)](#3-the-modules-8)
+  - [3. The modules (9)](#3-the-modules-9)
   - [4. Labels are global too](#4-labels-are-global-too)
   - [5. TRUE IS -1](#5-true-is--1)
   - [6. Two more naming rules that are not about collisions](#6-two-more-naming-rules-that-are-not-about-collisions)
@@ -169,11 +177,14 @@ reports `CORE`. §7 reads the whole report.
 | Needs | When |
 |---|---|
 | `#INCLUDE "GPB.INC.BL"` | every source using a `GP.` keyword |
-| `GPB.RT.nnn.BIN` beside the object | shared build, report says `GPBASIC` |
-| `GPC.RT.nnn.BIN` beside the object | shared build, report says `CORE` |
+| `GPB.RT.nnn.BIN` and `GP1.RT.nnn.BIN` | shared build, report says `GPBASIC` |
+| `GPC.RT.nnn.BIN` and `GP1.RT.nnn.BIN` | shared build, report says `CORE` |
 | nothing further | embedded build: the runtime is in the object |
 
-`nnn` is the compiler build number. An embedded build carries the runtime and needs no `.BIN`.
+`nnn` is the runtime build number, not the compiler build number. The bootstrap looks for the
+runtime files in the current directory, then in `/GPC/`, then at the root of the SD card.
+`GP1.RT.nnn.BIN` must sit in the same place as the runtime that loaded. An embedded build carries
+the runtime and needs no `.BIN`.
 
 A source that uses a `GP.` keyword is compiler input only. BASLOAD encodes the keywords as byte
 pairs the ROM has no handler for, so stock BASIC can neither `LIST` nor `RUN` BASLOAD's output.
@@ -471,7 +482,7 @@ reads the debug map the compiler writes when `MAKE A DEBUG MAP?` is answered yes
 the address cannot be resolved.
 
 `GPC.HELP.PRG` is this reference, on the machine. It reads `HELP-TXT/` beside it — `GPC.HELP.IDX`
-and one `.HLP` per topic — and shows 90 topics at 80x30. Arrows, `PgUp` / `PgDn`, `HOME` and `END`
+and one `.HLP` per topic — and shows 98 topics at 80x30. Arrows, `PgUp` / `PgDn`, `HOME` and `END`
 move. `RETURN` opens the highlighted index row. `/` finds and `N` repeats the search. `L` follows a
 topic's cross references, `X` writes its code out as a `.BL` where it has any, `T` cycles the colour
 themes, `?` is the about box. `ESC` goes back a step, and quits from the index.
@@ -503,6 +514,7 @@ removes dead code, including a module costs its whole size whether or not it is 
 | `GUI-DIALOGS.INC.BL` | every dialog as a verb: `MSGBOX`, `ASKYN`, `INPUTBOX`, `PICKMENU`, `LISTBOX`, the `LIST.` verbs and `FORM.`. `#INCLUDE` it after `GUI`, `COMBO` and `CHECK` |
 | `COMBO.INC.BL` | a drop-down list that folds into one row, a `GUI.FORM` control |
 | `CHECK.INC.BL` | a check box, a `GUI.FORM` control |
+| `GUI-LITE.INC.BL` | `MSGBOX`, `PICKMENU` and `CLOSEBOX` in low memory, nothing banked, the screen under the box saved to VRAM. An alternative to `GUI-DIALOGS`, never both |
 | `FILEPICK.INC.BL` | a popup file picker, `PICKBANKS` / `PICKFILE` / `PICKSCAN`: reads the drive into a RAM bank, filters by suffix, answers with a name. Needs `GUI.INC.BL`, `GUI-DIALOGS.INC.BL`, `FILEIO.INC.BL` and `FILEDIR.INC.BL` |
 | `STRINGS.INC.BL` | the string helpers: BASIC where BASIC is enough, assembly where it is not |
 | `STRCASE.INC.BL` | case, rewriting a string in place, in assembly |
@@ -513,7 +525,7 @@ removes dead code, including a module costs its whole size whether or not it is 
 | `KB.INC.BL` | empty the keyboard buffer |
 | `FILEIO.INC.BL` | the drive: status, exists, delete, rename, copy, directories, a string array to a file and back |
 | `FILEDIR.INC.BL` | read a directory, into a RAM bank or into low RAM |
-| `DOS.INC.BL` | a smaller alternative to `FILEIO.INC.BL`: `DOSX` sends a command to the drive and returns the error, `DOS.EXISTS` tests for a file. Include one of the two, not both |
+| `DOS.INC.BL` | a smaller alternative to `FILEIO.INC.BL`: `DOSX` sends a command to the drive and returns the error, `DOSX.EXISTS` tests for a file. Include one of the two, not both |
 | `KV.INC.BL` | strings by key in one RAM bank, saved and loaded as one file. No `GP.ASM`, so no `#SYMFILE` |
 | `MATH.INC.BL` | the smaller and the larger of two numbers, as a `GOSUB` or as a verb |
 | `MEM.INC.BL` | a block copied and a block filled, through the KERNAL. Low RAM and the I/O page only |
@@ -631,12 +643,14 @@ Three implementations, and what each costs:
 | **Dialogs** | BASIC | `GUI-DIALOGS.INC.BL` — every dialog as a one-line verb · §4.12 |
 | **Dialogs** | BASIC | `COMBO.INC.BL` — `COMBO.ADD`, a drop-down that folds into one row · §4.17 |
 | **Dialogs** | BASIC | `CHECK.INC.BL` — `CHECK.ADD`, a check box, `[X]` or `[ ]` · §4.21 |
+| **Dialogs** | BASIC | `GUI-LITE.INC.BL` — `MSGBOX` `PICKMENU` `CLOSEBOX`, in low memory, nothing banked · §4.24 |
 | **Code in a bank** | ASM | `GP.BANKED` `GP.ENDBANKED` — p-code at `$A000`, out of the low-memory budget, see §3.12 |
 | **Bank ownership** | BASIC | `BANKMGR.INC.BL` — `INIT` `CLAIM` `GET.FREE.BANK` `RELEASE` `COUNT` · §4.13 |
 | **Key-value store** | BASIC | `KV.INC.BL` — `INIT` `GET` `PUT` `DEL` `FIND` `AT` `WIPE` `SAVE` `LOAD`, strings in one RAM bank · §4.20 |
 | **Keyboard** | BASIC | `KB.INC.BL` — `KB.CLEARKB` · §4.14 |
 | **The drive** | BASIC | `FILEIO.INC.BL` — `STATUS` `EXISTS` `SIZE` `DELETE` `RENAME` `COPY` `MKDIR` `CHDIR` `SAVEARRAY` `LOADARRAY` · §4.15 |
 | **The drive** | BASIC | `FILEDIR.INC.BL` — `FILE.DIR.INIT` `OPEN` `NEXT`, into a bank or low RAM · §4.16 |
+| **The drive** | BASIC | `DOS.INC.BL` — `DOSX` `DOSX.EXISTS`, the smaller alternative to `FILEIO` · §4.25 |
 | **Screen — stash** | BASIC | `STASHVRAM.INC.BL` — `SV.SAVE` `SV.RESTORE` `SV.PUT` `SV.GET`, kept in VRAM · §4.18 |
 | **Screen — stash** | BASIC | `STASHVRAMGC.INC.BL` — `SV.COMPACT` · §4.19 |
 | **Numbers** | BASIC | `MATH.INC.BL` — `MATH.MIN` `MATH.MAX` · §4.22 |
@@ -3293,12 +3307,12 @@ Any other key is offered to the buttons' marked letters.
 file, as `COMBO.INC.BL` does. A program that includes the GUI and leaves this one out stops with
 `LABEL NOT FOUND`.
 
-`GPBMODS` (§4.24) runs three boxes and a combo on one form, under DIALOG > CHECK BOX + COMBO.
+`GPBMODS` (§4.26) runs three boxes and a combo on one form, under DIALOG > CHECK BOX + COMBO.
 
 ---
 
 
-*See also: 4.24 GPBMODS -- the harness that drives every module, 4.21 CHECK.INC.BL -- a check box, [X] or [ ], 4.11 GUI.INC.BL -- the box that puts the screen back, and the form in , 4.17 COMBO.INC.BL -- a drop-down list that folds into one row*
+*See also: 4.26 GPBMODS -- the harness that drives every module, 4.21 CHECK.INC.BL -- a check box, [X] or [ ], 4.11 GUI.INC.BL -- the box that puts the screen back, and the form in , 4.17 COMBO.INC.BL -- a drop-down list that folds into one row*
 
 ## 4.22 MATH.INC.BL -- the smaller and the larger of two numbers
 
@@ -3372,9 +3386,224 @@ Either routine brings the GP block in, 1,536 bytes, because `GP.CALL` lives ther
 
 *See also: 4.19 STASHVRAMGC.INC.BL -- close the holes in a STASHVRAM store, 4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM, 4.23 MEM.INC.BL -- a block copied, a block filled*
 
-## 4.24 GPBMODS -- the harness that drives every module
+## 4.24 GUI-LITE.INC.BL -- a message box and a menu, in low memory
 
-##### 4.24 `GPBMODS` — the harness that drives every module
+##### 4.24 `GUI-LITE.INC.BL` — a message box and a menu, in low memory
+
+Three verbs. `MSGBOX` shows up to four lines over one or two buttons, and closes before it returns.
+`PICKMENU` shows a menu and leaves it open. `CLOSEBOX` takes down the box opened last. Each box is
+as wide as its text and has a drop shadow. A program calls the three verbs and nothing else.
+
+```basic
+#INCLUDE "GPB.INC.BL"
+#INCLUDE "THEME.INC.BL"
+#INCLUDE "GUI-LITE.INC.BL"
+
+GOSUB THEME.SELECT
+C = GP.FN(PICKMENU, 4, 4, "MENU", "ABOUT,QUIT")
+IF C = 1 THEN GP.SUB MSGBOX, "ABOUT", "GUI-LITE", "", "", "", "OK", ""
+GP.SUB CLOSEBOX
+```
+
+`#INCLUDE` it after `GPB.INC.BL` and `THEME.INC.BL`. It includes neither. Every colour is read from
+`THEME.CLR`, so `THEME.SELECT` (§4.1) runs before the first box.
+
+It uses `GP.BOX`, `GP.FILL`, `GP.PRINTAT` and `GP.CALL`, so a program that includes it carries the
+GP block, 1,536 bytes. It holds no `GP.BANKED`, `GP.BANKEDSTR` or `BANK`, and adds no `.OVL`.
+
+The cells under a box and its shadow go to VRAM bank 0 when the box opens, and come back when it
+closes. The first box saves at `GL.SAVE.AT`, and each later box just above the one before. A box W
+columns wide and H rows high takes (2W + 4) x (H + 1) bytes. The largest box on an 80x30 screen
+takes 5,084 bytes, so four of them end at `$8F70`. The save area must end below `$10000`.
+
+| `#DEFINE` | default | sets |
+|---|---|---|
+| `GL.SAVE.AT` | `$4000` | the VRAM bank 0 address the first box saves at |
+| `GL.MOST.OPEN` | 4 | how many boxes may be open at once |
+
+Define either one before the `#INCLUDE` to change it.
+
+The frame is `THEME.BORDER`, the inside and the menu rows `THEME.TEXT`, the title `THEME.TITLE` and
+the shadow `THEME.SHADOW`. The menu bar and the focused button are `THEME.HILITE`, and the other
+button is `THEME.BAR`.
+
+The caller keeps every box and its shadow on the screen. The shadow is two columns right of the box
+and one row below it.
+
+`GUI-DIALOGS.INC.BL` (§4.12) declares `MSGBOX` and `PICKMENU` too. Include one or the other. With
+both, the compile stops at `GP.DEFPROC VERB ALREADY DECLARED`.
+
+`STASHVRAM.INC.BL` (§4.18) starts its window at `$04000`, the default `SV.BASE`. A program that
+includes both moves one of them.
+
+The `GUI-LITE` sample, `GPC-BASIC-TOOLS-SRC/GUI-LITE/GUI-LITE.BASL`, calls all three verbs.
+
+
+*See also: 4.24.1 MSGBOX -- lines of text over one or two buttons, 4.24.2 PICKMENU -- a menu that stays open, 4.24.3 CLOSEBOX -- take down the box opened last, 4.1 THEME.INC.BL -- named colour roles, 4.12 GUI-DIALOGS.INC.BL -- every dialog as a verb, 4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM, 4.24 GUI-LITE.INC.BL -- a message box and a menu, in low memory*
+
+## 4.24.1 MSGBOX -- lines of text over one or two buttons
+
+###### 4.24.1 `MSGBOX` — lines of text over one or two buttons
+
+```entry
+  Syntax    GP.FN(MSGBOX, t$, l1$, l2$, l3$, l4$, b1$, b2$)
+            GP.SUB MSGBOX, t$, l1$, l2$, l3$, l4$, b1$, b2$
+  Returns   The button chosen, 1 or 2.
+  Kind      BASIC. A verb in GUI-LITE.INC.BL. Needs the GP block.
+  Notes     All seven arguments are required. Pass "" for a line or a
+            button that is not wanted.
+            t$ goes in the top edge. "" leaves the edge plain.
+            l1$ to l4$ are centred, one a row. A "" line is a blank
+            row, and the box ends at the last line that is not "".
+            b2$ "" gives one button.
+            The box is centred on the screen. It is 6 columns wider
+            than the widest of t$, the lines and the button row.
+            The focus starts on b1$. LEFT moves it to b1$, RIGHT to
+            the last button, TAB to the other one. RETURN chooses
+            the button with the focus. ESC chooses the last button.
+            The box closes before MSGBOX returns.
+  Example
+```
+```basic
+            B = GP.FN(MSGBOX, "QUIT", "LEAVE?", "", "", "", "YES", "NO")
+            IF B = 1 THEN GOTO BYE
+```
+
+
+*See also: 4.24 GUI-LITE.INC.BL -- a message box and a menu, in low memory*
+
+## 4.24.2 PICKMENU -- a menu that stays open
+
+###### 4.24.2 `PICKMENU` — a menu that stays open
+
+```entry
+  Syntax    GP.FN(PICKMENU, x, y, t$, items$)
+  Returns   The item chosen, counting from 1. 0 for ESC.
+  Kind      BASIC. A verb in GUI-LITE.INC.BL. Needs the GP block.
+  Notes     x, y is the top-left corner of the box. t$ goes in the
+            top edge, and "" leaves it plain.
+            items$ is the items separated by commas, one a row. An
+            item cannot contain a comma.
+            The box is 6 columns wider than the longest of t$ and the
+            items, and 2 rows taller than the number of items.
+            The bar starts on item 1. UP and DOWN move it and wrap at
+            the ends. RETURN chooses.
+            The box stays open when PICKMENU returns, so a MSGBOX can
+            open over it. GP.SUB CLOSEBOX (§4.24.3) takes it down.
+  WARNING   CLOSEBOX writes back the screen as it was when the menu
+            opened. Repaint the screen under a menu only after
+            CLOSEBOX.
+  Example
+```
+```basic
+            C = GP.FN(PICKMENU, 4, 4, "FILE", "OPEN,SAVE,QUIT")
+            IF C = 2 THEN GOSUB SAVE.FILE
+            GP.SUB CLOSEBOX
+```
+
+
+*See also: 4.24.3 CLOSEBOX -- take down the box opened last, 4.24 GUI-LITE.INC.BL -- a message box and a menu, in low memory*
+
+## 4.24.3 CLOSEBOX -- take down the box opened last
+
+###### 4.24.3 `CLOSEBOX` — take down the box opened last
+
+```entry
+  Syntax    GP.SUB CLOSEBOX
+  Does      Takes down the box opened last and puts back the screen
+            under it and its shadow.
+  Kind      BASIC. A verb in GUI-LITE.INC.BL. Needs the GP block.
+  Notes     PICKMENU's box is the one a program closes. MSGBOX closes
+            its own.
+            Call it only with a box open.
+```
+
+---
+
+
+*See also: 4.24 GUI-LITE.INC.BL -- a message box and a menu, in low memory*
+
+## 4.25 DOS.INC.BL -- a drive command, and a test for a file
+
+##### 4.25 `DOS.INC.BL` — a drive command, and a test for a file
+
+Two verbs on the drive's command channel. `DOSX` sends a command and reads the drive's answer.
+`DOSX.EXISTS` tests whether a file opens. Each also has a `GOSUB` entry that takes its argument in
+a variable.
+
+It is the smaller alternative to `FILEIO.INC.BL` (§4.15). A program includes one or the other, not
+both. It needs `GPB.INC.BL` ahead of it and includes nothing.
+
+`DOS.DEVICE` is the drive. A call with it 0 uses 8 and leaves it 8.
+
+After either verb, `DOS.ERR` is the drive's error number and `DOS.MSG$` its message. `DOS.ERR` under
+`DOS.OKMAX`, 20, is success.
+
+Nothing in the module needs the GP block. `GP.FN` brings it in, 1,536 bytes. `GP.SUB` and `GOSUB`
+leave it out (§3.11).
+
+
+*See also: 4.25.1 DOSX -- send a command, read the answer, 4.25.2 DOSX.EXISTS -- whether a file opens, 4.15 FILEIO.INC.BL -- the drive: status, files, directories, 3.11 Calling a routine in one statement, 4.25 DOS.INC.BL -- a drive command, and a test for a file*
+
+## 4.25.1 DOSX -- send a command, read the answer
+
+###### 4.25.1 `DOSX` — send a command, read the answer
+
+```entry
+  Syntax    GP.SUB DOSX, cmd$
+            GP.FN(DOSX, cmd$)
+            DOS.CMDSTR$ = cmd$ : GOSUB DOS.CMD
+  Returns   DOS.ERR, the drive's error number.
+  Kind      BASIC. A verb in DOS.INC.BL. GP.FN needs the GP block.
+  Notes     Opens the command channel to DOS.DEVICE as logical file
+            15 with cmd$ as the command, reads the answer, and closes
+            the file.
+            cmd$ "" sends no command and reads the drive's status.
+            DOS.MSG$ holds the message. The track and sector are
+            read and discarded.
+            DOS.ERR under 20 is success.
+            DOS.CMDSTR$ is "" afterwards.
+  WARNING   Do not call it with logical file 15 open.
+  Example
+```
+```basic
+            GP.SUB DOSX, "S:OLD.DAT"
+            IF DOS.ERR >= DOS.OKMAX THEN PRINT DOS.ERR; " "; DOS.MSG$
+```
+
+
+*See also: 4.25 DOS.INC.BL -- a drive command, and a test for a file*
+
+## 4.25.2 DOSX.EXISTS -- whether a file opens
+
+###### 4.25.2 `DOSX.EXISTS` — whether a file opens
+
+```entry
+  Syntax    GP.FN(DOSX.EXISTS, name$)
+            DOS.NAME$ = name$ : GOSUB DOS.DOS.EXISTS
+  Returns   -1 if the file opens, 0 if not. DOS.OK holds the same.
+  Kind      BASIC. A verb in DOS.INC.BL. GP.FN needs the GP block.
+  Notes     Opens the command channel as logical file 15, then
+            name$ + ",S,R" as logical file 14, reads the command
+            channel while the file is open, and closes both.
+            -1 means DOS.ERR came back under 20.
+            DOS.ERR and DOS.MSG$ hold the drive's answer, found or
+            not.
+  WARNING   Do not call it with logical file 14 or 15 open.
+  Example
+```
+```basic
+            IF GP.FN(DOSX.EXISTS, "SCORES.DAT") THEN GOSUB LOAD.SCORES
+```
+
+---
+
+
+*See also: 4.25 DOS.INC.BL -- a drive command, and a test for a file*
+
+## 4.26 GPBMODS -- the harness that drives every module
+
+##### 4.26 `GPBMODS` — the harness that drives every module
 
 `GPC-BASIC-TOOLS-SRC/GPB-MODS-TESTING/GPBMODS.BASL`. A menu bar of nine dropdowns whose rows reach nearly every
 public entry point in this section. It is the one program that holds all twenty-one modules at once, and
@@ -3483,7 +3712,7 @@ upstream for it, and the build copies root's over this folder's every time.
 ---
 
 
-## 4.24 GPBMODS -- the harness that drives every module (2)
+## 4.26 GPBMODS -- the harness that drives every module (2)
 
 
 *See also: 4.5 BMX.INC.BL -- a BMX bitmap into VERA, 4.13 BANKMGR.INC.BL -- who owns which RAM bank, 3.12 Code in a bank, 3.10 Text in a bank, 4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM*
@@ -3623,11 +3852,13 @@ The convention is one dotted prefix per module, and nothing writes outside its o
 | `GUI.` | `GUI.INC.BL` |
 | `GUI.LISTBOX.` | `GUI-DIALOGS.INC.BL`, kept apart from the rest of `GUI.` |
 | `DLG.` | `GUI-DIALOGS.INC.BL`, the dialog verbs’ arguments and internals |
+| `GL.` | `GUI-LITE.INC.BL` |
 | `STASH.` / `STASH.FILE.` | `STASH.INC.BL` / `STASHFILE.INC.BL` |
 | `SORT.` | `SORT.INC.BL` |
 | `STRCASE.` | `STRCASE.INC.BL` |
 | `BMX.` / `BMXK.` | `BMX.INC.BL` (variables / its KERNAL constants) |
 | `KV.` | `KV.INC.BL` |
+| `DOS.` | `DOS.INC.BL` |
 | `MATH.` | `MATH.INC.BL` |
 | `MEM.` | `MEM.INC.BL`, its two KERNAL constants included |
 
@@ -3659,7 +3890,7 @@ after a change.
 ---
 
 
-*See also: 6. The traps, collected, 4.2 STRINGS.INC.BL -- string helpers, 4.1 THEME.INC.BL -- named colour roles, 4.3 APPSYS.INC.BL -- start politely, leave it as you found it, 4.4 LINEINPUT.INC.BL -- a positioned entry field, 4.6 MENU.INC.BL -- menus built a row at a time, 4.9 MENUPULL.INC.BL -- a dropdown under a bar item, 4.11 GUI.INC.BL -- the box that puts the screen back, and the form in , 4.12 GUI-DIALOGS.INC.BL -- every dialog as a verb, STASH.INC.BL -- save a text rectangle, and put it back., STASHFILE.INC.BL -- a saved text rectangle, through a file., 4.7 SORT.INC.BL -- shell sort a string array*
+*See also: 6. The traps, collected, 4.2 STRINGS.INC.BL -- string helpers, 4.1 THEME.INC.BL -- named colour roles, 4.3 APPSYS.INC.BL -- start politely, leave it as you found it, 4.4 LINEINPUT.INC.BL -- a positioned entry field, 4.6 MENU.INC.BL -- menus built a row at a time, 4.9 MENUPULL.INC.BL -- a dropdown under a bar item, 4.11 GUI.INC.BL -- the box that puts the screen back, and the form in , 4.12 GUI-DIALOGS.INC.BL -- every dialog as a verb, 4.24 GUI-LITE.INC.BL -- a message box and a menu, in low memory, STASH.INC.BL -- save a text rectangle, and put it back., STASHFILE.INC.BL -- a saved text rectangle, through a file.*
 
 ## 1. The prefixes that are taken
 
@@ -3680,6 +3911,7 @@ after a change.
 | `GUI.` | `GUI.INC.BL` | the box the dialogs sit in, and the form and controls inside it |
 | `GUI.LISTBOX.` | `GUI-DIALOGS.INC.BL` | the listbox dialog’s answer, kept apart from the rest of `GUI.` |
 | `DLG.` | `GUI-DIALOGS.INC.BL` | the dialog verbs: their arguments, and their internals |
+| `GL.` | `GUI-LITE.INC.BL` | the message box and menu verbs: their arguments, the open boxes, and the VERA and key constants |
 | `STASH.` | `STASH.INC.BL` | a text rectangle into a RAM bank, and back |
 | `STASH.FILE.` | `STASHFILE.INC.BL` | the same rectangle through a file, kept apart from the rest of `STASH.` |
 | `SORT.` | `SORT.INC.BL` | shell sort a string array in place |
@@ -3688,6 +3920,7 @@ after a change.
 | `BMXK.` | `BMX.INC.BL` | its KERNAL/VERA constants, kept apart from its variables |
 | `FILE.` | `FILEIO.INC.BL` | the drive: status, exists, delete, rename, directories |
 | `FILE.DIR.` | `FILEDIR.INC.BL` | reading a directory, kept apart from the rest of `FILE.` |
+| `DOS.` | `DOS.INC.BL` | the drive's command channel, the smaller alternative to `FILE.` |
 | `SV.` | `STASHVRAM.INC.BL` | the VRAM store. `SVGC.` is `STASHVRAMGC.INC.BL`'s one constant |
 | `KV.` | `KV.INC.BL` | keys and values in one RAM bank |
 | `MATH.` | `MATH.INC.BL` | the smaller and the larger of two numbers |
@@ -3706,7 +3939,7 @@ free today; it is one library update away from not being.
 ## 1. The prefixes that are taken (2)
 
 
-*See also: 2. Using it, 4.2 STRINGS.INC.BL -- string helpers, 4.10 STRUSING.INC.BL -- a number to a template, 4.1 THEME.INC.BL -- named colour roles, 4.3 APPSYS.INC.BL -- start politely, leave it as you found it, 4.4 LINEINPUT.INC.BL -- a positioned entry field, 4.14 KB.INC.BL -- the keyboard buffer, emptied, 4.6 MENU.INC.BL -- menus built a row at a time, 4.9 MENUPULL.INC.BL -- a dropdown under a bar item, 4.11 GUI.INC.BL -- the box that puts the screen back, and the form in , 4.12 GUI-DIALOGS.INC.BL -- every dialog as a verb, STASH.INC.BL -- save a text rectangle, and put it back.*
+*See also: 2. Using it, 4.2 STRINGS.INC.BL -- string helpers, 4.10 STRUSING.INC.BL -- a number to a template, 4.1 THEME.INC.BL -- named colour roles, 4.3 APPSYS.INC.BL -- start politely, leave it as you found it, 4.4 LINEINPUT.INC.BL -- a positioned entry field, 4.14 KB.INC.BL -- the keyboard buffer, emptied, 4.6 MENU.INC.BL -- menus built a row at a time, 4.9 MENUPULL.INC.BL -- a dropdown under a bar item, 4.11 GUI.INC.BL -- the box that puts the screen back, and the form in , 4.12 GUI-DIALOGS.INC.BL -- every dialog as a verb, 4.24 GUI-LITE.INC.BL -- a message box and a menu, in low memory*
 
 ## 2. GP.* is keywords, not variables -- and the difference bites
 
@@ -3908,6 +4141,23 @@ assembly to write into, and creates every `{VAR}` slot. **Do not assign `FILE.NA
 `FILE.NAME$` is shared with `FILEIO` on purpose: the name a picker chose is the name `FILE.EXISTS`
 and `FILE.DELETE` want.
 
+##### `DOS.INC.BL` — a drive command, and a test for a file
+
+Routines, arguments and examples: §4.25.
+
+| | |
+|---|---|
+| in | `DOS.CMDSTR$` — the command, for `GOSUB DOS.CMD`. `DOSX` stores its argument here<br>`DOS.NAME$` — the file, for `GOSUB DOS.DOS.EXISTS`. `DOSX.EXISTS` stores its argument here<br>`DOS.DEVICE` — the drive; 0 means 8 |
+| out | `DOS.ERR` `DOS.MSG$` — the drive's error number and message, after either routine<br>`DOS.OK` — -1 the file opened, 0 not, from `DOS.DOS.EXISTS` |
+| verbs | `DOSX` `DOSX.EXISTS` |
+| internal | `DOS.JUNK%` — the track and sector, read and discarded |
+| constants | `DOS.OKMAX` — 20. An error number under it is success<br>`DOS.CHAN` — 14, the logical file and secondary address `DOS.DOS.EXISTS` opens |
+
+`DOS.CMD` writes two of its inputs: `DOS.CMDSTR$` is `""` afterwards, and a `DOS.DEVICE` of 0
+becomes 8. `DOS.DOS.EXISTS` sets `DOS.DEVICE` the same way.
+
+`FILE.` is `FILEIO.INC.BL`'s, the larger alternative. A program includes one of the two.
+
 ##### `STASHVRAM.INC.BL` — rectangles and blobs, kept in VRAM
 
 Routines, arguments and examples: §4.18.
@@ -4046,6 +4296,25 @@ hand the control its geometry, add a button row, run the form, answer. `GUI.LIST
 the `GP.BSTR` image layout — which is how `LIST.BANK` shows a directory that was never in low
 memory.
 
+##### `GUI-LITE.INC.BL` — a message box and a menu, in low memory
+
+Routines, arguments and examples: §4.24.
+
+| | |
+|---|---|
+| in | the arguments, in the call. `MSGBOX` stores them in `GL.TITLE$` `GL.LINE.ONE$` `.TWO$` `.THREE$` `.FOUR$` `GL.BUTTON.ONE$` `.TWO$`, and `PICKMENU` in `GL.BOX.X%` `GL.BOX.Y%` `GL.TITLE$` `GL.ITEMS$` |
+| in, optional | `GL.SAVE.AT` — the VRAM bank 0 address the first box saves at, `$4000` by default<br>`GL.MOST.OPEN` — how many boxes may be open at once, 4 by default<br>both are `#DEFINE`s, set before the `#INCLUDE` |
+| out | `GL.CHOSEN%` — the button or the item, and what `GP.FN` reads back |
+| verbs | `MSGBOX` `PICKMENU` `CLOSEBOX` |
+| internal | `GL.BOX.W%` `GL.BOX.H%` `GL.BOX.OFFSET%` `GL.BUTTON.COLOUR%` `GL.BUTTON.ROW.W%` `GL.BUTTONS%` `GL.BUTTONS.X%` `GL.BUTTONS.Y%` `GL.COPY.FROM%` `GL.COPY.TO%` `GL.DRAWING%` `GL.ITEM$` `GL.ITEM.COLOUR%` `GL.ITEM.COUNT%` `GL.ITEM.START%` `GL.KEY.CODE%` `GL.LINES%` `GL.MAP.BASE.PAGE%` `GL.MAP.STRIDE%` `GL.PRESSED$` `GL.ROW` `GL.ROW.BANK%` `GL.ROW.BYTES%` `GL.ROW.BYTES.LOW%` `GL.ROW.BYTES.HIGH%` `GL.ROW.LOW%` `GL.ROW.MIDDLE%` `GL.SAVE.ADDRESS` `GL.SAVE.USED` `GL.SCAN` `GL.STRIDE.LOW%` `GL.STRIDE.HIGH%` `GL.TEXT.COLOUR%` `GL.WIDEST%`<br>the open boxes: `GL.OPEN.COUNT%`, and the arrays `GL.OPEN.X%()` `GL.OPEN.Y%()` `GL.OPEN.W%()` `GL.OPEN.H%()` `GL.OPEN.OFFSET()` |
+| constants | `GL.VERA.LOW` `.MIDDLE` `.HIGH` `.CTRL` `GL.LAYER.CONFIG` `.MAPBASE` `GL.PORT.SCREEN` `.SAVE` `.PAGE` `GL.MEMORY.COPY` `GL.STEP.ONE` `GL.SCREEN.MODE`<br>`GL.KEY.TAB` `.RETURN` `.DOWN` `.ESCAPE` `.RIGHT` `.UP` `.LEFT` |
+
+The verbs carry no `GL.` prefix. `GUI-DIALOGS.INC.BL` declares `MSGBOX` and `PICKMENU` too, so a
+program includes one of the two modules.
+
+The module `DIM`s the five `GL.OPEN` arrays to `GL.MOST.OPEN`. Do not `DIM` them yourself. Every
+`GL.` label is internal.
+
 ##### `STASH.INC.BL` — save a text rectangle, and put it back
 
 | | |
@@ -4168,7 +4437,10 @@ a copy was set up with.
 ## 3. The modules (8)
 
 
-*See also: 4.1 THEME.INC.BL -- named colour roles, 4.3 APPSYS.INC.BL -- start politely, leave it as you found it, 4.2 STRINGS.INC.BL -- string helpers, 4.10 STRUSING.INC.BL -- a number to a template, 4.14 KB.INC.BL -- the keyboard buffer, emptied, 4.4 LINEINPUT.INC.BL -- a positioned entry field, 4.5 BMX.INC.BL -- a BMX bitmap into VERA, 4.15 FILEIO.INC.BL -- the drive: status, files, directories, 4.16 FILEDIR.INC.BL -- a directory, into a bank or into low RAM, 4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM, 4.20 KV.INC.BL -- keys and values in one RAM bank, 4.6 MENU.INC.BL -- menus built a row at a time*
+## 3. The modules (9)
+
+
+*See also: 4.1 THEME.INC.BL -- named colour roles, 4.3 APPSYS.INC.BL -- start politely, leave it as you found it, 4.2 STRINGS.INC.BL -- string helpers, 4.10 STRUSING.INC.BL -- a number to a template, 4.14 KB.INC.BL -- the keyboard buffer, emptied, 4.4 LINEINPUT.INC.BL -- a positioned entry field, 4.5 BMX.INC.BL -- a BMX bitmap into VERA, 4.15 FILEIO.INC.BL -- the drive: status, files, directories, 4.16 FILEDIR.INC.BL -- a directory, into a bank or into low RAM, 4.25 DOS.INC.BL -- a drive command, and a test for a file, 4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM, 4.20 KV.INC.BL -- keys and values in one RAM bank*
 
 ## 4. Labels are global too
 
@@ -4461,8 +4733,8 @@ and nowhere left to grow; `GPBMODS` at `LOW FREE 12288` has both.
 
 ##### What ships with the program
 
-`nnn` in a runtime name is the compiler build, so a runtime file serves only programs from its own
-build.
+`nnn` in a runtime name is the runtime build number. A program loads the runtime files carrying the
+number of the compiler that built it.
 
 | mode | files |
 |---|---|
@@ -4473,8 +4745,8 @@ build.
 | | `GP1.RT.nnn.BIN`, always |
 | | `NAME.OVL`, holding every `BANK` line's region, beside the `.PRG` |
 
-The bootstrap looks for the runtime in the current directory, then at the root of the SD card, so
-one copy at `/` serves every program. `GP1.RT.nnn.BIN` must sit in the same place as the runtime
+The bootstrap looks for the runtime in the current directory, then in `/GPC/`, then at the root of
+the SD card. One copy in `/GPC/` or at `/` serves every program. `GP1.RT.nnn.BIN` must sit in the same place as the runtime
 that loaded. A runtime file that is not found prints `?RT`, the third letter of its name and the
 build number: `?RTB128` for `GPB.RT.128.BIN`.
 

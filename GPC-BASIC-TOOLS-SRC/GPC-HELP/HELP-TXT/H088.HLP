@@ -1,116 +1,86 @@
-@7. Memory, and what the compiler tells you
+@3. The modules (7)
+=GUI-DIALOGS.INC.BL -- every dialog as a verb
 .
-=7. MEMORY, AND WHAT THE COMPILER TELLS YOU
+.Routines, arguments and examples: SEC 4.12.
 .
-=What GPC prints when it finishes
+.MSGBOX, ASKYN, ASKOK, ASKTEXT, INPUTBOX, PICKMENU, LISTBOX and LISTBOXM are
+.the dialogs, each with an EX form that also takes the title and the second
+.and third lines. LIST.BEGIN, LIST.ARRAY, LIST.BANK, LISTTO.RUN, LIST.ITEM
+.and LIST.SORT build a list box a step at a time; PANELOPEN, PANELCLOSE and
+.the FORM. verbs do the same for a form. DLGRESET, DLGSHADOW, DLGSHADOWCLR,
+.DLGSTYLE and DLGGLYPH set what every dialog starts from, and KBCLEAR throws
+.away what is already typed.
 .
-.One item a line. GPBMODS, built shared:
+.  in
+.      the arguments, in the call. They land in DLG. and NOT in the GUI.
+.        inputs: GUI.DEFAULTS runs after they are stored and would clear them
+.      DLGRESET bank -- the RAM bank every dialog saves the screen into,
+.        once, before the first one
+.      GUI.LIST.ITEM$() -- the rows, 1..count, for the array-backed list
+.        verbs, and the caller owns the DIM
 .
-:OK LOW CODE 11520, SHARED GPBASIC
-:LOW FREE 12288, FRAME STACK 2048
-:LINES 3795
-:BANK   7 CODE  4864 USED  3328 FREE
-:BANK   9 CODE   768 USED  7424 FREE
-:BANK   4 CODE  7680 USED   512 FREE
-:BANK  10 CODE   768 USED  7424 FREE
-:BANK   8 CODE  1792 USED  6400 FREE
-:BANK  11 CODE  3072 USED  5120 FREE
-:BANK   5 TEXT  7424 USED   768 FREE
-:BANK   6 TEXT  4352 USED  3840 FREE
-:TOTAL BANKS 8, 30720 USED
+.  out
+.      GUI.ANSWER -- ASKYN, ASKOK
+.      GUI.TEXT$ and GUI.OK -- INPUTBOX
+.      GUI.SEL -- PICKMENU
+.      GUI.LISTBOX.SEL .MARKS$ .MARKED -- the listbox verbs
+.      GUI.KEY -- 13 accepted, 27 cancelled
 .
-.An embedded build prints a RUNTIME line second. GPCTEST-E:
+.  internal
+.      the whole of DLG.*
 .
-:OK LOW CODE 969, EMBEDDED GPBASIC
-:RUNTIME 11775
-:LOW FREE 23808, FRAME STACK 2048
+.In a multi-select list GUI.LISTBOX.SEL is not the answer -- it is where the
+.cursor was left. The marks are.
 .
-.  LOW CODE
-.      the p-code in low memory, in bytes. P-code and GP.ASM blocks in a
-.        GP.BANKED region are not in it
+.The scrolling list is not in this module. It is GUI.CT.LIST, one of
+.GUI.FORM's control types, and lives in GUI.INC.BL beside the field. This
+.file is the dialog around it: measure, open, hand the control its geometry,
+.add a button row, run the form, answer. GUI.LIST.FETCH, in GUI.INC.BL, is
+.the one place a row is read, and it reads either the array or a RAM bank
+.holding the GP.BSTR image layout -- which is how LIST.BANK shows a directory
+.that was never in low memory.
 .
-.  SHARED EMBEDDED
-.      SHARED loads a resident runtime file at run time. EMBEDDED carries the
-.        runtime in the object
+=GUI-LITE.INC.BL -- a message box and a menu, in low memory
 .
-.  GPBASIC CORE
-.      GPBASIC when a GP. keyword reached the 1,536-byte handler block:
-.        shared, the program loads GPB.RT.nnn.BIN; embedded, the block is in
-.        the object. CORE when none did: shared, it loads GPC.RT.nnn.BIN;
-.        embedded, ScanGPUsage dropped the block
+.Routines, arguments and examples: SEC 4.24.
 .
-.  RUNTIME
-.      embedded only. The runtime bytes carried in the object
+.  in
+.      the arguments, in the call. MSGBOX stores them in GL.TITLE$
+.        GL.LINE.ONE$ .TWO$ .THREE$ .FOUR$ GL.BUTTON.ONE$ .TWO$, and PICKMENU
+.        in GL.BOX.X% GL.BOX.Y% GL.TITLE$ GL.ITEMS$
 .
-.  LOW FREE
-.      what is left in low memory for variables, strings and arrays. This is
-.        the number that runs out. It ends at $9F00 embedded, and at the
-.        resident runtime shared
+.  in, optional
+.      GL.SAVE.AT -- the VRAM bank 0 address the first box saves at, $4000 by
+.        default
+.      GL.MOST.OPEN -- how many boxes may be open at once, 4 by default
+.      both are #DEFINEs, set before the #INCLUDE
 .
-.  FRAME STACK
-.      the 2,048 bytes reserved between the p-code and the workspace for
-.        GOSUB and FOR frames. LOW FREE does not include them
+.  out
+.      GL.CHOSEN% -- the button or the item, and what GP.FN reads back
 .
-.  LINES
-.      the source lines compiled, the lines of GP.ASM and GP.BANKEDSTR blocks
-.        included. Lines left out as dead code are not counted
+.  verbs
+.      MSGBOX PICKMENU CLOSEBOX
 .
-.  DEAD CODE
-.      printed only when dead code is removed: the source lines left out, and
-.        the p-code bytes they would have taken. LOW CODE is already without
-.        them
+.  internal
+.      GL.BOX.W% GL.BOX.H% GL.BOX.OFFSET% GL.BUTTON.COLOUR% GL.BUTTON.ROW.W%
+.        GL.BUTTONS% GL.BUTTONS.X% GL.BUTTONS.Y% GL.COPY.FROM% GL.COPY.TO%
+.        GL.DRAWING% GL.ITEM$ GL.ITEM.COLOUR% GL.ITEM.COUNT% GL.ITEM.START%
+.        GL.KEY.CODE% GL.LINES% GL.MAP.BASE.PAGE% GL.MAP.STRIDE% GL.PRESSED$
+.        GL.ROW GL.ROW.BANK% GL.ROW.BYTES% GL.ROW.BYTES.LOW%
+.        GL.ROW.BYTES.HIGH% GL.ROW.LOW% GL.ROW.MIDDLE% GL.SAVE.ADDRESS
+.        GL.SAVE.USED GL.SCAN GL.STRIDE.LOW% GL.STRIDE.HIGH% GL.TEXT.COLOUR%
+.        GL.WIDEST%
+.      the open boxes: GL.OPEN.COUNT%, and the arrays GL.OPEN.X%()
+.        GL.OPEN.Y%() GL.OPEN.W%() GL.OPEN.H%() GL.OPEN.OFFSET()
 .
-.  BANK
-.      printed only when the program has a region or banked text. One line a
-.        bank: CODE for a GP.BANKED region, TEXT for GP.BANKEDSTR, then the
-.        bytes used and free of its 8,192. Both are whole pages, so FREE is
-.        room that is certainly there
+.  constants
+.      GL.VERA.LOW .MIDDLE .HIGH .CTRL GL.LAYER.CONFIG .MAPBASE
+.        GL.PORT.SCREEN .SAVE .PAGE GL.MEMORY.COPY GL.STEP.ONE GL.SCREEN.MODE
+.      GL.KEY.TAB .RETURN .DOWN .ESCAPE .RIGHT .UP .LEFT
 .
-.  TOTAL BANKS
-.      after the BANK lines: how many, and the bytes they use
+.The verbs carry no GL. prefix. GUI-DIALOGS.INC.BL declares MSGBOX and
+.PICKMENU too, so a program includes one of the two modules.
 .
-.Two budgets come off LOW FREE:
-.
-.  - LOW FREE is the workspace the running program has for its data.
-.  - LOW FREE minus 4,096 is how much more low-memory p-code will fit.
-.    WriteObjectCode refuses to leave less than 4K of workspace, so a build
-.    reporting LOW FREE 4096 is one page from PROGRAM TOO BIG.
-.
-.A program can be comfortable on one and out of room on the other. LOW FREE
-.4096 is 4K to run in and nowhere left to grow; GPBMODS at LOW FREE 12288 has
-.both.
-.
-=What ships with the program
-.
-.nnn in a runtime name is the compiler build, so a runtime file serves only
-.programs from its own build.
-.
-.  EMBEDDED
-.      FILES: NAME.PRG. The runtime and the bank 1 code are in the object
-.
-.    
-.      FILES: NAME.OVL, holding every BANK line's region -- only if the
-.        program has one
-.
-.  SHARED
-.      FILES: NAME.PRG
-.
-.    
-.      FILES: GPB.RT.nnn.BIN when the report says GPBASIC, GPC.RT.nnn.BIN
-.        when it says CORE
-.
-.    
-.      FILES: GP1.RT.nnn.BIN, always
-.
-.    
-.      FILES: NAME.OVL, holding every BANK line's region, beside the .PRG
-.
-.The bootstrap looks for the runtime in the current directory, then at the
-.root of the SD card, so one copy at / serves every program. GP1.RT.nnn.BIN
-.must sit in the same place as the runtime that loaded. A runtime file that
-.is not found prints ?RT, the third letter of its name and the build number:
-.?RTB128 for GPB.RT.128.BIN.
-.
-.GPC.BIN, GPC.IMG.nnn.BIN and GP1.IMG.nnn.BIN are the compiler and its inputs
-.and do not ship.
+.The module DIMs the five GL.OPEN arrays to GL.MOST.OPEN. Do not DIM them
+.yourself. Every GL. label is internal.
 .

@@ -32,6 +32,7 @@ The convention is one dotted prefix per module, and nothing writes outside its o
 | `GUI.` | `GUI.INC.BL` | the box the dialogs sit in, and the form and controls inside it |
 | `GUI.LISTBOX.` | `GUI-DIALOGS.INC.BL` | the listbox dialog’s answer, kept apart from the rest of `GUI.` |
 | `DLG.` | `GUI-DIALOGS.INC.BL` | the dialog verbs: their arguments, and their internals |
+| `GL.` | `GUI-LITE.INC.BL` | the message box and menu verbs: their arguments, the open boxes, and the VERA and key constants |
 | `STASH.` | `STASH.INC.BL` | a text rectangle into a RAM bank, and back |
 | `STASH.FILE.` | `STASHFILE.INC.BL` | the same rectangle through a file, kept apart from the rest of `STASH.` |
 | `SORT.` | `SORT.INC.BL` | shell sort a string array in place |
@@ -40,6 +41,7 @@ The convention is one dotted prefix per module, and nothing writes outside its o
 | `BMXK.` | `BMX.INC.BL` | its KERNAL/VERA constants, kept apart from its variables |
 | `FILE.` | `FILEIO.INC.BL` | the drive: status, exists, delete, rename, directories |
 | `FILE.DIR.` | `FILEDIR.INC.BL` | reading a directory, kept apart from the rest of `FILE.` |
+| `DOS.` | `DOS.INC.BL` | the drive's command channel, the smaller alternative to `FILE.` |
 | `SV.` | `STASHVRAM.INC.BL` | the VRAM store. `SVGC.` is `STASHVRAMGC.INC.BL`'s one constant |
 | `KV.` | `KV.INC.BL` | keys and values in one RAM bank |
 | `MATH.` | `MATH.INC.BL` | the smaller and the larger of two numbers |
@@ -249,6 +251,23 @@ assembly to write into, and creates every `{VAR}` slot. **Do not assign `FILE.NA
 `FILE.NAME$` is shared with `FILEIO` on purpose: the name a picker chose is the name `FILE.EXISTS`
 and `FILE.DELETE` want.
 
+### `DOS.INC.BL` — a drive command, and a test for a file
+
+Routines, arguments and examples: §4.25.
+
+| | |
+|---|---|
+| in | `DOS.CMDSTR$` — the command, for `GOSUB DOS.CMD`. `DOSX` stores its argument here<br>`DOS.NAME$` — the file, for `GOSUB DOS.DOS.EXISTS`. `DOSX.EXISTS` stores its argument here<br>`DOS.DEVICE` — the drive; 0 means 8 |
+| out | `DOS.ERR` `DOS.MSG$` — the drive's error number and message, after either routine<br>`DOS.OK` — -1 the file opened, 0 not, from `DOS.DOS.EXISTS` |
+| verbs | `DOSX` `DOSX.EXISTS` |
+| internal | `DOS.JUNK%` — the track and sector, read and discarded |
+| constants | `DOS.OKMAX` — 20. An error number under it is success<br>`DOS.CHAN` — 14, the logical file and secondary address `DOS.DOS.EXISTS` opens |
+
+`DOS.CMD` writes two of its inputs: `DOS.CMDSTR$` is `""` afterwards, and a `DOS.DEVICE` of 0
+becomes 8. `DOS.DOS.EXISTS` sets `DOS.DEVICE` the same way.
+
+`FILE.` is `FILEIO.INC.BL`'s, the larger alternative. A program includes one of the two.
+
 ### `STASHVRAM.INC.BL` — rectangles and blobs, kept in VRAM
 
 Routines, arguments and examples: §4.18.
@@ -386,6 +405,25 @@ hand the control its geometry, add a button row, run the form, answer. `GUI.LIST
 `GUI.INC.BL`, is the one place a row is read, and it reads either the array or a RAM bank holding
 the `GP.BSTR` image layout — which is how `LIST.BANK` shows a directory that was never in low
 memory.
+
+### `GUI-LITE.INC.BL` — a message box and a menu, in low memory
+
+Routines, arguments and examples: §4.24.
+
+| | |
+|---|---|
+| in | the arguments, in the call. `MSGBOX` stores them in `GL.TITLE$` `GL.LINE.ONE$` `.TWO$` `.THREE$` `.FOUR$` `GL.BUTTON.ONE$` `.TWO$`, and `PICKMENU` in `GL.BOX.X%` `GL.BOX.Y%` `GL.TITLE$` `GL.ITEMS$` |
+| in, optional | `GL.SAVE.AT` — the VRAM bank 0 address the first box saves at, `$4000` by default<br>`GL.MOST.OPEN` — how many boxes may be open at once, 4 by default<br>both are `#DEFINE`s, set before the `#INCLUDE` |
+| out | `GL.CHOSEN%` — the button or the item, and what `GP.FN` reads back |
+| verbs | `MSGBOX` `PICKMENU` `CLOSEBOX` |
+| internal | `GL.BOX.W%` `GL.BOX.H%` `GL.BOX.OFFSET%` `GL.BUTTON.COLOUR%` `GL.BUTTON.ROW.W%` `GL.BUTTONS%` `GL.BUTTONS.X%` `GL.BUTTONS.Y%` `GL.COPY.FROM%` `GL.COPY.TO%` `GL.DRAWING%` `GL.ITEM$` `GL.ITEM.COLOUR%` `GL.ITEM.COUNT%` `GL.ITEM.START%` `GL.KEY.CODE%` `GL.LINES%` `GL.MAP.BASE.PAGE%` `GL.MAP.STRIDE%` `GL.PRESSED$` `GL.ROW` `GL.ROW.BANK%` `GL.ROW.BYTES%` `GL.ROW.BYTES.LOW%` `GL.ROW.BYTES.HIGH%` `GL.ROW.LOW%` `GL.ROW.MIDDLE%` `GL.SAVE.ADDRESS` `GL.SAVE.USED` `GL.SCAN` `GL.STRIDE.LOW%` `GL.STRIDE.HIGH%` `GL.TEXT.COLOUR%` `GL.WIDEST%`<br>the open boxes: `GL.OPEN.COUNT%`, and the arrays `GL.OPEN.X%()` `GL.OPEN.Y%()` `GL.OPEN.W%()` `GL.OPEN.H%()` `GL.OPEN.OFFSET()` |
+| constants | `GL.VERA.LOW` `.MIDDLE` `.HIGH` `.CTRL` `GL.LAYER.CONFIG` `.MAPBASE` `GL.PORT.SCREEN` `.SAVE` `.PAGE` `GL.MEMORY.COPY` `GL.STEP.ONE` `GL.SCREEN.MODE`<br>`GL.KEY.TAB` `.RETURN` `.DOWN` `.ESCAPE` `.RIGHT` `.UP` `.LEFT` |
+
+The verbs carry no `GL.` prefix. `GUI-DIALOGS.INC.BL` declares `MSGBOX` and `PICKMENU` too, so a
+program includes one of the two modules.
+
+The module `DIM`s the five `GL.OPEN` arrays to `GL.MOST.OPEN`. Do not `DIM` them yourself. Every
+`GL.` label is internal.
 
 ### `STASH.INC.BL` — save a text rectangle, and put it back
 

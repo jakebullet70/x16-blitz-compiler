@@ -1,77 +1,99 @@
-@6. The traps, collected
+@3. The modules (5)
+=MENU.INC.BL -- menus built a row at a time
 .
-=6. THE TRAPS, COLLECTED
+.Routines, arguments and examples: SEC 4.6.
 .
-.Each of these has cost a debugging session at least once.
+.  verbs
+.      MENU.BEGIN MENU.ITEM MENU.ITEMX MENU.SELECTED MENU.DRAWBAR, called
+.        with GP.SUB
+.      MENUTO.VERT MENUTO.BAR, called with GP.FN
 .
-.  P AND 255 on a heap or VRAM address
-.      WHAT HAPPENS: AND is 16-bit signed; above 32,767 it raises OUT OF
-.        RANGE instead of masking
-.      DO THIS: H = INT(P/256) : L = P - H*256
+.  in
+.      MENU.ATTR -- the rows, packed attribute
+.      MENU.HIATTR -- the highlighted row; 0 inverts MENU.ATTR
+.      MENU.HOTATTR -- the hot key letter; 0 leaves it untinted
+.      MENU.DISATTR -- a disabled row; 0 is MENU.ATTR
+.      MENU.SEPATTR -- separators and the frame; 0 is MENU.ATTR
+.      MENU.SEPCHR -- the separator glyph; 0 is MENU.LINE
+.      MENU.FLAGS -- the popup's flags
+.      MENU.BARFLAGS -- the bar's flags
+.      MENU.GAP -- cells between bar items
+.      MENU.HINTX MENU.HINTY MENU.HINTW MENU.HINTATTR -- the hint field;
+.        MENU.HINTW 0 is off
+.      MENU.MARKED -- the bar item MENU.DRAWBAR lights
 .
-.  an address in an A% variable
-.      WHAT HAPPENS: % is signed 16-bit and truncates without error -- A% =
-.        49152 reads back -16,384
-.      DO THIS: untyped variable, or split into page and offset
+.  out
+.      MENU.EXITKEY -- the key that ended the run
+.      MENU.BARNUM -- the bar's row count
+.      MENU.SELX MENU.SELW -- the chosen bar item's column and width
+.      MENU.MARKED -- the bar item left lit
+.      MENU.OK -- 0 if bank MENU.TEXTBANK was already claimed
 .
-.  $0400 for machine code
-.      WHAT HAPPENS: stock BASIC leaves it free, a compiled GPC program does
-.        not -- runtime state lives there, and it is corrupted with no error
-.      DO THIS: banked RAM, $A000-$BFFF
+.  formals
+.      MENU.SLOT MENU.SEL MENU.ROWTEXT$ MENU.ROWHINT$ MENU.ROWON MENU.RUNROW
+.        MENU.RUNCOL MENU.STYLE MENU.CHOSEN
 .
-.  INPUT answered with RETURN alone
-.      WHAT HAPPENS: the variable gets "", or 0 for a number, and the program
-.        goes on. Stock BASIC keeps the old value. INPUT# reads an empty line
-.        as ""
-.      DO THIS: IF A$ = "" THEN A$ = DEFAULT$ where the old value mattered
+.  arrays
+.      MENU.FLAG$() MENU.HOTKEY$() MENU.HOTCOL$() -- DIMmed by the module on
+.        the first MENU.BEGIN
 .
-.  PRINT after GP.PRINTAT
-.      WHAT HAPPENS: GP drawing never calls the KERNAL, so the cursor is
-.        wherever it was
-.      DO THIS: LOCATE first, or stay in one world
+.  banked groups
+.      MENU.TEXTS MENU.HINTS, in MENU.INC.BANKED.BL
 .
-.  SORT.INC.BL with no #SYMFILE
-.      WHAT HAPPENS: {VAR} cannot resolve a crunched name -- {} NEEDS
-.        #SYMFILE
-.      DO THIS: #SYMFILE "@:PROG.SYM", before the #INCLUDEs
+.  internal
+.      MENU.ATCOL MENU.ATROW MENU.BARX MENU.BARY MENU.BASE MENU.BOXH
+.        MENU.BOXW MENU.CAP MENU.CODE MENU.COUNT MENU.CUR MENU.DONE
+.        MENU.DRAWN MENU.DRAWX MENU.DRAWY MENU.EACH MENU.EXITBIT MENU.FRAME
+.        MENU.GLYPH MENU.HAVE MENU.HILITE MENU.HINTAT MENU.HOTAT MENU.HOTCH$
+.        MENU.HOTHIT MENU.INKEY$ MENU.LEFTW MENU.MOVE MENU.PADHELD
+.        MENU.PADNEW MENU.PADNOW MENU.PADRAW MENU.PAINT MENU.READY MENU.ROW
+.        MENU.ROWFLAG$ MENU.ROWIS$ MENU.ROWW MENU.RUNBASE MENU.RUNFLAGS
+.        MENU.RUNSLOT MENU.SCAN MENU.SHOW$ MENU.SKIPS MENU.SPAN MENU.STEP
+.        MENU.TEXTW MENU.TINTAT MENU.USE MENU.WANT MENU.WAS MENU.WIDE
 .
-.  GP.BOX X,Y,W,H,,7
-.      WHAT HAPPENS: optionals cannot be skipped over
-.      DO THIS: GP.BOX X,Y,W,H,0,7
+.  constants
+.      MENU.TEXTBANK MENU.BAR MENU.POPUP MENU.BAR.MAX MENU.POPUP.MAX MENU.ON
+.        MENU.OFF
+.      MENU.SOLID MENU.THIN MENU.ROUND MENU.THICK MENU.NOBOX
+.      MENU.MUSTSEL MENU.KEEPMARK MENU.NOWRAP MENU.GAMEPAD MENU.DOWNEXIT
+.        MENU.UPEXIT MENU.KEYEXIT MENU.HINTMID
+.      MENU.DOWN MENU.UP MENU.LEFT MENU.RIGHT MENU.ENTER MENU.ESC MENU.STOP
+.        MENU.LINE
+.      MENU.PORT MENU.PAD.UP MENU.PAD.DOWN MENU.PAD.LEFT MENU.PAD.RIGHT
+.        MENU.PAD.B MENU.PAD.START
 .
-.  SCREEN after BMX.PAINT
-.      WHAT HAPPENS: reloads the default palette and throws the image's
-.        colours away
-.      DO THIS: set the mode first
+.The formals are the verbs' arguments. GP.DEFPROC formals are ordinary shared
+.variables (SEC 3.11), so a formal holds the last value passed until the next
+.call.
 .
-.  STR.FIELD$ wanted bigger
-.      WHAT HAPPENS: auto-DIMed at 0..10 on first use, and you cannot DIM it
-.        after
-.      DO THIS: DIM it before the first call, set STR.MAX
+.GUI.INC.BL sets MENU.RUNSLOT, reads MENU.READY, MENU.COUNT and MENU.WIDE,
+.and calls MENU.MEASURE. A program of your own should not.
 .
-.  #DEFINE X 129536
-.      WHAT HAPPENS: #DEFINE takes an INT16 -- ERROR: INVALID PARAMETER
-.      DO THIS: an ordinary variable
+=MENUPULL.INC.BL -- a dropdown under a bar item
 .
-.  GP.SUB above its GP.DEFPROC
-.      WHAT HAPPENS: the call carries an address, not a line number -- GP.SUB
-.        BEFORE ITS GP.DEFPROC
-.      DO THIS: declare the routine above every caller
+.Routines, arguments and examples: SEC 4.9. Its variables use the MENU.
+.prefix; MENUPULL. is its labels and one constant.
 .
-.  an array element as a GP.DEFPROC formal
-.      WHAT HAPPENS: GP.DEFPROC FORMAL IS NOT A VARIABLE
-.      DO THIS: plain scalar formals, and set the array before the call
+.  verbs
+.      MENUTO.PULLDOWN, called with GP.FN
 .
-.  a GP.DEFPROC body calling its own verb
-.      WHAT HAPPENS: one set of formals, so it writes over the arguments in
-.        use -- wrong answer, no error
-.      DO THIS: recursion needs its own saved copies, or a different shape
+.  in
+.      MENU.STASHBANK -- the bank the covered cells go to; 0 takes one from
+.        BANKMGR on the first call
 .
-.  a variable called LEN, ST, POS, MB or CHAR
-.      WHAT HAPPENS: the name is a reserved word on its own
-.      DO THIS: dot it -- BASLOAD matches the whole identifier, so
-.        LINEINPUT.LEN works
+.  out
+.      MENU.NEXTBAR -- the bar item LEFT or RIGHT walks to, or 0
+.      MENU.EXITKEY MENU.BARNUM MENU.SELX MENU.SELW MENU.MARKED, as for
+.        MENU.INC.BL
 .
-=SEE ALSO
+.  formals
+.      MENU.PULLAT MENU.STYLE MENU.CHOSEN
 .
->91|4.7 SORT.INC.BL -- shell sort a string array
+.  internal
+.      MENU.COLS MENU.EDGE MENU.LEFTOF MENU.RIGHTOF MENU.STASHED, and
+.        STASH.BANK STASH.SLOT STASH.MOVE STASH.X STASH.Y STASH.W STASH.H,
+.        which it sets
+.
+.  constants
+.      MENUPULL.SCRMODE
+.

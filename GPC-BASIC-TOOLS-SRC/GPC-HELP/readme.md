@@ -1,6 +1,6 @@
 # GPC.HELP
 
-The GP.BASIC and BASL reference, on the machine. A scrolling master index over 90 topics, written
+The GP.BASIC and BASL reference, on the machine. A scrolling master index over 98 topics, written
 in GP.BASIC and built from `GPC-BASIC/` — the manual, the name register, the file list and the
 module banner headers — by a script, so the help cannot drift from the library it documents.
 
@@ -195,9 +195,9 @@ length, kind — for up to 140 lines, and the text above it. A line is truncated
 because no row can show more.
 
 **The index bank** holds eight bytes a row at the front — text offset low and high, length, type,
-topic, section line, topic length low and high — and the text above them. `HELP.MAXIX` is 250 rows:
-2,000 bytes of records and 6,192 for text. Rows past the end are dropped. Today's index is 179 rows
-and 5,992 bytes of text.
+topic, section line, topic length low and high — and the text above them. `HELP.MAXIX` is 210 rows:
+1,680 bytes of records and 6,512 for text. The viewer drops rows past either limit, so `MKHELP.PY`
+refuses to write an index that does not fit. Today's index is 189 rows and 6,338 bytes of text.
 
 There is no list control, and none is wanted: the section and cross-reference pickers are at most 12
 items, which fit a screen, so `MENU.POPUP` does the job.

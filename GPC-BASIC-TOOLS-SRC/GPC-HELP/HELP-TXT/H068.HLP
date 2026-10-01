@@ -1,41 +1,28 @@
-@4.24 GPBMODS -- the harness that drives every module (2)
-=The text is in a bank
+@4.24.1 MSGBOX -- lines of text over one or two buttons
 .
-.542 strings in 72 named groups, 11,776 bytes across two pools, none of it in
-.low RAM. Every string the shell says sits in a GP.BANKEDSTR block in front
-.of the routine that says it and is read back with GP.BSTR. Two pools,
-.because one pool is a hard 8,192 bytes and BStrPoolWrite stops the compile
-.when one fills. Which pool a group is in costs the call site nothing, so
-.moving a group is the whole of the answer to a full one.
+=4.24.1 MSGBOX
 .
-.Every menu is a block of its own, index 0 the menu's title and 1 upwards the
-.rows. A loop to GP.BSTRCOUNT passes each row to MENU.ITEM, so a row is added
-.by adding a line to the block, and no other menu moves.
+.  Syntax    GP.FN(MSGBOX, t$, l1$, l2$, l3$, l4$, b1$, b2$)
+.            GP.SUB MSGBOX, t$, l1$, l2$, l3$, l4$, b1$, b2$
+.  Returns   The button chosen, 1 or 2.
+.  Kind      BASIC. A verb in GUI-LITE.INC.BL. Needs the GP block.
+.  Notes     All seven arguments are required. Pass "" for a line or a
+.            button that is not wanted.
+.            t$ goes in the top edge. "" leaves the edge plain.
+.            l1$ to l4$ are centred, one a row. A "" line is a blank
+.            row, and the box ends at the last line that is not "".
+.            b2$ "" gives one button.
+.            The box is centred on the screen. It is 6 columns wider
+.            than the widest of t$, the lines and the button row.
+.            The focus starts on b1$. LEFT moves it to b1$, RIGHT to
+.            the last button, TAB to the other one. RETURN chooses
+.            the button with the focus. ESC chooses the last button.
+.            The box closes before MSGBOX returns.
+.  Example
 .
-.The numbers under ABOUT / BANK MEMORY and ABOUT / MODULE SIZES are typed
-.into GP.BANKEDSTR blocks, so they are only true of the build they were taken
-.from.
-.
-=The room it runs in
-.
-.The workspace is what is left between the program's own p-code and the
-.resident runtime: $4000 to $6600, 9,728 bytes. The first p-code opcode is
-..varspace and its operand is what the scalars take -- 3,292 here, leaving
-.about 6,436 for the string arrays and the whole string heap.
-.
-.Moving code into a bank moves no scalars. A banked routine's variables are
-.the same workspace variables low memory sees, so .varspace grows as panels
-.are added whatever bank they run from.
-.
-.GPC-BASIC/ inside the sample folder is the library working copy and it is
-.ahead of the root copy. A module is proved here and copied whole into root.
-.GPB.INC.BL runs the other way: root is upstream for it, and the build copies
-.root's over this folder's every time.
+:            B = GP.FN(MSGBOX, "QUIT", "LEAVE?", "", "", "", "YES", "NO")
+:            IF B = 1 THEN GOTO BYE
 .
 =SEE ALSO
 .
->83|4.5 BMX.INC.BL -- a BMX bitmap into VERA
->100|4.13 BANKMGR.INC.BL -- who owns which RAM bank
->62|3.12 Code in a bank
->55|3.10 Text in a bank
->105|4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM
+>112|4.24 GUI-LITE.INC.BL -- a message box and a menu, in low memory

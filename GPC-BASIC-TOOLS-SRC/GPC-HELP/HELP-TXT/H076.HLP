@@ -1,121 +1,78 @@
-@3. The modules (2)
-=STRUSING.INC.BL -- a number to a template
+@STASH.INC.BL -- save a text rectangle, and put it back.
 .
-.Routines, arguments and examples: SEC 4.10.
+=STASH.INC.BL
 .
-.  in
-.      STR.USING.NUM -- the value, both routines
-.      STR.USING.MASK$ -- the template, STR.USING
-.      STR.USING.DP -- decimal places, STR.USING.FIX
+.  save a text rectangle, and put it back.
 .
-.  out
-.      STR.USING.STR$ -- the result: a field from STR.USING, digits from
-.        STR.USING.FIX
-.      STR.USING.OVR -- -1 when the value scaled past 1e9 and the digits are
-.        unusable
-.      STR.USING.SGN -- -1 when the ROUNDED value is negative
+=MODULE HEADER
 .
-.  internal
-.      STR.USING.INT$ STR.USING.FRC$ STR.USING.SIGN$ STR.USING.OUT$
-.        STR.USING.C$
-.      STR.USING.IW STR.USING.ZW STR.USING.Z STR.USING.W STR.USING.F
-.      STR.USING.GRP STR.USING.PT STR.USING.I STR.USING.V
+:      STASH.SAVE      copy a rectangle of the screen into a RAM bank
+:      STASH.RESTORE   copy it back, where it was or somewhere else
 .
-.STR.USING.DP is an output of STR.USING and an input to STR.USING.FIX. The
-.mask carries the decimal count, so STR.USING overwrites whatever was there.
-.A program alternating the two routines must set STR.USING.DP again before
-.every FIX.
+.  The same rectangle through a FILE is STASHFILE.INC.BL, built on this.
 .
-.STR.USING.INT$ and STR.USING.FRC$ survive a call and are the two halves of
-.the digits, without sign, point or field. They are listed internal because
-.their width is the routine's business, not the caller's -- read
-.STR.USING.STR$.
+.  The program needs a #SYMFILE, before the includes and named after the
+.  source PRG. The assembly reaches BASIC's variables through {VAR} and
+.  BASLOAD crunches every name first; without one the compile stops with "{}
+.  NEEDS #SYMFILE".
 .
-.The prefix is STR.USING., a sub-prefix of STRINGS.INC.BL's STR., on the same
-.footing as FILE.DIR. inside FILE.. Nothing here is written by STRINGS.INC.BL
-.and nothing there is written by this module, so either can be included
-.alone.
+:      #SAVEAS "@:MYPROG.PRG"
+:      #SYMFILE "@:MYPROG.SYM"
+:      #INCLUDE "GPB.INC.BL"
+:      #INCLUDE "STASH.INC.BL"
 .
-=KB.INC.BL -- the keyboard buffer, emptied
+.  Usage:
+:      STASH.BANK = 8
+:      STASH.X = 10 : STASH.Y = 4 : STASH.W = 30 : STASH.H = 8
+:      GOSUB STASH.SAVE
+:      ... draw over it ...
+:      GOSUB STASH.RESTORE
 .
-.Routines, arguments and examples: SEC 4.14.
+:   in   STASH.BANK     the RAM bank to keep the cells in. 1..255, and
+:                       it is yours: this writes the whole of it
+:        STASH.X  STASH.Y     top left, in CELLS
+:        STASH.W  STASH.H     size, in cells
 .
-.  out
-.      --
+:        STASH.SLOT     byte offset into the bank. Default 0, which is what
+:                       every caller that never heard of it holds
 .
-.  internal
-.      KB.K$
+:   out  STASH.OK       -1 if it fitted and was saved, 0 if not
+:        STASH.NEXT     the offset just past what was written
 .
-.One routine, KB.CLEARKB, and one variable it drains into. Nothing else is in
-.the prefix.
+.  RESTORE needs only the bank: four header bytes go in first -- w, h, x, y
+.  -- so the rectangle describes itself. STASH.MOVE = 1 with STASH.X /
+.  STASH.Y pastes it somewhere else instead.
 .
-=LINEINPUT.INC.BL -- a positioned entry field
+.  A bank is 8,192 bytes and a cell is two, so 4,094 cells fit -- 63x63, and
+.  NOT a whole 80x60 screen. Too big is refused before the first write, with
+.  STASH.OK = 0.
 .
-.Routines, arguments and examples: SEC 4.4.
+=MORE THAN ONE RECTANGLE IN A BANK
 .
-.  in
-.      LINEINPUT.X LINEINPUT.Y -- top left of the field
-.      LINEINPUT.LEN -- how many characters fit
-.      LINEINPUT.ATTR -- packed attribute
-.      LINEINPUT.TEXT$ -- the starting value
-.      LINEINPUT.MASK -- non-zero shows asterisks
-.      LINEINPUT.ALLOW$ -- the only characters accepted
-.      LINEINPUT.DENY$ -- characters refused
-.      LINEINPUT.LABEL$ -- LINEINPUT.ASK only
+.  Feed STASH.NEXT back in as the next STASH.SLOT and the bank holds a stack
+.  of them, which is what nested dialogs want -- one bank for the lot rather
+.  than one bank a level. That is a bump allocator in two variables, and
+.  release is LIFO by remembering the offset. STASHVRAM.INC.BL allocates the
+.  same way.
 .
-.  out
-.      LINEINPUT.TEXT$ -- what was typed
-.      LINEINPUT.KEY -- the key that ended it
+=RESTORE READS THE SLOT IT IS GIVEN
 .
-.  internal
-.      LINEINPUT.SHOW$ LINEINPUT.WAS$ LINEINPUT.K$ LINEINPUT.CELL$
-.        LINEINPUT.CODE LINEINPUT.CX LINEINPUT.CA LINEINPUT.INV LINEINPUT.LIT
-.        LINEINPUT.TICK LINEINPUT.DONE LINEINPUT.FILLED LINEINPUT.HOME
-.        LINEINPUT.BAR
+.  Nothing checks that two saves do not overlap and nothing records which is
+.  which: the header describes a rectangle's SIZE, not its identity, so
+.  restoring the wrong offset restores whatever is there. The offsets are the
+.  caller's to keep straight, the same way the bank number already is.
 .
-.  constants
-.      LINEINPUT.RETURN LINEINPUT.DELETE LINEINPUT.ESCAPE LINEINPUT.STOP
-.        LINEINPUT.DOWN LINEINPUT.UP LINEINPUT.TAB LINEINPUT.SPACE
-.        LINEINPUT.STAR LINEINPUT.BLINK
+.  A row's address is worked out in BASIC, once a row, and the row is copied
+.  in assembly. That keeps the assembly free of any pointer needing zero
+.  page: a blob runs with the interpreter live, so codePtr, zTemp0, NSStatus
+.  and the mantissas must survive it. The destination goes into the OPERAND
+.  of the store instead.
 .
-.LINEINPUT.SHOW$ is listed internal but is the one exception worth knowing:
-.it holds what the field displayed, which is what you want if you are
-.repainting a masked field yourself. FORM.EXP.BL uses it for exactly that.
+.  #REM 1 is load bearing: without it BASLOAD strips the body and the block
+.  reaches the compiler empty, refused as "block mismatch". #REM 0 restores
+.  the default.
 .
-=BMX.INC.BL -- a BMX bitmap into VERA
+=SEE ALSO
 .
-.Routines, arguments and examples: SEC 4.5.
-.
-.  in
-.      BMX.FILE$
-.
-.  out
-.      BMX.ERROR$ -- empty means it worked
-.      BMX.WIDTH BMX.HEIGHT BMX.DEPTH BMX.VERSION BMX.PALUSED BMX.PALFIRST
-.        BMX.DATAOFF BMX.PACKED -- the header, readable after BMX.OPEN
-.
-.  in, optional
-.      BMX.STASH -- where BMX.PAINT keeps the machine's palette; VRAM $13000
-.        by default, -1 to keep nothing
-.
-.  internal
-.      BMX.PTR BMX.HEADER$ BMX.SCRATCH BMX.SCRATCH$ BMX.PALBASE BMX.ADDR
-.        BMX.LO BMX.HI BMX.BANK BMX.REST BMX.COUNT BMX.CHUNK BMX.GOT BMX.STEP
-.        BMX.SKIP BMX.ROW BMX.ROWS BMX.X0 BMX.Y0 BMX.BAD BMX.KEPT BMX.SRC
-.        BMX.DST
-.
-.  constants
-.      BMXK.MACPTR BMXK.CHKIN BMXK.CLRCHN BMXK.MEMCOPY BMXK.VCTRL BMXK.VLO
-.        BMXK.VMID BMXK.VHI BMXK.PORTLO BMXK.PORTLO.B BMXK.PORTHI BMXK.LFN
-.
-.BMX.PTR doubles as the "have I initialised" flag -- it is zero until
-.BMX.INIT has run. Zeroing it yourself would leak a string block and
-.re-allocate.
-.
-.BMX.STASH is the one variable here a caller may want to set, and it has to
-.be set before the first BMX.OPEN -- BMX.INIT runs then, and fills in the
-.default only if you have not. That is why -1 rather than 0 switches the
-.stash off: 0 already means "never set". BMX.KEPT is the once-per-run guard
-.that makes a slideshow restore the machine's palette rather than the
-.previous picture's.
-.
+>128|STASHFILE.INC.BL -- a saved text rectangle, through a file.
+>105|4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM

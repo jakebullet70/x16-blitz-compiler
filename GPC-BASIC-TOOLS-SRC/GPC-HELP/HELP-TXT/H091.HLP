@@ -1,0 +1,76 @@
+@4. Labels are global too
+.
+=4. LABELS ARE GLOBAL TOO
+.
+.Every NAME: in every module is a jump target in one flat space, including
+.the ones you were never meant to call. BMX.STREAM.MORE, LINEINPUT.REDRAW,
+.THEME.SELECT.DARK and most of MENU.* are internal, and a GOSUB to one will
+.do something, just not something useful.
+.
+.MENU.INC.BL is called through its verbs, MENU.BEGIN, ITEM, ITEMX, SELECTED
+.and DRAWBAR with GP.SUB and MENUTO.VERT and MENUTO.BAR with GP.FN, and
+.MENUPULL.INC.BL through MENUTO.PULLDOWN. Every label in both files is
+.internal: the .BODY labels behind the verbs, MENU.RUN, .WAIT, .KEYED, .TURN,
+..MOVED, .WRAPTOP, .WRAPBOT, .CANCEL, .KEYHOT, .HOTTAKE, .SKIPOFF, .SKIPLOOP,
+..LIGHT, .DRAWALL, .SPOT, .DRAWROW, .SEPROW, .HINTSHOW, .PADKEY, .PADREAD,
+..STRIP, .CREATE, .MEASURE, .FRAMEBOX, .BARPLACE, and MENUPULL.MARK, .BESIDE,
+..PLACE and .SAVE.
+.
+.FILE.* has a great many, because most of the module is one routine feeding
+.another: the callable names are FILE.STATUS, EXISTS, DELETE, RENAME, COPY,
+.MKDIR, CHDIR, UP, GETPATH, SAVEARRAY and LOADARRAY, plus FILE.DIR.INIT,
+..OPEN and .NEXT. FILE.CMD, .DONE, .PETNAME, .PETNEW, .TOPET, .PATHWALK,
+..WRITEROWS, .READROWS, .ROWREAL, .ROWDROP, .KEEPROW, FILE.DIR.WHERE,
+..LOWRAM, .ASKFOR, .SUCK, .SKIPDISK, .FILL and .STEP are not. FILE.DIR.FILL
+.and FILE.DIR.STEP are the two assembly blobs and enter with no arguments set
+.up at all.
+.
+.STRINGS has three of its own. STR.SPLIT.NEXT and STR.REPLACE.NEXT are loop
+.continuations rather than entry points: enter either directly and you resume
+.a loop whose accumulators were never initialised. STR.TRIM.GO is the shared
+.body of the three trims and runs with whatever STR.OP% last held. The
+.callable names are STR.PADR, PADL, PADC, SPLIT, REPLACE, PET2SCR, TRIM,
+.LTRIM, RTRIM and SPLICE.
+.
+.GUI.INC.BL has more internal labels than anything else in the library,
+.because GUI.FORM is a dispatcher and every arm of it is one. The callable
+.names are GUI.OPEN and GUI.CLOSE -- the dialogs themselves are verbs, in
+.GUI-DIALOGS.INC.BL. GUI.FORM is usable and undocumented, the module's own.
+.Everything else, the whole of GUI.FORM., GUI.BUTTON, GUI.BTN., GUI.LIST.,
+.GUI.FIELD.DRAW, GUI.FRAME, GUI.GLYPHS, GUI.SHADOW.*, GUI.SIZE,
+.GUI.PLACE.BOX, GUI.PLACE.SCROLL and GUI.SCREEN, is not.
+.
+=A module in a bank keeps its names
+.
+.Where a module's #INCLUDE sits changes none of its names. THEME.SELECT is
+.THEME.SELECT in low memory and inside a GP.BANKED region, and a GOSUB to it
+.compiles to what reaches it: an ordinary GOSUB from inside the same region,
+.and a .bgosub that selects the region's bank from anywhere else.
+.BANKED-OR-NOT.md has the rules.
+.
+.So a name is callable from anywhere, in any build. An older library gave
+.some modules a banked .BODY and a low-memory front door, and a program that
+.calls a .BODY name stops with LABEL NOT FOUND. What this section calls
+.internal is still internal.
+.
+.Include a module once. One #INCLUDE in low memory and another in a region is
+.DUPLICATE SYMBOL where the module has no #IFNDEF guard. Where it has one,
+.the module lands at the first #INCLUDE and the second produces nothing.
+.
+.Each module also has a skip label it jumps over itself with -- THEME.SKIP,
+.APPSYS.SKIP, STR.SKIP, BMX.MODULE.END, LINEINPUT.MODULE.END,
+.MENU.MODULE.END, MENUPULL.MODULE.END, GUI.MODULE.END,
+.GUI.LISTBOX.MODULE.END, STASH.MODULE.END, STASHFILE.MODULE.END,
+.SORT.MODULE.END and STRCASE.MODULE.END. Those exist so an include can sit
+.anywhere in the file, the top included. Do not branch to one.
+.
+.BASLOAD refuses a name used as both a label and a variable (BASLOAD.MD:319).
+.BMX.SKIP is the byte-skip counter, so the module's skip label had to be
+.BMX.MODULE.END -- a name is either a label or a variable, never both.
+.
+=SEE ALSO
+.
+>84|4.6 MENU.INC.BL -- menus built a row at a time
+>93|4.9 MENUPULL.INC.BL -- a dropdown under a bar item
+>95|4.11 GUI.INC.BL -- the box that puts the screen back, and the form in 
+>97|4.12 GUI-DIALOGS.INC.BL -- every dialog as a verb

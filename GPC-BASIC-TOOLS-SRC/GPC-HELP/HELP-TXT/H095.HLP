@@ -1,0 +1,93 @@
+@8. Known bugs
+.
+=8. KNOWN BUGS
+.
+.Three, all live on 12th September 2026 and all reproducible. Each says what
+.happens, what causes it, and what to do instead. A bug leaves this list when
+.it is fixed, not when it is understood.
+.
+=A string never gives memory back
+.
+.A$ = "" frees nothing. A string variable owns its block: the assignment sets
+.the length to zero and keeps the capacity. The heap scavenger reclaims only
+.a block a string outgrew and abandoned, never one a variable still holds. A
+.working buffer that has once held a 250-character line is spoken for until
+.the program ends.
+.
+.So a big temporary cannot be built and then freed. It has to not be built.
+.
+.Measured 2026-09-02. The editor's find folded the needle and every line it
+.scanned into new strings and compared with MID$ per position: 579 bytes gone
+.for the rest of the run, from a workspace with 1,489 free, and the GUI
+.dialogs then died on what was left. Rewritten to fold in place through
+.GP.STRPTR with one GP.INSTR per line, a find costs 81 bytes, and the program
+.came out 59 bytes smaller.
+.
+.Do this -- PRINT FRE(0) at eight points down the run and read the descent.
+.It is a high-water ceiling, so it only falls, and the step that falls is the
+.culprit.
+.
+=BINPUT# stops at 255 bytes
+.
+.BINPUT# n, A$, len cannot read more than 255 bytes. Three independent caps
+.land on that one number, so there is no single constant to raise.
+.
+.  the read buffer is 255 bytes
+.      WHERE: ReadBuffer: .fill 255
+.
+.  the count argument is 8 bit, and unchecked
+.      WHERE: GetInteger8Bit takes mantissa byte 0 and returns
+.
+.  a BASIC string is 255 characters
+.      WHERE: nowhere to put a longer record in any case
+.
+.The second is the trap. BINPUT# 12, A$, 256 sets the count to 0 and hands
+.back an empty string, silently. 300 gives 44 bytes.
+.
+.It is also not a block read. It is a CHRIN loop, one KERNAL call per byte
+.with an EOF check on top of that. BINPUT# is one statement, not one
+.transfer, so anything costing a BINPUT# per record pays that stride per
+.record.
+.
+.LINPUT# shares the same buffer and stops at 255 too, but runs on to the
+.delimiter afterwards, so the next read starts at a line boundary.
+.
+.Do this -- a record cannot be one string. Make it N strings of 255, or keep
+.it in a bank and copy out the part that is needed.
+.
+=File I/O in a GP.DO key loop
+.
+.A save routine reached from inside a program's own GP.DO key loop writes its
+.file completely and correctly, and then the program stops with
+.
+:INPUT/OUTPUT ERROR @ $005B
+.
+.The address is identical in every failing build, which says a clobbered
+.instruction pointer rather than a real device error.
+.
+.Seven shapes have been compiled and probed. Do not bisect them again.
+.
+.  OPEN/PRINT#/CLOSE at top level
+.      RESULT: passes
+.
+.  four consecutive PRINT#, no PRINT between
+.      RESULT: passes
+.
+.  the same inside GP.DO ... GP.EXITDO
+.      RESULT: passes
+.
+.  the same behind a GOSUB inside a GP.DO
+.      RESULT: passes
+.
+.  the same behind GP.SELECT then GOSUB inside a GP.DO
+.      RESULT: passes
+.
+.  the real routine called from the top level of the same program
+.      RESULT: passes
+.
+.  the real routine reached from the program's own GP.DO key loop
+.      RESULT: fails
+.
+.Do this -- a plain PRINT immediately after the CLOSE makes it pass. Channel
+.0 output runs CLRCHN; a non-zero channel runs CHKOUT and READST instead, so
+.the suspect is channel state left behind rather than the file I/O.

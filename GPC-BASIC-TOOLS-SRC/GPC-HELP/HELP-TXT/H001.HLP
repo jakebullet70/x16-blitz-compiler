@@ -53,16 +53,19 @@
 .  #INCLUDE "GPB.INC.BL"
 .      WHEN: every source using a GP. keyword
 .
-.  GPB.RT.nnn.BIN beside the object
+.  GPB.RT.nnn.BIN and GP1.RT.nnn.BIN
 .      WHEN: shared build, report says GPBASIC
 .
-.  GPC.RT.nnn.BIN beside the object
+.  GPC.RT.nnn.BIN and GP1.RT.nnn.BIN
 .      WHEN: shared build, report says CORE
 .
 .  nothing further
 .      WHEN: embedded build: the runtime is in the object
 .
-.nnn is the compiler build number. An embedded build carries the runtime and
+.nnn is the runtime build number, not the compiler build number. The
+.bootstrap looks for the runtime files in the current directory, then in
+./GPC/, then at the root of the SD card. GP1.RT.nnn.BIN must sit in the same
+.place as the runtime that loaded. An embedded build carries the runtime and
 .needs no .BIN.
 .
 .A source that uses a GP. keyword is compiler input only. BASLOAD encodes the
