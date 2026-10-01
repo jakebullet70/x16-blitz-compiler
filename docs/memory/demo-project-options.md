@@ -52,5 +52,14 @@ radio and read-only value controls, `FORMTO.EVENT`, and SHIFT+TAB out of a text 
 `GFE.TEXT.INC.BL`. The user hand-tested it and it works. It has a folder `readme.md` with a release cut, and
 `release.sh` ships it as `SAMPLES/GUI-FIELD-EDIT/`.
 
+**LANDER64 was built 2026-10-01**, outside the six. The user asked for a graphics C64 BASIC
+game with an open licence. It is a port of rosdec/lander64 (GPL-3.0, `contest/lander64.bas`) in
+`GPC-BASIC-TOOLS-SRC/LANDER64/`, with `LICENSE` beside it. Plain X16 BASIC, so `LANDER64.SRC.PRG`
+runs in ROM BASIC. It uses `SPRITE`/`SPRMEM`/`MOVSPR`, `JOY(0)` and `JOY(1)`, PSG noise, and
+`VPEEK` of the layer 1 map for the landing test. It has a `samplesbuild.py` entry, a `release.sh`
+entry and `USER-RUNS/lander64-demo.bat`. Not hand-tested yet. Other open-licence candidates
+found: Kidelyneen (EgonOlsen71, Unlicense), Ball and Paddle (alejsanc, Apache-2.0), Skyscrape64
+(croys, MIT). Magazine type-ins are publisher copyright, so they cannot ship.
+
 **How to apply:** when the user asks for the next demo, start from this list. Related:
 [[release-samples-shape]], [[samples-build-in-place]], [[ask-before-writing-asm]].

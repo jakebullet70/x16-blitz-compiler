@@ -298,6 +298,16 @@ SAMPLES = [
         "fake":  "MANDELASM.PRG",
     },
     {
+        "dir":   "LANDER64",
+        "files": [("GPC-BASIC-TOOLS-SRC/LANDER64/LANDER64.SRC.PRG",  "LANDER64.SRC.PRG"),
+                  ("GPC-BASIC-TOOLS-SRC/LANDER64/LANDER64.PRG",      "LANDER64.PRG"),
+                  ("GPC-BASIC-TOOLS-SRC/LANDER64/LANDER64.BASL",     "LANDER64.BASL"),
+                  ("GPC-BASIC-TOOLS-SRC/LANDER64/LICENSE",           "LICENSE"),
+                  ("GPC-BASIC-TOOLS-SRC/LANDER64/readme.md",         "README.md")],
+        "globs": [],
+        "fake":  "LANDER64.PRG",
+    },
+    {
         "dir":   "GUI-FIELD-EDIT",
         "files": [("GPC-BASIC-TOOLS-SRC/GUI-FIELD-EDIT/GUI-FIELD-EDIT.PRG",  "GUI-FIELD-EDIT.PRG"),
                   ("GPC-BASIC-TOOLS-SRC/GUI-FIELD-EDIT/GUI-FIELD-EDIT.OVL",  "GUI-FIELD-EDIT.OVL"),

@@ -106,6 +106,12 @@ PROGRAMS = [
          shared=False,
          install=None, data=[], overlay=False),
 
+    #   EMBEDDED, and plain X16 BASIC like MANDEL: LANDER64.SRC.PRG runs in ROM BASIC.
+    dict(name="LANDER64",
+         src=("GPC-BASIC-TOOLS-SRC/LANDER64", "LANDER64.BASL"),
+         shared=False,
+         install=None, data=[], overlay=False),
+
     #   EMBEDDED, and banked: the library runs from GP.BANKED regions, so the object
     #   ships with its .OVL beside it.
     dict(name="GUI-FIELD-EDIT",

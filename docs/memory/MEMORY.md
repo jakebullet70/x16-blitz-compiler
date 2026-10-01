@@ -83,7 +83,7 @@ again. See [memory-is-git-tracked](memory-is-git-tracked.md).
 ## The CUA GUI library
 - [LISTS and DIR plan](lists-and-dir-plan.md) — lists read GP.BSTR-layout banks at run time; LIST.BANK and FILEPICK tested, LIST.SORT written and awaiting its run
 - [GUI-CUA phase 5 state](gui-cua-phase5-state.md) — written not verified; what is owed and what still drifts
-- [Demo project options](demo-project-options.md) — the six showcase ideas; #1 MANDELBROT-SPEED built and in release, #2 KV-BANKED parked, GUI-FIELD-EDIT works
+- [Demo project options](demo-project-options.md) — the six showcase ideas; #1 MANDELBROT-SPEED built and in release, #2 KV-BANKED parked, GUI-FIELD-EDIT works, LANDER64 built
 
 ## The BASL cruncher
 - [Folding onto a label line saves nothing](folding-onto-a-label-line-saves-nothing.md) — a bare label is not a BASIC line
