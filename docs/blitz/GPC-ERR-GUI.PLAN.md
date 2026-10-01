@@ -220,7 +220,7 @@ One blob is written.
 
 | blob | what it does | why |
 |---|---|---|
-| line fetch | walk `NAME.SRC.PRG` to a line number and copy its bytes out | A lookup crosses the whole file. `ERR.SRC.SEEK.ASM` in `GPC-BASIC/ERRSRC.INC.BL` is the blob. |
+| line fetch | walk `NAME.SRC.PRG` to a line number and copy its bytes out | A lookup crosses the whole file. `ERR.SRC.SEEK.ASM` in `GPC-BASIC-TOOLS-SRC/GPC.ERR/ERRSRC.INC.BL` is the blob. |
 | bank loader | not written | `BLOAD` pulls the whole tokenised source into consecutive banks in one call. |
 
 The render is BASIC. The keyword text is a `GP.BANKEDSTR` group and only BASIC can read one, so the
@@ -503,8 +503,8 @@ Each phase leaves a tool that works.
 |---|---|---|
 | 1 | Done. A failed statement's BASIC line is kept and printed above the banner. Section 5 has the code. | the capture and the print |
 | 2 | Done. The GUI shell, `FILEPICK` for the map, the MAP lookup and the SYM `LABELS` lookup. An address or a BASIC line gives a file name, a BASIC line and the nearest label with its source line, shown in a framed window under a menu bar. `LINPUT#` replaced the `GET#` loops. | none |
-| 3 | Done. `GPC-BASIC/ERRSRC.INC.BL` pulls `NAME.SRC.PRG` into a run of RAM banks with `BLOAD`, and `ERR.SRC.WINDOW` returns a line and the three either side, rendered. `GPC-BASIC/ERRTOKEN.INC.BL` holds the keyword text as two `GP.BANKEDSTR` groups in bank 61: 274 slots, 199 keywords, a slot no keyword uses being an empty string. `source/gpc/gen_err_tokens.py` generates it from the 41 `#TOKEN` lines in `GPC-BASIC/GPB.INC.BL` and the stock tables in `source/common-scripts/c64tokens.py`, and stops if the two token sources disagree. | the walk and the copy |
-| 4 | Done. `GPC-BASIC/ERRSRC.INC.BL` gained `ERR.SRC.WORDS$`, which cuts the names out of the line as it renders it, because a keyword renders with no space around it and the finished text no longer says where a name stops. `ERR.NAMES.WANT` splits them and cuts the `$` or `%` type suffix for the lookup. `ERR.SYM.SCAN` reads both halves of the symbol file in one pass and stops once the last wanted name is found. Six names show, two to a row, in a `NAMES` block under the source window. The working display landed with it, and a lookup names each step on screen as it runs. Sections 4.7 and 4.8 have the rest. | none |
+| 3 | Done. `GPC-BASIC-TOOLS-SRC/GPC.ERR/ERRSRC.INC.BL` pulls `NAME.SRC.PRG` into a run of RAM banks with `BLOAD`, and `ERR.SRC.WINDOW` returns a line and the three either side, rendered. `GPC-BASIC-TOOLS-SRC/GPC.ERR/ERRTOKEN.INC.BL` holds the keyword text as two `GP.BANKEDSTR` groups in bank 61: 274 slots, 199 keywords, a slot no keyword uses being an empty string. `source/gpc/gen_err_tokens.py` generates it from the 41 `#TOKEN` lines in `GPC-BASIC/GPB.INC.BL` and the stock tables in `source/common-scripts/c64tokens.py`, and stops if the two token sources disagree. | the walk and the copy |
+| 4 | Done. `GPC-BASIC-TOOLS-SRC/GPC.ERR/ERRSRC.INC.BL` gained `ERR.SRC.WORDS$`, which cuts the names out of the line as it renders it, because a keyword renders with no space around it and the finished text no longer says where a name stops. `ERR.NAMES.WANT` splits them and cuts the `$` or `%` type suffix for the lookup. `ERR.SYM.SCAN` reads both halves of the symbol file in one pass and stops once the last wanted name is found. Six names show, two to a row, in a `NAMES` block under the source window. The working display landed with it, and a lookup names each step on screen as it runs. Sections 4.7 and 4.8 have the rest. | none |
 | 5 | Not needed. Phase 5 is a bank loader for the tokenised source. `BLOAD` pulls that file into consecutive banks in one call. Size is the second reason, with 12,872 bytes left under the ceiling. | none |
 
 `C.GPC.ERR.PRG` is 9,144 bytes SHARED against the 22,016 byte ceiling, so 12,872 bytes are left.

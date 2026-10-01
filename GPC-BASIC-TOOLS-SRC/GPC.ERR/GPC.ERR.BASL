@@ -107,8 +107,8 @@ GP.ENDBANKED
 ## hold a bank across a read, and a region may not. MENUKEY.INC.BL reads the
 ## keyboard layout under BANK 0 and leaves that bank selected.
 ## ---------------------------------------------------------------------------
-#INCLUDE "GPC-BASIC/ERRTOKEN.INC.BL"
-#INCLUDE "GPC-BASIC/ERRSRC.INC.BL"
+#INCLUDE "ERRTOKEN.INC.BL"
+#INCLUDE "ERRSRC.INC.BL"
 #INCLUDE "GPC-BASIC/MENUKEY.INC.BL"
 
 ERR.LIBEND:

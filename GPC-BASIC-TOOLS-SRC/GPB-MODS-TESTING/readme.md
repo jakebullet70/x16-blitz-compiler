@@ -288,6 +288,6 @@ compiled in, but nothing calls `KB.CLEARKB` or `SV.COMPACT`, so nothing on scree
 bytes of banked p-code, `STASHVRAMGC` 304 and `KB` 27. `COMBO` and `CHECK` share bank 10, and
 DIALOG > CHECK BOX + COMBO drives both.
 
-`GPBMODS.BASL` leaves out `BMX`, `DOS`, `ERRSRC`, `ERRTOKEN`, `KV`, `MATH` and `MEM`. `BMX`
+`GPBMODS.BASL` leaves out `BMX`, `DOS`, `KV`, `MATH` and `MEM`. `BMX`
 needs a bitmap file and a screen-mode change and is not GUI, and `GPC-BASIC/BMXVIEW.EXP.BL`
 covers it.

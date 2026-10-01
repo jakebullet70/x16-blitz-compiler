@@ -210,12 +210,15 @@ TREES = [
     ("GPC-BASIC-TOOLS-SRC/GPC-HELP/HELP-TXT",   "SRC/GPC-HELP/HELP-TXT"),
 ]
 
-# GPC.ERR's source, whole and rebuildable. Its #INCLUDE lines name GPC-BASIC/, so the 22
-# modules sit in a folder of that name beside the source. They are the sample folder's
-# copies rather than the library masters: those are what the shipped object was built from.
+# GPC.ERR's source, whole and rebuildable. Its #INCLUDE lines name GPC-BASIC/ for the 20
+# library modules, so they sit in a folder of that name beside the source. They are the sample
+# folder's copies rather than the library masters: those are what the shipped object was built
+# from. ERRTOKEN and ERRSRC are GPC.ERR's own and sit beside the source.
 GPCERR_SRC = [
-    ("GPC-BASIC-TOOLS-SRC/GPC.ERR/GPC.ERR.BASL", "SRC/GPC-ERROR/GPC.ERR.BASL"),
-    ("GPC-BASIC-TOOLS-SRC/GPC.ERR/readme.md",    "SRC/GPC-ERROR/README.md"),
+    ("GPC-BASIC-TOOLS-SRC/GPC.ERR/GPC.ERR.BASL",    "SRC/GPC-ERROR/GPC.ERR.BASL"),
+    ("GPC-BASIC-TOOLS-SRC/GPC.ERR/ERRTOKEN.INC.BL", "SRC/GPC-ERROR/ERRTOKEN.INC.BL"),
+    ("GPC-BASIC-TOOLS-SRC/GPC.ERR/ERRSRC.INC.BL",   "SRC/GPC-ERROR/ERRSRC.INC.BL"),
+    ("GPC-BASIC-TOOLS-SRC/GPC.ERR/readme.md",       "SRC/GPC-ERROR/README.md"),
 ]
 
 # GPC.HELP's source, the same shape as GPC-ERROR, with the help content it was built beside.
@@ -332,8 +335,10 @@ SRC_README = (
     "        GPB.INC.BL          the one module it includes\n"
     "      GPC-ERROR/\n"
     "        GPC.ERR.BASL        the error-line helper\n"
+    "        ERRTOKEN.INC.BL     its keyword text\n"
+    "        ERRSRC.INC.BL       its source reader\n"
     "        README.md           its own notes\n"
-    "        GPC-BASIC/          the 22 modules it includes\n"
+    "        GPC-BASIC/          the 20 library modules it includes\n"
     "      GPC-HELP/\n"
     "        GPC.HELP.BASL       the on-machine reference viewer\n"
     "        README.md           its own notes\n"
