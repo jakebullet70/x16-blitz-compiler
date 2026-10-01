@@ -1,121 +1,43 @@
-@3.10 Text in a bank
+@3.11.3 GP.FN -- call a verb from inside an expression
 .
-=3.10 TEXT IN A BANK
+=3.11.3 GP.FN
 .
-=SYNTAX
+.  Syntax    GP.FN(verb [, expression ...])
+.  Does      Assigns each expression to the matching formal, calls the
+.            routine, and gives back the variable the declaration
+.            named after RETURNS.
+.  Kind      FUNCTION. Two runtime opcodes bracket the call.
+.  Notes     The verb must be declared RETURNS. Its type is the type
+.            of the term, so a verb returning a string is a string
+.            term and concatenates.
+.            The body may be as long as it likes and may print, read
+.            files, open blocks and call other verbs. The caller's
+.            half-built expression and its string temporaries are
+.            carried across it.
+.            Costs 5 bytes of p-code at the call site against GP.SUB's
+.            3, plus the read of the RETURNS variable that the long
+.            spelling pays anyway, plus 2 bytes for each argument
+.            after the first -- an argument waits on the frame stack
+.            until the call, so the number of formals is not a limit.
+.            A string result costs 3 bytes more: it is copied into a
+.            temporary, so two calls to one verb may share an
+.            expression.
+.  WARNING   The call must sit below its GP.DEFPROC (SEC 3.11.1), as
+.            GP.SUB's (SEC 3.11.2) does.
+.            The body must not call its own verb: there is one set of
+.            formals and it would write over the arguments in use.
+.            An argument may be as deep an expression as any other,
+.            and however many there are only one of them is on the
+.            evaluation stack at a time.
+.  Example
 .
-:GP.BANKEDSTR <bank> <NAME>
-:  "first"
-:  "second"
-:  SPC(20)
-:GP.ENDBANKEDSTR
-:
-:  A$ = GP.BSTR(<NAME>, n)
-:  N  = GP.BSTRCOUNT(<NAME>)
-:  GP.BSTRSET <NAME>, n, A$
+:            PRINT "AREA "; GP.FN(AREA, 3, 4)
+:            T = A + GP.FN(AREA, 3, 4) * 2
+:            PRINT "X" + GP.FN(TAG, "AB") + "Y"
+:            PRINT GP.FN(TAG, "AB") + GP.FN(TAG, "CD")
+:            PRINT GP.FN(AREA, 2, GP.FN(AREA, 3, 4))
 .
-=DESCRIPTION
+=SEE ALSO
 .
-.Moves a program's literal text out of low RAM and into a RAM bank, at
-.compile time. A string constant costs 2 + LEN bytes of p-code wherever it
-.appears; GP.BSTR(NAME, n) costs 5, so text of four characters or more is
-.cheaper read from the bank than written in the line. Over half of a
-.menu-driven program's own code is usually literal text, and text is the one
-.thing in a program with no reason to be resident: it is never executed,
-.never indexed, and read one item at a time.
-.
-.The body is quoted lines and SPC(n). One item a line, nothing else on the
-.line. A quoted line passes through byte for byte, with its case, leading
-.spaces and trailing spaces kept. SPC(n) declares an empty slot of capacity
-.n, and n is a decimal constant of 0 to 255. Both kinds count as body lines,
-.so a block of nothing but SPC(n) is not an empty block. Body lines are not
-.REM lines and must not be: BASLOAD upper-cases REM text.
-.
-.Blocks are named, and you may write as many as you like. Each is indexed
-.from zero within itself, so inserting a line in one group moves nothing
-.outside it. A block names the bank its text goes in, written on each block
-.rather than only the first so a block can be read where it sits. Groups that
-.name the same bank share it and fill it in the order the compiler reads
-.them.
-.
-.The name costs nothing at run time. It is resolved while the program
-.compiles, into the group's first index, and the compiler adds that to your
-.index for you. No letter of the name reaches the object, which is the whole
-.reason the lookup is not in the bank.
-.
-.GP.BSTRCOUNT(NAME) is a composite: it compiles to a plain number, so FOR I =
-.0 TO GP.BSTRCOUNT(BS.FILE) - 1 costs no more than writing the count out.
-.
-:#DEFINE GM.TEXTBANK 5
-:
-:GP.BANKEDSTR GM.TEXTBANK BS.FILE
-:  " OPEN "
-:  " SAVE "
-:  " QUIT "
-:GP.ENDBANKEDSTR
-:
-:GP.BANKEDSTR GM.TEXTBANK BS.EDIT
-:  " CUT "
-:  " PASTE "
-:GP.ENDBANKEDSTR
-:
-:  FOR I = 0 TO GP.BSTRCOUNT(BS.EDIT) - 1
-:    PRINT GP.BSTR(BS.EDIT, I)
-:  NEXT I
-.
-.Claim the bank, exactly as a GP.BANKED code region's bank is claimed. The
-.compiler picks it while the object is written, so BANKMGR has to be told
-.rather than asked:
-.
-:BANKMGR.WANT = GM.TEXTBANK : GOSUB BANKMGR.CLAIM
-.
-.Either build. Both put the text in one NAME.OVL file beside the program: the
-.bootstrap reads it for a shared build and StartCode reads it for an embedded
-.one, so an embedded program with banked text is a .PRG and a .OVL together.
-.The runtime finds which bank a slot went to in a sixteen-byte table at
-.$07F0, in the low-memory hole both builds leave alone -- the bootstrap
-.extension page writes it there for a shared program, and StartCode copies it
-.out of the image for an embedded one.
-.
-.A group name is not a variable. No $, no %, no ( -- any of those is a syntax
-.error rather than something quietly ignored. A name that no block declared
-.is a syntax error at the line that used it, and so is a second block
-.claiming a name already taken. An empty block is refused too: a group of no
-.strings would make GP.BSTRCOUNT zero and every GP.BSTR on it read the next
-.group's text.
-.
-.There is no run-time bounds check. The compiler knows every index it emits
-.and nothing a program does can produce one out of range, so an index past
-.the end of a group reads whatever follows it. That is the same bargain the
-.array fast path makes.
-.
-.GP.BSTRSET <NAME>, n, A$ writes a slot. It takes the same name and index
-.pair as GP.BSTR(<NAME>, n), with no bracket. A record in the bank is
-.[capacity][length][capacity bytes], and the capacity is fixed at compile
-.time. A quoted body line's capacity is its own length, so a quoted line can
-.only ever be overwritten by something the same length or shorter. SPC(n) is
-.the way to get a slot with room in it.
-.
-.The write is cut to fit. A string longer than the slot keeps its first
-.capacity characters. No error is raised. The next record is never touched.
-.An index not below the bank's string count writes nothing and raises
-.nothing, and a slot whose bank is not present writes nothing.
-.
-.A program may have more than one text bank. Sixteen of them, which is the
-.range of the slot field a group carries and the length of the table at $07F0
-.-- BSTR_MAX_BANKS in source/common-source/source/common.inc. That matters
-.when a library already owns one: MENU keeps its rows in MENU.TEXTBANK, so a
-.program using it and wanting a pool of its own names a second bank rather
-.than crowding into MENU's. The other limits are 8 KB a bank, 128 groups a
-.program and 4,096 strings a bank.
-.
-.Each text bank is a region, so it counts toward the 127 regions (SEC 3.12)
-.and no two regions may share a bank.
-.
-.GP.BSTR and GP.BSTRSET are ordinary GP keywords, so they pull in the 1.5 KB
-.GP block; the two block keywords do not, and neither does GP.BSTRCOUNT.
-.
-.Reading it from inside a GP.BANKED region works: the handler puts the
-.caller's bank back before it returns. Writing from inside one works too. The
-.compiler copies a string literal out of the region first, because the text
-.bank is the one at $A000 while the write runs.
+>54|3.11.1 GP.DEFPROC -- declare a verb and its arguments
+>55|3.11.2 GP.SUB -- call a verb

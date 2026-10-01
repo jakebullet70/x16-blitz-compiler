@@ -1,75 +1,75 @@
-@4.9 MENUPULL.INC.BL -- a dropdown under a bar item
+@4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM
 .
-=4.9 MENUPULL.INC.BL -- A DROPDOWN UNDER A BAR ITEM
+=4.18 STASHVRAM.INC.BL -- RECTANGLES AND BLOBS, KEPT IN VRAM
 .
 =DESCRIPTION
 .
-.  N = GP.FN(MENUTO.PULLDOWN, barnum, style)
-.      IN: the popup slot, the bar MENUTO.BAR or MENU.DRAWBAR last drew,
-.        MENU.STASHBANK
-.      OUT: N MENU.EXITKEY MENU.NEXTBAR MENU.BARNUM MENU.SELX MENU.SELW
+.  SV.INIT
+.      IN: SV.BASE SV.TOP SV.MAX
+.      OUT: SV.OK
 .
-:MENU.BARFLAGS = MENU.DOWNEXIT
-:B = GP.FN(MENUTO.BAR, 0, 0, MENU.NOBOX)
-:GP.DO
-:    IF B = 0 THEN GP.EXITDO
-:    GOSUB MY.FILL
-:    N = GP.FN(MENUTO.PULLDOWN, B, MENU.ROUND)
-:    B = MENU.NEXTBAR
-:GP.LOOP
+.  SV.SAVE
+.      IN: SV.X SV.Y SV.W SV.H
+.      OUT: SV.HND SV.OK
 .
-.MY.FILL is the caller's: MENU.BEGIN MENU.POPUP and the rows for bar item B.
+.  SV.RESTORE
+.      IN: SV.HND SV.MOVE SV.X SV.Y
+.      OUT: SV.OK
 .
-.Requires MENU.INC.BL (SEC 4.6) and STASH.INC.BL (SEC 3.6), included by the
-.caller, and a #SYMFILE for STASH. A program with no dropdown leaves this
-.file out and does not carry STASH.
+.  SV.PUT
+.      IN: SV.ADDR SV.LEN
+.      OUT: SV.HND SV.OK
 .
-.MENUTO.PULLDOWN marks bar item barnum, opens the popup slot under it and
-.runs it. A barnum out of range or disabled returns 0 and draws nothing. The
-.bar is the one last drawn, where it was drawn, read with MENU.GAP and
-.MENU.BARFLAGS as they are now. The item the last call marked is unmarked and
-.barnum is marked. It stays marked on the way out, in MENU.MARKED.
+.  SV.GET
+.      IN: SV.HND SV.ADDR
+.      OUT: SV.OK
 .
-.The dropdown's corner is the item's column on the row under the bar, moved
-.left if the box would run off the screen. The screen width comes from the
-.KERNAL's screen_mode. The style and colours are MENUTO.VERT's (SEC 4.6), and
-.the run adds MENU.KEYEXIT to MENU.FLAGS.
+.  SV.FREE
+.      IN: SV.HND
+.      OUT: SV.OK
 .
-.  N
-.      the row, for RETURN or a hot key. Any other exit is 0
+.  SV.RESET
+.      IN: --
+.      OUT: SV.OK
 .
-.  MENU.EXITKEY
-.      the key that ended it
+:#INCLUDE "STASHVRAM.INC.BL"
+:
+:SV.MAX = 16 : DIM SV.PAGE%(16), SV.PAGES%(16)
+:GOSUB SV.INIT
+:SV.X = 10 : SV.Y = 5 : SV.W = 40 : SV.H = 12 : GOSUB SV.SAVE
+:IF SV.HND = 0 THEN <it did not fit>
+:REM ... draw over it ...
+:GOSUB SV.RESTORE
 .
-.  MENU.NEXTBAR
-.      the bar item LEFT or RIGHT walks to, stepping over disabled items as
-.        the bar does. With no live neighbour it is barnum. 0 for any other
-.        exit
+.No GP.ASM, and so no #SYMFILE. The cells never leave VRAM: one data port
+.reads, the other writes, and the KERNAL's memory_copy moves between them
+.without stepping either. That is what STASH.INC.BL cannot do, and the reason
+.to reach for this one. It also executes no BANK, so unlike STASH it may live
+.inside a GP.BANKED region.
 .
-.  MENU.BARNUM
-.      the bar's row count
+.SV.BASE and SV.TOP are the VRAM window in bytes, rounded in to whole
+.256-byte pages, and default to $04000 and $1AFFF. The caller DIMs the two
+.arrays to SV.MAX. SV.MOVE works as STASH.MOVE does: SV.RESTORE puts the
+.rectangle back where it came from when 0, at SV.X SV.Y when not. SV.HND is 1
+.to SV.MAX, or 0 if it did not fit. SV.ERROR$ says why when something is
+.refused, and is "" otherwise.
 .
-.  MENU.SELX MENU.SELW
-.      the item's column and width
+.Allocation is a bump pointer on 256-byte pages, released LIFO. Panels nest
+.and close in reverse and a log is append-only, so a hole only appears if a
+.caller frees out of order -- and then STASHVRAMGC.INC.BL (SEC 4.19) closes
+.it. Pages rather than bytes are what let a handle's address live in an
+.ordinary %: a page number reaches 511 where a 17-bit VRAM address would not.
 .
-.The screen under the dropdown is saved first and put back after, in STASH
-.slot 0 of bank MENU.STASHBANK. Set it before the first call to choose the
-.bank. Left at 0, the first call takes one from BANKMGR.GET.FREE.BANK. If
-.none is free, the dropdown still runs and the screen is not put back.
+.There is one allocator and it is this one. SV.BASE and SV.TOP are the
+.caller's contract, checked only against the layer 1 map and the charset.
+.BMX.STASH defaults to $13000, inside the default window -- a program using
+.both must move one of them.
 .
-.WARNING: MENUTO.PULLDOWN sets STASH.BANK, STASH.SLOT, STASH.MOVE, STASH.X,
-.STASH.Y, STASH.W and STASH.H. Set them again before the caller's own next
-.STASH call.
-.
-.Example: pass 6 of MENUTO.EXP.BL.
-.
-=EXAMPLE PROGRAM
-.
-.  MENUTO.EXP.BL -- runnable, in the GPC-BASIC folder
+.A screen-mode change re-uploads the charset and can re-lay the map. Held
+.handles do not survive it; call SV.RESET after one.
 .
 =SEE ALSO
 .
->84|4.6 MENU.INC.BL -- menus built a row at a time
->44|3.6 Screen -- stash and restore
->93|4.9 MENUPULL.INC.BL -- a dropdown under a bar item
->124|STASH.INC.BL -- save a text rectangle, and put it back.
+>96|4.19 STASHVRAMGC.INC.BL -- close the holes in a STASHVRAM store
+>95|4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM
+>112|STASH.INC.BL -- save a text rectangle, and put it back.

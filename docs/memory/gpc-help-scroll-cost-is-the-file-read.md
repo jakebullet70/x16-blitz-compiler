@@ -1,6 +1,6 @@
 ---
 name: gpc-help-scroll-cost-is-the-file-read
-description: "GPC-HELP's scroll is dominated by re-reading the .HLP on every keypress, not by moving cells -- measured 04/09/26"
+description: "GPC-HELP USED TO re-read the .HLP on every scroll; FIXED 04/09/26, the topic loads once (line table bank 9, text banks 15-22 since 2026-10-01, no split) and a scroll step is ~2.6 jiffies"
 metadata:
   type: project
 ---

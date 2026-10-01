@@ -63,8 +63,9 @@ HELP.GUIEND:
 ## ============================================================================
 ## GPC.HELP.BASL -- the GP.BASIC and BASL reference, on the machine.
 ##
-## The index loads once at startup. A topic is read once into HELP.TBANK and
-## every scroll after that paints one row out of the bank.
+## The index loads once at startup. A topic is read once into the banks, its
+## line table into HELP.TBANK and its text into the banks from HELP.TEXTBANK.
+## Every scroll after that paints one row out of them.
 ##
 ## The content is HELP-TXT/ beside the program: GPC.HELP.IDX and one .HLP per
 ## topic, built by MKHELP.PY from GPC-BASIC/. Nothing here parses markdown,
@@ -84,7 +85,7 @@ HELP.GUIEND:
 ## that were never generated and GPC stops with UNKNOWN LINE NUMBER.
 ## ============================================================================
 
-## The index bank holds 210 records and 6,512 characters of text, and rows
+## The index bank holds 210 records and 6,302 characters of text, and rows
 ## past either limit are dropped. Change MKHELP.PY's IDX_ROWS with it.
 #DEFINE HELP.MAXIX 210
 
@@ -99,22 +100,28 @@ HELP.GUIEND:
 
 #DEFINE HELP.TBANK 9
 
-## The index bank. Records at the front, eight bytes each: text offset lo and
-## hi, length, type, topic, section line, topic length lo and hi. The text sits
-## above them, row N at HELP.IWIN + (N - 1) * 8.
+## The topic text, in eight banks from 15. A line never straddles two.
+#DEFINE HELP.TEXTBANK 15
+#DEFINE HELP.TEXTBANKS 8
+
+## The index bank. Records at the front, nine bytes each: text offset lo and
+## hi, length, type, topic, section line lo and hi, topic length lo and hi. The
+## text sits above them, row N at HELP.IWIN + (N - 1) * 9.
 #DEFINE HELP.IBANK 10
 #DEFINE HELP.IWIN $A000
-#DEFINE HELP.IXREC 8
+#DEFINE HELP.IXREC 9
 #DEFINE HELP.IXWIDE 72
 #DEFINE HELP.WIN $A000
 #DEFINE HELP.BANKSIZE 8192
-#DEFINE HELP.MAXLINES 140
+#DEFINE HELP.MAXLINES 2048
 
-## The line table is in the bank. Four bytes a line at the front: offset low,
-## offset high, length, kind. The text sits above them, line N at (N-1)*4.
-## WARNING: do not move this to arrays. Three DIMs of HELP.MAXLINES cost 840
-## bytes of workspace and raise OUT OF MEMORY.
+## The line table fills HELP.TBANK, four bytes a line: offset low, offset high,
+## length, kind. Line N is at (N-1)*4. The offset is into the line's text bank,
+## and the kind byte carries which one: kind + 16 * (bank - HELP.TEXTBANK).
+## WARNING: do not move this to arrays. The workspace cannot hold three DIMs of
+## HELP.MAXLINES, and OUT OF MEMORY is what it raises.
 #DEFINE HELP.RECSIZE 4
+#DEFINE HELP.KINDBANK 16
 
 ## VERA and the KERNAL, for HELP.PAGE.SHIFT. A #DEFINE takes a signed int16, so
 ## an address is written in hex, and it refuses a digit anywhere in the name, so
@@ -216,6 +223,11 @@ HELP.BOOT:
 
     ## The splash art. The compiler puts it there; BANKMGR has to be told.
     IF GP.FN(BANKMGR.CLAIM.BANK, HELP.BANBANK) = 0 THEN GOTO HELP.BANK.FAILED
+
+    ## The topic text. HELP.PAGE.LOAD fills them.
+    FOR HELP.I = 0 TO HELP.TEXTBANKS - 1
+        IF GP.FN(BANKMGR.CLAIM.BANK, HELP.TEXTBANK + HELP.I) = 0 THEN GOTO HELP.BANK.FAILED
+    NEXT HELP.I
 
     ## Asked after the mode change. APPSYS.STARTUP reported the old screen.
     GOSUB GUI.SCREEN
@@ -420,15 +432,18 @@ HELP.IDXROW:
     IF HELP.IXFREE + HELP.TL > 8192 THEN HELP.IX.N = HELP.IX.N - 1 : RETURN
     HELP.REC = HELP.IWIN + (HELP.IX.N - 1) * HELP.IXREC
     HELP.LN2 = VAL(HELP.FLD$(4)) : HELP.HI = INT(HELP.LN2 / 256)
+    HELP.SECLINE = VAL(HELP.FLD$(3))
+    HELP.SECHI = INT(HELP.SECLINE / 256)
     BANK HELP.IBANK
     POKE HELP.REC, HELP.IXFREE - INT(HELP.IXFREE / 256) * 256
     POKE HELP.REC + 1, INT(HELP.IXFREE / 256)
     POKE HELP.REC + 2, HELP.TL
     POKE HELP.REC + 3, HELP.KIND
     POKE HELP.REC + 4, VAL(HELP.FLD$(2))
-    POKE HELP.REC + 5, VAL(HELP.FLD$(3))
-    POKE HELP.REC + 6, HELP.LN2 - HELP.HI * 256
-    POKE HELP.REC + 7, HELP.HI
+    POKE HELP.REC + 5, HELP.SECLINE - HELP.SECHI * 256
+    POKE HELP.REC + 6, HELP.SECHI
+    POKE HELP.REC + 7, HELP.LN2 - HELP.HI * 256
+    POKE HELP.REC + 8, HELP.HI
     HELP.SP = GP.STRPTR(HELP.T$) + 1
     GP.IF HELP.TL > 0 THEN
         FOR HELP.I = 0 TO HELP.TL - 1
@@ -445,8 +460,9 @@ HELP.IXREAD:
     HELP.REC = HELP.IWIN + (HELP.IXR - 1) * HELP.IXREC
     HELP.IXOFF = PEEK(HELP.REC) + PEEK(HELP.REC + 1) * 256
     HELP.IXLEN = PEEK(HELP.REC + 2) : HELP.IXTYPE = PEEK(HELP.REC + 3)
-    HELP.IXTOPIC = PEEK(HELP.REC + 4) : HELP.IXSEC = PEEK(HELP.REC + 5)
-    HELP.IXLINES = PEEK(HELP.REC + 6) + PEEK(HELP.REC + 7) * 256
+    HELP.IXTOPIC = PEEK(HELP.REC + 4)
+    HELP.IXSEC = PEEK(HELP.REC + 5) + PEEK(HELP.REC + 6) * 256
+    HELP.IXLINES = PEEK(HELP.REC + 7) + PEEK(HELP.REC + 8) * 256
     RETURN
 
 ## The row's text, in HELP.ROW$. Call HELP.IXREAD first: this uses its offset
@@ -733,8 +749,9 @@ HELP.PAGE.LOOP:
     GOTO HELP.PAGE.LOOP
 
 ## ============================================================================
-## The topic lives in a bank. It is read once, on entry, into HELP.TBANK, and a
-## scroll then paints one row out of RAM.
+## The topic lives in banks. It is read once, on entry: the line table into
+## HELP.TBANK and the text into the banks from HELP.TEXTBANK. A scroll then
+## paints one row out of RAM.
 ##
 ## WARNING: this cannot be one GP.CALL. The KERNAL's memory_copy takes no bank
 ## argument and BANK applies only around a PEEK or a POKE, so a raw call runs
@@ -745,8 +762,9 @@ HELP.PAGE.LOAD:
     HELP.PG.LINES = 0 : HELP.LINKN = 0 : HELP.ATTOPIC = 0
     ## The link menu is built as the topic loads, one popup row a cross reference.
     GP.SUB MENU.BEGIN, MENU.POPUP
-    ## The text starts above the line table, which owns the front of the bank.
-    HELP.PG.P = HELP.MAXLINES * HELP.RECSIZE
+    ## The text starts at the bottom of the first text bank.
+    HELP.PG.P = 0
+    HELP.PG.BANKIX = 0
     HELP.RECP = HELP.WIN
     HELP.IXR = HELP.GO : GOSUB HELP.IXREAD
     HELP.TOPICNUM = HELP.IXTOPIC
@@ -807,7 +825,14 @@ HELP.LOAD.STORE:
     ## Ordinary text starts at column 2, which is the widest a row can be. Link
     ## rows indent to 5 and are clamped where they are drawn.
     IF HELP.W > HELP.COLS - 2 THEN HELP.W = HELP.COLS - 2
-    ## Out of bank is recorded as an empty line, not a half written one.
+    ## A line that will not fit starts the next text bank.
+    GP.IF HELP.PG.P + HELP.W > HELP.BANKSIZE THEN
+        GP.IF HELP.PG.BANKIX < HELP.TEXTBANKS - 1 THEN
+            HELP.PG.BANKIX = HELP.PG.BANKIX + 1
+            HELP.PG.P = 0
+        GP.ENDIF
+    GP.ENDIF
+    ## Out of banks is recorded as an empty line, not a half written one.
     IF HELP.PG.P + HELP.W > HELP.BANKSIZE THEN HELP.W = 0
     ## The blob writes the line record as well as the text.
     ## WARNING: these are signed int16 holding an unsigned address. $A000
@@ -817,10 +842,11 @@ HELP.LOAD.STORE:
     HELP.AS.SRC% = HELP.SP
     HELP.AS.DST% = HELP.WIN + HELP.PG.P
     HELP.AS.LEN% = HELP.W
-    HELP.AS.BANK% = HELP.TBANK
+    HELP.AS.RECBANK% = HELP.TBANK
+    HELP.AS.TEXTBANK% = HELP.TEXTBANK + HELP.PG.BANKIX
     HELP.AS.REC% = HELP.RECP
     HELP.AS.OFF% = HELP.PG.P
-    HELP.AS.KIND% = HELP.KIND
+    HELP.AS.KIND% = HELP.KIND + HELP.PG.BANKIX * HELP.KINDBANK
     GOSUB HELP.STORE.ASM
     HELP.RECP = HELP.RECP + HELP.RECSIZE
     HELP.PG.P = HELP.PG.P + HELP.W
@@ -828,7 +854,8 @@ HELP.LOAD.STORE:
 
 ## ============================================================================
 ## ============================================================================
-## One line into the bank, in assembly.
+## One line into the banks, in assembly: the record into HELP.AS.RECBANK% and
+## the text into HELP.AS.TEXTBANK%.
 ##
 ## zTemp0, zTemp1 and zTemp2 hold the three pointers. They are free inside a
 ## blob: SYS clobbers zTemp0 reaching it.
@@ -856,7 +883,7 @@ HELP.STORE.ASM:
     REM STA $31
     REM LDA $00                  ; the bank we were handed, to put back
     REM PHA
-    REM LDA {HELP.AS.BANK%}
+    REM LDA {HELP.AS.RECBANK%}
     REM STA $00
     REM ; ---- offset low, offset high, length, kind ----
     REM LDY #0
@@ -872,6 +899,8 @@ HELP.STORE.ASM:
     REM INY
     REM LDA {HELP.AS.KIND%}
     REM STA ($30),Y
+    REM LDA {HELP.AS.TEXTBANK%}  ; the text goes in its own bank
+    REM STA $00
     REM LDX {HELP.AS.LEN%}
     REM BEQ HSDONE
     REM LDY #0
@@ -1010,7 +1039,9 @@ HELP.PAGE.ROW:
     HELP.REC = HELP.WIN + (HELP.LN - 1) * HELP.RECSIZE
     HELP.A = HELP.WIN + PEEK(HELP.REC) + PEEK(HELP.REC + 1) * 256
     HELP.W = PEEK(HELP.REC + 2)
-    HELP.KIND = PEEK(HELP.REC + 3)
+    HELP.KINDBYTE = PEEK(HELP.REC + 3)
+    HELP.ROW.BANKIX = INT(HELP.KINDBYTE / HELP.KINDBANK)
+    HELP.KIND = HELP.KINDBYTE - HELP.ROW.BANKIX * HELP.KINDBANK
     HELP.ATTR = THEME.CLR(THEME.TEXT)
     HELP.INDENT = 2
     GP.IF HELP.KIND = 1 THEN
@@ -1025,8 +1056,9 @@ HELP.PAGE.ROW:
     GP.ENDIF
     HELP.WMAX = HELP.COLS - HELP.INDENT
     IF HELP.W > HELP.WMAX THEN HELP.W = HELP.WMAX
-    ## A dialog may have run between the record read and here, so select again.
-    BANK HELP.TBANK
+    ## The line's text bank. A dialog may have run since the record read, so it
+    ## is selected here.
+    BANK HELP.TEXTBANK + HELP.ROW.BANKIX
     GP.IF HELP.W > 0 THEN
         FOR HELP.I = 0 TO HELP.W - 1
             GP.CHAR HELP.INDENT + HELP.I, HELP.Y, PEEK(HELP.A + HELP.I), HELP.ATTR

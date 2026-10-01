@@ -1,11 +1,33 @@
-@3.4.3 GP.ISEMPTY -- test for a zero-length string
+@3.5 Arrays
 .
-=3.4.3 GP.ISEMPTY
+=3.5 ARRAYS
 .
-.  Syntax    GP.ISEMPTY(a$)
-.  Returns   -1 if a$ has zero length, 0 if not.
-.  Kind      COMPOSITE. Expands to LEN(a$) = 0.
-.  Notes     A string of spaces is not empty. STR.TRIM first if
-.            that is the intent.
-.            GP.ISEMPTY(a$), LEN(a$) = 0 and a$ = "" are the same four
-.            bytes. Use whichever reads better.
+=SYNTAX
+.
+:GP.ARRPTR(a())
+.
+=WHAT IT COSTS
+.
+.  ASM: GP.ARRPTR
+.    ASM -- machine code in the GP runtime block. One GP keyword pays for the
+.    whole block.
+.
+=DESCRIPTION
+.
+.Sorting a string array is SORT.INC.BL (SEC 4.7). It takes the address
+.GP.ARRPTR returns, because a BASL subroutine cannot be passed an array.
+.
+.GP.ARRPTR returns the address of element zero; the header is already
+.skipped. Machine code called through GP.CALL can then work on the array in
+.bulk. Add the stride yourself: 2 bytes per element for a string array (each
+.element is a pointer to the string block -- see GP.STRPTR for its layout), 6
+.for a numeric array. Multi-dimensional arrays are rejected, and
+.GP.ARRPTR(A(3)) is a syntax error; write 3*2 or 3*6 into the address.
+.
+=EXAMPLE PROGRAM
+.
+.  ARRAYS.EXP.BL -- runnable, in the GPC-BASIC folder
+.
+=SEE ALSO
+.
+>82|4.7 SORT.INC.BL -- shell sort a string array

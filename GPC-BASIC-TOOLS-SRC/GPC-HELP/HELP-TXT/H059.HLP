@@ -1,52 +1,15 @@
-@4.17 COMBO.INC.BL -- a drop-down list that folds into one row
+@4.24.3 CLOSEBOX -- take down the box opened last
 .
-=4.17 COMBO.INC.BL -- A DROP-DOWN LIST THAT FOLDS INTO ONE ROW
+=4.24.3 CLOSEBOX
 .
-=DESCRIPTION
-.
-.  COMBO.ADD
-.      IN: COMBO.X COMBO.Y COMBO.W COMBO.COUNT COMBO.SEL COMBO.BANK, over
-.        COMBO.ITEM$()
-.      OUT: COMBO.SEL
-.
-:COMBO.ITEM$(1) = " TEXAS"
-:COMBO.ITEM$(2) = " UTAH"
-:COMBO.X = GUI.INNER.LEFT : COMBO.Y = GUI.INNER.TOP
-:COMBO.W = 16 : COMBO.COUNT = 2 : COMBO.SEL = 1
-:GOSUB COMBO.ADD
-:REM ... run the form ... the answer is in COMBO.SEL
-.
-.Only COMBO.ADD is called by an application. COMBO.DRAW, COMBO.KEY and
-.COMBO.OPEN are reached by GUI.FORM, which dispatches a GUI.CT.COMBO control
-.to them by name. The call goes between GUI.OPEN and GUI.FORM.RUN.
-.
-.COMBO.W is the width in cells, brackets included; 5 is the floor and
-.anything less is raised to it. COMBO.BANK is where the dropdown saves the
-.cells it covers, and 0 takes GUI.BANK -- which is what the dialog around it
-.is already using. The caller owns the DIM of COMBO.ITEM$().
-.
-.One combo to a dialog, since there is one COMBO.ITEM$(). The dropdown is the
-.popup slot of MENU.INC.BL (SEC 4.6), loaded from COMBO.ITEM$() each time it
-.opens, so whatever the caller last built in that slot is gone after. An item
-.is a menu row: & marks a hot key and "-" is a separator. The MENU.* colours
-.and flags it sets are put back.
-.
-.A long list belongs in GUI.LISTBOX (SEC 4.12). The dropdown shows every item
-.at once, 32 at most, and does not scroll.
-.
-.The dropdown is framed like the dialog behind it. With GUI.GLYPH non-zero it
-.draws from GUI.EDGE.H, GUI.EDGE.V, GUI.CORNER.TL, .TR, .BL and .BR, the same
-.six a dialog frames with, so a re-ordered charset gets its own frame here
-.too. With GUI.GLYPH = 0 the frame is GP.BOX style 1.
-.
-.It is required by GUI.INC.BL, which names COMBO.DRAW and COMBO.KEY. BASLOAD
-.resolves every label in a file, so a program that includes the GUI and
-.leaves this one out stops with LABEL NOT FOUND whether it ever draws a combo
-.or not. It needs MENU.INC.BL, and what that requires.
+.  Syntax    GP.SUB CLOSEBOX
+.  Does      Takes down the box opened last and puts back the screen
+.            under it and its shadow.
+.  Kind      BASIC. A verb in GUI-LITE.INC.BL. Needs the GP block.
+.  Notes     PICKMENU's box is the one a program closes. MSGBOX closes
+.            its own.
+.            Call it only with a box open.
 .
 =SEE ALSO
 .
->84|4.6 MENU.INC.BL -- menus built a row at a time
->97|4.12 GUI-DIALOGS.INC.BL -- every dialog as a verb
->104|4.17 COMBO.INC.BL -- a drop-down list that folds into one row
->95|4.11 GUI.INC.BL -- the box that puts the screen back, and the form in 
+>101|4.24 GUI-LITE.INC.BL -- a message box and a menu, in low memory

@@ -12,7 +12,6 @@ python MKHELP.PY
 
 - **GETTING STARTED**
   - [1. What GP.BASIC is](#1-what-gpbasic-is)
-  - [1. What GP.BASIC is (2)](#1-what-gpbasic-is-2)
   - [2. Using it](#2-using-it)
 - **WHAT IS IN GPC**
   - [1. What has to be on the drive to compile](#1-what-has-to-be-on-the-drive-to-compile)
@@ -20,12 +19,10 @@ python MKHELP.PY
   - [3. BASLOAD -- the tokeniser, and why it is forked](#3-basload----the-tokeniser-and-why-it-is-forked)
   - [4. The tools](#4-the-tools)
   - [5. GPC-BASIC/ -- the library](#5-gpc-basic----the-library)
-  - [5. GPC-BASIC/ -- the library (2)](#5-gpc-basic----the-library-2)
   - [6. GPC-BASIC/ -- the examples](#6-gpc-basic----the-examples)
   - [7. The documents](#7-the-documents)
 - **GP.* CORE KEYWORDS**
   - [3. Command reference](#3-command-reference)
-  - [3. Command reference (2)](#3-command-reference-2)
   - [3.1 Loops](#31-loops)
   - [3.2 Multi-way branch](#32-multi-way-branch)
   - [3.3 Machine code](#33-machine-code)
@@ -41,33 +38,26 @@ python MKHELP.PY
   - [3.7 Screen -- drawing](#37-screen----drawing)
   - [3.8 Block IF](#38-block-if)
   - [3.9 Inline assembly](#39-inline-assembly)
-  - [3.9 Inline assembly (2)](#39-inline-assembly-2)
   - [3.10 Text in a bank](#310-text-in-a-bank)
-  - [3.10 Text in a bank (2)](#310-text-in-a-bank-2)
   - [3.11 Calling a routine in one statement](#311-calling-a-routine-in-one-statement)
   - [3.11.1 GP.DEFPROC -- declare a verb and its arguments](#3111-gpdefproc----declare-a-verb-and-its-arguments)
   - [3.11.2 GP.SUB -- call a verb](#3112-gpsub----call-a-verb)
   - [3.11.3 GP.FN -- call a verb from inside an expression](#3113-gpfn----call-a-verb-from-inside-an-expression)
   - [3.12 Code in a bank](#312-code-in-a-bank)
-  - [3.12 Code in a bank (2)](#312-code-in-a-bank-2)
 - **BASL MODULES**
   - [4. Module reference -- the BASL library](#4-module-reference----the-basl-library)
   - [4.1 THEME.INC.BL -- named colour roles](#41-themeincbl----named-colour-roles)
   - [4.2 STRINGS.INC.BL -- string helpers](#42-stringsincbl----string-helpers)
-  - [4.2 STRINGS.INC.BL -- string helpers (2)](#42-stringsincbl----string-helpers-2)
   - [4.3 APPSYS.INC.BL -- start politely, leave it as you found it](#43-appsysincbl----start-politely-leave-it-as-you-found-it)
   - [4.4 LINEINPUT.INC.BL -- a positioned entry field](#44-lineinputincbl----a-positioned-entry-field)
   - [4.5 BMX.INC.BL -- a BMX bitmap into VERA](#45-bmxincbl----a-bmx-bitmap-into-vera)
   - [4.6 MENU.INC.BL -- menus built a row at a time](#46-menuincbl----menus-built-a-row-at-a-time)
-  - [4.6 MENU.INC.BL -- menus built a row at a time (2)](#46-menuincbl----menus-built-a-row-at-a-time-2)
-  - [4.6 MENU.INC.BL -- menus built a row at a time (3)](#46-menuincbl----menus-built-a-row-at-a-time-3)
   - [4.7 SORT.INC.BL -- shell sort a string array](#47-sortincbl----shell-sort-a-string-array)
   - [4.8 STRCASE.INC.BL -- case, in place](#48-strcaseincbl----case-in-place)
   - [4.9 MENUPULL.INC.BL -- a dropdown under a bar item](#49-menupullincbl----a-dropdown-under-a-bar-item)
   - [4.10 STRUSING.INC.BL -- a number to a template](#410-strusingincbl----a-number-to-a-template)
   - [4.11 GUI.INC.BL -- the box that puts the screen back, and the form in it](#411-guiincbl----the-box-that-puts-the-screen-back-and-the-form-in-it)
   - [4.12 GUI-DIALOGS.INC.BL -- every dialog as a verb](#412-gui-dialogsincbl----every-dialog-as-a-verb)
-  - [4.12 GUI-DIALOGS.INC.BL -- every dialog as a verb (2)](#412-gui-dialogsincbl----every-dialog-as-a-verb-2)
   - [4.13 BANKMGR.INC.BL -- who owns which RAM bank](#413-bankmgrincbl----who-owns-which-ram-bank)
   - [4.14 KB.INC.BL -- the keyboard buffer, emptied](#414-kbincbl----the-keyboard-buffer-emptied)
   - [4.15 FILEIO.INC.BL -- the drive: status, files, directories](#415-fileioincbl----the-drive-status-files-directories)
@@ -76,7 +66,6 @@ python MKHELP.PY
   - [4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM](#418-stashvramincbl----rectangles-and-blobs-kept-in-vram)
   - [4.19 STASHVRAMGC.INC.BL -- close the holes in a STASHVRAM store](#419-stashvramgcincbl----close-the-holes-in-a-stashvram-store)
   - [4.20 KV.INC.BL -- keys and values in one RAM bank](#420-kvincbl----keys-and-values-in-one-ram-bank)
-  - [4.20 KV.INC.BL -- keys and values in one RAM bank (2)](#420-kvincbl----keys-and-values-in-one-ram-bank-2)
   - [4.21 CHECK.INC.BL -- a check box, [X] or [ ]](#421-checkincbl----a-check-box-x-or)
   - [4.22 MATH.INC.BL -- the smaller and the larger of two numbers](#422-mathincbl----the-smaller-and-the-larger-of-two-numbers)
   - [4.23 MEM.INC.BL -- a block copied, a block filled](#423-memincbl----a-block-copied-a-block-filled)
@@ -88,23 +77,13 @@ python MKHELP.PY
   - [4.25.1 DOSX -- send a command, read the answer](#4251-dosx----send-a-command-read-the-answer)
   - [4.25.2 DOSX.EXISTS -- whether a file opens](#4252-dosxexists----whether-a-file-opens)
   - [4.26 GPBMODS -- the harness that drives every module](#426-gpbmods----the-harness-that-drives-every-module)
-  - [4.26 GPBMODS -- the harness that drives every module (2)](#426-gpbmods----the-harness-that-drives-every-module-2)
   - [STASH.INC.BL -- save a text rectangle, and put it back.](#stashincbl----save-a-text-rectangle-and-put-it-back)
   - [STASHFILE.INC.BL -- a saved text rectangle, through a file.](#stashfileincbl----a-saved-text-rectangle-through-a-file)
 - **GLOBALS AND NAMING**
   - [5. Variables](#5-variables)
   - [1. The prefixes that are taken](#1-the-prefixes-that-are-taken)
-  - [1. The prefixes that are taken (2)](#1-the-prefixes-that-are-taken-2)
   - [2. GP.* is keywords, not variables -- and the difference bites](#2-gp-is-keywords-not-variables----and-the-difference-bites)
   - [3. The modules](#3-the-modules)
-  - [3. The modules (2)](#3-the-modules-2)
-  - [3. The modules (3)](#3-the-modules-3)
-  - [3. The modules (4)](#3-the-modules-4)
-  - [3. The modules (5)](#3-the-modules-5)
-  - [3. The modules (6)](#3-the-modules-6)
-  - [3. The modules (7)](#3-the-modules-7)
-  - [3. The modules (8)](#3-the-modules-8)
-  - [3. The modules (9)](#3-the-modules-9)
   - [4. Labels are global too](#4-labels-are-global-too)
   - [5. TRUE IS -1](#5-true-is--1)
   - [6. Two more naming rules that are not about collisions](#6-two-more-naming-rules-that-are-not-about-collisions)
@@ -114,8 +93,6 @@ python MKHELP.PY
   - [8. Known bugs](#8-known-bugs)
 - **MEMORY AND LIMITS**
   - [7. Memory, and what the compiler tells you](#7-memory-and-what-the-compiler-tells-you)
-  - [7. Memory, and what the compiler tells you (2)](#7-memory-and-what-the-compiler-tells-you-2)
-  - [7. Memory, and what the compiler tells you (3)](#7-memory-and-what-the-compiler-tells-you-3)
 
 ---
 
@@ -233,9 +210,6 @@ Low memory is what runs out. A program short of it can put a module's `#INCLUDE`
 `GP.BANKED` region and run it from a RAM bank, with no change to its callers. §3.12 has the rules.
 
 ---
-
-
-## 1. What GP.BASIC is (2)
 
 
 *See also: 2. Using it, 7. Memory, and what the compiler tells you, 4. Module reference -- the BASL library, 5. Variables, 3.12 Code in a bank, STASH.INC.BL -- save a text rectangle, and put it back., 4.7 SORT.INC.BL -- shell sort a string array, 4.8 STRCASE.INC.BL -- case, in place, 4.2 STRINGS.INC.BL -- string helpers*
@@ -482,7 +456,7 @@ reads the debug map the compiler writes when `MAKE A DEBUG MAP?` is answered yes
 the address cannot be resolved.
 
 `GPC.HELP.PRG` is this reference, on the machine. It reads `HELP-TXT/` beside it — `GPC.HELP.IDX`
-and one `.HLP` per topic — and shows 98 topics at 80x30. Arrows, `PgUp` / `PgDn`, `HOME` and `END`
+and one `.HLP` per topic — and shows 75 topics at 80x30. Arrows, `PgUp` / `PgDn`, `HOME` and `END`
 move. `RETURN` opens the highlighted index row. `/` finds and `N` repeats the search. `L` follows a
 topic's cross references, `X` writes its code out as a `.BL` where it has any, `T` cycles the colour
 themes, `?` is the about box. `ESC` goes back a step, and quits from the index.
@@ -533,9 +507,6 @@ removes dead code, including a module costs its whole size whether or not it is 
 What each one costs in bytes is in the command reference, under *At a glance*.
 
 ---
-
-
-## 5. GPC-BASIC/ -- the library (2)
 
 
 *See also: 4.1 THEME.INC.BL -- named colour roles, 4.3 APPSYS.INC.BL -- start politely, leave it as you found it, STASH.INC.BL -- save a text rectangle, and put it back., STASHFILE.INC.BL -- a saved text rectangle, through a file., 4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM, 4.19 STASHVRAMGC.INC.BL -- close the holes in a STASHVRAM store, 4.4 LINEINPUT.INC.BL -- a positioned entry field, 4.6 MENU.INC.BL -- menus built a row at a time, 4.13 BANKMGR.INC.BL -- who owns which RAM bank, 4.9 MENUPULL.INC.BL -- a dropdown under a bar item, 4.11 GUI.INC.BL -- the box that puts the screen back, and the form in , 4.12 GUI-DIALOGS.INC.BL -- every dialog as a verb*
@@ -663,9 +634,6 @@ composite for anything that is only a spelling of keywords already present.
 
 The keywords in detail. Square brackets mean optional. Optionals cannot be skipped over:
 `GP.BOX X,Y,W,H,,7` is a syntax error — write out the default you are passing through.
-
-
-## 3. Command reference (2)
 
 
 *See also: 4. Module reference -- the BASL library, 3.8 Block IF, 3.9 Inline assembly, 3.4 Strings, 3.3.1 GP.HIBYTE / GP.LOBYTE -- split an address into two bytes, 3.10 Text in a bank, 3.11 Calling a routine in one statement, 4.1 THEME.INC.BL -- named colour roles, 4.2 STRINGS.INC.BL -- string helpers, 4.3 APPSYS.INC.BL -- start politely, leave it as you found it, 4.4 LINEINPUT.INC.BL -- a positioned entry field, 4.5 BMX.INC.BL -- a BMX bitmap into VERA*
@@ -1321,9 +1289,6 @@ GP.ENDASM
 Example: [`ASM.EXP.BL`](ASM.EXP.BL)
 
 
-## 3.9 Inline assembly (2)
-
-
 *See also: 3.12 Code in a bank, 4.16 FILEDIR.INC.BL -- a directory, into a bank or into low RAM*
 
 ## 3.10 Text in a bank
@@ -1438,9 +1403,6 @@ it returns. Writing from inside one works too. The compiler copies a string lite
 region first, because the text bank is the one at `$A000` while the write runs.
 
 ---
-
-
-## 3.10 Text in a bank (2)
 
 
 *See also: 3.12 Code in a bank*
@@ -1759,9 +1721,6 @@ its first line runs. Nothing else in the program pays it.
 ---
 
 
-## 3.12 Code in a bank (2)
-
-
 *See also: 7. Memory, and what the compiler tells you, 4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM, 3.10 Text in a bank, 3.9 Inline assembly, 4.6 MENU.INC.BL -- menus built a row at a time, 4.4 LINEINPUT.INC.BL -- a positioned entry field, 4.11 GUI.INC.BL -- the box that puts the screen back, and the form in , 4.17 COMBO.INC.BL -- a drop-down list that folds into one row, 4.21 CHECK.INC.BL -- a check box, [X] or [ ], 4.12 GUI-DIALOGS.INC.BL -- every dialog as a verb*
 
 ---
@@ -1998,9 +1957,6 @@ past 255 characters.
 
 Examples: [`SPLITT.EXP.BL`](SPLITT.EXP.BL), [`STRINGS.EXP.BL`](STRINGS.EXP.BL). Regression test:
 [`STRTST.EXP.BL`](STRTST.EXP.BL), thirty-three cases.
-
-
-## 4.2 STRINGS.INC.BL -- string helpers (2)
 
 
 *See also: 3.4.5 GP.STRPTR -- address of a string block, 3.4.1 GP.INSTR -- position of a substring, 4.2 STRINGS.INC.BL -- string helpers*
@@ -2364,12 +2320,6 @@ Examples: [`MENUTO.EXP.BL`](MENUTO.EXP.BL) runs a popup, a bar and a dropdown by
 [`MENUBUILD.EXP.BL`](MENUBUILD.EXP.BL) builds both slots and reads them back.
 
 ---
-
-
-## 4.6 MENU.INC.BL -- menus built a row at a time (2)
-
-
-## 4.6 MENU.INC.BL -- menus built a row at a time (3)
 
 
 *See also: 4.13 BANKMGR.INC.BL -- who owns which RAM bank, 3.10 Text in a bank, 4.9 MENUPULL.INC.BL -- a dropdown under a bar item, 4.6 MENU.INC.BL -- menus built a row at a time*
@@ -2792,9 +2742,6 @@ lets the whole module sit inside a `GP.BANKED` region.
 Example: [`GUI.EXP.BL`](GUI.EXP.BL).
 
 ---
-
-
-## 4.12 GUI-DIALOGS.INC.BL -- every dialog as a verb (2)
 
 
 *See also: 3.7 Screen -- drawing, 4.6 MENU.INC.BL -- menus built a row at a time, 4.20 KV.INC.BL -- keys and values in one RAM bank, 4.12 GUI-DIALOGS.INC.BL -- every dialog as a verb, 4.11 GUI.INC.BL -- the box that puts the screen back, and the form in , 4.17 COMBO.INC.BL -- a drop-down list that folds into one row, 4.21 CHECK.INC.BL -- a check box, [X] or [ ]*
@@ -3258,9 +3205,6 @@ slot 0    "*KVSTORE", 2, the version (1), the slot count (64)
 ---
 
 
-## 4.20 KV.INC.BL -- keys and values in one RAM bank (2)
-
-
 *See also: 3.12 Code in a bank, 4.13 BANKMGR.INC.BL -- who owns which RAM bank, 4.20 KV.INC.BL -- keys and values in one RAM bank*
 
 ## 4.21 CHECK.INC.BL -- a check box, [X] or [ ]
@@ -3712,9 +3656,6 @@ upstream for it, and the build copies root's over this folder's every time.
 ---
 
 
-## 4.26 GPBMODS -- the harness that drives every module (2)
-
-
 *See also: 4.5 BMX.INC.BL -- a BMX bitmap into VERA, 4.13 BANKMGR.INC.BL -- who owns which RAM bank, 3.12 Code in a bank, 3.10 Text in a bank, 4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM*
 
 ## STASH.INC.BL -- save a text rectangle, and put it back.
@@ -3843,9 +3784,11 @@ The convention is one dotted prefix per module, and nothing writes outside its o
 |---|---|
 | `GP.` | keywords, **not variables** — see below |
 | `STR.` | `STRINGS.INC.BL` |
+| `STR.USING.` | `STRUSING.INC.BL`, kept apart from the rest of `STR.` |
 | `THEME.` | `THEME.INC.BL` |
 | `APPSYS.` | `APPSYS.INC.BL` |
 | `LINEINPUT.` | `LINEINPUT.INC.BL` |
+| `KB.` | `KB.INC.BL` |
 | `MENU.` | `MENU.INC.BL`, and `MENUPULL.INC.BL`'s variables |
 | `MENUTO.` | the runners in `MENU.INC.BL` and `MENUPULL.INC.BL` |
 | `MENUPULL.` | `MENUPULL.INC.BL`'s labels |
@@ -3857,8 +3800,10 @@ The convention is one dotted prefix per module, and nothing writes outside its o
 | `SORT.` | `SORT.INC.BL` |
 | `STRCASE.` | `STRCASE.INC.BL` |
 | `BMX.` / `BMXK.` | `BMX.INC.BL` (variables / its KERNAL constants) |
+| `FILE.` / `FILE.DIR.` | `FILEIO.INC.BL` / `FILEDIR.INC.BL` |
 | `KV.` | `KV.INC.BL` |
 | `DOS.` | `DOS.INC.BL` |
+| `SV.` / `SVGC.` | `STASHVRAM.INC.BL` / `STASHVRAMGC.INC.BL` |
 | `MATH.` | `MATH.INC.BL` |
 | `MEM.` | `MEM.INC.BL`, its two KERNAL constants included |
 
@@ -3890,7 +3835,7 @@ after a change.
 ---
 
 
-*See also: 6. The traps, collected, 4.2 STRINGS.INC.BL -- string helpers, 4.1 THEME.INC.BL -- named colour roles, 4.3 APPSYS.INC.BL -- start politely, leave it as you found it, 4.4 LINEINPUT.INC.BL -- a positioned entry field, 4.6 MENU.INC.BL -- menus built a row at a time, 4.9 MENUPULL.INC.BL -- a dropdown under a bar item, 4.11 GUI.INC.BL -- the box that puts the screen back, and the form in , 4.12 GUI-DIALOGS.INC.BL -- every dialog as a verb, 4.24 GUI-LITE.INC.BL -- a message box and a menu, in low memory, STASH.INC.BL -- save a text rectangle, and put it back., STASHFILE.INC.BL -- a saved text rectangle, through a file.*
+*See also: 6. The traps, collected, 4.2 STRINGS.INC.BL -- string helpers, 4.10 STRUSING.INC.BL -- a number to a template, 4.1 THEME.INC.BL -- named colour roles, 4.3 APPSYS.INC.BL -- start politely, leave it as you found it, 4.4 LINEINPUT.INC.BL -- a positioned entry field, 4.14 KB.INC.BL -- the keyboard buffer, emptied, 4.6 MENU.INC.BL -- menus built a row at a time, 4.9 MENUPULL.INC.BL -- a dropdown under a bar item, 4.11 GUI.INC.BL -- the box that puts the screen back, and the form in , 4.12 GUI-DIALOGS.INC.BL -- every dialog as a verb, 4.24 GUI-LITE.INC.BL -- a message box and a menu, in low memory*
 
 ## 1. The prefixes that are taken
 
@@ -3934,9 +3879,6 @@ Do not reuse a taken prefix for a name the module has not defined. `THEME.MINE` 
 free today; it is one library update away from not being.
 
 ---
-
-
-## 1. The prefixes that are taken (2)
 
 
 *See also: 2. Using it, 4.2 STRINGS.INC.BL -- string helpers, 4.10 STRUSING.INC.BL -- a number to a template, 4.1 THEME.INC.BL -- named colour roles, 4.3 APPSYS.INC.BL -- start politely, leave it as you found it, 4.4 LINEINPUT.INC.BL -- a positioned entry field, 4.14 KB.INC.BL -- the keyboard buffer, emptied, 4.6 MENU.INC.BL -- menus built a row at a time, 4.9 MENUPULL.INC.BL -- a dropdown under a bar item, 4.11 GUI.INC.BL -- the box that puts the screen back, and the form in , 4.12 GUI-DIALOGS.INC.BL -- every dialog as a verb, 4.24 GUI-LITE.INC.BL -- a message box and a menu, in low memory*
@@ -4416,30 +4358,6 @@ a copy was set up with.
 ---
 
 
-## 3. The modules (2)
-
-
-## 3. The modules (3)
-
-
-## 3. The modules (4)
-
-
-## 3. The modules (5)
-
-
-## 3. The modules (6)
-
-
-## 3. The modules (7)
-
-
-## 3. The modules (8)
-
-
-## 3. The modules (9)
-
-
 *See also: 4.1 THEME.INC.BL -- named colour roles, 4.3 APPSYS.INC.BL -- start politely, leave it as you found it, 4.2 STRINGS.INC.BL -- string helpers, 4.10 STRUSING.INC.BL -- a number to a template, 4.14 KB.INC.BL -- the keyboard buffer, emptied, 4.4 LINEINPUT.INC.BL -- a positioned entry field, 4.5 BMX.INC.BL -- a BMX bitmap into VERA, 4.15 FILEIO.INC.BL -- the drive: status, files, directories, 4.16 FILEDIR.INC.BL -- a directory, into a bank or into low RAM, 4.25 DOS.INC.BL -- a drive command, and a test for a file, 4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM, 4.20 KV.INC.BL -- keys and values in one RAM bank*
 
 ## 4. Labels are global too
@@ -4858,12 +4776,6 @@ workspace, and inside a region it costs no p-code at all.
   demand: build it in a bank, or in pieces.
 
 ---
-
-
-## 7. Memory, and what the compiler tells you (2)
-
-
-## 7. Memory, and what the compiler tells you (3)
 
 
 *See also: 3.12 Code in a bank, 3.10 Text in a bank, 4.5 BMX.INC.BL -- a BMX bitmap into VERA, STASH.INC.BL -- save a text rectangle, and put it back.*

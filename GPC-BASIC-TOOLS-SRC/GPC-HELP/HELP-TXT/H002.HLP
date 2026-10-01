@@ -1,12 +1,73 @@
-@1. What GP.BASIC is (2)
+@2. Using it
+.
+=2. USING IT
+.
+.Every BASL source that uses a GP. keyword must declare the keyword set:
+.
+:#INCLUDE "GPB.INC.BL"
+.
+.BASLOAD knows only the ROM's keywords. Without that line GP.DO 5 is a syntax
+.error.
+.
+=Where the library lives
+.
+.Keep GPC-BASIC/ as a folder beside your own sources and include from it by
+.path:
+.
+:#INCLUDE "/GPC-BASIC/GPB.INC.BL"
+.
+.#INCLUDE accepts a path as well as a bare filename. Verified on R49 for both
+.absolute (/GPC-BASIC/GPB.INC.BL) and relative (GPC-BASIC/GPB.INC.BL) forms.
+.Use the leading slash: it is absolute from the drive root and still resolves
+.when the program sits in a subdirectory. ../ and // are not understood by
+.the filesystem, so a path descends and never rises.
+.
+.Then BASLOAD and GPC as usual: BASLOAD "MYPROG.BL", then compile the
+.resulting PRG with GPC.PRG.
+.
+=A program that uses GP.BASIC is compile-only
+.
+.One GP.BASIC keyword is enough. BASLOAD encodes them as the byte pairs
+.$CE58-$CE7F and stock BASIC has no handler behind them, so the ROM can
+.neither LIST nor RUN the result. It is compiler input.
+.
+.Run GPC.PRG on BASLOAD's .PRG, then run the object it writes.
+.
+=Numbers, and what a variable holds
+.
+.One numeric type on the evaluation stack: a 4-byte mantissa, a 1-byte
+.exponent and a status byte carrying the sign. Exponent 0 means the value is
+.an exact integer.
+.
+.  A A()
+.      BYTES: 6
+.      HOLDS: mantissa, exponent, status. Exact integers while the exponent
+.        is 0
+.
+.  A% A%()
+.      BYTES: 2
+.      HOLDS: signed 16-bit two's complement, -32,768 to 32,767
+.
+.  A$ A$()
+.      BYTES: 2
+.      HOLDS: a pointer into the string heap
+.
+.% is smaller, not faster, and it truncates without raising an error.
+.WriteInteger stores the low two bytes of the value on the stack; ReadInteger
+.sign-extends the MSB. A% = 49152 reads back as -16,384. Use % for counters,
+.indices and screen coordinates.
+.
+.Do not use % for an address. Main RAM runs to $9F00 (40,704), the string
+.heap is above 32,767 by definition, and a VRAM address is 17 bits (up to
+.131,071). Hold an address in an untyped variable, which represents all three
+.exactly, or split it into page and offset.
+.
+.Numeric literals above 65,535 are accepted. The compiler has a 16-bit fast
+.path for constants; anything wider compiles through the float encoder.
+.Neither wraps.
+.
+.AND and OR are 16-bit signed and raise OUT OF RANGE above 32,767; see SEC 6.
+.
 =SEE ALSO
 .
->10|2. Using it
->181|7. Memory, and what the compiler tells you
->69|4. Module reference -- the BASL library
->131|5. Variables
->62|3.12 Code in a bank
->124|STASH.INC.BL -- save a text rectangle, and put it back.
->91|4.7 SORT.INC.BL -- shell sort a string array
->92|4.8 STRCASE.INC.BL -- case, in place
->72|4.2 STRINGS.INC.BL -- string helpers
+>153|6. The traps, collected

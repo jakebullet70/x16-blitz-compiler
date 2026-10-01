@@ -1,83 +1,115 @@
-@4.6 MENU.INC.BL -- menus built a row at a time (3)
-=Keys and flags
+@4.15 FILEIO.INC.BL -- the drive: status, files, directories
 .
-.  UP, DOWN
-.      move, on the popup
+=4.15 FILEIO.INC.BL -- THE DRIVE: STATUS, FILES, DIRECTORIES
 .
-.  LEFT, RIGHT
-.      move, on the bar
+=WHAT IT COSTS
 .
-.  RETURN
-.      choose a live row
+.    BASIC -- ordinary BASL in a .INC.BL, called with GOSUB. Free unless you
+.    #INCLUDE it.
 .
-.  ESC or STOP
-.      cancel, and return 0
+=DESCRIPTION
 .
-.  a hot key
-.      choose its row at once
+.  FILE.STATUS
+.      IN: --
+.      OUT: FILE.ERR FILE.MSG$ FILE.TRK FILE.SEC
 .
-.  MENU.MUSTSEL
-.      VALUE: 1
-.      ESC and STOP do not cancel
+.  FILE.EXISTS
+.      IN: FILE.NAME$
+.      OUT: FILE.OK
 .
-.  MENU.KEEPMARK
-.      VALUE: 2
-.      the chosen row stays lit. On the bar, MENUTO.BAR sets MENU.MARKED to
-.        it
+.  FILE.SIZE
+.      IN: a name -- a verb, not a GOSUB
+.      OUT: FILE.OK FILE.BLOCKS
 .
-.  MENU.NOWRAP
-.      VALUE: 4
-.      stop at the ends instead of wrapping
+.  FILE.DELETE
+.      IN: FILE.NAME$, pattern allowed
+.      OUT: FILE.ERR FILE.TRK
 .
-.  MENU.GAMEPAD
-.      VALUE: 8
-.      the SNES pad in port 1 as well: directions move, B or START chooses
+.  FILE.RENAME
+.      IN: FILE.NAME$ FILE.NEW$
+.      OUT: FILE.ERR
 .
-.  MENU.DOWNEXIT
-.      VALUE: 16
-.      bar only: DOWN chooses the item
+.  FILE.COPY
+.      IN: FILE.NAME$ FILE.NEW$
+.      OUT: FILE.ERR
 .
-.  MENU.UPEXIT
-.      VALUE: 32
-.      bar only: UP chooses the item
+.  FILE.MKDIR FILE.RMDIR FILE.CHDIR
+.      IN: FILE.NAME$
+.      OUT: FILE.ERR
 .
-.  MENU.KEYEXIT
-.      VALUE: 64
-.      a key the menu has no use for ends the run, and the row it was on is
-.        returned
+.  FILE.UP
+.      IN: --
+.      OUT: FILE.ERR
 .
-.  MENU.HINTMID
-.      VALUE: 128
-.      centre the hint in its field
+.  FILE.CURDIR
+.      IN: --
+.      OUT: FILE.PATH$
 .
-.On the bar, UP and DOWN do nothing unless MENU.UPEXIT or MENU.DOWNEXIT is
-.set.
+.  FILE.SAVEARRAY
+.      IN: FILE.NAME$ FILE.ROWS FILE.LINE$()
+.      OUT: FILE.ERR
 .
-.The pad acts on new presses only, one step a press. Cancel is keyboard only.
-.With no pad connected the flag changes nothing; in the emulator a pad needs
-.-joy1.
+.  FILE.LOADARRAY
+.      IN: FILE.NAME$ FILE.MAX.ROWS
+.      OUT: FILE.ROWS FILE.LINE$()
 .
-.MENU.EXITKEY is the key that ended the run: 13 for RETURN, 27 for ESC, 3 for
-.STOP, the hot key, or the key MENU.KEYEXIT handed back. A pad press is
-.reported as the key it stands for.
+:#SYMFILE "@:MYPROG.SYM"
+:#INCLUDE "FILEIO.INC.BL"
+:
+:FILE.NAME$ = "SCORES.DAT" : GOSUB FILE.EXISTS
+:IF FILE.OK THEN N = GP.FN(FILE.SIZE, "SCORES.DAT")
 .
-.MENU.BARNUM is the bar's row count. MENU.SELX and MENU.SELW are the chosen
-.bar item's column and width, for placing a panel under it. MENU.MARKED is
-.the bar item left lit by MENU.KEEPMARK or by MENUTO.PULLDOWN (SEC 4.9).
-.MENU.DRAWBAR redraws the bar with it lit, to repaint a bar that a panel has
-.covered.
+.The #SYMFILE is required, before the #INCLUDEs. FILE.TOPET is GP.ASM and
+.reaches FILE.PETP% through {VAR}; without a symbol file the compile stops at
+.{} NEEDS #SYMFILE.
 .
-.Examples: MENUTO.EXP.BL runs a popup, a bar and a dropdown by hand, and
-.MENUBUILD.EXP.BL builds both slots and reads them back.
+.FILE.SIZE is declared with GP.DEFPROC, so it is called as a verb -- GP.SUB
+.FILE.SIZE, "MYFILE.DAT" or N = GP.FN(FILE.SIZE, "MYFILE.DAT") -- and not
+.with a GOSUB. Everything else in the table is a plain GOSUB.
 .
-=EXAMPLE PROGRAM
+.FILE.DEVICE is the drive and 0 means 8. FILE.ISO non-zero folds names to
+.PETSCII on the way out. FILE.LINE$() is the caller's DIM, as GUI.LIST.ITEM$
+.is; left alone the implicit DIM gives 0 to 10. FILE.ROWS is an input to
+.SAVEARRAY and an output from LOADARRAY.
 .
-.  MENUTO.EXP.BL -- runnable, in the GPC-BASIC folder
-.  MENUBUILD.EXP.BL -- runnable, in the GPC-BASIC folder
+.FILE.ERR under 20 is success. 0 is OK. 1 is files scratched and carries the
+.count in FILE.TRK. 62 is FILE NOT FOUND, 63 FILE EXISTS, 26 WRITE PROTECT.
+.FILE.ERR is DS and FILE.MSG$ is DS$ -- the X16 has neither.
+.
+.This module takes logical file 14 and secondary address 14. Not 2 or 3:
+.those belong to the editor, GPC-HELP and the cruncher. The two are equal so
+.a later seek needs no reopen.
+.
+.ST is not a disk status. LINPUT# on a channel whose OPEN found nothing
+.returns CHR$(0) with ST = 66, and keeps doing so. ST is 64 before a
+.program's first statement, because LOAD leaves bit 6 set.
+.
+.The traps, each one measured on the drive:
+.
+.  - Read the command channel or the next OPEN misbehaves. The drive holds
+.    its error state until channel 15 is read. Every routine here ends by
+.    reading it.
+.  - FILE.RENAME onto a name that exists returns 62, not 63 -- which is what
+.    a missing source also returns. Test with FILE.EXISTS first.
+.  - FILE.COPY is one drive. C:new=old cannot cross devices. It takes a comma
+.    list, so it also concatenates.
+.  - FILE.SAVEARRAY overwrites, with @: on the open.
+.  - FILE.DELETE takes a pattern. S:*.BAK scratches every match.
+.  - The last row of a file arrives with ST already set, so a row is stored
+.    before the loop ends. A blank final line is indistinguishable from end
+.    of file and is dropped.
+.
+.CMDR-DOS has no REL files. For random access use ,M open mode with P and T
+.on channel 15:
+.
+:OPEN 1,8,2,"LEVEL.DAT,S,R"
+:OPEN 15,8,15,"P"+CHR$(2)+CHR$(0)+CHR$(1)+CHR$(0)+CHR$(0)
+.
+.T returns the position and the file size. The data channel's secondary
+.address must equal the P or T channel argument. VAL("$"+MID$(A$,10)) from
+.the manual returns 0 here -- VAL stops at the first non-numeric character,
+.so parse the eight hex digits by hand.
 .
 =SEE ALSO
 .
->100|4.13 BANKMGR.INC.BL -- who owns which RAM bank
->55|3.10 Text in a bank
->93|4.9 MENUPULL.INC.BL -- a dropdown under a bar item
->84|4.6 MENU.INC.BL -- menus built a row at a time
+>92|4.15 FILEIO.INC.BL -- the drive: status, files, directories

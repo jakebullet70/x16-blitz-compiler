@@ -1,27 +1,18 @@
-@3.3.1 GP.HIBYTE / GP.LOBYTE -- split an address into two bytes
+@3.4.2 GP.CONTAINS -- test for a substring
 .
-=3.3.1 GP.HIBYTE / GP.LOBYTE
+=3.4.2 GP.CONTAINS
 .
-.  Syntax    GP.HIBYTE(n)   GP.LOBYTE(n)
-.  Returns   GP.HIBYTE: INT(n / 256), the 256-byte page.
-.            GP.LOBYTE: MOD(n, 256), the offset within that page.
-.  Kind      COMPOSITE. Expands to INT(n/256) and MOD(n,256). No
-.            runtime code, and neither needs the GP block.
-.  Notes     n is 0-65,535, which covers every address on the machine.
-.            Everything that consumes an address takes eight bits at a
-.            time: GP.CALL's registers, VERA's $9F20/$9F21. The
-.            addresses to split come from GP.STRPTR (SEC 3.4.5) and
-.            GP.ARRPTR (SEC 3.5).
-.  WARNING   Never write P AND 255 for the low byte. AND is 16-bit
-.            signed and any address worth splitting is above 32,767,
-.            so it raises OUT OF RANGE instead of masking. GP.LOBYTE
-.            is built on MOD, which uses the full 32-bit divide.
+.  Syntax    GP.CONTAINS(hay$, needle$)
+.  Returns   -1 if needle$ occurs anywhere in hay$, 0 if not.
+.  Kind      COMPOSITE. Expands to GP.INSTR(hay$, needle$) <> 0, and
+.            compiles to the same object. Use whichever reads better.
+.  Notes     Case sensitive, as SEC 3.4.1 is.
+.            An empty needle$ returns 0, not -1, because GP.INSTR
+.            reports not-found for one.
 .  Example
 .
-:            P = GP.STRPTR(A$)
-:            GP.CALL $A000, GP.LOBYTE(P), GP.HIBYTE(P)
+:            IF GP.CONTAINS(F$, ".BAS") THEN GOSUB LOAD.IT
 .
 =SEE ALSO
 .
->42|3.4.5 GP.STRPTR -- address of a string block
->43|3.5 Arrays
+>35|3.4.1 GP.INSTR -- position of a substring

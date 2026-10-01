@@ -1,32 +1,26 @@
-@4.25 DOS.INC.BL -- a drive command, and a test for a file
+@5. TRUE IS -1
 .
-=4.25 DOS.INC.BL -- A DRIVE COMMAND, AND A TEST FOR A FILE
+=5. TRUE IS -1
 .
-=DESCRIPTION
+.Every flag the library hands back is -1 for true and 0 for false, and
+.anything written against it should be too. GUI.OK GUI.ANSWER GUI.STASHED
+.STASH.OK SORT.OK MENU.OK FILE.OK BANKMGR.OK APPSYS.IS.EMULATOR -- all of
+.them.
 .
-.Two verbs on the drive's command channel. DOSX sends a command and reads the
-.drive's answer. DOSX.EXISTS tests whether a file opens. Each also has a
-.GOSUB entry that takes its argument in a variable.
+.That is what a comparison in this compiler evaluates to, so a flag and a
+.test read the same way, and it is the value NOT wants: NOT is -x-1, so NOT
+.-1 is 0 while NOT 1 is -2, which is still true. IF itself tests non-zero, so
+.IF FLAG THEN works either way and IF FLAG = 1 THEN is the spelling that
+.breaks.
 .
-.It is the smaller alternative to FILEIO.INC.BL (SEC 4.15). A program
-.includes one or the other, not both. It needs GPB.INC.BL ahead of it and
-.includes nothing.
+:IF GUI.OK THEN <accepted> : REM yes
+:IF NOT GUI.OK THEN <cancelled> : REM yes
+:IF GUI.OK = 0 THEN <cancelled> : REM yes
+:IF GUI.OK = 1 THEN <accepted> : REM NO -- it is -1
 .
-.DOS.DEVICE is the drive. A call with it 0 uses 8 and leaves it 8.
+.A flag the CALLER sets is read as non-zero, so LINEINPUT.MASK = 1 and
+.STASH.MOVE = 1 still work. Write -1 in new code all the same.
 .
-.After either verb, DOS.ERR is the drive's error number and DOS.MSG$ its
-.message. DOS.ERR under DOS.OKMAX, 20, is success.
-.
-.Nothing in the module needs the GP block. GP.FN brings it in, 1,536 bytes.
-.GP.SUB and GOSUB leave it out (SEC 3.11).
-.
-=IN THIS SECTION
-.
->117|4.25.1 DOSX -- send a command, read the answer
->118|4.25.2 DOSX.EXISTS -- whether a file opens
-.
-=SEE ALSO
-.
->102|4.15 FILEIO.INC.BL -- the drive: status, files, directories
->57|3.11 Calling a routine in one statement
->116|4.25 DOS.INC.BL -- a drive command, and a test for a file
+.Printing one needs STR$ whole. The MID$(STR$(N), 2) idiom strips the leading
+.space STR$ puts on a positive number; -1 has no leading space, so that idiom
+.eats the minus and prints 1.

@@ -1,87 +1,47 @@
-@3. Command reference (2)
-.  Dialogs
-.      BASIC
-.      COMBO.INC.BL -- COMBO.ADD, a drop-down that folds into one row - SEC
-.        4.17
+@3.3 Machine code
 .
-.  Dialogs
-.      BASIC
-.      CHECK.INC.BL -- CHECK.ADD, a check box, [X] or [ ] - SEC 4.21
+=3.3 MACHINE CODE
 .
-.  Dialogs
-.      BASIC
-.      GUI-LITE.INC.BL -- MSGBOX PICKMENU CLOSEBOX, in low memory, nothing
-.        banked - SEC 4.24
+=SYNTAX
 .
-.  Code in a bank
-.      ASM
-.      GP.BANKED GP.ENDBANKED -- p-code at $A000, out of the low-memory
-.        budget, see SEC 3.12
+:GP.CALL address [,a] [,x] [,y] [,carry]
+:GP.A   GP.X   GP.Y   GP.C
 .
-.  Bank ownership
-.      BASIC
-.      BANKMGR.INC.BL -- INIT CLAIM GET.FREE.BANK RELEASE COUNT - SEC 4.13
+=WHAT IT COSTS
 .
-.  Key-value store
-.      BASIC
-.      KV.INC.BL -- INIT GET PUT DEL FIND AT WIPE SAVE LOAD, strings in one
-.        RAM bank - SEC 4.20
+.  ASM: GP.CALL GP.A GP.X GP.Y GP.C
+.    ASM -- machine code in the GP runtime block. One GP keyword pays for the
+.    whole block.
 .
-.  Keyboard
-.      BASIC
-.      KB.INC.BL -- KB.CLEARKB - SEC 4.14
+=DESCRIPTION
 .
-.  The drive
-.      BASIC
-.      FILEIO.INC.BL -- STATUS EXISTS SIZE DELETE RENAME COPY MKDIR CHDIR
-.        SAVEARRAY LOADARRAY - SEC 4.15
+.Calls machine code with the registers set. All four arguments are optional
+.and default to 0. The four value words read the registers back afterwards.
 .
-.  The drive
-.      BASIC
-.      FILEDIR.INC.BL -- FILE.DIR.INIT OPEN NEXT, into a bank or low RAM -
-.        SEC 4.16
+.They are keywords, not variables: X = GP.A reads, GP.A = 5 is a syntax
+.error. They share SYS's $030C-$030F, so they also read what a plain SYS left
+.behind.
 .
-.  The drive
-.      BASIC
-.      DOS.INC.BL -- DOSX DOSX.EXISTS, the smaller alternative to FILEIO -
-.        SEC 4.25
+:GP.CALL $FF5F, 0, 0, 0, 1 : REM KERNAL screen_mode, carry set = report
+:COLS = GP.X : ROWS = GP.Y
 .
-.  Screen -- stash
-.      BASIC
-.      STASHVRAM.INC.BL -- SV.SAVE SV.RESTORE SV.PUT SV.GET, kept in VRAM -
-.        SEC 4.18
+.Put machine code in banked RAM, $A000-$BFFF, not at $0400. Stock X16 BASIC
+.leaves $0400 free for the user; a compiled GPC program does not. That page
+.holds runtime state (stringHighMemory, storeStartHigh, variableStartPage),
+.and code POKEd over it corrupts the program without raising an error.
 .
-.  Screen -- stash
-.      BASIC
-.      STASHVRAMGC.INC.BL -- SV.COMPACT - SEC 4.19
+.For anything longer than a few bytes use GP.ASM (SEC 3.9) instead of GP.CALL
+.and a POKE loop. It assembles into the program: no bank to reserve, and no
+.list of numbers to keep in step with a comment.
 .
-.  Numbers
-.      BASIC
-.      MATH.INC.BL -- MATH.MIN MATH.MAX - SEC 4.22
+=IN THIS SECTION
 .
-.  Memory
-.      BASIC
-.      MEM.INC.BL -- MEM.COPY MEM.FILL, the KERNAL's block move - SEC 4.23
+>33|3.3.1 GP.HIBYTE / GP.LOBYTE -- split an address into two bytes
 .
-.The rule is in SEC 1: assembly for tight loops and bulk data moves, BASIC
-.for everything else, and a composite for anything that is only a spelling of
-.keywords already present.
+=EXAMPLE PROGRAM
 .
-.The keywords in detail. Square brackets mean optional. Optionals cannot be
-.skipped over: GP.BOX X,Y,W,H,,7 is a syntax error -- write out the default
-.you are passing through.
+.  MLCALL.EXP.BL -- runnable, in the GPC-BASIC folder
 .
 =SEE ALSO
 .
->69|4. Module reference -- the BASL library
->47|3.8 Block IF
->48|3.9 Inline assembly
->37|3.4 Strings
->36|3.3.1 GP.HIBYTE / GP.LOBYTE -- split an address into two bytes
->55|3.10 Text in a bank
->57|3.11 Calling a routine in one statement
->71|4.1 THEME.INC.BL -- named colour roles
->72|4.2 STRINGS.INC.BL -- string helpers
->81|4.3 APPSYS.INC.BL -- start politely, leave it as you found it
->82|4.4 LINEINPUT.INC.BL -- a positioned entry field
->83|4.5 BMX.INC.BL -- a BMX bitmap into VERA
+>45|3.9 Inline assembly

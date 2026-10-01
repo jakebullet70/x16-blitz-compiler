@@ -76,7 +76,7 @@ again. See [memory-is-git-tracked](memory-is-git-tracked.md).
 - [The editor's slow RETURN](editor-return-is-the-line-table.md) — FIXED at 87x, the 2048-entry boundary is the trap; [the LINPUT# loader](gpc-editor-loader-linput-and-blob.md) — 10.5x over GET#, ST=66 on a missing file
 - [Editor: ASCII inside, PETSCII outside](gpc-editor-is-ascii-inside-petscii-outside.md) — why the font is re-ordered in VRAM; [ALT keys need the keymap](gpc-editor-alt-keys-need-the-keymap.md), in ISO mode ALT+F sends nothing
 - [VERA FX cache writes are aligned](vera-fx-cache-write-is-aligned.md) — the row renderer needs an EVEN column
-- [GPC-HELP scroll cost is the file read](gpc-help-scroll-cost-is-the-file-read.md) — the .HLP is re-read every keypress
+- [GPC-HELP scroll cost is the file read](gpc-help-scroll-cost-is-the-file-read.md) — FIXED 04/09/26: loaded once, table in bank 9 and text in 15-22, topics no longer split; the body below the fold is history
 - [HOSTFS is not the DIR slowness](hostfs-is-not-the-dir-slowness.md) — XFMGR is much faster on the same host; the 2 s is our read loop. QUEUED after LISTS/DIR
 - [Bar and dropdown drive each other](menubar-menuhelp-cross-axis-exits.md) — DOWNEXIT and KEYEXIT are the two halves; [use the whole interface](menuhelp-use-the-whole-interface.md), build the library's own example first
 

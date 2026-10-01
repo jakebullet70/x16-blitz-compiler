@@ -1,18 +1,28 @@
-@3.4.2 GP.CONTAINS -- test for a substring
+@3.4.5 GP.STRPTR -- address of a string block
 .
-=3.4.2 GP.CONTAINS
+=3.4.5 GP.STRPTR
 .
-.  Syntax    GP.CONTAINS(hay$, needle$)
-.  Returns   -1 if needle$ occurs anywhere in hay$, 0 if not.
-.  Kind      COMPOSITE. Expands to GP.INSTR(hay$, needle$) <> 0, and
-.            compiles to the same object. Use whichever reads better.
-.  Notes     Case sensitive, as SEC 3.4.1 is.
-.            An empty needle$ returns 0, not -1, because GP.INSTR
-.            reports not-found for one.
+.  Syntax    GP.STRPTR(a$)
+.  Returns   Address of the string's [ActLen][Data] block.
+.  Kind      ASM. Needs the GP block.
+.  Notes     The length byte is at the address, the first character at
+.            +1, the block capacity at -2.
+.            With GP.CALL (SEC 3.3), machine code can fill a string in
+.            place and set its length. Stock BASIC cannot do that.
+.  WARNING   Split the address with GP.LOBYTE / GP.HIBYTE (SEC 3.3.1),
+.            never with P AND 255. AND is 16-bit signed and the string
+.            heap is above 32,767, so P AND 255 raises OUT OF RANGE.
+.            The longhand H = INT(P / 256) : L = P - H * 256 is what
+.            the keywords compile to. The same applies to SEC 3.5
+.            GP.ARRPTR and to any VRAM address in the top eighth of
+.            memory.
 .  Example
 .
-:            IF GP.CONTAINS(F$, ".BAS") THEN GOSUB LOAD.IT
+:            P = GP.STRPTR(A$)
+:            GP.CALL $A000, GP.LOBYTE(P), GP.HIBYTE(P)
 .
 =SEE ALSO
 .
->38|3.4.1 GP.INSTR -- position of a substring
+>32|3.3 Machine code
+>33|3.3.1 GP.HIBYTE / GP.LOBYTE -- split an address into two bytes
+>40|3.5 Arrays

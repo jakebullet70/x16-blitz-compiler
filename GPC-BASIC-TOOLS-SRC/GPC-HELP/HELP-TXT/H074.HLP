@@ -1,119 +1,93 @@
-@4.26 GPBMODS -- the harness that drives every module
+@8. Known bugs
 .
-=4.26 GPBMODS -- THE HARNESS THAT DRIVES EVERY MODULE
+=8. KNOWN BUGS
 .
-=DESCRIPTION
+.Three, all live on 12th September 2026 and all reproducible. Each says what
+.happens, what causes it, and what to do instead. A bug leaves this list when
+.it is fixed, not when it is understood.
 .
-.GPC-BASIC-TOOLS-SRC/GPB-MODS-TESTING/GPBMODS.BASL. A menu bar of nine
-.dropdowns whose rows reach nearly every public entry point in this section.
-.It is the one program that holds all twenty-one modules at once, and the
-.worked example of GP.BANKED, GP.BANKEDSTR and BANKMGR in one place.
+=A string never gives memory back
 .
-:gpbmods-demo.bat
+.A$ = "" frees nothing. A string variable owns its block: the assignment sets
+.the length to zero and keeps the capacity. The heap scavenger reclaims only
+.a block a string outgrew and abandoned, never one a variable still holds. A
+.working buffer that has once held a 250-character line is spoken for until
+.the program ends.
 .
-.The drive is source/drive/, not the sample folder. The object is compiled
-.SHARED and loads GPB.RT.nnn.BIN from there.
+.So a big temporary cannot be built and then freed. It has to not be built.
 .
-.No row is a stub. A chosen row calls the library for real and shows what
-.came back, on the panel and on the LAST line at the foot of the page. Three
-.modules are under test before any row is chosen: MENU draws the bar,
-.MENUPULL every dropdown, and STASH puts the screen back under a closed one.
+.Measured 2026-09-02. The editor's find folded the needle and every line it
+.scanned into new strings and compared with MID$ per position: 579 bytes gone
+.for the rest of the run, from a workspace with 1,489 free, and the GUI
+.dialogs then died on what was left. Rewritten to fold in place through
+.GP.STRPTR with one GP.INSTR per line, a find costs 81 bytes, and the program
+.came out 59 bytes smaller.
 .
-.  DIALOG -- D
-.      GUI GUI-DIALOGS COMBO CHECK
+.Do this -- PRINT FRE(0) at eight points down the run and read the descent.
+.It is a high-water ceiling, so it only falls, and the step that falls is the
+.culprit.
 .
-.  LISTS -- L
-.      MENU
+=BINPUT# stops at 255 bytes
 .
-.  INPUT -- I
-.      LINEINPUT
+.BINPUT# n, A$, len cannot read more than 255 bytes. Three independent caps
+.land on that one number, so there is no single constant to raise.
 .
-.  SCREEN -- S
-.      STASH STASHFILE STASHVRAM
+.  the read buffer is 255 bytes
+.      WHERE: ReadBuffer: .fill 255
 .
-.  STRINGS -- G
-.      STRINGS STRCASE STRUSING
+.  the count argument is 8 bit, and unchecked
+.      WHERE: GetInteger8Bit takes mantissa byte 0 and returns
 .
-.  DATA -- A
-.      SORT
+.  a BASIC string is 255 characters
+.      WHERE: nowhere to put a longer record in any case
 .
-.  THEME -- T
-.      THEME
+.The second is the trap. BINPUT# 12, A$, 256 sets the count to 0 and hands
+.back an empty string, silently. 300 gives 44 bytes.
 .
-.  ABOUT -- B
-.      BANKMGR
+.It is also not a block read. It is a CHRIN loop, one KERNAL call per byte
+.with an EOF check on top of that. BINPUT# is one statement, not one
+.transfer, so anything costing a BINPUT# per record pays that stride per
+.record.
 .
-.  FILES -- F
-.      FILEIO FILEDIR
+.LINPUT# shares the same buffer and stops at 255 too, but runs on to the
+.delimiter afterwards, so the next read starts at a line boundary.
 .
-.APPSYS runs at startup and at exit rather than from a row. STRINGS answers
-.to G because SCREEN has taken S: a hot key need not be an item's initial,
-.and & marks it, as in " STRIN&GS ".
+.Do this -- a record cannot be one string. Make it N strings of 255, or keep
+.it in a bank and copy out the part that is needed.
 .
-.Twenty-one modules are included and nineteen are driven. KB and STASHVRAMGC
-.are compiled in and have entry points -- KB.CLEARKB, SV.COMPACT -- that no
-.panel calls. BMX (SEC 4.5) is not included: it wants a bitmap file and a
-.screen mode of its own, and the BMXVIEW example in GPC-BASIC/ covers it.
+=File I/O in a GP.DO key loop
 .
-.WARNING: FILES writes to the drive. Four of its rows do. Everything they
-.make is named GPBFILE.* or GPBDIR, and the row that makes each one removes
-.it.
+.A save routine reached from inside a program's own GP.DO key loop writes its
+.file completely and correctly, and then the program stops with
 .
-=Thirteen banks
+:INPUT/OUTPUT ERROR @ $005B
 .
-.Ten are named at compile time. Nine are claimed from BANKMGR (SEC 4.13) at
-.startup, because the compiler picks them while the object is written and the
-.manager is told rather than asked. The tenth, 62, is claimed by the first
-.MENU.BEGIN when the bar is built, before any bank is allocated. Three more
-.are allocated at run time: the cells a dropdown covers, preset into
-.MENU.STASHBANK, the cells a dialog covers, and FILEDIR's directory buffer.
+.The address is identical in every failing build, which says a clobbered
+.instruction pointer rather than a real device error.
 .
-.  bank 4, 5,632 bytes
-.      LINEINPUT GUI GUI-DIALOGS
+.Seven shapes have been compiled and probed. Do not bisect them again.
 .
-.  bank 5, 7,936 bytes
-.      literal text, pool one
+.  OPEN/PRINT#/CLOSE at top level
+.      RESULT: passes
 .
-.  bank 6, 5,120 bytes
-.      literal text, pool two
+.  four consecutive PRINT#, no PRINT between
+.      RESULT: passes
 .
-.  bank 7, 5,120 bytes
-.      APPSYS BANKMGR KB SORT STASHVRAM STASHVRAMGC STRCASE STRINGS STRUSING
+.  the same inside GP.DO ... GP.EXITDO
+.      RESULT: passes
 .
-.  bank 8, 1,792 bytes
-.      FILEIO FILEDIR
+.  the same behind a GOSUB inside a GP.DO
+.      RESULT: passes
 .
-.  bank 9, 768 bytes
-.      THEME
+.  the same behind GP.SELECT then GOSUB inside a GP.DO
+.      RESULT: passes
 .
-.  bank 10, 1,536 bytes
-.      COMBO CHECK
+.  the real routine called from the top level of the same program
+.      RESULT: passes
 .
-.  bank 11, 3,072 bytes
-.      the two biggest dropdown handlers, this program's own code
+.  the real routine reached from the program's own GP.DO key loop
+.      RESULT: fails
 .
-.  bank 12, 2,816 bytes
-.      MENU MENUPULL
-.
-.  bank 62, 4,352 bytes
-.      the menu store, MENU.TEXTS and MENU.HINTS
-.
-.Seven of those are GP.BANKED code regions (SEC 3.12) and three are
-.GP.BANKEDSTR text pools (SEC 3.10). All ten are in one GPBMODS.OVL, each
-.behind its own bank and page-count bytes, with a one-byte end marker.
-.GPBMODS.PRG is 11,542 bytes and GPBMODS.OVL is 38,165: the ten sections come
-.to 38,144, the header bytes to 20, and the end marker is the last byte.
-.
-.Only what holds a BANK statement stays in low RAM. STASH and STASHFILE
-.execute BANK, which the compiler refuses inside a region; STASHVRAM (SEC
-.4.18) is the one to reach for from inside one.
-.
-.Seven regions and not one, because a region holds at most 8,192 bytes and
-.the GUI fills its own. A region may call another: the call selects the other
-.bank and its RETURN puts the caller's back.
-.
-.A nearly empty region still costs a whole page count. Bank 9 holds 502 bytes
-.of THEME in three pages. Below about a page and a half of p-code, a region
-.gives back less than it looks like. Bank 10 held 705 bytes of COMBO in 768
-.the same way, until CHECK moved in beside it.
-.
+.Do this -- a plain PRINT immediately after the CLOSE makes it pass. Channel
+.0 output runs CLRCHN; a non-zero channel runs CHKOUT and READST instead, so
+.the suspect is channel state left behind rather than the file I/O.

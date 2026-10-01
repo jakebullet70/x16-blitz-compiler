@@ -1,107 +1,56 @@
-@4.1 THEME.INC.BL -- named colour roles
+@4.7 SORT.INC.BL -- shell sort a string array
 .
-=4.1 THEME.INC.BL -- NAMED COLOUR ROLES
-.
-=WHAT IT COSTS
-.
-.    BASIC -- ordinary BASL in a .INC.BL, called with GOSUB. Free unless you
-.    #INCLUDE it.
+=4.7 SORT.INC.BL -- SHELL SORT A STRING ARRAY
 .
 =DESCRIPTION
 .
-.  THEME.SELECT
-.      IN: THEME.ID%
-.      OUT: fills THEME.CLR()
+.  SORT.RUN
+.      IN: SORT.PTR SORT.DESCEND SORT.NOCASE
+.      OUT: SORT.OK SORT.COUNT
 .
-.  THEME.NEXT
-.      IN: THEME.ID%
-.      OUT: the following theme, loaded
+:#SYMFILE "@:MYPROG.SYM"
+:#INCLUDE "SORT.INC.BL"
+:
+:SORT.PTR = GP.ARRPTR(NAME$())
+:SORT.DESCEND = 0 : SORT.NOCASE = 0
+:GOSUB SORT.RUN
 .
-.  THEME.RESET
-.      IN: THEME.ID%
-.      OUT: the selected theme's shipped values, reloaded
+.Shell sort with Ciura's gap sequence -- 132, 57, 23, 10, 4, 1 -- moving the
+.2-byte element pointers rather than string data. A swap costs the same
+.whatever the strings are: no temporary, no copy, no heap traffic.
 .
-.  THEME.SET
-.      IN: THEME.ATTR%
-.      OUT: issues COLOR -- makes it the colour PRINT uses
+.The array is passed as an address because a BASL subroutine cannot be passed
+.an array; GP.ARRPTR is a keyword for this purpose. The empty parentheses in
+.GP.ARRPTR(A$()) are required -- A$ and A$() are different variables.
 .
-.  THEME.HI
-.      IN: THEME.ATTR%
-.      OUT: THEME.INV%, the inverse attribute
+.SORT.OK is -1 when it sorted and 0 if the sort was refused: more than 255
+.elements, so DIM A$(254) is the largest accepted (DIM A$(255) is 256
+.elements), or an array whose elements are not strings. The element count and
+.the type are read from the array's own header, three bytes below what
+.GP.ARRPTR returns, so a wrong count cannot be passed in.
 .
-.Five themes, THEME.COUNT of them:
+.Never-assigned elements are empty strings, not garbage. A DIM A$(20) with
+.five entries filled sorts its fifteen empties to the front; a null pointer
+.reads as "", as it does elsewhere in the runtime.
 .
-.  0
-.      X16
-.      blue page, white text, cyan headings. The default
+.SORT.DESCEND and SORT.NOCASE are ordinary variables rather than arguments,
+.so they are sticky. Set both on every call.
 .
-.  1
-.      DARK
-.      black page, light grey text
+.The program must have a #SYMFILE, placed before the #INCLUDEs. The assembly
+.reaches BASIC's variables through {VAR}, and BASLOAD crunches every name
+.before the compiler sees it; without the mapping the compile stops with {}
+.NEEDS #SYMFILE.
 .
-.  2
-.      LIGHT
-.      white page, black text
+.Example: ARRAYS.EXP.BL. Regression test: SORT.EXP.BL, eight cases including
+.a 200-element array -- element 128 is where the doubled index stops fitting
+.in a byte. Every case checks content as well as order: a sort that reads the
+.wrong element leaves the array in order with a string duplicated.
 .
-.  3
-.      GRAY
-.      dark grey page, light blue frames. From the XFMGR file manager
+=EXAMPLE PROGRAM
 .
-.  4
-.      CUSTOM
-.      whatever THEME.CLR() already holds
-.
-.THEME.NEXT moves to the following one and wraps, which is what a program
-.binds to a key. A cached attribute does not follow it: work out anything
-.derived from THEME.CLR(), a reversed bar included, after every load.
-.
-.CUSTOM loads nothing. Selecting it leaves THEME.CLR() as it stands, so a
-.program that lets the user change colours carries those changes into CUSTOM
-.rather than discarding them. The one exception is a cold start -- CUSTOM
-.selected before any other theme has been loaded -- where there is nothing to
-.keep and it takes X16's values. THEME.RESET goes back to those.
-.
-.GPC-BASIC-TOOLS-SRC/color-test edits the roles against a mock of the GUI and
-.prints the THEME.CLR() lines to paste back in here. It carries its own
-.GPC-BASIC folder and is still at nine roles, so it offers THEME.FOCUS and
-.THEME.BAR but not THEME.SHADOW.
-.
-.Roles, for indexing THEME.CLR(): THEME.PAGE THEME.TEXT THEME.TITLE
-.THEME.BORDER THEME.HILITE THEME.DIMMED THEME.WARN THEME.FOCUS THEME.BAR
-.THEME.SHADOW, and THEME.SLOTS = 10.
-.
-.THEME.FOCUS is the eighth: what a focused control wears while GUI.FORM has
-.the keyboard (SEC 4.11). It is a separate role from THEME.HILITE because a
-.dialog shows both at once -- the highlighted row of a list, and the control
-.the TAB key has landed on. THEME.BAR is the ninth, the band a menu bar or
-.status line sits on, and THEME.SHADOW the tenth and newest, the colour a
-.drop shadow is filled with.
-.
-.The module's own scalars are int16: THEME.ID%, THEME.ATTR% and THEME.INV%.
-.THEME.CLR() is not -- it stays an untyped array, and it is DIMmed to
-.THEME.SLOTS - 1, which is the last role and no element beyond it.
-.
-.Usage is THEME.ID%, one GOSUB THEME.SELECT, then THEME.CLR(role) wherever an
-.attribute is wanted:
-.
-:THEME.ID% = 1 : GOSUB THEME.SELECT
-:GP.BOX 4,2,30,8, 2, THEME.CLR(THEME.BORDER)
-:GP.PRINTAT 6,3, "TITLE", THEME.CLR(THEME.TITLE)
-.
-.The values are packed attributes, background * 16 + foreground, which is
-.what GP.BOX, GP.FILL and GP.PRINTAT take. For COLOR, which takes the halves
-.separately, use THEME.SET.
-.
-.#DEFINE substitutes at translation time, so THEME.CLR(THEME.TITLE) compiles
-.to THEME.CLR(2). The readable name costs no variable and no lookup.
-.
-.THEME.CLR is DIMmed by the module. Do not DIM it in your own program.
-.
-.Formatting a NUMBER into a column is STRUSING.INC.BL (SEC 4.10), a separate
-.module: it needs no #SYMFILE and neither module depends on the other.
+.  ARRAYS.EXP.BL -- runnable, in the GPC-BASIC folder
+.  SORT.EXP.BL -- runnable, in the GPC-BASIC folder
 .
 =SEE ALSO
 .
->95|4.11 GUI.INC.BL -- the box that puts the screen back, and the form in 
->94|4.10 STRUSING.INC.BL -- a number to a template
->71|4.1 THEME.INC.BL -- named colour roles
+>82|4.7 SORT.INC.BL -- shell sort a string array

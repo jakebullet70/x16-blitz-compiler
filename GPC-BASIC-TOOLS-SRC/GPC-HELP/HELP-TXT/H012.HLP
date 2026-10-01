@@ -1,121 +1,78 @@
-@3. Command reference
+@3.2 Multi-way branch
 .
-=3. COMMAND REFERENCE
+=3.2 MULTI-WAY BRANCH
 .
-.40 keywords, encoded $CE7F down to $CE4D and allocated downward. Eleven of
-.the fifty-one slots are holes and stay holes: the byte values are the ABI
-.and are never renumbered.
+=SYNTAX
 .
-=At a glance -- where each part comes from
+:GP.SELECT <var>
+:GP.CASE <expr> [,<expr> ...]
+:    ...
+:GP.OTHER
+:    ...
+:GP.ENDSEL
 .
-.Three implementations, and what each costs:
+=WHAT IT COSTS
 .
-.  - ASM -- a keyword run by machine code in the runtime. Costs runtime
-.    bytes, and one GP keyword anywhere in a program pays for the whole
-.    1,536-byte block. Documented in SEC 3.
-.  - BASIC -- a .INC.BL module of ordinary BASL, called with GOSUB. Costs
-.    nothing unless #INCLUDEd, and then only its own p-code. Documented in
-.    SEC 4.
-.  - COMPOSITE -- a keyword with no machine code of its own; the compiler
-.    expands it into keywords that already exist. Costs the runtime nothing.
-.    Documented in SEC 3 with the ASM keywords.
+.  ASM: GP.SELECT GP.CASE GP.OTHER GP.ENDSEL
+.    ASM -- machine code in the GP runtime block. One GP keyword pays for the
+.    whole block.
 .
-.  Loops
-.      ASM
-.      GP.DO GP.LOOP GP.EXITDO
+=DESCRIPTION
 .
-.  Multi-way branch
-.      ASM
-.      GP.SELECT GP.CASE GP.OTHER GP.ENDSEL
+.The selector must be a plain numeric variable. It is re-read at each
+.GP.CASE, the tests run in the order written, and the first match wins.
+.GP.OTHER is optional; if nothing matches and there is no GP.OTHER the select
+.is skipped, which is not an error.
 .
-.  Block IF
-.      ASM
-.      GP.IF GP.ELSEIF GP.ELSE GP.ENDIF -- see SEC 3.8
+.An expression, a constant or an array element is refused at compile time.
+.Assign to a scalar first: T = RND(1)*3 : GP.SELECT T. A scalar is a fixed
+.slot, so the re-read yields the same value every time. The restriction is
+.what lets the construct compile to core opcodes only -- a program whose one
+.GP keyword is a select does not carry the GP block, as with GP.IF.
 .
-.  Machine code
-.      ASM
-.      GP.CALL GP.A GP.X GP.Y GP.C
+.Case values are numeric expressions, not only constants. prog8's when
+.requires compile-time integers.
 .
-.  Inline assembly
-.      COMPOSITE
-.      GP.ASM GP.ENDASM -- free, and leaves the block out, see SEC 3.9
+.GP.ENDSEL is required. Nothing needs cleaning up; the requirement is
+.structural. The compiler has no symbol table, the emitted keywords are the
+.block, and every case branch resolves by scanning forward to it.
 .
-.  Strings
-.      ASM
-.      GP.INSTR GP.STRPTR GP.COMP
+.A case body may take its statements on the same line, after a colon:
 .
-.  Strings
-.      COMPOSITE
-.      GP.CONTAINS GP.ISEMPTY -- free, see SEC 3.4
+:GP.SELECT ED.KEY%
+:  GP.CASE 157 : GOSUB ED.MOVE.LEFT
+:  GP.CASE 29  : GOSUB ED.MOVE.RIGHT
+:  GP.CASE 27  : MENU.ACTIVE = 0 : GOSUB ED.OPEN.MENUBAR
+:  GP.OTHER    : GOSUB ED.KEY.RANGE
+:GP.ENDSEL
 .
-.  Addresses
-.      COMPOSITE
-.      GP.HIBYTE GP.LOBYTE -- free, see SEC 3.3.1
+.More than one statement after the colon is allowed, and so is GP.OTHER. The
+.body may also go on the following lines. Both forms compile to the same
+.code.
 .
-.  Arrays
-.      ASM
-.      GP.ARRPTR
+.GOTO out of a select is safe: a select holds nothing open. GP.DO is the one
+.block that opens a stack frame, and a GOTO leaving one is handled -- the
+.compiler emits an .unwind before it and FixBranches fills in how many loop
+.frames it closes. No runtime bytes; two p-code bytes at the GOTO. The case
+.it cannot handle is a GOTO from inside one GP.DO into another at the same
+.depth: the depth difference is zero, nothing is closed, and the frame
+.survives.
 .
-.  Banked text
-.      ASM
-.      GP.BANKEDSTR GP.ENDBANKEDSTR GP.BSTR GP.BSTRSET - GP.BSTRCOUNT is
-.        COMPOSITE -- see SEC 3.10
+.GP.SELECT does not replace ON x GOTO/GOSUB, which is a jump table and
+.remains correct for a dense 1..n index. Use GP.SELECT for a sparse selector
+.-- key codes, state machines, bit depths -- where ON does not apply.
 .
-.  Routine calls
-.      COMPOSITE
-.      GP.DEFPROC GP.SUB -- free, and leaves the block out, see SEC 3.11
+:GP.SELECT BMX.DEPTH
+:    GP.CASE 8
+:    GP.CASE 1, 2, 4
+:        BMX.ERROR$ = "NEEDS ANOTHER SCREEN MODE"
+:    GP.OTHER
+:        BMX.ERROR$ = "BAD BIT DEPTH"
+:GP.ENDSEL
 .
-.  Routine calls
-.      ASM
-.      GP.FN -- the same call as a value, and it brings the GP block in
+.An empty case body, 8 above, matches and falls out of the select. It is the
+.cheapest way to say that a value is acceptable.
 .
-.  Screen
-.      ASM
-.      GP.BOX GP.FILL GP.PRINTAT
+=EXAMPLE PROGRAM
 .
-.  Screen
-.      COMPOSITE
-.      GP.CHAR -- free, one cell in GP.PRINTAT's shape running GP.FILL's
-.        handler
-.
-.  Colour roles
-.      BASIC
-.      THEME.INC.BL -- THEME.SELECT, THEME.CLR() - SEC 4.1
-.
-.  String helpers
-.      BASIC+ASM
-.      STRINGS.INC.BL -- PADR PADL PADC SPLIT REPLACE SPLICE PET2SCR TRIM
-.        LTRIM RTRIM - SEC 4.2
-.
-.  Screen etiquette, panels
-.      BASIC
-.      APPSYS.INC.BL -- STARTUP RESTORE PANEL.SAVE/LOAD/PUT ISEMU - SEC 4.3
-.
-.  Entry fields
-.      BASIC
-.      LINEINPUT.INC.BL -- LINEINPUT.GET, LINEINPUT.ASK - SEC 4.4
-.
-.  Bitmaps
-.      BASIC+ASM
-.      BMX.INC.BL -- BMX.OPEN PAINT SHOW CLOSE RESTORE, BMX.LOAD a verb - SEC
-.        4.5
-.
-.  Menus
-.      BASIC
-.      MENU.INC.BL -- MENU.BEGIN ITEM ITEMX SELECTED DRAWBAR, MENUTO.VERT
-.        MENUTO.BAR - SEC 4.6
-.
-.  Menus
-.      BASIC
-.      MENUPULL.INC.BL -- MENUTO.PULLDOWN, a dropdown under a bar item - SEC
-.        4.9
-.
-.  Dialogs
-.      BASIC
-.      GUI.INC.BL -- GUI.SAY GUI.YN GUI.MENU GUI.INPUT GUI.OPEN GUI.CLOSE -
-.        SEC 4.11
-.
-.  Dialogs
-.      BASIC
-.      GUI-DIALOGS.INC.BL -- every dialog as a one-line verb - SEC 4.12
-.
+.  SELECT.EXP.BL -- runnable, in the GPC-BASIC folder

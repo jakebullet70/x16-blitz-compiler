@@ -1,79 +1,49 @@
-@3.9 Inline assembly
+@3.11.1 GP.DEFPROC -- declare a verb and its arguments
 .
-=3.9 INLINE ASSEMBLY
+=3.11.1 GP.DEFPROC
 .
-=SYNTAX
+.  Syntax    GP.DEFPROC verb [, formal ...] [RETURNS variable]
+.  Does      Names the routine that follows it, the variables a caller
+.            fills in, and the one its result comes back in. Emits no
+.            code.
+.  Kind      COMPOSITE. Records a position, a formal list and a result
+.            variable at compile time.
+.  Notes     The routine starts at the next statement, on the same
+.            line or on the line below. GOSUB to its label still
+.            works.
+.            A verb is a bare name: no $, no %, no subscript. Verbs
+.            are their own namespace, so a verb and a variable may
+.            share a name. One verb costs one variable record.
+.            A formal is a plain scalar variable, numeric or string.
+.            Up to 12 of them.
+.            RETURNS names a plain scalar variable too, and it is what
+.            GP.FN (SEC 3.11.3) reads after the call. Its type is the
+.            type of the call. Without it the verb is callable with
+.            GP.SUB (SEC 3.11.2) only.
+.            Call the verb with GP.SUB as a statement, or with GP.FN
+.            inside an expression. Every call sits below the
+.            GP.DEFPROC that declares it.
+.  WARNING   An array or an array element cannot be a formal, and it
+.            cannot be the RETURNS variable either. A module whose
+.            arguments are array elements takes the verb and no
+.            formals, and its caller sets the array first.
+.  Example
 .
-:#REM 1
-:GP.ASM
-:REM <instruction>
-:...
-:GP.ENDASM
-:#REM 0
+:            DB.SELECT:
+:              GP.DEFPROC DBSELECT, DB.A
+:              DB.ROW = DB.A : GOSUB DB.READ
+:              RETURN
+:
+:            AREA:
+:              GP.DEFPROC AREA, A.W, A.H RETURNS A.R
+:              A.R = A.W * A.H
+:              RETURN
+:
+:            REM calling them, anywhere below the declarations
+:              GP.SUB DBSELECT, 1
+:              PRINT "AREA "; GP.FN(AREA, 3, 4)
 .
-=WHAT IT COSTS
+=SEE ALSO
 .
-.  COMPOSITE: GP.ASM GP.ENDASM
-.    COMPOSITE -- no machine code. The compiler expands it into keywords that
-.    already exist. Runtime cost is zero.
-.
-=DESCRIPTION
-.
-.65C02 assembly, assembled by GPC at compile time, with the bytes placed in
-.the program.
-.
-.The alternative is to assemble by hand: work out the opcode for each
-.instruction, POKE the numbers into memory nothing else is using, and point
-.GP.CALL at that address. These two do the same thing -- increment A, then X,
-.then Y:
-.
-:## by hand: 26, 232 and 200 ARE inc a / inx / iny, and ML has to be somewher
-:POKE ML+0,26 : POKE ML+1,232 : POKE ML+2,200 : GP.CALL ML,10,20,30
-.
-:## assembled: the bytes land in the program, and there is no address to find
-:#REM 1
-:GP.ASM
-:REM inc a
-:REM inx
-:REM iny
-:GP.ENDASM
-:#REM 0
-.
-.It costs no runtime bytes. A block is five bytes of p-code plus the
-.assembled instructions, and every handler it uses is already in every
-.compiled program. A program whose only GP.BASIC keyword is GP.ASM compiles
-.without the 1.5 KB block: measured EMBEDDED CORE and RUNTIME 12031, the same
-.as a program using no GP keyword.
-.
-=#REM 1 is required
-.
-.The body rides in REM statements because BASLOAD stores REM text byte for
-.byte. Outside a REM, ORA, AND, EOR and ROR are BASIC keywords and the text
-.is destroyed; inside one it arrives intact, braces included. Lower case is
-.accepted and upshifted.
-.
-.#REM 0 is BASLOAD's default and strips the body before the compiler runs.
-.GP.ASM and GP.ENDASM are real keywords rather than REMs so that the block is
-.still found, empty, and GPC reports BLOCK MISMATCH rather than compiling a
-.program that contains no code. Set #REM 0 again after GP.ENDASM.
-.
-=Labels and branches
-.
-.A label is name:, alone on a line or in front of an instruction; six
-.characters are significant. Labels belong to their block -- the same name in
-.two blocks is two different labels, and neither can branch to the other.
-.
-:#REM 1
-:GP.ASM
-:REM ldx #5
-:REM loop: lda #42
-:REM jsr $ffd2
-:REM dex
-:REM bne loop
-:GP.ENDASM
-:#REM 0
-.
-.BNE, BEQ, BRA and the rest take a label, as do JMP and JSR. A branch further
-.than 127 bytes is OUT OF RANGE at compile time, reported on its own line,
-.rather than a wrong address at run time.
-.
+>56|3.11.3 GP.FN -- call a verb from inside an expression
+>55|3.11.2 GP.SUB -- call a verb

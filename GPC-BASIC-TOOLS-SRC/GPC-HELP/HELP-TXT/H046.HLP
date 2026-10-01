@@ -1,56 +1,34 @@
-@4.6 MENU.INC.BL -- menus built a row at a time (2)
-=Colours, hints and the gap
+@4.14 KB.INC.BL -- the keyboard buffer, emptied
 .
-.Set once by the caller, and read by every run:
+=4.14 KB.INC.BL -- THE KEYBOARD BUFFER, EMPTIED
 .
-.  MENU.ATTR
-.      the rows, background * 16 + foreground
+=WHAT IT COSTS
 .
-.  MENU.HIATTR
-.      the highlighted row. 0 inverts MENU.ATTR
+.    BASIC -- ordinary BASL in a .INC.BL, called with GOSUB. Free unless you
+.    #INCLUDE it.
 .
-.  MENU.HOTATTR
-.      the hot key letter. 0 leaves it untinted. Only rows drawn in MENU.ATTR
-.        are tinted
+=DESCRIPTION
 .
-.  MENU.DISATTR
-.      a disabled row. 0 is MENU.ATTR
+.  KB.CLEARKB
+.      IN: --
+.      OUT: --
 .
-.  MENU.SEPATTR
-.      separator lines and the frame. 0 is MENU.ATTR
+:#INCLUDE "KB.INC.BL"
+:
+:GOSUB KB.CLEARKB
+:GOSUB GUI.YN
 .
-.  MENU.SEPCHR
-.      the separator glyph. 0 is MENU.LINE, 192, the stroke GP.BOX style 1
-.        draws with
+.Call it before opening a dialog, and after a keystroke that redraws. A
+.dialog opened with a key still queued reads it, answers itself and closes; a
+.held arrow repeats faster than a page can be drawn and scrolls on after the
+.key is let go.
 .
-.  MENU.FLAGS
-.      the popup's flags, added together
+.GUI.INC.BL carries a private copy, GUI.CLEARKB, from when code inside a
+.GP.BANKED region could not call another bank. Fix one and fix the other.
+.There are only the two, and a second #INCLUDE of this file cannot supply the
+.copy -- the #IFNDEF guard makes it produce nothing.
 .
-.  MENU.BARFLAGS
-.      the bar's flags
+=SEE ALSO
 .
-.  MENU.GAP
-.      cells between bar items. 0 is none
-.
-.  MENU.HINTX MENU.HINTY MENU.HINTW MENU.HINTATTR
-.      the hint field. MENU.HINTW 0 turns hints off
-.
-.A hint is shown only when the highlight moves, never on opening. The field
-.is cleared to MENU.HINTATTR first, and a hint longer than MENU.HINTW is cut.
-.
-=The frame
-.
-.Both runners draw a GP.BOX with its corner at row, col, one cell bigger all
-.round than the rows, in MENU.SEPATTR. style is MENU.SOLID 0, MENU.THIN 1,
-.MENU.ROUND 2, MENU.THICK 3, or 256 and up for the address of an
-.eight-character glyph table:
-.
-:T.GLYPH$ = "++++--!!"
-:N = GP.FN(MENUTO.VERT, 4, 10, GP.STRPTR(T.GLYPH$) + 1)
-.
-.MENU.NOBOX, 255, draws no frame and puts the first row at row, col.
-.
-.A popup row, and its highlight, is as wide as the widest row. A bar item is
-.as wide as its own text, with MENU.GAP cells between items, so spaces inside
-.the text are how a bar item gets padding.
-.
+>91|4.14 KB.INC.BL -- the keyboard buffer, emptied
+>86|4.11 GUI.INC.BL -- the box that puts the screen back, and the form in 

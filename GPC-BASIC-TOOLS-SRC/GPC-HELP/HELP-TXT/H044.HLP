@@ -1,117 +1,150 @@
-@4.5 BMX.INC.BL -- a BMX bitmap into VERA
+@4.12 GUI-DIALOGS.INC.BL -- every dialog as a verb
 .
-=4.5 BMX.INC.BL -- A BMX BITMAP INTO VERA
+=4.12 GUI-DIALOGS.INC.BL -- EVERY DIALOG AS A VERB
+.
+=WHAT IT COSTS
+.
+.    BASIC -- ordinary BASL in a .INC.BL, called with GOSUB. Free unless you
+.    #INCLUDE it.
 .
 =DESCRIPTION
 .
-.  BMX.OPEN
-.      IN: BMX.FILE$
-.      OUT: BMX.ERROR$, and the header -- BMX.WIDTH .HEIGHT .DEPTH .VERSION
-.        .PALUSED .PALFIRST .DATAOFF .PACKED
+.A dialog is a call with its arguments in it. Nothing is set up in globals
+.first, and nothing a previous dialog set carries into the next one.
 .
-.  BMX.PAINT
-.      IN: an open file
-.      OUT: palette and pixels in VRAM, file closed
+.  DLGRESET bank
+.      IN: the RAM bank the covered cells go to
+.      OUT: every other input back to its default
 .
-.  BMX.SHOW
-.      IN: BMX.FILE$
-.      OUT: both of the above
+.  DLGSHADOW on - DLGGLYPH on
+.      IN: non-zero
+.      OUT: the shadow and the frame glyphs, for every box after it
 .
-.  BMX.CLOSE
+.  DLGSHADOWCLR attr
+.      IN: a packed colour
+.      OUT: the shadow's own colour; 0, the default, is black on black
+.
+.  DLGSTYLE style
+.      IN: a GP.BOX style (SEC 3.7); 0, the default, is a solid block
+.      OUT: the frame every box after it draws; DLGGLYPH overrides it
+.
+.  KBCLEAR
 .      IN: --
-.      OUT: abandons a file opened by BMX.OPEN
+.      OUT: the keyboard buffer emptied
 .
-.  BMX.RESTORE
-.      IN: --
-.      OUT: puts the machine's own palette back
+.  MSGBOX msg$
+.      OUT: GUI.KEY -- something to say, and one way out
 .
-.BMX.ERROR$ empty means it worked.
+.  ASKYN msg$ - ASKOK msg$
+.      OUT: -1 for yes, or OK
 .
-.BMX.LOAD is BMX.OPEN as a verb. It is declared with GP.DEFPROC, takes the
-.file name and returns the error string, so the open is one statement: IF
-.GP.FN(BMX.LOAD, F$) <> "" THEN GOTO COMPLAIN. Everything else in the table
-.is a plain GOSUB.
+.  ASK3 t$, m$, b1$, b2$, b3$, dflt, esc
+.      OUT: the button pressed, 1..3; esc is the one ESC means, and b3$ ""
+.        leaves two
 .
-.The #SYMFILE is required, above the program's #INCLUDEs, and named after the
-.source PRG. The compiler derives the name it expects from the PRG it
-.compiles, so the directive must match it. BMX.MOVE is GP.ASM and reaches
-.BASIC's variables through {VAR}. Without a symbol file the compile stops
-.with {} NEEDS #SYMFILE @ <line>, then falls out to BASIC with a ?STRING TOO
-.LONG ERROR that names neither the file nor the cause. A #SYMFILE after the
-.#INCLUDEs stops BASLOAD with SYMFILE NOT ALLOWED IN <file>:<line>.
+.  ASKTEXT msg$, len
+.      OUT: the typed line, "" when cancelled
 .
-:BMX.FILE$ = "TITLE.BMX"
-:SCREEN 128
-:GOSUB BMX.SHOW
-:IF BMX.ERROR$ <> "" THEN PRINT BMX.ERROR$
+.  INPUTBOX msg$, start$, len
+.      OUT: the text either way; GUI.OK says which
 .
-.Use the long form to read the size before committing to a screen mode, or to
-.report a bad file before the display is torn down:
+.  PICKMENU msg$, sel
+.      IN: the popup slot of MENU.INC.BL (SEC 4.6)
+.      OUT: the row, 1..N, or 0 cancelled
 .
-:BMX.FILE$ = F$
-:GOSUB BMX.OPEN
-:IF BMX.ERROR$ <> "" THEN GOTO COMPLAIN
-:REM ... BMX.WIDTH, BMX.HEIGHT, BMX.PALUSED readable here ...
-:SCREEN 128
-:GOSUB BMX.PAINT
+.  LISTBOX msg$, count, rows
+.      IN: GUI.LIST.ITEM$()
+.      OUT: the row, or 0 cancelled
 .
-.Set the screen mode before BMX.PAINT, not after. SCREEN reloads the default
-.palette, so a mode change after painting discards the image's colours:
-.correct pixels, wrong palette.
+.  LISTBOXM msg$, count, rows
+.      IN: the same
+.      OUT: how many are marked; GUI.LISTBOX.MARKS$ which
 .
-.BMX.PAINT writes the image's colours over the machine's palette, and nothing
-.on the X16 restores them -- not SCREEN, not the KERNAL's screen_mode.
-.BMX.PAINT therefore stashes all 256 entries in spare VRAM first, and
-.BMX.RESTORE writes them back:
+.  ASKLINE x, y, label$, len
+.      OUT: a line typed in place, no box; LINEINPUT.KEY 27 cancelled
 .
-:BMX.FILE$ = "TITLE.BMX"
-:SCREEN 128
-:GOSUB BMX.SHOW
-:REM ... the title screen ...
-:GOSUB BMX.RESTORE
+.  PANELOPEN t$, m$, rows, width - PANELCLOSE
+.      OUT: an empty box at GUI.INNER.LEFT and .TOP, and the screen back
 .
-.A program that keeps the machine need never call it. A program that returns
-.the machine to BASIC or chains to another calls it once. It is safe to call
-.at any time: with nothing stashed there is nothing to do, so a program whose
-.image failed to load can still call it on the way out. All 256 entries are
-.kept, not the range the file claims, and they are kept once per run -- so a
-.slideshow restores the machine's own palette rather than the previous
-.image's.
+:GP.SUB DLGRESET, 8
+:GP.SUB MSGBOX, "DISK FULL"
+:IF GP.FN(ASKYN, "DELETE THE FILE?") THEN GOSUB DELETEIT
+:F$ = GP.FN(ASKTEXT, "FILE NAME?", 16)
 .
-.BMX.STASH is the VRAM address they go to, $13000 by default, which is free
-.above the 320x240 framebuffer in the mode this module paints into. A caller
-.using tiles, sprites or a second bitmap there must move it or switch it off
-.with BMX.STASH = -1. The address is checked. A stash inside the bitmap
-.reports "BMX.STASH IS INSIDE THE BITMAP", one overlapping the PSG registers
-.reports "BMX.STASH RUNS INTO THE PSG REGISTERS", and neither paints.
+.Every verb has an EX form that takes a title and three message lines first,
+.always in that order, then its own arguments: MSGBOXEX t$, m$, m2$, m3$,
+.btn$, ASKYNEX t$, m$, m2$, m3$, dflt, okc, INPUTBOXEX ... start$, len, mask,
+.PICKMENUEX ... sel, flags, LISTBOXEX ... count, rows, multi. dflt 2 makes
+.the second button the default; okc non-zero says OK and CANCEL rather than
+.YES and NO; flags are MENU.MUSTSEL, .NOWRAP and .GAMEPAD.
 .
-.Use -1 to switch it off, not 0. Zero is what the variable holds before it is
-.set, and BMX.INIT runs at the first BMX.OPEN, after a caller would have set
-.it, so 0 has to keep meaning unset.
+.#INCLUDE it after GUI.INC.BL, COMBO.INC.BL and CHECK.INC.BL: a verb is
+.compiled before any call to it, and this one calls all of them. The rows are
+.filled first, because an array cannot be an argument -- MENU.BEGIN/MENU.ITEM
+.for PICKMENU, GUI.LIST.ITEM$(1..count) for the listbox, and the caller owns
+.that DIM.
 .
-.The module handles 8 bits per pixel, uncompressed, which is what SCREEN 128
-.displays without a decompressor. Anything else is reported rather than
-.attempted. The image is centred, and anything larger than 320x240 is
-.clipped.
+.Up and down move, PgUp and PgDn page, HOME and END jump, SPACE toggles a
+.mark in multi. TAB moves to the buttons and back, RETURN takes <<OK>> from
+.anywhere, ESC and STOP cancel -- and O and C press their buttons while the
+.eye is still in the list, which a list can offer and a typing field cannot.
 .
-.It can run from a RAM bank. Put its #INCLUDE between GP.BANKED and
-.GP.ENDBANKED (SEC 3.12). A call from outside the region selects the region's
-.bank and RETURN puts the caller's back, so a caller is written the same
-.either way. Its MACPTR reads land in VRAM and in low-memory string blocks,
-.never in $A000-$BFFF, so MACPTR's own bank stepping cannot reach a banked
-.copy of the code. See BANKED-OR-NOT.md.
+.In multi, GUI.LISTBOX.SEL is not the answer -- it is where the cursor was
+.left. The marks are: GUI.LISTBOX.MARKS$ is count characters with "1" for
+.marked. They are cleared on every call, so one run never reports the run
+.before it.
 .
-.Examples: BMXVIEW.EXP.BL is a viewer, BMXPAL.EXP.BL answers the palette
-.question, and BMXSPD.EXP.BL times both paths, the one-block path and the
-.centred row-at-a-time path.
+.The bottom frame edge reads 2 SELECTED OF 20 in multi, 20 ITEMS for a single
+.list too long to see at once, and is blank for one that fits.
+.
+=A list built a step at a time, out of an array or out of a bank
+.
+.  LIST.BEGIN title$, rows
+.      OUT: a list box declared, not yet drawn
+.
+.  LIST.ARRAY count
+.      IN: GUI.LIST.ITEM$()
+.      OUT: its rows come from the array
+.
+.  LIST.BANK bank, first, last
+.      IN: a RAM bank in the GP.BSTR image layout
+.      OUT: its rows come from the bank
+.
+.  LISTTO.RUN
+.      OUT: the row, or 0 cancelled
+.
+.  LIST.ITEM n
+.      OUT: row n as text
+.
+.  LIST.SORT bank, first, last
+.      OUT: that bank's rows in order, in place
+.
+:GP.SUB LIST.BEGIN, " OPEN FILE ", 12
+:GP.SUB LIST.BANK, MY.BANK%, 0, N - 1
+:SEL = GP.FN(LISTTO.RUN)
+:IF SEL > 0 THEN F$ = GP.FN(LIST.ITEM, SEL)
+.
+.A bank list never comes into low memory. The bank holds the GP.BSTR image
+.layout -- a 16-bit count at $A000, an offset a row at $A002, then the
+.records -- and GUI.LIST.FETCH reads one row at a time, as it is drawn. That
+.is how FILEPICK (SEC 4.20) shows a directory of any length in a program with
+.no room for it. LIST.SORT moves the two-byte offsets and not the records, so
+.a pointer into one stays good afterwards; it reaches the bank through
+.STASH.SELECT, which is what lets the whole module sit inside a GP.BANKED
+.region.
+.
+.Example: GUI.EXP.BL.
 .
 =EXAMPLE PROGRAM
 .
-.  BMXVIEW.EXP.BL -- runnable, in the GPC-BASIC folder
-.  BMXPAL.EXP.BL -- runnable, in the GPC-BASIC folder
-.  BMXSPD.EXP.BL -- runnable, in the GPC-BASIC folder
+.  GUI.EXP.BL -- runnable, in the GPC-BASIC folder
 .
 =SEE ALSO
 .
->62|3.12 Code in a bank
->83|4.5 BMX.INC.BL -- a BMX bitmap into VERA
+>42|3.7 Screen -- drawing
+>77|4.6 MENU.INC.BL -- menus built a row at a time
+>97|4.20 KV.INC.BL -- keys and values in one RAM bank
+>88|4.12 GUI-DIALOGS.INC.BL -- every dialog as a verb
+>86|4.11 GUI.INC.BL -- the box that puts the screen back, and the form in 
+>94|4.17 COMBO.INC.BL -- a drop-down list that folds into one row
+>98|4.21 CHECK.INC.BL -- a check box, [X] or [ ]

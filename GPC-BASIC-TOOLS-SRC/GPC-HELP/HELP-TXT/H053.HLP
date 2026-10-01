@@ -1,99 +1,66 @@
-@4.12 GUI-DIALOGS.INC.BL -- every dialog as a verb
+@4.21 CHECK.INC.BL -- a check box, [X] or [ ]
 .
-=4.12 GUI-DIALOGS.INC.BL -- EVERY DIALOG AS A VERB
-.
-=WHAT IT COSTS
-.
-.    BASIC -- ordinary BASL in a .INC.BL, called with GOSUB. Free unless you
-.    #INCLUDE it.
+=4.21 CHECK.INC.BL -- A CHECK BOX, [X] OR [ ]
 .
 =DESCRIPTION
 .
-.A dialog is a call with its arguments in it. Nothing is set up in globals
-.first, and nothing a previous dialog set carries into the next one.
+.  CHECK.ADD
+.      IN: CHECK.X CHECK.Y CHECK.TEXT$ CHECK.ON
+.      OUT: CHECK.CTRL
 .
-.  DLGRESET bank
-.      IN: the RAM bank the covered cells go to
-.      OUT: every other input back to its default
+:CHECK.X = GUI.INNER.LEFT : CHECK.Y = GUI.INNER.TOP
+:CHECK.TEXT$ = "SHOW HIDDEN FILES" : CHECK.ON = -1
+:GOSUB CHECK.ADD
+:HIDDEN = CHECK.CTRL
+:REM ... run the form ...
+:IF (GUI.CTRL.FLAGS%(HIDDEN) AND GUI.CF.CHECKED) <> 0 THEN PRINT "TICKED"
 .
-.  DLGSHADOW on - DLGGLYPH on
-.      IN: non-zero
-.      OUT: the shadow and the frame glyphs, for every box after it
+.Only CHECK.ADD is called by an application. CHECK.DRAW and CHECK.KEY are
+.reached by GUI.FORM, which dispatches a GUI.CT.CHECK control to them by
+.name. The call goes between GUI.FORM.BEGIN and GUI.FORM.RUN.
 .
-.  DLGSHADOWCLR attr
-.      IN: a packed colour
-.      OUT: the shadow's own colour; 0, the default, is black on black
+.CHECK.X and CHECK.Y are the cell the [ goes in, and the caption starts four
+.cells to the right. CHECK.TEXT$ = "" draws a bare box. A non-zero CHECK.ON
+.starts the box ticked. CHECK.CTRL is the control's number, and 0 when the
+.form is already full.
 .
-.  DLGSTYLE style
-.      IN: a GP.BOX style (SEC 3.7); 0, the default, is a solid block
-.      OUT: the frame every box after it draws; DLGGLYPH overrides it
+.The state is a flag on the control, GUI.CF.CHECKED in GUI.CTRL.FLAGS%().
+.Keep CHECK.CTRL and test the flag after GUI.FORM.RUN. One form carries as
+.many boxes as it has controls.
 .
-.  KBCLEAR
-.      IN: --
-.      OUT: the keyboard buffer emptied
+.  X
+.      DOES: ticks the box
 .
-.  MSGBOX msg$
-.      OUT: GUI.KEY -- something to say, and one way out
+.  DEL
+.      DOES: clears it
 .
-.  ASKYN msg$ - ASKOK msg$
-.      OUT: -1 for yes, or OK
+.  SPACE
+.      DOES: flips it
 .
-.  ASK3 t$, m$, b1$, b2$, b3$, dflt, esc
-.      OUT: the button pressed, 1..3; esc is the one ESC means, and b3$ ""
-.        leaves two
+.  TAB RIGHT DOWN
+.      DOES: the next control
 .
-.  ASKTEXT msg$, len
-.      OUT: the typed line, "" when cancelled
+.  SHIFT+TAB LEFT UP
+.      DOES: the previous control
 .
-.  INPUTBOX msg$, start$, len
-.      OUT: the text either way; GUI.OK says which
+.  RETURN
+.      DOES: presses the default button
 .
-.  PICKMENU msg$, sel
-.      IN: the popup slot of MENU.INC.BL (SEC 4.6)
-.      OUT: the row, 1..N, or 0 cancelled
+.  ESC STOP
+.      DOES: cancels the form
 .
-.  LISTBOX msg$, count, rows
-.      IN: GUI.LIST.ITEM$()
-.      OUT: the row, or 0 cancelled
+.Any other key is offered to the buttons' marked letters.
 .
-.  LISTBOXM msg$, count, rows
-.      IN: the same
-.      OUT: how many are marked; GUI.LISTBOX.MARKS$ which
+.It is required by GUI.INC.BL, which names CHECK.DRAW and CHECK.KEY. It goes
+.in after that file, as COMBO.INC.BL does. A program that includes the GUI
+.and leaves this one out stops with LABEL NOT FOUND.
 .
-.  ASKLINE x, y, label$, len
-.      OUT: a line typed in place, no box; LINEINPUT.KEY 27 cancelled
+.GPBMODS (SEC 4.26) runs three boxes and a combo on one form, under DIALOG >
+.CHECK BOX + COMBO.
 .
-.  PANELOPEN t$, m$, rows, width - PANELCLOSE
-.      OUT: an empty box at GUI.INNER.LEFT and .TOP, and the screen back
+=SEE ALSO
 .
-:GP.SUB DLGRESET, 8
-:GP.SUB MSGBOX, "DISK FULL"
-:IF GP.FN(ASKYN, "DELETE THE FILE?") THEN GOSUB DELETEIT
-:F$ = GP.FN(ASKTEXT, "FILE NAME?", 16)
-.
-.Every verb has an EX form that takes a title and three message lines first,
-.always in that order, then its own arguments: MSGBOXEX t$, m$, m2$, m3$,
-.btn$, ASKYNEX t$, m$, m2$, m3$, dflt, okc, INPUTBOXEX ... start$, len, mask,
-.PICKMENUEX ... sel, flags, LISTBOXEX ... count, rows, multi. dflt 2 makes
-.the second button the default; okc non-zero says OK and CANCEL rather than
-.YES and NO; flags are MENU.MUSTSEL, .NOWRAP and .GAMEPAD.
-.
-.#INCLUDE it after GUI.INC.BL, COMBO.INC.BL and CHECK.INC.BL: a verb is
-.compiled before any call to it, and this one calls all of them. The rows are
-.filled first, because an array cannot be an argument -- MENU.BEGIN/MENU.ITEM
-.for PICKMENU, GUI.LIST.ITEM$(1..count) for the listbox, and the caller owns
-.that DIM.
-.
-.Up and down move, PgUp and PgDn page, HOME and END jump, SPACE toggles a
-.mark in multi. TAB moves to the buttons and back, RETURN takes <<OK>> from
-.anywhere, ESC and STOP cancel -- and O and C press their buttons while the
-.eye is still in the list, which a list can offer and a typing field cannot.
-.
-.In multi, GUI.LISTBOX.SEL is not the answer -- it is where the cursor was
-.left. The marks are: GUI.LISTBOX.MARKS$ is count characters with "1" for
-.marked. They are cleared on every call, so one run never reports the run
-.before it.
-.
-.The bottom frame edge reads 2 SELECTED OF 20 in multi, 20 ITEMS for a single
-.list too long to see at once, and is blank for one that fits.
-.
+>108|4.26 GPBMODS -- the harness that drives every module
+>98|4.21 CHECK.INC.BL -- a check box, [X] or [ ]
+>86|4.11 GUI.INC.BL -- the box that puts the screen back, and the form in 
+>94|4.17 COMBO.INC.BL -- a drop-down list that folds into one row

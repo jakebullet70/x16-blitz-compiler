@@ -1,14 +1,53 @@
-@3.4.4 GP.COMP -- compare two strings, ignoring case
+@3.6 Screen -- stash and restore
 .
-=3.4.4 GP.COMP
+=3.6 SCREEN -- STASH AND RESTORE
 .
-.  Syntax    GP.COMP(a$, b$)
-.  Returns   -1 if a$ sorts before b$, 0 the same, 1 after.
-.  Kind      ASM. Needs the GP block.
-.  Notes     Case is ignored. GP.COMP(A$, B$) = 0 is the case-blind
-.            equality test that = cannot do, and the same call orders
-.            a sort.
-.            Length breaks a tie: "abc" sorts before "ABCD".
-.  Example
+=WHAT IT COSTS
 .
-:            IF GP.COMP(N$, "QUIT") = 0 THEN GOTO BYE
+.  ASM: GP.BOX GP.FILL GP.PRINTAT
+.    ASM -- machine code in the GP runtime block. One GP keyword pays for the
+.    whole block.
+.  COMPOSITE: GP.CHAR GP.PRINTAT GP.FILL
+.    COMPOSITE -- no machine code. The compiler expands it into keywords that
+.    already exist. Runtime cost is zero.
+.
+=DESCRIPTION
+.
+.Stashing a rectangle is STASH.INC.BL, written in GP.ASM. It writes a 4-byte
+.self-describing header and holds at most 4,094 cells: a bank is 8K and a
+.cell is two bytes, so a full 80x60 screen at 9,600 bytes does not fit.
+.
+:#SYMFILE "@:MYPROG.SYM"
+:#INCLUDE "STASH.INC.BL"
+:STASH.BANK = 8 : STASH.X = 10 : STASH.Y = 4 : STASH.W = 30 : STASH.H = 8
+:GOSUB STASH.SAVE
+:...
+:GOSUB STASH.RESTORE
+.
+.STASHFILE.INC.BL is the same rectangle through a file. It is a separate
+.module because, unless the compile removes dead code (SEC 7), everything a
+.module holds is compiled into every program that includes it, called or not.
+.
+.More than one rectangle in a bank. STASH.SLOT is a byte offset into the
+.bank, default 0, and STASH.NEXT comes back as the offset just past what was
+.written. Feed one into the other and the bank holds a stack of rectangles --
+.which is what nested dialogs want, one bank for the lot rather than one bank
+.a level. Nothing checks that two saves do not overlap: the header describes
+.a rectangle's size, not its identity, so the offsets are yours to keep
+.straight.
+.
+.STASHVRAM.INC.BL keeps rectangles in spare VRAM instead, addressed by handle
+.so a program can hold many at once without counting offsets. It needs no
+.#SYMFILE, because there is no GP.ASM in it: the cells never leave VRAM, so
+.one data port reads, the other writes, and memory_copy moves between them.
+.It executes no BANK either, so unlike STASH it runs inside a GP.BANKED
+.region. STASHVRAMGC.INC.BL closes the holes if a caller frees out of order,
+.and is a third file for the same dead-code reason.
+.
+=SEE ALSO
+.
+>160|7. Memory, and what the compiler tells you
+>112|STASH.INC.BL -- save a text rectangle, and put it back.
+>116|STASHFILE.INC.BL -- a saved text rectangle, through a file.
+>95|4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM
+>96|4.19 STASHVRAMGC.INC.BL -- close the holes in a STASHVRAM store

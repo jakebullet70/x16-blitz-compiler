@@ -1,69 +1,117 @@
-@3.12 Code in a bank (2)
-=Calling in, and calling out
+@4.5 BMX.INC.BL -- a BMX bitmap into VERA
 .
-.A call into a region selects the region's bank. A GOSUB, GP.SUB, GP.FN or FN
-.whose target is inside a region, from anywhere outside that region, compiles
-.to .bgosub. It keeps the selected bank, selects the region's, and RETURN
-.selects the kept one again. The caller may be in low memory or in another
-.region, and the calls nest like any GOSUB. A call that stays inside one
-.region is an ordinary GOSUB.
+=4.5 BMX.INC.BL -- A BMX BITMAP INTO VERA
 .
-.A call out of a region to low memory is a banked call too. A GOSUB, GP.SUB,
-.GP.FN or FN from inside a region to a target in low memory compiles to
-..bgosub with the region's own bank. RETURN selects that bank again, so a low
-.routine that executes BANK returns into the region under the right bank.
+=DESCRIPTION
 .
-.A GOTO selects nothing, so a GOTO into a region from outside it is refused
-.with NOT IMPLEMENTED, from low memory or from another region. IF ... GOTO,
-.IF ... THEN <line> and ON ... GOTO are refused the same way. Enter a region
-.by a call. A GOTO that stays inside one region, or leaves one for low
-.memory, compiles.
+.  BMX.OPEN
+.      IN: BMX.FILE$
+.      OUT: BMX.ERROR$, and the header -- BMX.WIDTH .HEIGHT .DEPTH .VERSION
+.        .PALUSED .PALFIRST .DATAOFF .PACKED
 .
-.ON ... GOSUB makes no banked call. An ON entry is three bytes and a .bgosub
-.is four. ON ... GOSUB compiles when the caller and every target are in low
-.memory, or all in the same region. Into a region, out of a region to low
-.memory, or from one region to another, the compile stops with ON GOSUB IN OR
-.OUT OF GP.BANKED. Write a GP.SELECT or one IF ... GOSUB a case instead. A
-.plain GOSUB makes the banked call.
+.  BMX.PAINT
+.      IN: an open file
+.      OUT: palette and pixels in VRAM, file closed
 .
-.A call between a region and anywhere outside it costs a byte and two bank
-.switches. .bgosub is a GOSUB with the bank after the address. Put a module
-.called inside a tight loop in the same place as the loop.
+.  BMX.SHOW
+.      IN: BMX.FILE$
+.      OUT: both of the above
 .
-.A runtime error inside a region names its bank. It prints the bank in hex, a
-.colon, and the address the p-code runs at: DIVIDE BY ZERO @ $14:A048. The
-.debug map lists the region's lines in the same form, and GPC.ERR.PRG reads
-.both.
+.  BMX.CLOSE
+.      IN: --
+.      OUT: abandons a file opened by BMX.OPEN
 .
-=The overlay file
+.  BMX.RESTORE
+.      IN: --
+.      OUT: puts the machine's own palette back
 .
-.Every region of a program goes into one file, NAME.OVL, and the file says
-.what is in it. Each region is introduced by two bytes -- the bank it belongs
-.in, then how many pages of it follow -- and those pages come next. Then the
-.next region, and so on to end of file. So a region costs its padded page
-.count plus two bytes, the padding rather than the p-code in it, and the
-.banks may be in any order with any gaps between them.
+.BMX.ERROR$ empty means it worked.
 .
-.The overlay ships beside the .PRG, in both builds. The program reads it once
-.per load, not once per RUN, and a missing or truncated one stops it with
-.?OVL; a region for a bank the machine does not have stops it with ?RAM.
-.Nothing pairs a .OVL to its .PRG, so a stale one is read. SEC 7 lists every
-.file a program ships.
+.BMX.LOAD is BMX.OPEN as a verb. It is declared with GP.DEFPROC, takes the
+.file name and returns the error string, so the open is one statement: IF
+.GP.FN(BMX.LOAD, F$) <> "" THEN GOTO COMPLAIN. Everything else in the table
+.is a plain GOSUB.
 .
-.Reading it costs time at startup. The bootstrap reads the file a byte at a
-.time, at roughly 26,000 bytes a second, so a program with 32K of regions
-.waits about a second and a quarter before its first line runs. Nothing else
-.in the program pays it.
+.The #SYMFILE is required, above the program's #INCLUDEs, and named after the
+.source PRG. The compiler derives the name it expects from the PRG it
+.compiles, so the directive must match it. BMX.MOVE is GP.ASM and reaches
+.BASIC's variables through {VAR}. Without a symbol file the compile stops
+.with {} NEEDS #SYMFILE @ <line>, then falls out to BASIC with a ?STRING TOO
+.LONG ERROR that names neither the file nor the cause. A #SYMFILE after the
+.#INCLUDEs stops BASLOAD with SYMFILE NOT ALLOWED IN <file>:<line>.
+.
+:BMX.FILE$ = "TITLE.BMX"
+:SCREEN 128
+:GOSUB BMX.SHOW
+:IF BMX.ERROR$ <> "" THEN PRINT BMX.ERROR$
+.
+.Use the long form to read the size before committing to a screen mode, or to
+.report a bad file before the display is torn down:
+.
+:BMX.FILE$ = F$
+:GOSUB BMX.OPEN
+:IF BMX.ERROR$ <> "" THEN GOTO COMPLAIN
+:REM ... BMX.WIDTH, BMX.HEIGHT, BMX.PALUSED readable here ...
+:SCREEN 128
+:GOSUB BMX.PAINT
+.
+.Set the screen mode before BMX.PAINT, not after. SCREEN reloads the default
+.palette, so a mode change after painting discards the image's colours:
+.correct pixels, wrong palette.
+.
+.BMX.PAINT writes the image's colours over the machine's palette, and nothing
+.on the X16 restores them -- not SCREEN, not the KERNAL's screen_mode.
+.BMX.PAINT therefore stashes all 256 entries in spare VRAM first, and
+.BMX.RESTORE writes them back:
+.
+:BMX.FILE$ = "TITLE.BMX"
+:SCREEN 128
+:GOSUB BMX.SHOW
+:REM ... the title screen ...
+:GOSUB BMX.RESTORE
+.
+.A program that keeps the machine need never call it. A program that returns
+.the machine to BASIC or chains to another calls it once. It is safe to call
+.at any time: with nothing stashed there is nothing to do, so a program whose
+.image failed to load can still call it on the way out. All 256 entries are
+.kept, not the range the file claims, and they are kept once per run -- so a
+.slideshow restores the machine's own palette rather than the previous
+.image's.
+.
+.BMX.STASH is the VRAM address they go to, $13000 by default, which is free
+.above the 320x240 framebuffer in the mode this module paints into. A caller
+.using tiles, sprites or a second bitmap there must move it or switch it off
+.with BMX.STASH = -1. The address is checked. A stash inside the bitmap
+.reports "BMX.STASH IS INSIDE THE BITMAP", one overlapping the PSG registers
+.reports "BMX.STASH RUNS INTO THE PSG REGISTERS", and neither paints.
+.
+.Use -1 to switch it off, not 0. Zero is what the variable holds before it is
+.set, and BMX.INIT runs at the first BMX.OPEN, after a caller would have set
+.it, so 0 has to keep meaning unset.
+.
+.The module handles 8 bits per pixel, uncompressed, which is what SCREEN 128
+.displays without a decompressor. Anything else is reported rather than
+.attempted. The image is centred, and anything larger than 320x240 is
+.clipped.
+.
+.It can run from a RAM bank. Put its #INCLUDE between GP.BANKED and
+.GP.ENDBANKED (SEC 3.12). A call from outside the region selects the region's
+.bank and RETURN puts the caller's back, so a caller is written the same
+.either way. Its MACPTR reads land in VRAM and in low-memory string blocks,
+.never in $A000-$BFFF, so MACPTR's own bank stepping cannot reach a banked
+.copy of the code. See BANKED-OR-NOT.md.
+.
+.Examples: BMXVIEW.EXP.BL is a viewer, BMXPAL.EXP.BL answers the palette
+.question, and BMXSPD.EXP.BL times both paths, the one-block path and the
+.centred row-at-a-time path.
+.
+=EXAMPLE PROGRAM
+.
+.  BMXVIEW.EXP.BL -- runnable, in the GPC-BASIC folder
+.  BMXPAL.EXP.BL -- runnable, in the GPC-BASIC folder
+.  BMXSPD.EXP.BL -- runnable, in the GPC-BASIC folder
 .
 =SEE ALSO
 .
->181|7. Memory, and what the compiler tells you
->105|4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM
->55|3.10 Text in a bank
->48|3.9 Inline assembly
->84|4.6 MENU.INC.BL -- menus built a row at a time
->82|4.4 LINEINPUT.INC.BL -- a positioned entry field
->95|4.11 GUI.INC.BL -- the box that puts the screen back, and the form in 
->104|4.17 COMBO.INC.BL -- a drop-down list that folds into one row
->109|4.21 CHECK.INC.BL -- a check box, [X] or [ ]
->97|4.12 GUI-DIALOGS.INC.BL -- every dialog as a verb
+>57|3.12 Code in a bank
+>76|4.5 BMX.INC.BL -- a BMX bitmap into VERA

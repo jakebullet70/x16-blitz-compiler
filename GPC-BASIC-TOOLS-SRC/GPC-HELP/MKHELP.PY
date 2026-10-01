@@ -86,9 +86,17 @@ IDXNAME = "GPC.HELP.IDX"
 # row text above them, each row's text cut at IDX_WIDE characters. They are
 # HELP.MAXIX, HELP.IXREC and HELP.IXWIDE in GPC.HELP.BASL; change them together.
 IDX_ROWS = 210
-IDX_REC = 8
+IDX_REC = 9
 IDX_WIDE = 72
 IDX_BANK = 8192
+
+# The viewer's topic banks: a line table of TOPIC_LINES records in one bank, and
+# the text in TEXT_BANKS banks of IDX_BANK bytes. Each line is cut at LINE_WIDE
+# characters and never straddles two banks. They are HELP.MAXLINES,
+# HELP.TEXTBANKS and HELP.COLS - 2 in GPC.HELP.BASL; change them together.
+TOPIC_LINES = 2048
+TEXT_BANKS = 8
+LINE_WIDE = 78
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_SRC = os.path.normpath(os.path.join(HERE, "..", "..", "GPC-BASIC"))
@@ -924,44 +932,21 @@ def add_tails(topics):
             t.lines.append(">@@%s@@|" % r)
 
 
-# THE SCREEN IS THE VIEWER'S PAGE BUFFER. It reads a topic straight from the
-# .HLP to the screen and keeps none of it, so the X16 side holds no page array
-# at all -- which is its whole memory problem solved, the heap costing about
-# 1.67 bytes a character (measured).
-#
-# Scrolling therefore RE-READS, which is why one file per topic matters twice:
-# an open and 27 lines is 4 jiffies. So a topic does NOT have to fit the
-# screen, and the bound here is generous on purpose -- SPLITTING COSTS MEMORY,
-# because every part is another index row and the index is the one thing that
-# is resident.
-MAXPAGE = 120
+def text_banks(t):
+    """How many text banks the viewer fills with topic `t`, packed as it packs.
 
-
-def split_long(topics, limit=MAXPAGE):
-    """Break any topic over `limit` lines at a section header, into parts."""
-    out = []
-    for t in topics:
-        if len(t.lines) <= limit:
-            out.append(t)
-            continue
-        start, part = 0, 1
-        while start < len(t.lines):
-            end = min(start + limit, len(t.lines))
-            if end < len(t.lines):
-                cut = end
-                while cut > start + limit // 3 and not t.lines[cut].startswith("="):
-                    cut -= 1
-                if cut > start + limit // 3:
-                    end = cut
-            title = t.title if part == 1 else "%s (%d)" % (t.title, part)
-            n = Topic(t.cat, t.key if part == 1 else "%s#%d" % (t.key, part), title)
-            n.lines = t.lines[start:end]
-            n.secs = [(nm, off - start) for nm, off in t.secs
-                      if start <= off < end]
-            n.md = t.md if part == 1 else []
-            out.append(n)
-            start, part = end, part + 1
-    return out
+    Call after substitute(): a ">" line stores only the text after its "|".
+    """
+    banks, used = 1, 0
+    for ln in t.lines:
+        body = ln[1:]
+        if ln.startswith(">"):
+            body = body.split("|", 1)[-1]
+        width = min(len(body), LINE_WIDE)
+        if used + width > IDX_BANK:
+            banks, used = banks + 1, 0
+        used += width
+    return banks
 
 
 def resolve_module_keys(topics):
@@ -1197,10 +1182,6 @@ def main():
                          "and no index. The PC-side reference on its own")
     ap.add_argument("--md-name", default="GPC-HELP.md",
                     help="the Markdown file to write, beside --out")
-    ap.add_argument("--maxpage", type=int, default=MAXPAGE,
-                    help="split a topic longer than this many lines. The viewer "
-                         "holds one topic in a string array, so this is a memory "
-                         "budget, not a style choice")
     ap.add_argument("--nosections", action="store_true",
                     help="index topics only, no section rows")
     args = ap.parse_args()
@@ -1247,11 +1228,6 @@ def main():
     topics += build_files(src)
 
     add_tails(topics)
-    # SPLITTING IS THE VIEWER'S MEMORY BUDGET, and part two of a split carries
-    # no Markdown -- the manual text goes with part one. So do not split for a
-    # file nothing is going to page through, or the .md grows empty sections.
-    if not args.md_only:
-        topics = split_long(topics, args.maxpage)
     byord = resolve_module_keys(topics)
     files = layout(topics)
     rows = build_index(files, topics, args.nosections)
@@ -1271,6 +1247,16 @@ def main():
         print("  INDEX DOES NOT FIT: %d of %d rows, %d of %d characters. Nothing "
               "written." % (len(rows), IDX_ROWS, idx_chars, idx_room))
         return 1
+    # WARNING: the viewer shows a topic's lines past its banks as blank, and says
+    # nothing. So a topic that does not fit is never written.
+    too_big = [t for t in topics
+               if len(t.lines) > TOPIC_LINES or text_banks(t) > TEXT_BANKS]
+    if not args.md_only and too_big:
+        for t in too_big:
+            print("  TOPIC DOES NOT FIT: %s, %d of %d lines, %d of %d banks. "
+                  "Nothing written." % (t.title, len(t.lines), TOPIC_LINES,
+                                        text_banks(t), TEXT_BANKS))
+        return 1
     if not args.md_only:
         write_hlp(out, files)
         write_idx(out, rows)
@@ -1280,10 +1266,11 @@ def main():
     print("  %d topics, %d index rows" % (len(topics), len(rows)))
 
     if not args.md_only:
-        big = max(len(t.lines) for t in topics)
+        big = max(topics, key=lambda t: len(t.lines))
         print("  index bank: %d of %d rows, %d of %d characters" %
               (len(rows), IDX_ROWS, idx_chars, idx_room))
-        print("  longest topic %d lines" % big)
+        print("  longest topic %d lines, %d of %d text banks" %
+              (len(big.lines), text_banks(big), TEXT_BANKS))
 
     if DROPPED:
         print("")

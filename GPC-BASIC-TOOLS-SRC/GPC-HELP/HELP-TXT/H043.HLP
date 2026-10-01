@@ -1,88 +1,114 @@
-@4.4 LINEINPUT.INC.BL -- a positioned entry field
+@4.11 GUI.INC.BL -- the box that puts the screen back, and the form in it
 .
-=4.4 LINEINPUT.INC.BL -- A POSITIONED ENTRY FIELD
+=4.11 GUI.INC.BL -- THE BOX THAT PUTS THE SCREEN BACK, AND THE FORM IN IT
+.
+=WHAT IT COSTS
+.
+.  ASM: GP.BOX GP.FILL GP.PRINTAT
+.    ASM -- machine code in the GP runtime block. One GP keyword pays for the
+.    whole block.
+.  COMPOSITE: GP.CHAR GP.PRINTAT GP.FILL
+.    COMPOSITE -- no machine code. The compiler expands it into keywords that
+.    already exist. Runtime cost is zero.
 .
 =DESCRIPTION
 .
-.  LINEINPUT.GET
-.      IN: LINEINPUT.X .Y .LEN .ATTR .TEXT$ .MASK .ALLOW$ .DENY$
-.      OUT: LINEINPUT.TEXT$ LINEINPUT.KEY
+.  GUI.OPEN
+.      IN: GUI.BODY.ROWS GUI.BODY.WIDTH
+.      OUT: GUI.INNER.LEFT .TOP .WIDTH -- the box on its own
 .
-.  LINEINPUT.ASK
-.      IN: the same plus LINEINPUT.LABEL$
-.      OUT: the same; LINEINPUT.X restored
+.  GUI.CLOSE
+.      IN: --
+.      OUT: the screen as it was
 .
-:LINEINPUT.X = 10 : LINEINPUT.Y = 6
-:LINEINPUT.LEN = 20
-:LINEINPUT.ATTR = THEME.CLR(THEME.TEXT)
-:LINEINPUT.TEXT$ = ""
-:GOSUB LINEINPUT.GET
-:IF LINEINPUT.KEY = 27 THEN GOTO CANCELLED
+.The dialogs are not here. They are one-line verbs in GUI-DIALOGS.INC.BL, SEC
+.4.12, and a program calls those. This file is what they are built out of:
+.the box, the control block, and GUI.FORM, the loop that runs a mix of
+.controls under one focus.
 .
-.INPUT and LINPUT cannot be used on a drawn screen: both take the bottom of
-.the screen, scroll it, echo in the current colour, and accept any length. A
-.LINEINPUT field stays at the given position, in the given colour, and stops
-.at the given width.
+:GP.SUB PANELOPEN, " READY ", "", 4, 30
+:GP.PRINTAT GUI.INNER.LEFT, GUI.INNER.TOP, "MY OWN ROWS", THEME.CLR(THEME.TEX
+:GP.SUB PANELCLOSE
 .
-.LINEINPUT.KEY is the key that ended the field, which is what makes a
-.multi-field form possible:
+.Requires GPB.INC.BL, STASH.INC.BL, THEME.INC.BL, BANKMGR.INC.BL,
+.MENU.INC.BL, LINEINPUT.INC.BL, COMBO.INC.BL and CHECK.INC.BL, and #INCLUDEs
+.none of them. All of them are needed whichever dialog you call: BASLOAD
+.resolves every label in the file, so leaving one out is LABEL NOT FOUND.
+.MENU.INC.BL goes in before GUI.INC.BL, for its #DEFINEs. COMBO.INC.BL and
+.CHECK.INC.BL go in after it. It wants a #SYMFILE, because STASH does.
 .
-.  13
-.      RETURN -- finished
+.PICKMENU runs the popup slot inside its box. Build the rows with MENU.BEGIN
+.MENU.POPUP and MENU.ITEM first. & hot keys are tinted in GUI.BORDER, and the
+.highlight is as wide as the widest row.
 .
-.  27 / 3
-.      ESC / STOP -- cancelled, and LINEINPUT.TEXT$ is put back to what it
-.        was
+.Everything the box takes -- three message lines, a title, the style, the
+.placement, the shadow, the frame glyphs, the bank the covered cells go to --
+.is listed in full in GP-BASIC.GLOBALS.md SEC 3. GUI.BANK = 0 does not save
+.the cells, and then the box is still on screen when the call returns.
 .
-.  17 / 145 / 9
-.      cursor down / up / TAB -- left the field, text kept
+.Every control has a focus, and TAB moves it. A dialog states its controls
+.and GUI.FORM runs them. A control is a button, a field, a list, a combo (SEC
+.4.17) or a check box (SEC 4.21); it hands back one of six verdicts -- stay,
+.next, previous, press, default, cancel -- and the dispatcher is one loop
+.whatever the mix.
 .
-.A form is therefore a loop over fields rather than a sequence of prompts,
-.and the user can return to an earlier field without restarting.
+.The default button and the focused control are different things. The default
+.is what RETURN presses from anywhere and is drawn <<LIKE THIS>>; the focus
+.is where TAB has got to and is drawn in THEME.FOCUS. INPUTBOX opens with the
+.default on OK and the focus in the field -- which is the point of keeping
+.the two apart, and GUI.DEFAULT sets only the first.
 .
-.LINEINPUT.MASK non-zero displays asterisks while holding the real string.
-.The field does not scroll: when it is full, further characters are refused
-.and the cursor inverts the last character rather than sitting past the end.
-.The cursor blinks off TI rather than a delay loop; a delay loop would
-.swallow keys pressed during it.
+.The answers are buttons. GUI.BTN.ONE$ and GUI.BTN.TWO$ carry them, and &
+.marks the accelerator: "&CANCEL" lights the C. An accelerator is live only
+.while the focused control does not eat printable keys, so C presses CANCEL
+.from the button row or from inside a list, and types a C in a field.
 .
-.LINEINPUT.ALLOW$ and LINEINPUT.DENY$ restrict what may be typed. Both are
-.empty by default, and the field then takes any printable character, as it
-.always has. ALLOW$ lists the characters accepted and DENY$ the ones refused;
-.a caller that sets both gets ALLOW$, and DENY$ is not consulted. A refused
-.key changes nothing -- not the text, and not the caret.
+.The typing dialog's answer is GUI.TEXT$, and the verb is INPUTBOX. BASLOAD
+.will not have a label and a variable of one name, and the $ does not
+.separate them.
 .
-.They compare raw bytes, so a set of LETTERS depends on the charset: PETSCII
-.shifted letters arrive as $C1-$DA and ISO ones as $41-$5A, and an ALLOW$
-.written for one silently refuses every capital in the other. Digits are
-.48-57 in both. Use ALLOW$ for a closed set short enough to write out, DENY$
-.for everything-except:
+=Fields on a form
 .
-.  Digits only
-.      SPELLING: ALLOW$ = "0123456789"
+.  GUI.FORM.ADD.FIELD
+.      IN: LINEINPUT.X .Y .LEN .TEXT$ and the rest of LINEINPUT's inputs
+.      OUT: GUI.CTRL.N -- the field's control number
 .
-.  Number with sign and point
-.      SPELLING: ALLOW$ = "0123456789.-"
+:LINEINPUT.X = GUI.INNER.LEFT : LINEINPUT.Y = GUI.INNER.TOP
+:LINEINPUT.LEN = 20 : LINEINPUT.TEXT$ = "UNTITLED"
+:GOSUB GUI.FORM.ADD.FIELD
+:NAME.CTRL = GUI.CTRL.N
+:REM ... run the form ...
+:PRINT GUI.CTRL.TEXT$(NAME.CTRL)
 .
-.  Yes or no
-.      SPELLING: ALLOW$ = "YyNn"
+.The text belongs to the control, in GUI.CTRL.TEXT$(n). LINEINPUT has one
+.buffer, so a field copies its text in when it takes the focus and back out
+.when it leaves. Read GUI.CTRL.TEXT$(n) after GUI.FORM.RUN. That is what lets
+.one form carry several fields.
 .
-.  Letters, no digits
-.      SPELLING: DENY$ = "0123456789"
+.The field is painted as soon as it is added, so a field that never takes the
+.focus is still drawn.
 .
-.  Filename, no punctuation
-.      SPELLING: DENY$ = ",:=*?"
+.Upper case, on the default charset. GP.PRINTAT converts PETSCII and BASLOAD
+.passes literals through as source bytes, so charset 2 lands lower case on
+.the graphics half of the font. ISO mode fixes the text and breaks the frame,
+.GP.BOX's $40-$7D being letters. Upper case with a frame, mixed case without
+.one, or re-order the font and set GUI.GLYPH.
 .
-.Both are sticky, like every other input in the library, so a form sets them
-.on the way into each field rather than once at the top.
-.
-.Example: FORM.EXP.BL -- three fields, one masked and one digits-only, in a
-.themed panel.
+.Example: GUI.EXP.BL.
 .
 =EXAMPLE PROGRAM
 .
-.  FORM.EXP.BL -- runnable, in the GPC-BASIC folder
+.  GUI.EXP.BL -- runnable, in the GPC-BASIC folder
 .
 =SEE ALSO
 .
->82|4.4 LINEINPUT.INC.BL -- a positioned entry field
+>88|4.12 GUI-DIALOGS.INC.BL -- every dialog as a verb
+>28|3. Command reference
+>94|4.17 COMBO.INC.BL -- a drop-down list that folds into one row
+>98|4.21 CHECK.INC.BL -- a check box, [X] or [ ]
+>86|4.11 GUI.INC.BL -- the box that puts the screen back, and the form in 
+>112|STASH.INC.BL -- save a text rectangle, and put it back.
+>65|4.1 THEME.INC.BL -- named colour roles
+>90|4.13 BANKMGR.INC.BL -- who owns which RAM bank
+>77|4.6 MENU.INC.BL -- menus built a row at a time
+>75|4.4 LINEINPUT.INC.BL -- a positioned entry field

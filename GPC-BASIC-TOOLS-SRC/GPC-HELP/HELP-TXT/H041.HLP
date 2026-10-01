@@ -1,12 +1,75 @@
-@4.2 STRINGS.INC.BL -- string helpers (2)
+@4.9 MENUPULL.INC.BL -- a dropdown under a bar item
+.
+=4.9 MENUPULL.INC.BL -- A DROPDOWN UNDER A BAR ITEM
+.
+=DESCRIPTION
+.
+.  N = GP.FN(MENUTO.PULLDOWN, barnum, style)
+.      IN: the popup slot, the bar MENUTO.BAR or MENU.DRAWBAR last drew,
+.        MENU.STASHBANK
+.      OUT: N MENU.EXITKEY MENU.NEXTBAR MENU.BARNUM MENU.SELX MENU.SELW
+.
+:MENU.BARFLAGS = MENU.DOWNEXIT
+:B = GP.FN(MENUTO.BAR, 0, 0, MENU.NOBOX)
+:GP.DO
+:    IF B = 0 THEN GP.EXITDO
+:    GOSUB MY.FILL
+:    N = GP.FN(MENUTO.PULLDOWN, B, MENU.ROUND)
+:    B = MENU.NEXTBAR
+:GP.LOOP
+.
+.MY.FILL is the caller's: MENU.BEGIN MENU.POPUP and the rows for bar item B.
+.
+.Requires MENU.INC.BL (SEC 4.6) and STASH.INC.BL (SEC 3.6), included by the
+.caller, and a #SYMFILE for STASH. A program with no dropdown leaves this
+.file out and does not carry STASH.
+.
+.MENUTO.PULLDOWN marks bar item barnum, opens the popup slot under it and
+.runs it. A barnum out of range or disabled returns 0 and draws nothing. The
+.bar is the one last drawn, where it was drawn, read with MENU.GAP and
+.MENU.BARFLAGS as they are now. The item the last call marked is unmarked and
+.barnum is marked. It stays marked on the way out, in MENU.MARKED.
+.
+.The dropdown's corner is the item's column on the row under the bar, moved
+.left if the box would run off the screen. The screen width comes from the
+.KERNAL's screen_mode. The style and colours are MENUTO.VERT's (SEC 4.6), and
+.the run adds MENU.KEYEXIT to MENU.FLAGS.
+.
+.  N
+.      the row, for RETURN or a hot key. Any other exit is 0
+.
+.  MENU.EXITKEY
+.      the key that ended it
+.
+.  MENU.NEXTBAR
+.      the bar item LEFT or RIGHT walks to, stepping over disabled items as
+.        the bar does. With no live neighbour it is barnum. 0 for any other
+.        exit
+.
+.  MENU.BARNUM
+.      the bar's row count
+.
+.  MENU.SELX MENU.SELW
+.      the item's column and width
+.
+.The screen under the dropdown is saved first and put back after, in STASH
+.slot 0 of bank MENU.STASHBANK. Set it before the first call to choose the
+.bank. Left at 0, the first call takes one from BANKMGR.GET.FREE.BANK. If
+.none is free, the dropdown still runs and the screen is not put back.
+.
+.WARNING: MENUTO.PULLDOWN sets STASH.BANK, STASH.SLOT, STASH.MOVE, STASH.X,
+.STASH.Y, STASH.W and STASH.H. Set them again before the caller's own next
+.STASH call.
+.
+.Example: pass 6 of MENUTO.EXP.BL.
+.
 =EXAMPLE PROGRAM
 .
-.  SPLITT.EXP.BL -- runnable, in the GPC-BASIC folder
-.  STRINGS.EXP.BL -- runnable, in the GPC-BASIC folder
-.  STRTST.EXP.BL -- runnable, in the GPC-BASIC folder
+.  MENUTO.EXP.BL -- runnable, in the GPC-BASIC folder
 .
 =SEE ALSO
 .
->42|3.4.5 GP.STRPTR -- address of a string block
->38|3.4.1 GP.INSTR -- position of a substring
->72|4.2 STRINGS.INC.BL -- string helpers
+>77|4.6 MENU.INC.BL -- menus built a row at a time
+>41|3.6 Screen -- stash and restore
+>84|4.9 MENUPULL.INC.BL -- a dropdown under a bar item
+>112|STASH.INC.BL -- save a text rectangle, and put it back.

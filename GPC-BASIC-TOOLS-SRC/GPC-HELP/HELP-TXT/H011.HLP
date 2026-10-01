@@ -1,26 +1,39 @@
-@7. The documents
+@3.1 Loops
 .
-=7. THE DOCUMENTS
+=3.1 LOOPS
 .
-.  GP-BASIC.md
-.      the manual -- the keyword reference and the module reference
+=SYNTAX
 .
-.  GP-BASIC.GLOBALS.md
-.      every global name each module owns, and the prefixes you may not use
+:GP.DO [count]
+:    ...
+:GP.LOOP
 .
-.  GP-BASIC.FILES.md
-.      this page
+=WHAT IT COSTS
 .
-.  README.md
-.      how to run the compiler, and what its answers mean
+.  ASM: GP.DO GP.LOOP GP.EXITDO
+.    ASM -- machine code in the GP runtime block. One GP keyword pays for the
+.    whole block.
 .
-.  BANKED-OR-NOT.md
-.      how to run a module from a RAM bank
+=DESCRIPTION
 .
-.  SRC/
-.      the BASLOAD source of the tools. Reference only -- nothing in it is
-.        needed to run
+.Counted loop, modelled on prog8's repeat. A count of 0, or no count, loops
+.forever. Loops nest.
 .
-.The library's documents live beside the includes they describe, in this
-.folder, so a relative link works both in the repository and in an unzipped
-.release.
+:GP.EXITDO
+.
+.Leaves the innermost GP.DO, closing its stack frame. A GOTO out of a GP.DO
+.closes its frames too -- see SEC 3.2 -- but GP.EXITDO is two bytes and needs
+.no branch target.
+.
+:GP.DO
+:  TICK = TICK + 1
+:  IF TICK = 9 THEN GP.EXITDO
+:GP.LOOP
+.
+=EXAMPLE PROGRAM
+.
+.  LOOPS.EXP.BL -- runnable, in the GPC-BASIC folder
+.
+=SEE ALSO
+.
+>31|3.2 Multi-way branch

@@ -1,6 +1,6 @@
-@4.14 KB.INC.BL -- the keyboard buffer, emptied
+@4.24 GUI-LITE.INC.BL -- a message box and a menu, in low memory
 .
-=4.14 KB.INC.BL -- THE KEYBOARD BUFFER, EMPTIED
+=4.24 GUI-LITE.INC.BL -- A MESSAGE BOX AND A MENU, IN LOW MEMORY
 .
 =WHAT IT COSTS
 .
@@ -9,26 +9,71 @@
 .
 =DESCRIPTION
 .
-.  KB.CLEARKB
-.      IN: --
-.      OUT: --
+.Three verbs. MSGBOX shows up to four lines over one or two buttons, and
+.closes before it returns. PICKMENU shows a menu and leaves it open. CLOSEBOX
+.takes down the box opened last. Each box is as wide as its text and has a
+.drop shadow. A program calls the three verbs and nothing else.
 .
-:#INCLUDE "KB.INC.BL"
+:#INCLUDE "GPB.INC.BL"
+:#INCLUDE "THEME.INC.BL"
+:#INCLUDE "GUI-LITE.INC.BL"
 :
-:GOSUB KB.CLEARKB
-:GOSUB GUI.YN
+:GOSUB THEME.SELECT
+:C = GP.FN(PICKMENU, 4, 4, "MENU", "ABOUT,QUIT")
+:IF C = 1 THEN GP.SUB MSGBOX, "ABOUT", "GUI-LITE", "", "", "", "OK", ""
+:GP.SUB CLOSEBOX
 .
-.Call it before opening a dialog, and after a keystroke that redraws. A
-.dialog opened with a key still queued reads it, answers itself and closes; a
-.held arrow repeats faster than a page can be drawn and scrolls on after the
-.key is let go.
+.#INCLUDE it after GPB.INC.BL and THEME.INC.BL. It includes neither. Every
+.colour is read from THEME.CLR, so THEME.SELECT (SEC 4.1) runs before the
+.first box.
 .
-.GUI.INC.BL carries a private copy, GUI.CLEARKB, from when code inside a
-.GP.BANKED region could not call another bank. Fix one and fix the other.
-.There are only the two, and a second #INCLUDE of this file cannot supply the
-.copy -- the #IFNDEF guard makes it produce nothing.
+.It uses GP.BOX, GP.FILL, GP.PRINTAT and GP.CALL, so a program that includes
+.it carries the GP block, 1,536 bytes. It holds no GP.BANKED, GP.BANKEDSTR or
+.BANK, and adds no .OVL.
+.
+.The cells under a box and its shadow go to VRAM bank 0 when the box opens,
+.and come back when it closes. The first box saves at GL.SAVE.AT, and each
+.later box just above the one before. A box W columns wide and H rows high
+.takes (2W + 4) x (H + 1) bytes. The largest box on an 80x30 screen takes
+.5,084 bytes, so four of them end at $8F70. The save area must end below
+.$10000.
+.
+.  GL.SAVE.AT
+.      DEFAULT: $4000
+.      SETS: the VRAM bank 0 address the first box saves at
+.
+.  GL.MOST.OPEN
+.      DEFAULT: 4
+.      SETS: how many boxes may be open at once
+.
+.Define either one before the #INCLUDE to change it.
+.
+.The frame is THEME.BORDER, the inside and the menu rows THEME.TEXT, the
+.title THEME.TITLE and the shadow THEME.SHADOW. The menu bar and the focused
+.button are THEME.HILITE, and the other button is THEME.BAR.
+.
+.The caller keeps every box and its shadow on the screen. The shadow is two
+.columns right of the box and one row below it.
+.
+.GUI-DIALOGS.INC.BL (SEC 4.12) declares MSGBOX and PICKMENU too. Include one
+.or the other. With both, the compile stops at GP.DEFPROC VERB ALREADY
+.DECLARED.
+.
+.STASHVRAM.INC.BL (SEC 4.18) starts its window at $04000, the default
+.SV.BASE. A program that includes both moves one of them.
+.
+.The GUI-LITE sample, GPC-BASIC-TOOLS-SRC/GUI-LITE/GUI-LITE.BASL, calls all
+.three verbs.
+.
+=IN THIS SECTION
+.
+>102|4.24.1 MSGBOX -- lines of text over one or two buttons
+>103|4.24.2 PICKMENU -- a menu that stays open
+>104|4.24.3 CLOSEBOX -- take down the box opened last
 .
 =SEE ALSO
 .
->101|4.14 KB.INC.BL -- the keyboard buffer, emptied
->95|4.11 GUI.INC.BL -- the box that puts the screen back, and the form in 
+>65|4.1 THEME.INC.BL -- named colour roles
+>88|4.12 GUI-DIALOGS.INC.BL -- every dialog as a verb
+>95|4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM
+>101|4.24 GUI-LITE.INC.BL -- a message box and a menu, in low memory

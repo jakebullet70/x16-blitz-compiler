@@ -1,38 +1,37 @@
-@4.22 MATH.INC.BL -- the smaller and the larger of two numbers
+@STASHFILE.INC.BL -- a saved text rectangle, through a file.
 .
-=4.22 MATH.INC.BL -- THE SMALLER AND THE LARGER OF TWO NUMBERS
+=STASHFILE.INC.BL
 .
-=WHAT IT COSTS
+.  a saved text rectangle, through a file.
 .
-.    BASIC -- ordinary BASL in a .INC.BL, called with GOSUB. Free unless you
-.    #INCLUDE it.
+=MODULE HEADER
 .
-=DESCRIPTION
+:      STASH.FILE.SAVE   a rectangle of the screen, out to a file
+:      STASH.FILE.LOAD   a saved file, back where it came from
+:      STASH.FILE.PUT    a saved file, pasted somewhere else
 .
-.  MATH.MIN
-.      IN: MATH.FIRST MATH.SECOND
-.      OUT: MATH.RESULT
+.  Requires, and does not #INCLUDE for you:
+:      GPB.INC.BL      GP.ASM
+:      STASH.INC.BL    which does the copying, and wants a #SYMFILE
 .
-.  MATH.MAX
-.      IN: MATH.FIRST MATH.SECOND
-.      OUT: MATH.RESULT
+.  Usage:
+:      STASH.BANK = 8 : STASH.FILE$ = "PANEL.BIN"
+:      STASH.X = 10 : STASH.Y = 4 : STASH.W = 30 : STASH.H = 8
+:      GOSUB STASH.FILE.SAVE
+:      ...
+:      GOSUB STASH.FILE.LOAD
 .
-:#INCLUDE "GPB.INC.BL"
-:#INCLUDE "MATH.INC.BL"
-:
-:MATH.FIRST = WANTED : MATH.SECOND = AVAILABLE
-:GOSUB MATH.MIN
-:ROWS = MATH.RESULT
+:   in   STASH.FILE$    the name
+:        STASH.DEV      the device. 0 means 8
+:        STASH.BANK     the bank to stage through
+:        and, for SAVE, the geometry STASH.SAVE wants
 .
-.Both routines share all three variables. The verbs are MATH.MINOF and
-.MATH.MAXOF, so the same answer comes back from GP.SUB MATH.MINOF, WANTED,
-.AVAILABLE or from GP.FN(MATH.MINOF, WANTED, AVAILABLE) inside an expression.
+.  The four header bytes go out with the cells, so loading one back needs
+.  nothing but the name.
 .
-.GP.FN brings the GP block in, 1,536 bytes. GOSUB and GP.SUB leave it out.
-.
-.Floats and integers both, and no range check. Equal arguments answer
-.MATH.FIRST.
+.  BSAVE's end address is EXCLUSIVE, so this writes the header and the cells
+.  and no padding. The length is w h 2 + 4.
 .
 =SEE ALSO
 .
->110|4.22 MATH.INC.BL -- the smaller and the larger of two numbers
+>112|STASH.INC.BL -- save a text rectangle, and put it back.

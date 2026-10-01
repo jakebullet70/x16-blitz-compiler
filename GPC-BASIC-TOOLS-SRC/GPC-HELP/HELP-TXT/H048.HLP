@@ -1,56 +1,71 @@
-@4.7 SORT.INC.BL -- shell sort a string array
+@4.16 FILEDIR.INC.BL -- a directory, into a bank or into low RAM
 .
-=4.7 SORT.INC.BL -- SHELL SORT A STRING ARRAY
+=4.16 FILEDIR.INC.BL -- A DIRECTORY, INTO A BANK OR INTO LOW RAM
 .
 =DESCRIPTION
 .
-.  SORT.RUN
-.      IN: SORT.PTR SORT.DESCEND SORT.NOCASE
-.      OUT: SORT.OK SORT.COUNT
+.  FILE.DIR.INIT
+.      IN: --
+.      OUT: --
+.
+.  FILE.DIR.OPEN
+.      IN: FILE.DIR.BANK FILE.DIR.PTR FILE.DIR.CAP FILE.DIR.PATTERN$
+.        FILE.DIR.ONLY
+.      OUT: FILE.DIR.GOT FILE.DIR.FULL FILE.DIR.SLOW
+.
+.  FILE.DIR.NEXT
+.      IN: --
+.      OUT: FILE.DIR.MORE FILE.NAME$ FILE.BLOCKS FILE.TYPE$
 .
 :#SYMFILE "@:MYPROG.SYM"
-:#INCLUDE "SORT.INC.BL"
+:#INCLUDE "FILEIO.INC.BL"
+:#INCLUDE "FILEDIR.INC.BL"
 :
-:SORT.PTR = GP.ARRPTR(NAME$())
-:SORT.DESCEND = 0 : SORT.NOCASE = 0
-:GOSUB SORT.RUN
+:GOSUB BANKMGR.GET.FREE.BANK
+:FILE.DIR.BANK = BANKMGR.BANK
+:FILE.DIR.PATTERN$ = "*.BASL" : FILE.DIR.ONLY = FILE.DIR.FILES
+:GOSUB FILE.DIR.OPEN
+:GP.DO
+:    GOSUB FILE.DIR.NEXT
+:    IF FILE.DIR.MORE = 0 THEN GP.EXITDO
+:    PRINT FILE.NAME$, FILE.BLOCKS, FILE.TYPE$
+:GP.LOOP
 .
-.Shell sort with Ciura's gap sequence -- 132, 57, 23, 10, 4, 1 -- moving the
-.2-byte element pointers rather than string data. A swap costs the same
-.whatever the strings are: no temporary, no copy, no heap traffic.
+.Requires GPB.INC.BL and FILEIO.INC.BL, and #INCLUDEs neither. The #SYMFILE
+.is required, for the same reason FILEIO needs one.
 .
-.The array is passed as an address because a BASL subroutine cannot be passed
-.an array; GP.ARRPTR is a keyword for this purpose. The empty parentheses in
-.GP.ARRPTR(A$()) are required -- A$ and A$() are different variables.
+.FILE.DIR.ONLY takes FILE.DIR.ALL, FILE.DIR.FILES or FILE.DIR.DIRS.
+.FILE.DIR.MORE is -1 while NEXT produced an entry and 0 at the end.
+.FILE.DIR.GOT is bytes read, 0 for an empty or failed listing. FILE.DIR.FULL
+.says the buffer filled before the listing ended, and FILE.DIR.SLOW is 1 if
+.the device had no MACPTR and the read fell back to CHRIN a byte at a time.
 .
-.SORT.OK is -1 when it sorted and 0 if the sort was refused: more than 255
-.elements, so DIM A$(254) is the largest accepted (DIM A$(255) is 256
-.elements), or an array whose elements are not strings. The element count and
-.the type are read from the array's own header, three bytes below what
-.GP.ARRPTR returns, so a wrong count cannot be passed in.
+.Two destinations, one code path: the reader takes an address and a size.
 .
-.Never-assigned elements are empty strings, not garbage. A DIM A$(20) with
-.five entries filled sorts its fifteen empties to the front; a null pointer
-.reads as "", as it does elsewhere in the runtime.
+:REM a bank -- 8,192 bytes at $A000, about 250 entries
+:FILE.DIR.BANK = BANKMGR.BANK
+:
+:REM low RAM
+:FILE.DIR.BANK = 0
+:DIM FD.BUF%(1022)
+:FILE.DIR.PTR = GP.ARRPTR(FD.BUF%())
+:FILE.DIR.CAP = 1023 * 2
 .
-.SORT.DESCEND and SORT.NOCASE are ordinary variables rather than arguments,
-.so they are sticky. Set both on every call.
+.A % array is TWO bytes an element, not six. The recipe above said six until
+.it was measured, and sized a 682-byte buffer as 2,046: a caller following it
+.handed the assembly three times the room it had, and the reader would have
+.run 1,364 bytes off the end of the array and into whatever the workspace put
+.after it. An untyped array is the six.
 .
-.The program must have a #SYMFILE, placed before the #INCLUDEs. The assembly
-.reaches BASIC's variables through {VAR}, and BASLOAD crunches every name
-.before the compiler sees it; without the mapping the compile stops with {}
-.NEEDS #SYMFILE.
-.
-.Example: ARRAYS.EXP.BL. Regression test: SORT.EXP.BL, eight cases including
-.a 200-element array -- element 128 is where the doubled index stops fitting
-.in a byte. Every case checks content as well as order: a sort that reads the
-.wrong element leaves the array in order with a string duplicated.
-.
-=EXAMPLE PROGRAM
-.
-.  ARRAYS.EXP.BL -- runnable, in the GPC-BASIC folder
-.  SORT.EXP.BL -- runnable, in the GPC-BASIC folder
+.FILE.DIR.BANKBASE and FILE.DIR.BANKROOM are the hardware window, not an
+.allocation -- every bank appears at $A000 and every bank is 8,192 bytes. The
+.bank number is the resource. Take it from BANKMGR.GET.FREE.BANK and put it
+.in FILE.DIR.BANK. This module claims no bank and executes no BANK statement.
+.Its two GP.ASM blocks write $00, so both are GP.ASM LOW (SEC 3.9) and stay
+.in low memory when the module is in a region.
 .
 =SEE ALSO
 .
->91|4.7 SORT.INC.BL -- shell sort a string array
+>45|3.9 Inline assembly
+>93|4.16 FILEDIR.INC.BL -- a directory, into a bank or into low RAM
+>92|4.15 FILEIO.INC.BL -- the drive: status, files, directories

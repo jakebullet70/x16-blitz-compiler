@@ -1,26 +1,25 @@
-@4.25.1 DOSX -- send a command, read the answer
+@6. Two more naming rules that are not about collisions
 .
-=4.25.1 DOSX
+=6. TWO MORE NAMING RULES THAT ARE NOT ABOUT COLLISIONS
 .
-.  Syntax    GP.SUB DOSX, cmd$
-.            GP.FN(DOSX, cmd$)
-.            DOS.CMDSTR$ = cmd$ : GOSUB DOS.CMD
-.  Returns   DOS.ERR, the drive's error number.
-.  Kind      BASIC. A verb in DOS.INC.BL. GP.FN needs the GP block.
-.  Notes     Opens the command channel to DOS.DEVICE as logical file
-.            15 with cmd$ as the command, reads the answer, and closes
-.            the file.
-.            cmd$ "" sends no command and reads the drive's status.
-.            DOS.MSG$ holds the message. The track and sector are
-.            read and discarded.
-.            DOS.ERR under 20 is success.
-.            DOS.CMDSTR$ is "" afterwards.
-.  WARNING   Do not call it with logical file 15 open.
-.  Example
+.#DEFINE takes an INT16 (BASLOAD.MD:313). A constant above 65535 is ERROR:
+.INVALID PARAMETER, not a warning -- which is why BMX.PALBASE (VRAM $1FA00,
+.129536) is an ordinary variable and not a #DEFINE. Every VRAM address past
+.$FFFF has the same problem.
 .
-:            GP.SUB DOSX, "S:OLD.DAT"
-:            IF DOS.ERR >= DOS.OKMAX THEN PRINT DOS.ERR; " "; DOS.MSG$
+.A dotted name whose tail is a reserved word is fine. MENU.COUNT, THEME.CLR,
+.LINEINPUT.LEN and LINEINPUT.RETURN all contain keywords and all work,
+.because BASLOAD matches the whole identifier. An undotted one does not: POS,
+.MB, ST, LEN and CHAR cannot be variables at all. This is the main reason the
+.library is dotted throughout.
 .
-=SEE ALSO
+.RETURNS joined that list on 08/09/26 -- it is GP.DEFPROC's result clause and
+.has a token of its own, so a bare RETURNS is no longer a name. RETURN is
+.untouched, and so is anything dotted.
 .
->116|4.25 DOS.INC.BL -- a drive command, and a test for a file
+.One rule applies only outside BASL: BASLOAD gives 64 significant characters,
+.the built-in BASIC gives two. Write the same code as a hand-typed .bas for
+.the PC-side converter and THEME.CLR and THEME.COUNT become the same
+.variable. That is a silent wrong answer -- it cost two test cycles during
+.tier 6, both times looking exactly like a compiler bug. Inside BASL you are
+.safe; in a raw .bas, give every variable a distinct first two characters.

@@ -1,47 +1,19 @@
-@3.3 Machine code
+@3.4.1 GP.INSTR -- position of a substring
 .
-=3.3 MACHINE CODE
+=3.4.1 GP.INSTR
 .
-=SYNTAX
+.  Syntax    GP.INSTR(hay$, needle$ [, start])
+.  Returns   Position of needle$ in hay$, 1-based. 0 if not found.
+.  Kind      ASM. Needs the GP block.
+.  Notes     start is the position to begin at. Default 1.
+.            Case sensitive. It compares raw bytes; SEC 3.4.4 is the
+.            case-blind test.
+.            An empty needle$ returns 0.
+.  Example
 .
-:GP.CALL address [,a] [,x] [,y] [,carry]
-:GP.A   GP.X   GP.Y   GP.C
-.
-=WHAT IT COSTS
-.
-.  ASM: GP.CALL GP.A GP.X GP.Y GP.C
-.    ASM -- machine code in the GP runtime block. One GP keyword pays for the
-.    whole block.
-.
-=DESCRIPTION
-.
-.Calls machine code with the registers set. All four arguments are optional
-.and default to 0. The four value words read the registers back afterwards.
-.
-.They are keywords, not variables: X = GP.A reads, GP.A = 5 is a syntax
-.error. They share SYS's $030C-$030F, so they also read what a plain SYS left
-.behind.
-.
-:GP.CALL $FF5F, 0, 0, 0, 1 : REM KERNAL screen_mode, carry set = report
-:COLS = GP.X : ROWS = GP.Y
-.
-.Put machine code in banked RAM, $A000-$BFFF, not at $0400. Stock X16 BASIC
-.leaves $0400 free for the user; a compiled GPC program does not. That page
-.holds runtime state (stringHighMemory, storeStartHigh, variableStartPage),
-.and code POKEd over it corrupts the program without raising an error.
-.
-.For anything longer than a few bytes use GP.ASM (SEC 3.9) instead of GP.CALL
-.and a POKE loop. It assembles into the program: no bank to reserve, and no
-.list of numbers to keep in step with a comment.
-.
-=IN THIS SECTION
-.
->36|3.3.1 GP.HIBYTE / GP.LOBYTE -- split an address into two bytes
-.
-=EXAMPLE PROGRAM
-.
-.  MLCALL.EXP.BL -- runnable, in the GPC-BASIC folder
+:            P = GP.INSTR(F$, ".BAS", 1)
+:            IF P > 0 THEN PRINT "FOUND AT"; P
 .
 =SEE ALSO
 .
->48|3.9 Inline assembly
+>38|3.4.4 GP.COMP -- compare two strings, ignoring case

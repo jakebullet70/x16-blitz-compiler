@@ -459,7 +459,7 @@ reads the debug map the compiler writes when `MAKE A DEBUG MAP?` is answered yes
 the address cannot be resolved.
 
 `GPC.HELP.PRG` is this reference, on the machine. It reads `HELP-TXT/` beside it — `GPC.HELP.IDX`
-and one `.HLP` per topic — and shows 98 topics at 80x30. Arrows, `PgUp` / `PgDn`, `HOME` and `END`
+and one `.HLP` per topic — and shows 75 topics at 80x30. Arrows, `PgUp` / `PgDn`, `HOME` and `END`
 move. `RETURN` opens the highlighted index row. `/` finds and `N` repeats the search. `L` follows a
 topic's cross references, `X` writes its code out as a `.BL` where it has any, `T` cycles the colour
 themes, `?` is the about box. `ESC` goes back a step, and quits from the index.
@@ -3952,9 +3952,11 @@ The convention is one dotted prefix per module, and nothing writes outside its o
 |---|---|
 | `GP.` | keywords, **not variables** — see below |
 | `STR.` | `STRINGS.INC.BL` |
+| `STR.USING.` | `STRUSING.INC.BL`, kept apart from the rest of `STR.` |
 | `THEME.` | `THEME.INC.BL` |
 | `APPSYS.` | `APPSYS.INC.BL` |
 | `LINEINPUT.` | `LINEINPUT.INC.BL` |
+| `KB.` | `KB.INC.BL` |
 | `MENU.` | `MENU.INC.BL`, and `MENUPULL.INC.BL`'s variables |
 | `MENUTO.` | the runners in `MENU.INC.BL` and `MENUPULL.INC.BL` |
 | `MENUPULL.` | `MENUPULL.INC.BL`'s labels |
@@ -3966,8 +3968,10 @@ The convention is one dotted prefix per module, and nothing writes outside its o
 | `SORT.` | `SORT.INC.BL` |
 | `STRCASE.` | `STRCASE.INC.BL` |
 | `BMX.` / `BMXK.` | `BMX.INC.BL` (variables / its KERNAL constants) |
+| `FILE.` / `FILE.DIR.` | `FILEIO.INC.BL` / `FILEDIR.INC.BL` |
 | `KV.` | `KV.INC.BL` |
 | `DOS.` | `DOS.INC.BL` |
+| `SV.` / `SVGC.` | `STASHVRAM.INC.BL` / `STASHVRAMGC.INC.BL` |
 | `MATH.` | `MATH.INC.BL` |
 | `MEM.` | `MEM.INC.BL`, its two KERNAL constants included |
 
@@ -3999,7 +4003,7 @@ after a change.
 ---
 
 
-*See also: 6. The traps, collected, 4.2 STRINGS.INC.BL -- string helpers, 4.1 THEME.INC.BL -- named colour roles, 4.3 APPSYS.INC.BL -- start politely, leave it as you found it, 4.4 LINEINPUT.INC.BL -- a positioned entry field, 4.6 MENU.INC.BL -- menus built a row at a time, 4.9 MENUPULL.INC.BL -- a dropdown under a bar item, 4.11 GUI.INC.BL -- the box that puts the screen back, and the form in , 4.12 GUI-DIALOGS.INC.BL -- every dialog as a verb, 4.24 GUI-LITE.INC.BL -- a message box and a menu, in low memory, STASH.INC.BL -- save a text rectangle, and put it back., STASHFILE.INC.BL -- a saved text rectangle, through a file.*
+*See also: 6. The traps, collected, 4.2 STRINGS.INC.BL -- string helpers, 4.10 STRUSING.INC.BL -- a number to a template, 4.1 THEME.INC.BL -- named colour roles, 4.3 APPSYS.INC.BL -- start politely, leave it as you found it, 4.4 LINEINPUT.INC.BL -- a positioned entry field, 4.14 KB.INC.BL -- the keyboard buffer, emptied, 4.6 MENU.INC.BL -- menus built a row at a time, 4.9 MENUPULL.INC.BL -- a dropdown under a bar item, 4.11 GUI.INC.BL -- the box that puts the screen back, and the form in , 4.12 GUI-DIALOGS.INC.BL -- every dialog as a verb, 4.24 GUI-LITE.INC.BL -- a message box and a menu, in low memory*
 
 ## 1. The prefixes that are taken
 

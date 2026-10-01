@@ -1,47 +1,125 @@
-@4.23 MEM.INC.BL -- a block copied, a block filled
+@5. Variables
 .
-=4.23 MEM.INC.BL -- A BLOCK COPIED, A BLOCK FILLED
+=5. VARIABLES
 .
-=DESCRIPTION
+.BASL has one flat namespace. There are no locals, no scoping and no
+.parameters. Every variable in every #INCLUDEd module is visible to your
+.program and the reverse, and nothing warns you: a collision is a wrong
+.answer, not an error.
 .
-.  MEM.COPY
-.      IN: MEM.SOURCE MEM.TARGET MEM.COUNT
-.      OUT: MEM.OK
+.The convention is one dotted prefix per module, and nothing writes outside
+.its own prefix.
 .
-.  MEM.FILL
-.      IN: MEM.TARGET MEM.COUNT MEM.VALUE
-.      OUT: MEM.OK
+=Prefixes already taken
 .
-:#INCLUDE "GPB.INC.BL"
-:#INCLUDE "MEM.INC.BL"
-:
-:MEM.TARGET = 4096 : MEM.COUNT = 1000 : MEM.VALUE = 32
-:GOSUB MEM.FILL
-:IF MEM.OK = 0 THEN PRINT "REFUSED"
+.  GP.
+.      OWNER: keywords, not variables -- see below
 .
-.The KERNAL's memory_copy and memory_fill. The verbs are MEM.BLOCKCOPY and
-.MEM.BLOCKFILL, and the two routines share MEM.TARGET, MEM.COUNT and MEM.OK.
+.  STR.
+.      OWNER: STRINGS.INC.BL
 .
-.MEM.COUNT is 1 to 65535. Anything outside that is refused and MEM.OK comes
-.back 0, never truncated. A longer block goes a chunk at a time; a chunk size
-.above $4000 cannot be a #DEFINE, which is signed. STASHVRAMGC.INC.BL (SEC
-.4.19) is the worked example.
+.  STR.USING.
+.      OWNER: STRUSING.INC.BL, kept apart from the rest of STR.
 .
-.Regions may overlap with the target below the source.
+.  THEME.
+.      OWNER: THEME.INC.BL
 .
-.WARNING: both ends are low RAM below $9F00, or a $9F00-$9FFF I/O port. No
-.bank survives the call, so $A000-$BFFF cannot be reached. Move a banked
-.block a window at a time.
+.  APPSYS.
+.      OWNER: APPSYS.INC.BL
 .
-.An address in $9F00-$9FFF is used without being stepped. Point a VERA data
-.port at the start of a run and pass $9F23 or $9F24 to move a whole block in
-.one call. STASHVRAM.INC.BL (SEC 4.18) does that by hand.
+.  LINEINPUT.
+.      OWNER: LINEINPUT.INC.BL
 .
-.Either routine brings the GP block in, 1,536 bytes, because GP.CALL lives
-.there.
+.  KB.
+.      OWNER: KB.INC.BL
+.
+.  MENU.
+.      OWNER: MENU.INC.BL, and MENUPULL.INC.BL's variables
+.
+.  MENUTO.
+.      OWNER: the runners in MENU.INC.BL and MENUPULL.INC.BL
+.
+.  MENUPULL.
+.      OWNER: MENUPULL.INC.BL's labels
+.
+.  GUI.
+.      OWNER: GUI.INC.BL
+.
+.  GUI.LISTBOX.
+.      OWNER: GUI-DIALOGS.INC.BL, kept apart from the rest of GUI.
+.
+.  DLG.
+.      OWNER: GUI-DIALOGS.INC.BL, the dialog verbs' arguments and internals
+.
+.  GL.
+.      OWNER: GUI-LITE.INC.BL
+.
+.  STASH. / STASH.FILE.
+.      OWNER: STASH.INC.BL / STASHFILE.INC.BL
+.
+.  SORT.
+.      OWNER: SORT.INC.BL
+.
+.  STRCASE.
+.      OWNER: STRCASE.INC.BL
+.
+.  BMX. / BMXK.
+.      OWNER: BMX.INC.BL (variables / its KERNAL constants)
+.
+.  FILE. / FILE.DIR.
+.      OWNER: FILEIO.INC.BL / FILEDIR.INC.BL
+.
+.  KV.
+.      OWNER: KV.INC.BL
+.
+.  DOS.
+.      OWNER: DOS.INC.BL
+.
+.  SV. / SVGC.
+.      OWNER: STASHVRAM.INC.BL / STASHVRAMGC.INC.BL
+.
+.  MATH.
+.      OWNER: MATH.INC.BL
+.
+.  MEM.
+.      OWNER: MEM.INC.BL, its two KERNAL constants included
+.
+.Use any other prefix for your own program: GAME., MAP., AIRLIFT.. A prefix
+.costs nothing at runtime -- BASLOAD crunches every identifier to a short
+.BASIC variable, so a long readable name and a two-letter one compile to the
+.same thing.
+.
+.Do not reuse a taken prefix for a name the module has not defined.
+.THEME.MINE is free today and is one library update from not being.
+.
+=GP.* is keywords, not variables
+.
+.GPB.INC.BL defines no variables. It is 27 keyword declarations and nothing
+.else.
+.
+:GP.A = 5 : REM SYNTAX ERROR -- GP.A is a keyword
+:X = GP.A : REM correct
+.
+.The value words are GP.A GP.X GP.Y GP.C, the registers after GP.CALL, and
+.that is all of them. They are keywords rather than variables because nothing
+.in the runtime can write a BASIC variable by name, so a command that returns
+.a value must return it through a keyword. X16's own ST, MX and MY work the
+.same way.
+.
+.The complete per-module in / out / internal register is GP-BASIC.GLOBALS.md,
+.with a script in SEC 6 of that file for re-checking it after a change.
 .
 =SEE ALSO
 .
->106|4.19 STASHVRAMGC.INC.BL -- close the holes in a STASHVRAM store
->105|4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM
->111|4.23 MEM.INC.BL -- a block copied, a block filled
+>153|6. The traps, collected
+>66|4.2 STRINGS.INC.BL -- string helpers
+>85|4.10 STRUSING.INC.BL -- a number to a template
+>65|4.1 THEME.INC.BL -- named colour roles
+>74|4.3 APPSYS.INC.BL -- start politely, leave it as you found it
+>75|4.4 LINEINPUT.INC.BL -- a positioned entry field
+>91|4.14 KB.INC.BL -- the keyboard buffer, emptied
+>77|4.6 MENU.INC.BL -- menus built a row at a time
+>84|4.9 MENUPULL.INC.BL -- a dropdown under a bar item
+>86|4.11 GUI.INC.BL -- the box that puts the screen back, and the form in 
+>88|4.12 GUI-DIALOGS.INC.BL -- every dialog as a verb
+>101|4.24 GUI-LITE.INC.BL -- a message box and a menu, in low memory

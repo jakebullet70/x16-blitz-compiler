@@ -1,84 +1,125 @@
-@3.7 Screen -- drawing
+@3.10 Text in a bank
 .
-=3.7 SCREEN -- DRAWING
+=3.10 TEXT IN A BANK
 .
 =SYNTAX
 .
-:GP.BOX x, y, w, h [,style] [,col]
-:GP.FILL x, y, w, h, char [,col]
-:GP.PRINTAT x, y, text$ [,col]
-.
-=WHAT IT COSTS
-.
-.  ASM: GP.BOX GP.FILL GP.PRINTAT
-.    ASM -- machine code in the GP runtime block. One GP keyword pays for the
-.    whole block.
-.  COMPOSITE: GP.CHAR GP.PRINTAT GP.FILL
-.    COMPOSITE -- no machine code. The compiler expands it into keywords that
-.    already exist. Runtime cost is zero.
+:GP.BANKEDSTR <bank> <NAME>
+:  "first"
+:  "second"
+:  SPC(20)
+:GP.ENDBANKEDSTR
+:
+:  A$ = GP.BSTR(<NAME>, n)
+:  N  = GP.BSTRCOUNT(<NAME>)
+:  GP.BSTRSET <NAME>, n, A$
 .
 =DESCRIPTION
 .
-.All three write directly to VERA and call no KERNAL routine, which is why
-.they are several times faster than PRINT. GPC's character output makes two
-.KERNAL calls per character, and BSOUT carries scroll, quote mode and cursor
-.handling.
+.Moves a program's literal text out of low RAM and into a RAM bank, at
+.compile time. A string constant costs 2 + LEN bytes of p-code wherever it
+.appears; GP.BSTR(NAME, n) costs 5, so text of four characters or more is
+.cheaper read from the bank than written in the line. Over half of a
+.menu-driven program's own code is usually literal text, and text is the one
+.thing in a program with no reason to be resident: it is never executed,
+.never indexed, and read one item at a time.
 .
-.GP.BOX draws the frame only. Styles: 0 solid block, 1 single line, 2 single
-.line with rounded corners, 3 thick line. A style of 256 or more is an
-.ADDRESS, not a style: eight screen codes of the caller's own, in the table's
-.order -- see the custom glyph note below. char in GP.FILL is PETSCII, e.g.
-.ASC(" ").
+.The body is quoted lines and SPC(n). One item a line, nothing else on the
+.line. A quoted line passes through byte for byte, with its case, leading
+.spaces and trailing spaces kept. SPC(n) declares an empty slot of capacity
+.n, and n is a decimal constant of 0 to 255. Both kinds count as body lines,
+.so a block of nothing but SPC(n) is not an empty block. Body lines are not
+.REM lines and must not be: BASLOAD upper-cases REM text.
 .
-.The colour argument is optional. Omitted, it uses whatever COLOR last set,
-.read from the KERNAL's $0376 -- the colour a PRINT would have used.
-.Supplied, it is one byte packed as the X16 packs it: background * 16 +
-.foreground. 255 is a real colour (light grey on light grey), not a
-.leave-unchanged marker.
+.Blocks are named, and you may write as many as you like. Each is indexed
+.from zero within itself, so inserting a line in one group moves nothing
+.outside it. A block names the bank its text goes in, written on each block
+.rather than only the first so a block can be read where it sits. Groups that
+.name the same bank share it and fill it in the order the compiler reads
+.them.
 .
-.These calls do not move the cursor PRINT uses. A PRINT after a GP.PRINTAT
-.continues from wherever the KERNAL's cursor was, not after the text just
-.drawn. Use LOCATE first, or stay in one world or the other.
+.The name costs nothing at run time. It is resolved while the program
+.compiles, into the group's first index, and the compiler adds that to your
+.index for you. No letter of the name reaches the object, which is the whole
+.reason the lookup is not in the bank.
 .
-.Nothing is clipped. Drawing off the right edge wraps to the next row; off
-.the bottom writes past the end of the screen map. Zero width or height draws
-.nothing, which is what a computed size reaches when it collapses.
+.GP.BSTRCOUNT(NAME) is a composite: it compiles to a plain number, so FOR I =
+.0 TO GP.BSTRCOUNT(BS.FILE) - 1 costs no more than writing the count out.
 .
-=ISO mode is handled for you
+:#DEFINE GM.TEXTBANK 5
+:
+:GP.BANKEDSTR GM.TEXTBANK BS.FILE
+:  " OPEN "
+:  " SAVE "
+:  " QUIT "
+:GP.ENDBANKEDSTR
+:
+:GP.BANKEDSTR GM.TEXTBANK BS.EDIT
+:  " CUT "
+:  " PASTE "
+:GP.ENDBANKEDSTR
+:
+:  FOR I = 0 TO GP.BSTRCOUNT(BS.EDIT) - 1
+:    PRINT GP.BSTR(BS.EDIT, I)
+:  NEXT I
 .
-.In ISO mode -- PRINT CHR$(15), or Ctrl+O -- the VERA tile index is the
-.character code, so translating PETSCII to a screen code is wrong rather than
-.merely wasteful: A would be written as $01. GP.PRINTAT reads the KERNAL's
-.ISO flag (bit 6 of $0372) per character and skips the translation when it is
-.set. A program that switches charset needs no source change and nothing to
-.declare. The test costs 7 cycles a cell in PETSCII mode and saves 34 in ISO.
+.Claim the bank, exactly as a GP.BANKED code region's bank is claimed. The
+.compiler picks it while the object is written, so BANKMGR has to be told
+.rather than asked:
 .
-.GP.FILL needs no test: it converts its single character before the loop, and
-.$20 is a fixed point of the translation, so a space fill -- padding and
-.blanking -- is correct in both modes.
+:BANKMGR.WANT = GM.TEXTBANK : GOSUB BANKMGR.CLAIM
 .
-.GP.BOX is the one case that needs the caller to act. It does no translation
-.at all; its glyphs go to VERA as tile indices, so the four built-in styles
-.are PETSCII screen codes and appear as letters in ISO mode. Translation
-.cannot fix this, because ISO-8859-15 has no box-drawing characters to
-.translate to. A style value of 256 or more is instead the address of eight
-.glyphs, and in ISO mode a tile index is a character code, so ASCII + - |
-.make a usable frame:
+.Either build. Both put the text in one NAME.OVL file beside the program: the
+.bootstrap reads it for a shared build and StartCode reads it for an embedded
+.one, so an embedded program with banked text is a .PRG and a .OVL together.
+.The runtime finds which bank a slot went to in a sixteen-byte table at
+.$07F0, in the low-memory hole both builds leave alone -- the bootstrap
+.extension page writes it there for a shared program, and StartCode copies it
+.out of the image for an embedded one.
 .
-:ISO.GLYPH$ = "++++--||" : REM TR TL BR BL TOP BOTTOM LEFT RIGHT
-:GP.BOX 50, 26, 4, 3, GP.STRPTR(ISO.GLYPH$) + 1, 1
+.A group name is not a variable. No $, no %, no ( -- any of those is a syntax
+.error rather than something quietly ignored. A name that no block declared
+.is a syntax error at the line that used it, and so is a second block
+.claiming a name already taken. An empty block is refused too: a group of no
+.strings would make GP.BSTRCOUNT zero and every GP.BSTR on it read the next
+.group's text.
 .
-.GP.STRPTR returns the address of the string block and the text starts at +1,
-.so a string literal is the cheapest way to carry the eight bytes. This costs
-.no runtime bytes; the pointer form already exists, and
-.GPC-BASIC-TOOLS-SRC/edit uses the same mechanism to draw frames from a
-.re-ordered font.
+.There is no run-time bounds check. The compiler knows every index it emits
+.and nothing a program does can produce one out of range, so an index past
+.the end of a group reads whatever follows it. That is the same bargain the
+.array fast path makes.
 .
-.ISO.EXP.BL tests all of this, reading cells back with VPEEK rather than
-.trusting the display. The ISO box corner, top edge and side read back as 43,
-.45 and 124.
+.GP.BSTRSET <NAME>, n, A$ writes a slot. It takes the same name and index
+.pair as GP.BSTR(<NAME>, n), with no bracket. A record in the bank is
+.[capacity][length][capacity bytes], and the capacity is fixed at compile
+.time. A quoted body line's capacity is its own length, so a quoted line can
+.only ever be overwritten by something the same length or shorter. SPC(n) is
+.the way to get a slot with room in it.
 .
-=EXAMPLE PROGRAM
+.The write is cut to fit. A string longer than the slot keeps its first
+.capacity characters. No error is raised. The next record is never touched.
+.An index not below the bank's string count writes nothing and raises
+.nothing, and a slot whose bank is not present writes nothing.
 .
-.  ISO.EXP.BL -- runnable, in the GPC-BASIC folder
-.  SCREEN.EXP.BL -- runnable, in the GPC-BASIC folder
+.A program may have more than one text bank. Sixteen of them, which is the
+.range of the slot field a group carries and the length of the table at $07F0
+.-- BSTR_MAX_BANKS in source/common-source/source/common.inc. That matters
+.when a library already owns one: MENU keeps its rows in MENU.TEXTBANK, so a
+.program using it and wanting a pool of its own names a second bank rather
+.than crowding into MENU's. The other limits are 8 KB a bank, 128 groups a
+.program and 4,096 strings a bank.
+.
+.Each text bank is a region, so it counts toward the 127 regions (SEC 3.12)
+.and no two regions may share a bank.
+.
+.GP.BSTR and GP.BSTRSET are ordinary GP keywords, so they pull in the 1.5 KB
+.GP block; the two block keywords do not, and neither does GP.BSTRCOUNT.
+.
+.Reading it from inside a GP.BANKED region works: the handler puts the
+.caller's bank back before it returns. Writing from inside one works too. The
+.compiler copies a string literal out of the region first, because the text
+.bank is the one at $A000 while the write runs.
+.
+=SEE ALSO
+.
+>57|3.12 Code in a bank

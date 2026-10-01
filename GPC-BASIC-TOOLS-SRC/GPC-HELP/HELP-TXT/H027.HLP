@@ -1,69 +1,61 @@
-@3.8 Block IF
+@3.11 Calling a routine in one statement
 .
-=3.8 BLOCK IF
-.
-=SYNTAX
-.
-:GP.IF <expr> THEN
-:    ...
-:GP.ELSEIF <expr> THEN
-:    ...
-:GP.ELSE
-:    ...
-:GP.ENDIF
-.
-=WHAT IT COSTS
-.
-.  ASM: GP.IF GP.ELSEIF GP.ELSE GP.ENDIF
-.    ASM -- machine code in the GP runtime block. One GP keyword pays for the
-.    whole block.
+=3.11 CALLING A ROUTINE IN ONE STATEMENT
 .
 =DESCRIPTION
 .
-.  GP.IF
-.      RULE: one per block, alone on its line, THEN required
+.Three keywords. GP.DEFPROC names a GOSUB target and the variables its
+.callers fill in, GP.SUB fills them and calls it in one statement, and GP.FN
+.does the same from inside an expression and gives back a value.
 .
-.  GP.ELSEIF
-.      RULE: any number of them, THEN required
+:    DB.A = 1 : GOSUB DB.SELECT
+:
+:    GP.SUB DBSELECT, 1
 .
-.  GP.ELSE
-.      RULE: optional, at most one
+.The two lines compile to the same p-code: an assignment per formal, then the
+.call. A call site costs what the long spelling costs. A declaration on a
+.line of its own costs one byte, the line marker every source line emits.
+.Folded onto the routine's own first statement it costs nothing. A bare label
+.is not a line, so folding onto one costs the byte anyway.
 .
-.  GP.ENDIF
-.      RULE: required; without it the compile stops on STRUCTURE IMBALANCE
+.GP.DEFPROC and GP.SUB have no machine code of their own, so a program whose
+.only GP.BASIC keywords are those two stays GP OUT and carries none of the GP
+.block. GP.FN has two runtime opcodes and brings the block in.
 .
-.  condition
-.      RULE: a numeric expression
+=IN THIS SECTION
 .
-.The first true condition runs and nothing below it does, so there is no
-.break to omit. A block whose conditions are all false and which has no
-.GP.ELSE is skipped, which is not an error.
+>54|3.11.1 GP.DEFPROC -- declare a verb and its arguments
+>55|3.11.2 GP.SUB -- call a verb
+>56|3.11.3 GP.FN -- call a verb from inside an expression
 .
-.There is no one-line form. GP.IF X > 5 THEN PRINT is a syntax error. Stock
-.IF ... THEN is unchanged and is the one-line form.
+=The formals are ordinary variables
 .
-.Blocks nest freely: inside each other, inside a GP.CASE body (SEC 3.2) and
-.inside a GP.DO loop (SEC 3.1). Use GP.SELECT (SEC 3.2) where one value is
-.compared against each alternative, and a block IF where each branch tests a
-.different condition.
+.A verb's formals and its RETURNS variable are plain variables in the
+.program's one variable list. Every call writes the same ones, and the body
+.can read and write them like any other. That is what makes the call cost
+.nothing, and it is also the whole of the rule about nesting:
 .
-.A GOTO out of a block is safe. The condition is evaluated and consumed on
-.the line it is written, so GP.ENDIF releases nothing. The block costs 14
-.runtime bytes.
+.  - A verb may appear inside its own argument list. GP.FN(AREA, 2,
+.    GP.FN(AREA, 3, 4)) is correct, because a call list is evaluated in full
+.    before any of it is stored into a formal. The inner call runs and
+.    finishes before the outer writes A.W. The values wait on the frame stack
+.    while the rest of the list is read, so neither the number of arguments
+.    nor the depth of any one of them is a limit.
+.  - A verb's body may not call the verb. There is one set of formals, so a
+.    routine that calls itself -- directly, or round through another verb --
+.    writes over the arguments it is still using. Nothing detects this: it
+.    compiles, both passes agree, and the answer is wrong.
 .
-:GP.IF N < 0 THEN
-:    PRINT "NEGATIVE"
-:GP.ELSEIF N = 0 THEN
-:    PRINT "ZERO"
-:GP.ELSE
-:    PRINT "POSITIVE"
-:GP.ENDIF
+.The refusals, all at compile time:
 .
-=EXAMPLE PROGRAM
-.
-.  IF.EXP.BL -- runnable, in the GPC-BASIC folder
-.
-=SEE ALSO
-.
->34|3.2 Multi-way branch
->33|3.1 Loops
+:    GP.DEFPROC VERB IS NOT A PLAIN NAME     a $, % or subscript on the verb
+:    GP.DEFPROC VERB ALREADY DECLARED        a second declaration of that ver
+:    GP.DEFPROC FORMAL IS NOT A VARIABLE     an array, or something that is n
+:    GP.DEFPROC RETURNS IS NOT A VARIABLE    an array element or a literal af
+:    TOO MANY GP.DEFPROC FORMALS             a thirteenth formal
+:    GP.SUB BEFORE ITS GP.DEFPROC            the call sits above the declarat
+:    GP.SUB DOES NOT MATCH ITS GP.DEFPROC    the wrong number of arguments
+:    GP.FN BEFORE ITS GP.DEFPROC             the call sits above the declarat
+:    GP.FN NEEDS A VERB DECLARED RETURNS     the verb has no result variable
+:    ARGUMENTS DO NOT MATCH THE GP.DEFPROC   the wrong number of arguments
+:    TYPE MISMATCH                           a string for a number, or a numb

@@ -1,28 +1,18 @@
-@4.24.1 MSGBOX -- lines of text over one or two buttons
+@2. GP.* is keywords, not variables -- and the difference bites
 .
-=4.24.1 MSGBOX
+=2. GP.* IS KEYWORDS, NOT VARIABLES -- AND THE DIFFERENCE BITES
 .
-.  Syntax    GP.FN(MSGBOX, t$, l1$, l2$, l3$, l4$, b1$, b2$)
-.            GP.SUB MSGBOX, t$, l1$, l2$, l3$, l4$, b1$, b2$
-.  Returns   The button chosen, 1 or 2.
-.  Kind      BASIC. A verb in GUI-LITE.INC.BL. Needs the GP block.
-.  Notes     All seven arguments are required. Pass "" for a line or a
-.            button that is not wanted.
-.            t$ goes in the top edge. "" leaves the edge plain.
-.            l1$ to l4$ are centred, one a row. A "" line is a blank
-.            row, and the box ends at the last line that is not "".
-.            b2$ "" gives one button.
-.            The box is centred on the screen. It is 6 columns wider
-.            than the widest of t$, the lines and the button row.
-.            The focus starts on b1$. LEFT moves it to b1$, RIGHT to
-.            the last button, TAB to the other one. RETURN chooses
-.            the button with the focus. ESC chooses the last button.
-.            The box closes before MSGBOX returns.
-.  Example
+.GPB.INC.BL defines no variables. It is 31 keyword declarations and nothing
+.else. Everything spelled GP.something is a BASIC keyword, so:
 .
-:            B = GP.FN(MSGBOX, "QUIT", "LEAVE?", "", "", "", "YES", "NO")
-:            IF B = 1 THEN GOTO BYE
+:GP.A = 5          <- SYNTAX ERROR. GP.A is a keyword; you cannot assign to i
+:X = GP.A          <- correct. It reads the accumulator after the last GP.CAL
 .
-=SEE ALSO
+.The value words are GP.A, GP.X, GP.Y and GP.C -- the registers after
+.GP.CALL, and now the whole list of them. They are keywords rather than
+.variables because nothing in the runtime can write a BASIC variable by name,
+.so a command that returns a value has to hand it back through a keyword.
+.X16's own ST, MX and MY exist for the same reason.
 .
->112|4.24 GUI-LITE.INC.BL -- a message box and a menu, in low memory
+.The full keyword list lives in GPC-BASIC/GPB.INC.BL.
+.

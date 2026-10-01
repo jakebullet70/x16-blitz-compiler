@@ -117,3 +117,14 @@
 .#INCLUDE inside a GP.BANKED region and run it from a RAM bank, with no
 .change to its callers. SEC 3.12 has the rules.
 .
+=SEE ALSO
+.
+>9|2. Using it
+>160|7. Memory, and what the compiler tells you
+>63|4. Module reference -- the BASL library
+>119|5. Variables
+>57|3.12 Code in a bank
+>112|STASH.INC.BL -- save a text rectangle, and put it back.
+>82|4.7 SORT.INC.BL -- shell sort a string array
+>83|4.8 STRCASE.INC.BL -- case, in place
+>66|4.2 STRINGS.INC.BL -- string helpers

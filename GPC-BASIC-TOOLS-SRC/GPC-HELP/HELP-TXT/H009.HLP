@@ -1,15 +1,26 @@
-@5. GPC-BASIC/ -- the library (2)
-=SEE ALSO
+@7. The documents
 .
->71|4.1 THEME.INC.BL -- named colour roles
->81|4.3 APPSYS.INC.BL -- start politely, leave it as you found it
->124|STASH.INC.BL -- save a text rectangle, and put it back.
->128|STASHFILE.INC.BL -- a saved text rectangle, through a file.
->105|4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM
->106|4.19 STASHVRAMGC.INC.BL -- close the holes in a STASHVRAM store
->82|4.4 LINEINPUT.INC.BL -- a positioned entry field
->84|4.6 MENU.INC.BL -- menus built a row at a time
->100|4.13 BANKMGR.INC.BL -- who owns which RAM bank
->93|4.9 MENUPULL.INC.BL -- a dropdown under a bar item
->95|4.11 GUI.INC.BL -- the box that puts the screen back, and the form in 
->97|4.12 GUI-DIALOGS.INC.BL -- every dialog as a verb
+=7. THE DOCUMENTS
+.
+.  GP-BASIC.md
+.      the manual -- the keyword reference and the module reference
+.
+.  GP-BASIC.GLOBALS.md
+.      every global name each module owns, and the prefixes you may not use
+.
+.  GP-BASIC.FILES.md
+.      this page
+.
+.  README.md
+.      how to run the compiler, and what its answers mean
+.
+.  BANKED-OR-NOT.md
+.      how to run a module from a RAM bank
+.
+.  SRC/
+.      the BASLOAD source of the tools. Reference only -- nothing in it is
+.        needed to run
+.
+.The library's documents live beside the includes they describe, in this
+.folder, so a relative link works both in the repository and in an unzipped
+.release.

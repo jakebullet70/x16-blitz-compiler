@@ -1,8 +1,8 @@
 # GP.BASIC and BASL -- the reference, for reading on Windows
 
 The same material `GPC.HELP.PRG` shows on the X16, laid out for an editor or a
-browser instead of an 80x30 screen: the 120-line pages are joined back up, each
-title appears once, and the cross references are links.
+browser instead of an 80x30 screen: each title appears once, and the cross
+references are links.
 
 **Generated. Do not edit.** `MKHELPWIN.PY` builds it from `GPC-HELP.md`, which
 `MKHELP.PY` builds from `GPC-BASIC/`. Correct the manual there, then:
@@ -432,7 +432,7 @@ reads the debug map the compiler writes when `MAKE A DEBUG MAP?` is answered yes
 the address cannot be resolved.
 
 `GPC.HELP.PRG` is this reference, on the machine. It reads `HELP-TXT/` beside it — `GPC.HELP.IDX`
-and one `.HLP` per topic — and shows 98 topics at 80x30. Arrows, `PgUp` / `PgDn`, `HOME` and `END`
+and one `.HLP` per topic — and shows 75 topics at 80x30. Arrows, `PgUp` / `PgDn`, `HOME` and `END`
 move. `RETURN` opens the highlighted index row. `/` finds and `N` repeats the search. `L` follows a
 topic's cross references, `X` writes its code out as a `.BL` where it has any, `T` cycles the colour
 themes, `?` is the about box. `ESC` goes back a step, and quits from the index.
@@ -3520,9 +3520,11 @@ The convention is one dotted prefix per module, and nothing writes outside its o
 |---|---|
 | `GP.` | keywords, **not variables** — see below |
 | `STR.` | `STRINGS.INC.BL` |
+| `STR.USING.` | `STRUSING.INC.BL`, kept apart from the rest of `STR.` |
 | `THEME.` | `THEME.INC.BL` |
 | `APPSYS.` | `APPSYS.INC.BL` |
 | `LINEINPUT.` | `LINEINPUT.INC.BL` |
+| `KB.` | `KB.INC.BL` |
 | `MENU.` | `MENU.INC.BL`, and `MENUPULL.INC.BL`'s variables |
 | `MENUTO.` | the runners in `MENU.INC.BL` and `MENUPULL.INC.BL` |
 | `MENUPULL.` | `MENUPULL.INC.BL`'s labels |
@@ -3534,8 +3536,10 @@ The convention is one dotted prefix per module, and nothing writes outside its o
 | `SORT.` | `SORT.INC.BL` |
 | `STRCASE.` | `STRCASE.INC.BL` |
 | `BMX.` / `BMXK.` | `BMX.INC.BL` (variables / its KERNAL constants) |
+| `FILE.` / `FILE.DIR.` | `FILEIO.INC.BL` / `FILEDIR.INC.BL` |
 | `KV.` | `KV.INC.BL` |
 | `DOS.` | `DOS.INC.BL` |
+| `SV.` / `SVGC.` | `STASHVRAM.INC.BL` / `STASHVRAMGC.INC.BL` |
 | `MATH.` | `MATH.INC.BL` |
 | `MEM.` | `MEM.INC.BL`, its two KERNAL constants included |
 
@@ -3564,7 +3568,7 @@ The complete per-module in / out / internal register is
 [GP-BASIC.GLOBALS.md](GP-BASIC.GLOBALS.md), with a script in §6 of that file for re-checking it
 after a change.
 
-*See also: [6. The traps, collected](#6-the-traps-collected), [4.2 `STRINGS.INC.BL` — string helpers](#42-stringsincbl--string-helpers), [4.1 `THEME.INC.BL` — named colour roles](#41-themeincbl--named-colour-roles), [4.3 `APPSYS.INC.BL` — start politely, leave it as you found it](#43-appsysincbl--start-politely-leave-it-as-you-found-it), [4.4 `LINEINPUT.INC.BL` — a positioned entry field](#44-lineinputincbl--a-positioned-entry-field), [4.6 `MENU.INC.BL` — menus built a row at a time](#46-menuincbl--menus-built-a-row-at-a-time), [4.9 `MENUPULL.INC.BL` — a dropdown under a bar item](#49-menupullincbl--a-dropdown-under-a-bar-item), 4.11 GUI.INC.BL -- the box that puts the screen back, and the form in, [4.12 `GUI-DIALOGS.INC.BL` — every dialog as a verb](#412-gui-dialogsincbl--every-dialog-as-a-verb), [4.24 `GUI-LITE.INC.BL` — a message box and a menu, in low memory](#424-gui-liteincbl--a-message-box-and-a-menu-in-low-memory), [STASH.INC.BL -- save a text rectangle, and put it back.](#stashincbl----save-a-text-rectangle-and-put-it-back), [STASHFILE.INC.BL -- a saved text rectangle, through a file.](#stashfileincbl----a-saved-text-rectangle-through-a-file)*
+*See also: [6. The traps, collected](#6-the-traps-collected), [4.2 `STRINGS.INC.BL` — string helpers](#42-stringsincbl--string-helpers), [4.10 `STRUSING.INC.BL` — a number to a template](#410-strusingincbl--a-number-to-a-template), [4.1 `THEME.INC.BL` — named colour roles](#41-themeincbl--named-colour-roles), [4.3 `APPSYS.INC.BL` — start politely, leave it as you found it](#43-appsysincbl--start-politely-leave-it-as-you-found-it), [4.4 `LINEINPUT.INC.BL` — a positioned entry field](#44-lineinputincbl--a-positioned-entry-field), [4.14 `KB.INC.BL` — the keyboard buffer, emptied](#414-kbincbl--the-keyboard-buffer-emptied), [4.6 `MENU.INC.BL` — menus built a row at a time](#46-menuincbl--menus-built-a-row-at-a-time), [4.9 `MENUPULL.INC.BL` — a dropdown under a bar item](#49-menupullincbl--a-dropdown-under-a-bar-item), 4.11 GUI.INC.BL -- the box that puts the screen back, and the form in, [4.12 `GUI-DIALOGS.INC.BL` — every dialog as a verb](#412-gui-dialogsincbl--every-dialog-as-a-verb), [4.24 `GUI-LITE.INC.BL` — a message box and a menu, in low memory](#424-gui-liteincbl--a-message-box-and-a-menu-in-low-memory)*
 
 ### 1. The prefixes that are taken
 

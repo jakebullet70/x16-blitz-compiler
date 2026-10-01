@@ -1,75 +1,32 @@
-@4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM
+@4.25 DOS.INC.BL -- a drive command, and a test for a file
 .
-=4.18 STASHVRAM.INC.BL -- RECTANGLES AND BLOBS, KEPT IN VRAM
+=4.25 DOS.INC.BL -- A DRIVE COMMAND, AND A TEST FOR A FILE
 .
 =DESCRIPTION
 .
-.  SV.INIT
-.      IN: SV.BASE SV.TOP SV.MAX
-.      OUT: SV.OK
+.Two verbs on the drive's command channel. DOSX sends a command and reads the
+.drive's answer. DOSX.EXISTS tests whether a file opens. Each also has a
+.GOSUB entry that takes its argument in a variable.
 .
-.  SV.SAVE
-.      IN: SV.X SV.Y SV.W SV.H
-.      OUT: SV.HND SV.OK
+.It is the smaller alternative to FILEIO.INC.BL (SEC 4.15). A program
+.includes one or the other, not both. It needs GPB.INC.BL ahead of it and
+.includes nothing.
 .
-.  SV.RESTORE
-.      IN: SV.HND SV.MOVE SV.X SV.Y
-.      OUT: SV.OK
+.DOS.DEVICE is the drive. A call with it 0 uses 8 and leaves it 8.
 .
-.  SV.PUT
-.      IN: SV.ADDR SV.LEN
-.      OUT: SV.HND SV.OK
+.After either verb, DOS.ERR is the drive's error number and DOS.MSG$ its
+.message. DOS.ERR under DOS.OKMAX, 20, is success.
 .
-.  SV.GET
-.      IN: SV.HND SV.ADDR
-.      OUT: SV.OK
+.Nothing in the module needs the GP block. GP.FN brings it in, 1,536 bytes.
+.GP.SUB and GOSUB leave it out (SEC 3.11).
 .
-.  SV.FREE
-.      IN: SV.HND
-.      OUT: SV.OK
+=IN THIS SECTION
 .
-.  SV.RESET
-.      IN: --
-.      OUT: SV.OK
-.
-:#INCLUDE "STASHVRAM.INC.BL"
-:
-:SV.MAX = 16 : DIM SV.PAGE%(16), SV.PAGES%(16)
-:GOSUB SV.INIT
-:SV.X = 10 : SV.Y = 5 : SV.W = 40 : SV.H = 12 : GOSUB SV.SAVE
-:IF SV.HND = 0 THEN <it did not fit>
-:REM ... draw over it ...
-:GOSUB SV.RESTORE
-.
-.No GP.ASM, and so no #SYMFILE. The cells never leave VRAM: one data port
-.reads, the other writes, and the KERNAL's memory_copy moves between them
-.without stepping either. That is what STASH.INC.BL cannot do, and the reason
-.to reach for this one. It also executes no BANK, so unlike STASH it may live
-.inside a GP.BANKED region.
-.
-.SV.BASE and SV.TOP are the VRAM window in bytes, rounded in to whole
-.256-byte pages, and default to $04000 and $1AFFF. The caller DIMs the two
-.arrays to SV.MAX. SV.MOVE works as STASH.MOVE does: SV.RESTORE puts the
-.rectangle back where it came from when 0, at SV.X SV.Y when not. SV.HND is 1
-.to SV.MAX, or 0 if it did not fit. SV.ERROR$ says why when something is
-.refused, and is "" otherwise.
-.
-.Allocation is a bump pointer on 256-byte pages, released LIFO. Panels nest
-.and close in reverse and a log is append-only, so a hole only appears if a
-.caller frees out of order -- and then STASHVRAMGC.INC.BL (SEC 4.19) closes
-.it. Pages rather than bytes are what let a handle's address live in an
-.ordinary %: a page number reaches 511 where a 17-bit VRAM address would not.
-.
-.There is one allocator and it is this one. SV.BASE and SV.TOP are the
-.caller's contract, checked only against the layer 1 map and the charset.
-.BMX.STASH defaults to $13000, inside the default window -- a program using
-.both must move one of them.
-.
-.A screen-mode change re-uploads the charset and can re-lay the map. Held
-.handles do not survive it; call SV.RESET after one.
+>106|4.25.1 DOSX -- send a command, read the answer
+>107|4.25.2 DOSX.EXISTS -- whether a file opens
 .
 =SEE ALSO
 .
->106|4.19 STASHVRAMGC.INC.BL -- close the holes in a STASHVRAM store
->105|4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM
->124|STASH.INC.BL -- save a text rectangle, and put it back.
+>92|4.15 FILEIO.INC.BL -- the drive: status, files, directories
+>52|3.11 Calling a routine in one statement
+>105|4.25 DOS.INC.BL -- a drive command, and a test for a file

@@ -1,117 +1,27 @@
-@3.9 Inline assembly (2)
-={VAR} -- a BASIC variable's slot
+@3.11.2 GP.SUB -- call a verb
 .
-.{VAR} is the address of the variable's slot, so reading and writing use the
-.same form: LDA {N%} reads it, STA {N%} writes it, in the slot BASIC itself
-.uses.
+=3.11.2 GP.SUB
 .
-.  {N} {N%} {N$}
-.      IS: the scalar's slot
+.  Syntax    GP.SUB verb [, expression ...]
+.  Does      Assigns each expression to the matching formal, in order,
+.            then calls the routine.
+.  Kind      COMPOSITE. Expands to an assignment per formal and a
+.            GOSUB.
+.  Notes     The count and the types must match the declaration. For
+.            the same call inside an expression use GP.FN (SEC 3.11.3).
+.            A call into a GP.BANKED region selects its bank. A call
+.            into or out of a region comes back with the caller's
+.            bank selected.
+.  WARNING   The call must sit below its GP.DEFPROC (SEC 3.11.1). It
+.            carries an address and not a line number, so a forward
+.            call is refused rather than compiled.
+.  Example
 .
-.  {N()}
-.      IS: the array's slot, which holds the base address of its data -- an
-.        element is two steps, as through GP.ARRPTR
-.
-.A name is letters, digits and dots, starting with a letter, up to 64
-.characters -- the same limit as BASLOAD. {DOC.GOT.OFF} works, so the dotted
-.names used throughout the library are reachable from assembly. Underscore is
-.not accepted: BASLOAD allows it in a name, this does not, and {A_B} reads
-.the name as A.
-.
-.{VAR} requires #SYMFILE. BASLOAD renames variables -- N% becomes A%, which
-.is how it provides 64 significant characters on a two-character BASIC -- and
-.it does not rename REM text with them, so the code says A% while the REM
-.still says {N%}. #SYMFILE is BASLOAD's record of that mapping and the
-.compiler reads it:
-.
-:#SYMFILE "@:PROG.SYM"
-.
-.Put it at the top of the source, named to match the PRG: compiling PROG.PRG
-.reads PROG.SYM. Nothing else changes -- {N%} is still written with the name
-.as authored.
-.
-.Two compile-time errors, both naming the line:
-.
-.  {} NEEDS #SYMFILE
-.      MEANS: no #SYMFILE, or it is not beside the PRG under the matching
-.        name
-.
-.  UNKNOWN VARIABLE IN {}
-.      MEANS: the name is not a variable of this program
-.
-.{VAR} never creates a variable, unlike an ordinary BASIC reference. Assign
-.the variable once in BASIC first, even M% = 0. A name that does not exist
-.otherwise resolves to a slot BASIC never reads, and the block runs, stores,
-.and changes nothing observable.
-.
-=In a GP.BANKED region
-.
-.A block inside a GP.BANKED region (SEC 3.12) is assembled into the region's
-.bank, after the region's p-code, and runs from there with that bank
-.selected. Its bytes count against the region's 8,192 and not against low
-.memory.
-.
-.GP.ASM LOW keeps a block in low memory inside a region. Outside a region the
-.word changes nothing.
-.
-:#REM 1
-:GP.ASM LOW
-:REM <instruction>
-:...
-:GP.ENDASM
-:#REM 0
-.
-.Use LOW for a block that writes $00, the RAM bank register. A block running
-.from a bank cannot select another: the next instruction is fetched from the
-.bank it selected. FILEDIR.INC.BL (SEC 4.16) writes both of its blocks this
-.way.
-.
-.LOW needs a #SYMFILE. BASLOAD crunches LOW like any name, and the compiler
-.reads it back through the symbol file.
-.
-.A block inside a region without LOW is checked for a store to $00: STA, STX,
-.STY or STZ to $00 or $0000. The check does not see an indexed or indirect
-.store, or a JSR to code that changes the bank. Those compile, and the
-.program fetches its next instruction from the wrong bank.
-.
-.Two compile-time errors, both naming the line:
-.
-.  GP.ASM LOW NEEDS #SYMFILE
-.      MEANS: no #SYMFILE, or it is not beside the PRG under the matching
-.        name
-.
-.  BANKED GP.ASM WRITES $00, USE GP.ASM LOW
-.      MEANS: a block inside a region, without LOW, stores to $00
-.
-=What is not there
-.
-.No expressions: {N%}+1 and LABEL+2 are not understood. Use an index
-.register.
-.
-.Zero page or absolute is decided by the operand. $34 is zero page, $0034 is
-.absolute, and a decimal under 256 is zero page. Every 65C02 addressing mode
-.is available, including the two the NMOS 6502 lacks -- LDA ($34) and JMP
-.($1234,X) -- except BBR, BBS, RMB and SMB.
-.
-.Registers come back through GP.A / GP.X / GP.Y / GP.C as they do from
-.GP.CALL; a block uses the same $030C-$030F slots. Those four are GP block
-.keywords, so reading one pulls in the 1.5 KB block that GP.ASM alone avoids.
-.{VAR} does not.
-.
-.A body can come from a file. #INCLUDE splices it in verbatim, and BASLOAD's
-.REM #nn-mm attribution makes an error inside it name the file:
-.
-:#REM 1
-:GP.ASM
-:#INCLUDE "MACPTR.ASM"
-:GP.ENDASM
-:#REM 0
-.
-=EXAMPLE PROGRAM
-.
-.  ASM.EXP.BL -- runnable, in the GPC-BASIC folder
+:            GP.SUB DBSELECT, 1
+:            GP.SUB DBFIND, PRICE, "ACME", TRUE
+:            GP.SUB DBWRITE
 .
 =SEE ALSO
 .
->62|3.12 Code in a bank
->103|4.16 FILEDIR.INC.BL -- a directory, into a bank or into low RAM
+>56|3.11.3 GP.FN -- call a verb from inside an expression
+>54|3.11.1 GP.DEFPROC -- declare a verb and its arguments

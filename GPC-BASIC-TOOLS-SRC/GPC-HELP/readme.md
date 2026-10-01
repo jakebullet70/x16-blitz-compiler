@@ -1,6 +1,6 @@
 # GPC.HELP
 
-The GP.BASIC and BASL reference, on the machine. A scrolling master index over 98 topics, written
+The GP.BASIC and BASL reference, on the machine. A scrolling master index over 75 topics, written
 in GP.BASIC and built from `GPC-BASIC/` — the manual, the name register, the file list and the
 module banner headers — by a script, so the help cannot drift from the library it documents.
 
@@ -49,7 +49,8 @@ every example in it — and writes them with a header naming where they came fro
 | Compiler known bugs | 1 | `GP-BASIC.md` §8 |
 | Memory and limits | 3 | `GP-BASIC.md` §7 |
 
-A topic longer than 120 lines is split, and each part counts as a topic.
+A topic is never split. The viewer holds up to 2,048 lines and eight banks of text, and
+`MKHELP.PY` refuses to write a topic past either.
 
 Two modules are written up from their banner alone, `STASH.INC.BL` and `STASHFILE.INC.BL`. They
 are the two `GP-BASIC.md` §4 does not reach, and **a module the manual does not document would
@@ -61,7 +62,7 @@ distinction the library is built on and it belongs next to the keyword, not in a
 screens away.
 
 [`GPC-HELP.md`](GPC-HELP.md) is the same content in one file, for reading on a PC.
-[`GPC-HELP.WIN.md`](GPC-HELP.WIN.md) is that file with the page splits joined, one contents list,
+[`GPC-HELP.WIN.md`](GPC-HELP.WIN.md) is that file with each title once, one contents list,
 and the cross references as links. [`GPC-HELP-TESTING.md`](GPC-HELP-TESTING.md) is the PC file
 built over the working library in `GPC-BASIC-TOOLS-SRC/GPB-MODS-TESTING/GPC-BASIC/` — see below. All three are
 generated.
@@ -77,15 +78,14 @@ python GPC-BASIC-TOOLS-SRC/GPC-HELP/MKHELPWIN.PY
 Run all three from the repository root, with these arguments, so the command line in the generated
 header stays reproducible.
 
-`MKHELP.PY` reads `GPC-BASIC/` and writes `HELP-TXT/H001.HLP`…`H090.HLP`, `HELP-TXT/GPC.HELP.IDX`
+`MKHELP.PY` reads `GPC-BASIC/` and writes `HELP-TXT/H001.HLP`…`H075.HLP`, `HELP-TXT/GPC.HELP.IDX`
 and `GPC-HELP.md`. `MKHELPWIN.PY` reads `GPC-HELP.md` and writes `GPC-HELP.WIN.md`.
 
 **Everything the viewer reads is in the one subfolder**, opened through the CMD path syntax
 `//HELP-TXT/:NAME` — what CMDR-DOS documents, and what a real SD card wants; the emulator would
 also take a plain `HELP-TXT/NAME`, which is the form that would not port. A run that produces fewer
-topics than the last one deletes the orphans. `--src` and `--out` move either end. `--maxpage`
-changes where a long topic is split, 120 lines by default. `--nosections` leaves the section rows
-out of the index.
+topics than the last one deletes the orphans. `--src` and `--out` move either end. `--nosections`
+leaves the section rows out of the index.
 
 **It exits non-zero if a character had no ASCII mapping**, listing the code points. That check
 exists because `−1` (U+2212, not the ASCII hyphen) came out as `?1` — a substitution no eye catches
@@ -180,7 +180,8 @@ the reading was free. So there is nothing to skip: one file a topic, and every o
 
 ### The topic and the index live in banks
 
-A topic is read once, into RAM bank 9 (`HELP.TBANK`), and every repaint comes out of that. The index
+A topic is read once, its line table into RAM bank 9 (`HELP.TBANK`) and its text into banks 15 to
+22 (`HELP.TEXTBANK`), and every repaint comes out of those. The index
 is read once at startup, into bank 10 (`HELP.IBANK`). Bank 8 is `GUI.BANK` and holds the cells under
 an open dialog.
 
@@ -190,14 +191,17 @@ died with `OUT OF MEMORY` opening a 120-line topic. With the index on the heap, 
 ALSO did the same. Moving the index into a bank gave back about 6,400 bytes of workspace for 432
 bytes of p-code.
 
-**The topic bank** holds a line table at the front, four bytes a line — offset low, offset high,
-length, kind — for up to 140 lines, and the text above it. A line is truncated at 78 characters,
-because no row can show more.
+**The line table** fills bank 9, four bytes a line — offset low, offset high, length, kind — for
+up to 2,048 lines. The offset is into the line's own text bank, and the kind byte's high nibble
+says which of the eight that is. A line that would straddle two banks starts the next one. A line
+is truncated at 78 characters, because no row can show more. The longest topic today is 854 lines,
+in four banks.
 
-**The index bank** holds eight bytes a row at the front — text offset low and high, length, type,
-topic, section line, topic length low and high — and the text above them. `HELP.MAXIX` is 210 rows:
-1,680 bytes of records and 6,512 for text. The viewer drops rows past either limit, so `MKHELP.PY`
-refuses to write an index that does not fit. Today's index is 189 rows and 6,338 bytes of text.
+**The index bank** holds nine bytes a row at the front — text offset low and high, length, type,
+topic, section line low and high, topic length low and high — and the text above them.
+`HELP.MAXIX` is 210 rows: 1,890 bytes of records and 6,302 for text. The viewer drops rows past
+either limit, so `MKHELP.PY` refuses to write an index that does not fit. Today's index is 166 rows
+and 5,572 bytes of text.
 
 There is no list control, and none is wanted: the section and cross-reference pickers are at most 12
 items, which fit a screen, so `MENU.POPUP` does the job.
@@ -364,11 +368,11 @@ A length that disagrees does not stop the viewer.
 | | |
 |---|---|
 | `GPC.HELP.BASL` | the viewer |
-| `GPC.HELP.PRG` | compiled SHARED, 8,128 bytes — what `help-demo.bat` runs |
+| `GPC.HELP.PRG` | compiled SHARED, 8,294 bytes — what `help-demo.bat` runs |
 | `GPC.HELP.OVL` | the region overlay, 20,747 bytes — sits beside the PRG on the drive |
 | `GPC-BASIC/` | the thirteen modules the viewer includes |
 | `HELP-TXT/GPC.HELP.IDX` | the master index, 179 rows |
-| `HELP-TXT/H001.HLP`…`H090.HLP` | one topic each |
+| `HELP-TXT/H001.HLP`…`H075.HLP` | one topic each |
 | `MKHELP.PY` | the content build |
 | `MKHELPWIN.PY` | `GPC-HELP.md` to `GPC-HELP.WIN.md` |
 | `GPC-HELP.md`, `GPC-HELP.WIN.md` | the same content, for a PC |

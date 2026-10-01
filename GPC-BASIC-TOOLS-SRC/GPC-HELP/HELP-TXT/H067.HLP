@@ -1,79 +1,142 @@
-@4.24 GUI-LITE.INC.BL -- a message box and a menu, in low memory
+@1. The prefixes that are taken
 .
-=4.24 GUI-LITE.INC.BL -- A MESSAGE BOX AND A MENU, IN LOW MEMORY
+=1. THE PREFIXES THAT ARE TAKEN
 .
-=WHAT IT COSTS
+.  GP.
+.      OWNER: GPB.INC.BL
+.      WHAT IT IS: keywords, not variables -- see SEC 2, this one is
+.        different
 .
-.    BASIC -- ordinary BASL in a .INC.BL, called with GOSUB. Free unless you
-.    #INCLUDE it.
+.  STR.
+.      OWNER: STRINGS.INC.BL
+.      WHAT IT IS: string helpers
 .
-=DESCRIPTION
+.  STR.USING.
+.      OWNER: STRUSING.INC.BL
+.      WHAT IT IS: a number to a template, kept apart from the rest of STR.
 .
-.Three verbs. MSGBOX shows up to four lines over one or two buttons, and
-.closes before it returns. PICKMENU shows a menu and leaves it open. CLOSEBOX
-.takes down the box opened last. Each box is as wide as its text and has a
-.drop shadow. A program calls the three verbs and nothing else.
+.  THEME.
+.      OWNER: THEME.INC.BL
+.      WHAT IT IS: colour roles
 .
-:#INCLUDE "GPB.INC.BL"
-:#INCLUDE "THEME.INC.BL"
-:#INCLUDE "GUI-LITE.INC.BL"
-:
-:GOSUB THEME.SELECT
-:C = GP.FN(PICKMENU, 4, 4, "MENU", "ABOUT,QUIT")
-:IF C = 1 THEN GP.SUB MSGBOX, "ABOUT", "GUI-LITE", "", "", "", "OK", ""
-:GP.SUB CLOSEBOX
+.  APPSYS.
+.      OWNER: APPSYS.INC.BL
+.      WHAT IT IS: screen save/restore, panels to disk
 .
-.#INCLUDE it after GPB.INC.BL and THEME.INC.BL. It includes neither. Every
-.colour is read from THEME.CLR, so THEME.SELECT (SEC 4.1) runs before the
-.first box.
+.  LINEINPUT.
+.      OWNER: LINEINPUT.INC.BL
+.      WHAT IT IS: entry fields
 .
-.It uses GP.BOX, GP.FILL, GP.PRINTAT and GP.CALL, so a program that includes
-.it carries the GP block, 1,536 bytes. It holds no GP.BANKED, GP.BANKEDSTR or
-.BANK, and adds no .OVL.
+.  KB.
+.      OWNER: KB.INC.BL
+.      WHAT IT IS: the keyboard drain
 .
-.The cells under a box and its shadow go to VRAM bank 0 when the box opens,
-.and come back when it closes. The first box saves at GL.SAVE.AT, and each
-.later box just above the one before. A box W columns wide and H rows high
-.takes (2W + 4) x (H + 1) bytes. The largest box on an 80x30 screen takes
-.5,084 bytes, so four of them end at $8F70. The save area must end below
-.$10000.
+.  MENU.
+.      OWNER: MENU.INC.BL
+.      WHAT IT IS: menus: the row store, the popup and the bar.
+.        MENUPULL.INC.BL's variables too
 .
-.  GL.SAVE.AT
-.      DEFAULT: $4000
-.      SETS: the VRAM bank 0 address the first box saves at
+.  MENUTO.
+.      OWNER: MENU.INC.BL MENUPULL.INC.BL
+.      WHAT IT IS: the runners, called with GP.FN
 .
-.  GL.MOST.OPEN
-.      DEFAULT: 4
-.      SETS: how many boxes may be open at once
+.  MENUPULL.
+.      OWNER: MENUPULL.INC.BL
+.      WHAT IT IS: a dropdown under a bar item: labels and one constant
 .
-.Define either one before the #INCLUDE to change it.
+.  GUI.
+.      OWNER: GUI.INC.BL
+.      WHAT IT IS: the box the dialogs sit in, and the form and controls
+.        inside it
 .
-.The frame is THEME.BORDER, the inside and the menu rows THEME.TEXT, the
-.title THEME.TITLE and the shadow THEME.SHADOW. The menu bar and the focused
-.button are THEME.HILITE, and the other button is THEME.BAR.
+.  GUI.LISTBOX.
+.      OWNER: GUI-DIALOGS.INC.BL
+.      WHAT IT IS: the listbox dialog's answer, kept apart from the rest of
+.        GUI.
 .
-.The caller keeps every box and its shadow on the screen. The shadow is two
-.columns right of the box and one row below it.
+.  DLG.
+.      OWNER: GUI-DIALOGS.INC.BL
+.      WHAT IT IS: the dialog verbs: their arguments, and their internals
 .
-.GUI-DIALOGS.INC.BL (SEC 4.12) declares MSGBOX and PICKMENU too. Include one
-.or the other. With both, the compile stops at GP.DEFPROC VERB ALREADY
-.DECLARED.
+.  GL.
+.      OWNER: GUI-LITE.INC.BL
+.      WHAT IT IS: the message box and menu verbs: their arguments, the open
+.        boxes, and the VERA and key constants
 .
-.STASHVRAM.INC.BL (SEC 4.18) starts its window at $04000, the default
-.SV.BASE. A program that includes both moves one of them.
+.  STASH.
+.      OWNER: STASH.INC.BL
+.      WHAT IT IS: a text rectangle into a RAM bank, and back
 .
-.The GUI-LITE sample, GPC-BASIC-TOOLS-SRC/GUI-LITE/GUI-LITE.BASL, calls all
-.three verbs.
+.  STASH.FILE.
+.      OWNER: STASHFILE.INC.BL
+.      WHAT IT IS: the same rectangle through a file, kept apart from the
+.        rest of STASH.
 .
-=IN THIS SECTION
+.  SORT.
+.      OWNER: SORT.INC.BL
+.      WHAT IT IS: shell sort a string array in place
 .
->113|4.24.1 MSGBOX -- lines of text over one or two buttons
->114|4.24.2 PICKMENU -- a menu that stays open
->115|4.24.3 CLOSEBOX -- take down the box opened last
+.  STRCASE.
+.      OWNER: STRCASE.INC.BL
+.      WHAT IT IS: case, rewriting a string in place
+.
+.  BMX.
+.      OWNER: BMX.INC.BL
+.      WHAT IT IS: BMX bitmap loading
+.
+.  BMXK.
+.      OWNER: BMX.INC.BL
+.      WHAT IT IS: its KERNAL/VERA constants, kept apart from its variables
+.
+.  FILE.
+.      OWNER: FILEIO.INC.BL
+.      WHAT IT IS: the drive: status, exists, delete, rename, directories
+.
+.  FILE.DIR.
+.      OWNER: FILEDIR.INC.BL
+.      WHAT IT IS: reading a directory, kept apart from the rest of FILE.
+.
+.  DOS.
+.      OWNER: DOS.INC.BL
+.      WHAT IT IS: the drive's command channel, the smaller alternative to
+.        FILE.
+.
+.  SV.
+.      OWNER: STASHVRAM.INC.BL
+.      WHAT IT IS: the VRAM store. SVGC. is STASHVRAMGC.INC.BL's one constant
+.
+.  KV.
+.      OWNER: KV.INC.BL
+.      WHAT IT IS: keys and values in one RAM bank
+.
+.  MATH.
+.      OWNER: MATH.INC.BL
+.      WHAT IT IS: the smaller and the larger of two numbers
+.
+.  MEM.
+.      OWNER: MEM.INC.BL
+.      WHAT IT IS: a block copied, a block filled, and the two KERNAL
+.        constants
+.
+.Pick anything else for your own program. AIRLIFT., GAME., MAP. -- a prefix
+.costs nothing at runtime because BASLOAD crunches every identifier down to a
+.short BASIC variable, so a long readable name and a two-letter one compile
+.to exactly the same thing.
+.
+.Do not reuse a taken prefix for a name the module has not defined.
+.THEME.MINE looks free today; it is one library update away from not being.
 .
 =SEE ALSO
 .
->71|4.1 THEME.INC.BL -- named colour roles
->97|4.12 GUI-DIALOGS.INC.BL -- every dialog as a verb
->105|4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM
->112|4.24 GUI-LITE.INC.BL -- a message box and a menu, in low memory
+>9|2. Using it
+>66|4.2 STRINGS.INC.BL -- string helpers
+>85|4.10 STRUSING.INC.BL -- a number to a template
+>65|4.1 THEME.INC.BL -- named colour roles
+>74|4.3 APPSYS.INC.BL -- start politely, leave it as you found it
+>75|4.4 LINEINPUT.INC.BL -- a positioned entry field
+>91|4.14 KB.INC.BL -- the keyboard buffer, emptied
+>77|4.6 MENU.INC.BL -- menus built a row at a time
+>84|4.9 MENUPULL.INC.BL -- a dropdown under a bar item
+>86|4.11 GUI.INC.BL -- the box that puts the screen back, and the form in 
+>88|4.12 GUI-DIALOGS.INC.BL -- every dialog as a verb
+>101|4.24 GUI-LITE.INC.BL -- a message box and a menu, in low memory

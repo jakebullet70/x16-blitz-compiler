@@ -2,13 +2,13 @@
 """Re-render GPC-HELP.md as one Windows-side reference.
 
 GPC-HELP.md is shaped by the X16 viewer it shares a generator with: every topic
-carries its title twice, long topics are cut into 120-line pages with a "(2)"
-heading on each, and the cross references at the foot of a page are plain text.
-None of that helps on a PC, where the file is read in an editor or a browser.
+carries its title twice, and the cross references at the foot of a topic are
+plain text. Neither helps on a PC, where the file is read in an editor or a
+browser.
 
-This script reads GPC-HELP.md and writes GPC-HELP.WIN.md with the page breaks
-healed, the duplicate headings folded away, one contents list over the whole
-document and every cross reference turned into a working link.
+This script reads GPC-HELP.md and writes GPC-HELP.WIN.md with the duplicate
+headings folded away, one contents list over the whole document and every
+cross reference turned into a working link.
 
 It reads GPC-HELP.md and nothing else, so it cannot disagree with the manual.
 Run MKHELP.PY first if the masters under GPC-BASIC/ have moved.
@@ -26,7 +26,6 @@ DEFAULT_SRC = os.path.join(HERE, "GPC-HELP.md")
 DEFAULT_OUT = os.path.join(HERE, "GPC-HELP.WIN.md")
 
 HEADING = re.compile(r"^(#{1,6})\s+(.*?)\s*$")
-PAGE_SUFFIX = re.compile(r"\s*\((\d+)\)$")
 SEE_ALSO = re.compile(r"^\*See also:\s*(.*?)\.?\*$")
 FENCE = re.compile(r"^```(\w*)\s*$")
 
@@ -34,7 +33,7 @@ FENCE = re.compile(r"^```(\w*)\s*$")
 def normalise(title):
     """Two spellings of one title compare equal.
 
-    A page heading is plain text and the heading under it is the manual's own,
+    A topic heading is plain text and the heading under it is the manual's own,
     with backticks and em dashes, so both are flattened before comparing.
     """
     t = title.lower().replace("`", "")
@@ -69,7 +68,7 @@ class Group(object):
 
 
 def parse(lines):
-    """GPC-HELP.md into groups of topics, page breaks healed."""
+    """GPC-HELP.md into groups of topics."""
     groups = []
     topic = None
     i = 0
@@ -91,15 +90,6 @@ def parse(lines):
 
         if m and len(m.group(1)) == 2:
             title = m.group(2)
-            page = PAGE_SUFFIX.search(title)
-            if page:
-                # A continuation page. Its heading is an artefact of the 120-line
-                # split, so the text carries straight on into the topic above it.
-                base = normalise(PAGE_SUFFIX.sub("", title))
-                if topic is not None and normalise(topic.title) == base:
-                    i += 1
-                    continue
-                title = PAGE_SUFFIX.sub("", title)
 
             # The manual's own heading follows, saying the same thing better.
             # Keep that one and drop this.
@@ -141,7 +131,7 @@ def parse(lines):
 
 
 def reflow(body):
-    """Trim the blank lines a healed page break leaves, and tidy entry blocks."""
+    """Trim the blank lines a dropped rule leaves, and tidy entry blocks."""
     out = []
     in_entry = False
     swallow = False
@@ -260,7 +250,7 @@ def link_refs(names, index):
 
 
 def merge_refs(lines):
-    """One list of names from however many pages the topic was cut into."""
+    """One list of names from the topic's See also lines."""
     names = []
     for line in lines:
         for name in line.split(", "):
@@ -288,8 +278,8 @@ def render(groups, src_name):
     out.append("# GP.BASIC and BASL -- the reference, for reading on Windows")
     out.append("")
     out.append("The same material `GPC.HELP.PRG` shows on the X16, laid out for an editor or a")
-    out.append("browser instead of an 80x30 screen: the 120-line pages are joined back up, each")
-    out.append("title appears once, and the cross references are links.")
+    out.append("browser instead of an 80x30 screen: each title appears once, and the cross")
+    out.append("references are links.")
     out.append("")
     out.append("**Generated. Do not edit.** `MKHELPWIN.PY` builds it from `%s`, which" % src_name)
     out.append("`MKHELP.PY` builds from `GPC-BASIC/`. Correct the manual there, then:")
