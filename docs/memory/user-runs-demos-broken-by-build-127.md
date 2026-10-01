@@ -18,6 +18,13 @@ On 2026-09-30 the runtime moved to build 128 (see [[banked-error-address-unplace
 files were replaced in all nine sample folders, and GPBMODS, GPC.HELP, COLORTST, BMXVIEW, GPC.GUI,
 EDIT and GPC.ERR were rebuilt. CRUNCH and XBASE were not.
 
+On 2026-10-01 the runtime moved to build 129 for the JOY fix (see [[gpc-joy-high-byte-diverges]]).
+`make install` refilled GPC-BASIC-TOOLS-SRC/GPC/, then the 128 runtimes and images were replaced in
+all 14 sample folders, KV-BANKED included. samplesbuild rebuilt 11 programs: GPBMODS, GPC.HELP,
+COLORTST, BMXVIEW, GPC.GUI, EDIT, GPC.ERR, GUI-LITE, MANDEL, MANDELASM and GUI-FIELD-EDIT.
+LANDER64 was rebuilt separately at 129 (14,977 bytes EMBEDDED). KV-BANKED, CRUNCH and XBASE
+were not rebuilt.
+
 Still open:
 - `help-demo.bat`, `gpcerr-demo.bat` and `gpc-gui-demo.bat` have not been re-run since.
 - EDIT.PRG, CRUNCH.PRG, COLORTST.PRG are embedded objects and never needed a runtime.

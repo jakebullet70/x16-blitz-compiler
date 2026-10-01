@@ -3885,6 +3885,10 @@ UnaryJoy: ;; [!joy]
 		txa
 		plx 								; we can update it now.
 		eor 	#$FF
+		lsr 	a 							; A, X, L, R to bits 3-0, as ROM BASIC returns them
+		lsr 	a
+		lsr 	a
+		lsr 	a
 		sta 	NSMantissa1,x
 		tya
 		eor 	#$FF

@@ -368,7 +368,7 @@ python source\gpc\samplesbuild.py GUI-FIELD-EDIT
   `GUI-DIALOGS.INC.BL`.
 - `GPC.BIN`, `GPC.PRG`, `BASLOAD-GPC.PRG` and `BASLOAD-GPC.BIN` are the
   compiler and tokeniser, for building on the machine.
-- `GPC.IMG.128.BIN`, `GP1.IMG.128.BIN` and `*.RT.128.BIN` are the runtime
+- `GPC.IMG.129.BIN`, `GP1.IMG.129.BIN` and `*.RT.129.BIN` are the runtime
   images the compiler embeds.
 - `GPC.INPUT` names the last compile's files. `GPC.PRG` writes it on every
   compile and `GPC.BIN` reads it.

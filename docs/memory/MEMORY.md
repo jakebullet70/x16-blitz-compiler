@@ -25,7 +25,7 @@ again. See [memory-is-git-tracked](memory-is-git-tracked.md).
 - [Compact early, not at the end](compact-early-not-at-the-end.md) — remind the user to /compact at the end of EVERY turn that lands a step; cost is context size x turns
 
 ## Build and toolchain
-- [USER-RUNS demos broken by Build 127](user-runs-demos-broken-by-build-127.md) — runtimes back beside each sample; the tree moved to build 128 on 2026-09-30
+- [USER-RUNS demos broken by Build 127](user-runs-demos-broken-by-build-127.md) — runtimes back beside each sample; the tree moved to build 129 on 2026-10-01
 - [Tool home layout deferred](tool-home-layout-deferred.md) — /GPC/ + /BASIC-SRC/ is next-version; copy the nine tool files into every working folder; research in docs/blitz/TOOL-HOME-LAYOUT.RESEARCH.md
 - [Build toolchain location](build-toolchain-location.md) — make, 64tass, python are off-PATH in C:\8bitProgramming; build setup is in docs/BUILDING.md
 - [Git Bash sed strips CRLF](git-bash-sed-strips-crlf.md) — `sed -i` writes LF and `grep -c $'\r$'` lies; count with Python bytes
@@ -105,6 +105,7 @@ again. See [memory-is-git-tracked](memory-is-git-tracked.md).
 - [FOR STEP 0 semantics](gpc-for-step0-semantics.md) — STEP 0 needs EXACT equality. **Blitz gets this wrong.**
 - [FOR 1 TO 0 runs once](gpc-basic-for-loop-runs-once.md) — guard every FOR 1 TO LEN()
 - [Empty INPUT gives ""](gpc-input-empty-line.md) — FIXED 2026-09-29; ROM keeps the old value, a chosen divergence
+- [GPC JOY high byte diverges](gpc-joy-high-byte-diverges.md) — A/X/L/R came back at $8000-$1000, ROM gives $800-$100; FIXED in runtime build 129
 - [X16 BASIC conformance](blitz-x16-basic-conformance.md) — 4 real defects fixed; `SLEEP 0` returns at once and still diverges
 - [Interpreter LOAD chain is safe](x16-interpreter-load-chain-is-safe.md) — R49 moves VARTAB, a longer chained program runs clean
 - [No END crashes at exit](program-without-end-crashes.md) — runs off the last line into $ffff; end every test program with END
