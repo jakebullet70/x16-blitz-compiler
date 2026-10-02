@@ -303,10 +303,10 @@ Plain BASL: no `GP.*` keyword and no `GP.ASM`, so it needs neither `GPB.INC.BL` 
 
 | | |
 |---|---|
-| in | `KV.KEY$` — the key, for `FIND` `GET` `PUT` `DEL`<br>`KV.VALUE$` — the value, for `PUT`<br>`KV.SLOT` — the slot, for `AT`<br>`KV.FNAME$` — the file, for `SAVE` and `LOAD`<br>`KV.HOMEBANK` — the bank every routine selects on its way out. The first `KV.INIT` sets 1 |
+| in | `KV.KEY$` — the key, for `FIND` `GET` `PUT` `DEL`<br>`KV.VALUE$` — the value, for `PUT`<br>`KV.SLOT` — the slot, for `AT`<br>`KV.FNAME$` — the file, for `SAVE` and `LOAD`<br>`KV.BANK` — the bank the store is in, set before the first `KV.INIT`. `KV.INIT` reads 0 as `KV.DEFBANK`, 40<br>`KV.HOMEBANK` — the bank every routine selects on its way out. The first `KV.INIT` sets 1 |
 | out | `KV.OK` — −1 done, 0 refused<br>`KV.SLOT` — the slot `FIND`, `GET` and `PUT` found, 0 if none<br>`KV.VALUE$` — `GET` and `AT`<br>`KV.KEY$` — `AT`, without its padding |
 | internal | `KV.READY` `KV.CODE%()` `KV.HIT` `KV.ADDR` `KV.INDEX` `KV.PADDED$` `KV.LENGTH` `KV.BYTE` `KV.MAGIC$` `KV.ERR` `KV.MSG$` `KV.TRACK` `KV.SECTOR` |
-| constants | `KV.BANK` `KV.BASE` `KV.TOP` `KV.SLOTS` `KV.SIZE` `KV.MAXLEN` `KV.VERSION` `KV.DEFS` |
+| constants | `KV.DEFBANK` `KV.BASE` `KV.TOP` `KV.SLOTS` `KV.SIZE` `KV.MAXLEN` `KV.VERSION` `KV.DEFS` |
 
 `KV.SLOT` is both an input and an output, the way `FILE.ROWS` is. `KV.AT` writes `KV.KEY$`, so a loop
 over the slots keeps its own key in a variable of its own.

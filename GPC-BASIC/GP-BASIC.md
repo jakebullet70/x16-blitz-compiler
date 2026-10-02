@@ -2520,7 +2520,7 @@ at the hardware is measured, not assumed.
 
 | Routine | in | out |
 |---|---|---|
-| `KV.INIT` | — | `KV.OK` |
+| `KV.INIT` | `KV.BANK` | `KV.OK` |
 | `KV.FIND` | `KV.KEY$` | `KV.SLOT` |
 | `KV.GET` | `KV.KEY$` | `KV.VALUE$` `KV.SLOT` `KV.OK` |
 | `KV.AT` | `KV.SLOT` | `KV.KEY$` `KV.VALUE$` `KV.OK` |
@@ -2545,8 +2545,10 @@ KV.FNAME$ = "SETTINGS.KV"
 GOSUB KV.SAVE
 ```
 
-Strings stored by key in RAM bank 40. `KV.INIT` runs before any other routine. Every routine is a
-plain `GOSUB`, and `KV.OK` is -1 for success and 0 for failure.
+Strings stored by key in RAM bank `KV.BANK`. `KV.INIT` reads a `KV.BANK` of 0 as `KV.DEFBANK`, which
+is 40, so a program that sets nothing gets bank 40. A program that wants another bank sets `KV.BANK`
+before the first `KV.INIT`. `KV.INIT` runs before any other routine. Every routine is a plain `GOSUB`,
+and `KV.OK` is -1 for success and 0 for failure.
 
 `KVBIN.INC.BL` (§4.26) keeps a store in a file that every program on the drive shares.
 
@@ -2581,19 +2583,25 @@ NEXT SLOT.NUMBER
 **`KV.PUTNUM` and `KV.GETNUM` are stubs.** Each sets `KV.OK = 0` and returns. Store a number as
 text: `STR$(N)` with `KV.PUT`, and `VAL(KV.VALUE$)` after `KV.GET`.
 
-**It selects a bank.** Every routine selects bank 40 and ends with `BANK KV.HOMEBANK`. The first
+**It selects a bank.** Every routine selects `KV.BANK` and ends with `BANK KV.HOMEBANK`. The first
 `KV.INIT` sets `KV.HOMEBANK` to 1, the bank selected at startup, and a program that keeps another bank
 selected sets it after `KV.INIT`. A call from a `GP.BANKED` region needs nothing: it is a banked
 call, and its `RETURN` selects the region's bank again (§3.12). The module cannot go inside a region,
 because the compiler refuses `BANK` there.
 
-A program that uses `BANKMGR` (§4.13) claims the bank after `BANKMGR.INIT` and before the first
-`GET.FREE.BANK`:
+A program that uses `BANKMGR` (§4.13) claims the bank the store is in. `BANKMGR.CLAIM` refuses bank 0,
+and `KV.BANK` is 0 until the program sets it or `KV.INIT` runs. For a fixed bank, set `KV.BANK`, claim
+it after `BANKMGR.INIT` and before the first `GET.FREE.BANK`, then call `KV.INIT`:
 
 ```basic
+KV.BANK = 40
 BANKMGR.SET.BANK = KV.BANK
 GOSUB BANKMGR.CLAIM
+GOSUB KV.INIT
 ```
+
+A bank from `GET.FREE.BANK` is already marked taken and needs no claim: `KV.BANK = BANKMGR.BANK`, then
+`KV.INIT`. `BANKMGR.BANK` is 0 when no bank is left, and `KV.INIT` then uses bank 40.
 
 **`KV.SAVE` writes the whole bank**, all 8,192 bytes, to `KV.FNAME$` on device 8, and replaces a file
 of that name. A disk error stops the program.

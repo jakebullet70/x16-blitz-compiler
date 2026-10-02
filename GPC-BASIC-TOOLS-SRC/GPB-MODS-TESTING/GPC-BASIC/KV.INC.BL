@@ -26,6 +26,7 @@
 ## **        KV.VALUE$     the value for PUT. Cut to 119 characters
 ## **        KV.SLOT       the slot for AT, 1-63
 ## **        KV.FNAME$     the file for SAVE and LOAD, on device 8
+## **        KV.BANK       the store's bank, set before INIT. 0 means KV.DEFBANK
 ## **        KV.HOMEBANK   the bank every routine selects on return. INIT sets 1
 ## **
 ## **   out  KV.SLOT       the slot FIND, GET and PUT found. 0 MEANS MISSING
