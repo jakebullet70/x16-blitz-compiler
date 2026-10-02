@@ -1,0 +1,218 @@
+## ***********************************************************************
+## **  KVBIN.EXP.BL -- every routine in KVBIN.INC.BL.
+## **
+## **  No GP commands. The same source compiles under GPC and runs tokenised
+## **  in stock BASIC.
+## **
+## **  A case's BAD is a sum, one digit a check.
+## **
+## **  WARNING: WRITES KVBT.BIN AND KVBJUNK.BIN TO THE DRIVE. KVBNONE.BIN
+## **  MUST NOT EXIST.
+## ***********************************************************************
+#SAVEAS "@:KVBIN.PRG"
+#INCLUDE "KVBIN.INC.BL"
+
+T.FAILS = 0
+T.BAD = 0
+T.STORE$ = "KVBT.BIN"
+KVBIN.FNAME$ = T.STORE$
+
+## =======================================================================
+## 1  CREATE makes 40 free slots, and INFO counts them.
+## =======================================================================
+GOSUB KVBIN.CREATE
+IF KVBIN.OK <> -1 THEN T.BAD = T.BAD + 1
+KVBIN.SLOTS = 0
+GOSUB KVBIN.INFO
+IF KVBIN.OK <> -1 THEN T.BAD = T.BAD + 10
+IF KVBIN.SLOTS <> 40 THEN T.BAD = T.BAD + 100
+T.NAME$ = "CREATE"
+GOSUB T.REPORT
+
+## =======================================================================
+## 2..5  PUT and GET: a first write, a rewrite, a missing key, a key and a
+## value that are too long.
+## =======================================================================
+KVBIN.KEY$ = "USER.NAME"
+KVBIN.VALUE$ = "STEVE"
+GOSUB KVBIN.PUT
+IF KVBIN.OK <> -1 THEN T.BAD = T.BAD + 1
+IF KVBIN.SLOT <> 1 THEN T.BAD = T.BAD + 10
+KVBIN.VALUE$ = ""
+GOSUB KVBIN.GET
+IF KVBIN.OK <> -1 THEN T.BAD = T.BAD + 100
+IF KVBIN.VALUE$ <> "STEVE" THEN T.BAD = T.BAD + 1000
+T.NAME$ = "PUT.NEW"
+GOSUB T.REPORT
+
+KVBIN.KEY$ = "SCR.THEME"
+KVBIN.VALUE$ = "DARK"
+GOSUB KVBIN.PUT
+IF KVBIN.SLOT <> 2 THEN T.BAD = T.BAD + 1
+KVBIN.KEY$ = "USER.NAME"
+KVBIN.VALUE$ = "SOMEONE ELSE"
+GOSUB KVBIN.PUT
+IF KVBIN.OK <> -1 THEN T.BAD = T.BAD + 10
+IF KVBIN.SLOT <> 1 THEN T.BAD = T.BAD + 100
+GOSUB KVBIN.GET
+IF KVBIN.VALUE$ <> "SOMEONE ELSE" THEN T.BAD = T.BAD + 1000
+T.NAME$ = "PUT.AGAIN"
+GOSUB T.REPORT
+
+KVBIN.KEY$ = "NOT.THERE"
+KVBIN.VALUE$ = "STALE"
+GOSUB KVBIN.GET
+IF KVBIN.OK <> 0 THEN T.BAD = T.BAD + 1
+IF KVBIN.WHY <> KVBIN.WHY.NOKEY THEN T.BAD = T.BAD + 10
+IF KVBIN.VALUE$ <> "" THEN T.BAD = T.BAD + 100
+T.NAME$ = "GET.MISSING"
+GOSUB T.REPORT
+
+T.LONG$ = ""
+FOR T.I = 1 TO 13
+    T.LONG$ = T.LONG$ + "0123456789"
+NEXT T.I
+KVBIN.KEY$ = "TWELVE.CHARSXYZ"
+KVBIN.VALUE$ = T.LONG$
+GOSUB KVBIN.PUT
+IF KVBIN.OK <> -1 THEN T.BAD = T.BAD + 1
+KVBIN.KEY$ = "TWELVE.CHARS"
+GOSUB KVBIN.GET
+IF KVBIN.OK <> -1 THEN T.BAD = T.BAD + 10
+IF LEN(KVBIN.VALUE$) <> 115 THEN T.BAD = T.BAD + 100
+IF KVBIN.VALUE$ <> LEFT$(T.LONG$, 115) THEN T.BAD = T.BAD + 1000
+T.NAME$ = "PUT.LONG"
+GOSUB T.REPORT
+
+## =======================================================================
+## 6..7  DEL frees the slot and the next new key takes it. An empty key is
+## refused.
+## =======================================================================
+KVBIN.KEY$ = "SCR.THEME"
+GOSUB KVBIN.DEL
+IF KVBIN.OK <> -1 THEN T.BAD = T.BAD + 1
+GOSUB KVBIN.GET
+IF KVBIN.OK <> 0 THEN T.BAD = T.BAD + 10
+GOSUB KVBIN.DEL
+IF KVBIN.WHY <> KVBIN.WHY.NOKEY THEN T.BAD = T.BAD + 100
+KVBIN.KEY$ = "SCR.COLS"
+KVBIN.VALUE$ = "80"
+GOSUB KVBIN.PUT
+IF KVBIN.SLOT <> 2 THEN T.BAD = T.BAD + 1000
+T.NAME$ = "DEL"
+GOSUB T.REPORT
+
+KVBIN.KEY$ = ""
+KVBIN.VALUE$ = "NOBODY"
+GOSUB KVBIN.PUT
+IF KVBIN.OK <> 0 THEN T.BAD = T.BAD + 1
+IF KVBIN.WHY <> KVBIN.WHY.BADKEY THEN T.BAD = T.BAD + 10
+GOSUB KVBIN.GET
+IF KVBIN.OK <> 0 THEN T.BAD = T.BAD + 100
+T.NAME$ = "EMPTY.KEY"
+GOSUB T.REPORT
+
+## =======================================================================
+## 8  AT reads a slot by number, and reports a free one.
+## =======================================================================
+KVBIN.SLOT = 2
+GOSUB KVBIN.AT
+IF KVBIN.OK <> -1 THEN T.BAD = T.BAD + 1
+IF KVBIN.KEY$ <> "SCR.COLS" THEN T.BAD = T.BAD + 10
+IF KVBIN.VALUE$ <> "80" THEN T.BAD = T.BAD + 100
+KVBIN.SLOT = 30
+GOSUB KVBIN.AT
+IF KVBIN.OK <> 0 THEN T.BAD = T.BAD + 1000
+T.NAME$ = "AT"
+GOSUB T.REPORT
+
+## =======================================================================
+## 9..11  Three keys are in. 37 more fill the store, the next is refused,
+## and it fits after EXPAND. The walk then counts 41 used slots of 60.
+## =======================================================================
+FOR T.I = 1 TO 37
+    KVBIN.KEY$ = "FILL." + MID$(STR$(100 + T.I), 3)
+    KVBIN.VALUE$ = "VALUE" + STR$(T.I)
+    GOSUB KVBIN.PUT
+    IF KVBIN.OK <> -1 THEN T.BAD = T.BAD + 1
+NEXT T.I
+IF KVBIN.SLOT <> 40 THEN T.BAD = T.BAD + 100
+KVBIN.KEY$ = "ONE.TOO.MANY"
+KVBIN.VALUE$ = "X"
+GOSUB KVBIN.PUT
+IF KVBIN.OK <> 0 THEN T.BAD = T.BAD + 1000
+IF KVBIN.WHY <> KVBIN.WHY.FULL THEN T.BAD = T.BAD + 10000
+T.NAME$ = "FULL"
+GOSUB T.REPORT
+
+GOSUB KVBIN.EXPAND
+IF KVBIN.OK <> -1 THEN T.BAD = T.BAD + 1
+IF KVBIN.SLOTS <> 60 THEN T.BAD = T.BAD + 10
+KVBIN.KEY$ = "ONE.TOO.MANY"
+KVBIN.VALUE$ = "X"
+GOSUB KVBIN.PUT
+IF KVBIN.SLOT <> 41 THEN T.BAD = T.BAD + 100
+KVBIN.KEY$ = "FILL.26"
+GOSUB KVBIN.GET
+IF KVBIN.VALUE$ <> "VALUE 26" THEN T.BAD = T.BAD + 1000
+T.NAME$ = "EXPAND"
+GOSUB T.REPORT
+
+T.USED = 0
+T.SEEN = 0
+GOSUB KVBIN.FIRST
+T.WALK:
+    IF KVBIN.OK = 0 THEN GOTO T.WALKED
+    T.SEEN = T.SEEN + 1
+    IF KVBIN.KEY$ <> "" THEN T.USED = T.USED + 1
+    IF KVBIN.SLOT = 1 AND KVBIN.VALUE$ <> "SOMEONE ELSE" THEN T.BAD = T.BAD + 1
+    GOSUB KVBIN.NEXT
+    GOTO T.WALK
+T.WALKED:
+IF T.SEEN <> 60 THEN T.BAD = T.BAD + 10
+IF T.USED <> 41 THEN T.BAD = T.BAD + 100
+T.NAME$ = "WALK"
+GOSUB T.REPORT
+
+## =======================================================================
+## 12..13  A missing file, and a file that is not a store.
+## =======================================================================
+KVBIN.FNAME$ = "KVBNONE.BIN"
+KVBIN.KEY$ = "USER.NAME"
+GOSUB KVBIN.GET
+IF KVBIN.OK <> 0 THEN T.BAD = T.BAD + 1
+IF KVBIN.WHY <> KVBIN.WHY.NOFILE THEN T.BAD = T.BAD + 10
+IF KVBIN.DOSERR <> 62 THEN T.BAD = T.BAD + 100
+T.NAME$ = "NO.FILE"
+GOSUB T.REPORT
+
+OPEN 2, 8, 2, "@:KVBJUNK.BIN,S,W"
+PRINT# 2, "THIS IS NOT A STORE"
+CLOSE 2
+KVBIN.FNAME$ = "KVBJUNK.BIN"
+GOSUB KVBIN.GET
+IF KVBIN.OK <> 0 THEN T.BAD = T.BAD + 1
+IF KVBIN.WHY <> KVBIN.WHY.NOTSTORE THEN T.BAD = T.BAD + 10
+GOSUB KVBIN.PUT
+IF KVBIN.WHY <> KVBIN.WHY.NOTSTORE THEN T.BAD = T.BAD + 100
+T.NAME$ = "NOT.A.STORE"
+GOSUB T.REPORT
+
+PRINT
+PRINT "FAILS"; T.FAILS
+END
+
+## =======================================================================
+## Helpers.
+## =======================================================================
+
+T.REPORT:
+    IF T.BAD = 0 THEN PRINT "PASS "; T.NAME$
+    IF T.BAD <> 0 THEN GOSUB T.FAIL
+    T.BAD = 0
+    RETURN
+
+T.FAIL:
+    PRINT "FAIL "; T.NAME$; " BAD"; T.BAD
+    T.FAILS = T.FAILS + 1
+    RETURN

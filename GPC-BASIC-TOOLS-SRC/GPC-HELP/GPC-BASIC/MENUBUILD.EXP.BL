@@ -1,0 +1,140 @@
+## ***********************************************************************
+## **  MENUBUILD.EXP.BL -- MENU.INC.BL's builder, read back. Step 1 of
+## **  docs/blitz/GUI-MENUS.PLAN.md: no runner, nothing drawn.
+## **
+## **  Each row prints as TEXT/KEY/COL/ON/HINT, KEY "." for none, ON 1 for
+## **  enabled, and is checked against what it should be.
+## **
+## **  Compile SHARED: the store is a GP.BANKEDSTR group in bank 62.
+## ***********************************************************************
+#SAVEAS "@:MENUBUILD.PRG"
+#INCLUDE "GPB.INC.BL"
+#INCLUDE "BANKMGR.INC.BL"
+#INCLUDE "MENU.INC.BANKED.BL"
+#INCLUDE "MENU.INC.BL"
+
+T.FAILS = 0
+GOSUB BANKMGR.INIT
+
+## ---- a row before any MENU.BEGIN is dropped, and must not auto-DIM the store.
+GP.SUB MENU.ITEM, "EARLY"
+
+GP.SUB MENU.BEGIN, MENU.BAR
+GP.SUB MENU.ITEM, "&FILE"
+GP.SUB MENU.ITEM, "HEL&P"
+GP.SUB MENU.ITEM, "A&&B"
+GP.SUB MENU.ITEM, "NONE"
+GP.SUB MENU.ITEM, "END&"
+
+## ---- the popup is built after the bar, so the bar must still be whole.
+GP.SUB MENU.BEGIN, MENU.POPUP
+GP.SUB MENU.ITEMX, "&ADD RECORD", "ADD A NEW RECORD", MENU.ON
+GP.SUB MENU.ITEMX, "&DEL RECORD", "DELETE THE ROW", MENU.OFF
+GP.SUB MENU.ITEM, "-"
+GP.SUB MENU.ITEMX, "SAVE &AS", "", -1
+GP.SUB MENU.ITEM, "&QUIT"
+
+IF MENU.OK = 0 THEN PRINT "FAIL BANK CLAIM" : T.FAILS = T.FAILS + 1
+
+PRINT "BAR"
+T.SLOT = MENU.BAR
+T.WANTN = 5
+GOSUB T.COUNT
+T.ROW = 1
+T.WANT$ = "FILE/F/1/1/"
+GOSUB T.CHECK
+T.ROW = 2
+T.WANT$ = "HELP/P/4/1/"
+GOSUB T.CHECK
+T.ROW = 3
+T.WANT$ = "A&B/./0/1/"
+GOSUB T.CHECK
+T.ROW = 4
+T.WANT$ = "NONE/./0/1/"
+GOSUB T.CHECK
+T.ROW = 5
+T.WANT$ = "END&/./0/1/"
+GOSUB T.CHECK
+
+PRINT "POPUP"
+T.SLOT = MENU.POPUP
+T.WANTN = 5
+GOSUB T.COUNT
+T.ROW = 1
+T.WANT$ = "ADD RECORD/A/1/1/ADD A NEW RECORD"
+GOSUB T.CHECK
+T.ROW = 2
+T.WANT$ = "DEL RECORD/D/1/0/DELETE THE ROW"
+GOSUB T.CHECK
+T.ROW = 3
+T.WANT$ = "-/./0/1/"
+GOSUB T.CHECK
+T.ROW = 4
+T.WANT$ = "SAVE AS/A/6/1/"
+GOSUB T.CHECK
+T.ROW = 5
+T.WANT$ = "QUIT/Q/1/1/"
+GOSUB T.CHECK
+
+## ---- a rebuild empties the slot: the old row 2's hint must not survive.
+PRINT "REBUILD"
+GP.SUB MENU.BEGIN, MENU.POPUP
+GP.SUB MENU.ITEM, "&ONE"
+GP.SUB MENU.ITEM, "&TWO"
+T.WANTN = 2
+GOSUB T.COUNT
+T.ROW = 2
+T.WANT$ = "TWO/T/1/1/"
+GOSUB T.CHECK
+T.SLOT = MENU.BAR
+T.WANTN = 5
+GOSUB T.COUNT
+
+## ---- the bar holds 16; the rest are dropped, not spilled into the popup.
+PRINT "OVERFLOW"
+GP.SUB MENU.BEGIN, MENU.BAR
+FOR T.I = 1 TO 20
+    GP.SUB MENU.ITEM, "ROW"
+NEXT T.I
+T.SLOT = MENU.BAR
+T.WANTN = MENU.BAR.MAX
+GOSUB T.COUNT
+T.SLOT = MENU.POPUP
+T.WANTN = 2
+GOSUB T.COUNT
+T.ROW = 1
+T.WANT$ = "ONE/O/1/1/"
+GOSUB T.CHECK
+
+PRINT
+PRINT "FAILS"; T.FAILS
+END
+
+## =======================================================================
+## Helpers.
+## =======================================================================
+
+## ---- row T.ROW of slot T.SLOT as TEXT/KEY/COL/ON/HINT, against T.WANT$.
+T.CHECK:
+    T.AT = T.SLOT * MENU.BAR.MAX + T.ROW - 1
+    T.KEY$ = MID$(MENU.HOTKEY$(T.SLOT), T.ROW, 1)
+    IF ASC(T.KEY$) = 0 THEN T.KEY$ = "."
+    T.COL = ASC(MID$(MENU.HOTCOL$(T.SLOT), T.ROW, 1))
+    T.ON$ = "1"
+    IF MID$(MENU.FLAG$(T.SLOT), T.ROW, 1) = "1" THEN T.ON$ = "0"
+    T.GOT$ = GP.BSTR(MENU.TEXTS, T.AT) + "/" + T.KEY$ + "/" + MID$(STR$(T.COL), 2) + "/" + T.ON$ + "/" + GP.BSTR(MENU.HINTS, T.AT)
+    IF T.GOT$ = T.WANT$ THEN PRINT "PASS "; T.GOT$
+    IF T.GOT$ <> T.WANT$ THEN GOSUB T.FAIL
+    RETURN
+
+T.COUNT:
+    T.N = LEN(MENU.FLAG$(T.SLOT))
+    IF T.N = T.WANTN THEN PRINT "PASS COUNT"; T.N
+    IF T.N <> T.WANTN THEN PRINT "FAIL COUNT"; T.N; " WANT"; T.WANTN : T.FAILS = T.FAILS + 1
+    RETURN
+
+T.FAIL:
+    PRINT "FAIL "; T.GOT$
+    PRINT "WANT "; T.WANT$
+    T.FAILS = T.FAILS + 1
+    RETURN

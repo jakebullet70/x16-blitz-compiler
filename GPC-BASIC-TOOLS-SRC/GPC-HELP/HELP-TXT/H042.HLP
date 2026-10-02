@@ -94,8 +94,8 @@
 .
 =EXAMPLE PROGRAM
 .
-.  STRUSING.EXP.BL -- runnable, in the GPC-BASIC folder
-.  USINGT.EXP.BL -- runnable, in the GPC-BASIC folder
+>194|STRUSING.EXP.BL
+>196|USINGT.EXP.BL  the regression test for STRUSING.INC.BL
 .
 =SEE ALSO
 .

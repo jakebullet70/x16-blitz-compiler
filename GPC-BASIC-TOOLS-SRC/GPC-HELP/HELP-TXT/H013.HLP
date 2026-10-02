@@ -40,7 +40,7 @@
 .
 =EXAMPLE PROGRAM
 .
-.  MLCALL.EXP.BL -- runnable, in the GPC-BASIC folder
+>185|MLCALL.EXP.BL  GP.CALL and GP.A / GP.X / GP.Y / GP.C
 .
 =SEE ALSO
 .

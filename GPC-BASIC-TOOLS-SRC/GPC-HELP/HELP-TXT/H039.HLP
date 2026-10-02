@@ -48,8 +48,8 @@
 .
 =EXAMPLE PROGRAM
 .
-.  ARRAYS.EXP.BL -- runnable, in the GPC-BASIC folder
-.  SORT.EXP.BL -- runnable, in the GPC-BASIC folder
+>168|ARRAYS.EXP.BL  the GP.BASIC array set
+>188|SORT.EXP.BL  the regression test for SORT.INC.BL
 .
 =SEE ALSO
 .

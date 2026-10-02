@@ -1,0 +1,80 @@
+## ***********************************************************************
+## **
+## **  BMXVIEW.EXP.BL -- a BMX bitmap viewer, in about thirty lines.
+## **
+## **  All the work is in BMX.INC.BL; this is only the part that talks to a
+## **  person. It uses the two-step form -- BMX.OPEN, look at the header,
+## **  then SCREEN and BMX.PAINT -- so a file that turns out not to be a BMX
+## **  is reported on the text screen the user is already looking at, rather
+## **  than after the display has been torn down to show it.
+## **
+## **  BMX is the X16's own bitmap format. The reference viewer is
+## **  GPC-BASIC-TOOLS-SRC/BMXVIEWER/BMXVIEWER.BAS, written for interpreted BASIC; the
+## **  GP.BASIC version is shorter for two specific reasons, both of them in
+## **  BMX.INC.BL: GP.STRPTR replaces POINTER() plus a PEEK of the CBM
+## **  string descriptor, and GP.CALL replaces staging A/X/Y/C through
+## **  $030C..$030F and SYSing.
+## **
+## **  Build:  copy GPB.INC.BL, APPSYS.INC.BL, BMX.INC.BL, STRCASE.INC.BL
+## **          and this file into source/drive/, then
+## **            python source/gpc/build_basl.py BMXVIEW.EXP.BL BMXVIEW.SRC.PRG
+## **          and compile BMXVIEW.SRC.PRG with GPC.BIN. Put some .BMX
+## **          files on the same drive -- GPC-BASIC-TOOLS-SRC/BMXVIEWER/SAMPLES has 30.
+## **
+## ***********************************************************************
+## STRCASE.INC.BL reaches BASIC's variables through {VAR}, so this program
+## needs a #SYMFILE -- BASLOAD's own record of the names it crunched. Both
+## directives go BEFORE the #INCLUDEs; a #SYMFILE after one is refused.
+#SAVEAS "@:BMXVIEW.SRC.PRG"
+#SYMFILE "@:BMXVIEW.SRC.SYM"
+#INCLUDE "GPB.INC.BL"
+#INCLUDE "STRCASE.INC.BL"
+#INCLUDE "APPSYS.INC.BL"
+#INCLUDE "BMX.INC.BL"
+
+#DEFINE VIEW.MODE 128
+
+## ---- Remember the screen the user had, so quitting puts it back rather
+## ---- than leaving them at a READY in whatever the last picture used.
+
+GOSUB APPSYS.STARTUP
+
+VIEW.MAIN:
+    PRINT
+    INPUT "BMX FILE (RETURN ALONE TO STOP)";BMX.FILE$
+    IF GP.ISEMPTY(BMX.FILE$) THEN GOTO VIEW.QUIT
+## ---- GP.UPPER was a keyword and is STRCASE.INC.BL now. It rewrites the
+## ---- string where it lies, through the address GP.STRPTR hands over, so
+## ---- this is still no copy and no allocation -- only two lines instead
+## ---- of one, because a BASL routine cannot be passed a variable.
+    STRCASE.PTR = GP.STRPTR(BMX.FILE$) : STRCASE.MODE = STRCASE.UPPER
+    GOSUB STRCASE.GO
+    IF NOT GP.CONTAINS(BMX.FILE$, ".") THEN BMX.FILE$ = BMX.FILE$ + ".BMX"
+
+    GOSUB BMX.OPEN
+    IF BMX.ERROR$ <> "" THEN GOTO VIEW.COMPLAIN
+
+    PRINT BMX.WIDTH;"X";BMX.HEIGHT;BMX.PALUSED;"COLOURS"
+    SCREEN VIEW.MODE
+    GOSUB BMX.PAINT
+    GOSUB VIEW.ANYKEY
+## ---- The picture's palette is borrowed, not taken. Nothing on the X16
+## ---- puts it back, so text mode returns unreadable without this line.
+    GOSUB BMX.RESTORE
+    SCREEN APPSYS.MODE
+    IF BMX.ERROR$ <> "" THEN GOTO VIEW.COMPLAIN
+    GOTO VIEW.MAIN
+
+VIEW.COMPLAIN:
+    PRINT BMX.ERROR$
+    GOTO VIEW.MAIN
+
+VIEW.QUIT:
+    GOSUB APPSYS.RESTORE
+    PRINT "BYE"
+    END
+
+VIEW.ANYKEY:
+    GET VIEW.KEY$
+    IF VIEW.KEY$ = "" THEN GOTO VIEW.ANYKEY
+    RETURN

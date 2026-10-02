@@ -1,0 +1,207 @@
+## ***********************************************************************
+## **
+## **  STRINGS.EXP.BL -- the GP.BASIC string set.
+## **
+## **  GP.INSTR / GP.STRPTR          functions
+## **  GP.CONTAINS / GP.ISEMPTY      composite -- no runtime code
+## **  GP.HIBYTE / GP.LOBYTE         composite -- splitting an address
+## **  STRCASE.GO                    BASL+ASM, from STRCASE.INC.BL:
+## **                                  UPPER / LOWER
+## **  STR.TRIM / LTRIM / RTRIM      BASL+ASM, from STRINGS.INC.BL
+## **  STR.PADR / PADL / PADC        BASL, from STRINGS.INC.BL
+## **  STR.REPLACE / STR.SPLICE      BASL, from STRINGS.INC.BL
+## **
+## **  Build:  copy GPC-BASIC/GPB.INC.BL, GPC-BASIC/STRINGS.INC.BL,
+## **          GPC-BASIC/STRCASE.INC.BL and this file into source/drive/, then
+## **            python source/gpc/build_basl.py STRINGS.EXP.BL STRINGS.PRG
+## **          and compile STRINGS.PRG with GPC.BIN.
+## **
+## **  Compile-only: the ROM cannot RUN a PRG containing GP tokens.
+## **
+## ***********************************************************************
+## BOTH modules reach BASIC's variables through {VAR}, so this program needs a
+## #SYMFILE. Both directives go BEFORE the #INCLUDEs.
+#SAVEAS "@:STRINGS.PRG"
+#SYMFILE "@:STRINGS.SYM"
+#INCLUDE "GPB.INC.BL"
+#INCLUDE "STRINGS.INC.BL"
+#INCLUDE "STRCASE.INC.BL"
+
+## NOTE ON NAMES: the search cursor below is HIT, not POS -- POS is a BASIC keyword
+## ($B9), so "POS = 1" compiles to nonsense and surfaces only as a runtime SYNTAX ERROR
+## at a p-code offset. A dotted name dodges it too.
+
+## ---- 1. GP.INSTR is INSTR.  Position of the needle in the haystack,
+## ---- 1-based, 0 when absent.  The third argument is where to start,
+## ---- which is what lets you walk every occurrence rather than the first.
+
+TEXT$ = "THE RAIN IN SPAIN"
+PRINT "INSTR RAIN   ->"; GP.INSTR(TEXT$, "RAIN")
+PRINT "INSTR ZEBRA  ->"; GP.INSTR(TEXT$, "ZEBRA")
+
+## every occurrence of "IN": start the next search past the last hit
+HIT = 1
+GP.DO
+  HIT = GP.INSTR(TEXT$, "IN", HIT)
+  IF HIT = 0 THEN GP.EXITDO
+  PRINT "  IN AT"; HIT
+  HIT = HIT + 1
+GP.LOOP
+
+## ---- 1b. GP.CONTAINS is the yes/no spelling of that question; GP.ISEMPTY is LEN(a$)=0
+## ---- written down. Both COMPOSITE -- the compiler expands them into keywords that
+## ---- already exist, so the object is identical to the long form and they cost nothing.
+
+PRINT "CONTAINS RAIN  ->"; GP.CONTAINS(TEXT$, "RAIN")
+PRINT "  same as      ->"; GP.INSTR(TEXT$, "RAIN") <> 0
+PRINT "CONTAINS ZEBRA ->"; GP.CONTAINS(TEXT$, "ZEBRA")
+
+## ---- CASE SENSITIVE, because GP.INSTR compares raw bytes. GP.COMP is
+## ---- the case-folding one, and it compares whole strings rather than
+## ---- searching. An EMPTY needle is 0, not -1.
+
+IF GP.CONTAINS(TEXT$, "SPAIN") THEN PRINT "  FOUND SPAIN"
+IF NOT GP.CONTAINS(TEXT$, "PORTUGAL") THEN PRINT "  NO PORTUGAL"
+
+NOTHING$ = ""
+SPACES$ = "   "
+PRINT "ISEMPTY EMPTY  ->"; GP.ISEMPTY(NOTHING$)
+PRINT "ISEMPTY SPACES ->"; GP.ISEMPTY(SPACES$)
+
+## ---- A STRING OF SPACES IS NOT EMPTY. Trim it first if that is what you
+## ---- meant -- which is the next section.
+
+STR.PTR = GP.STRPTR(SPACES$)
+GOSUB STR.TRIM
+PRINT "  after TRIM   ->"; GP.ISEMPTY(SPACES$)
+
+## ---- 2. the trims.  TRIM does both ends, LTRIM the left (leading
+## ---- spaces), RTRIM the right (trailing spaces).
+## ----
+## ---- THESE WERE KEYWORDS -- GP.TRIM, GP.LTRIM, GP.RTRIM -- and are STRINGS.INC.BL
+## ---- now, GP.ASM driven by GP.STRPTR. The string still goes in as an ADDRESS and is
+## ---- rewritten where it lies, so nothing is copied or allocated. One input and three
+## ---- entry labels: there is no mode to forget to set.
+## ----
+## ---- PASS A VARIABLE, NEVER A LITERAL. GP.STRPTR("  both  ") is the address of that
+## ---- text inside the P-CODE, and trimming it would EDIT THE PROGRAM. The keyword form
+## ---- could not be misused this way -- the compiler insisted on a variable.
+
+BOTH$ = "  both  "
+STR.PTR = GP.STRPTR(BOTH$) : GOSUB STR.TRIM
+PRINT "TRIM  ["; BOTH$; "]"
+
+LEAD$ = "  left  "
+STR.PTR = GP.STRPTR(LEAD$) : GOSUB STR.LTRIM
+PRINT "LTRIM ["; LEAD$; "]"
+
+TRAIL$ = "  right  "
+STR.PTR = GP.STRPTR(TRAIL$) : GOSUB STR.RTRIM
+PRINT "RTRIM ["; TRAIL$; "]"
+
+## ---- 3. case.  A-Z only: digits, punctuation and PETSCII graphics are
+## ---- left exactly as they were. STRCASE.MODE IS AN ORDINARY VARIABLE, so a
+## ---- call that forgets to set it repeats whatever the last one did.
+
+WORD$ = "Mixed Case 42!"
+STRCASE.PTR = GP.STRPTR(WORD$) : STRCASE.MODE = STRCASE.UPPER : GOSUB STRCASE.GO
+PRINT "UPPER ["; WORD$; "]"
+STRCASE.PTR = GP.STRPTR(WORD$) : STRCASE.MODE = STRCASE.LOWER : GOSUB STRCASE.GO
+PRINT "LOWER ["; WORD$; "]"
+
+## ---- 4. padding lives in BASL, not the runtime. PADR left justifies, PADL right,
+## ---- PADC centres. An in-place ASM statement only ever gets the string's BLOCK, never
+## ---- the variable slot, so it can never GROW one past its born capacity -- and
+## ---- padding to a field width is exactly growing. BASIC assignment reallocates.
+
+STR.STR$ = "NAME" : STR.WIDTH = 12
+GOSUB STR.PADR
+PRINT "PAD   ["; STR.STR$; "]"
+
+STR.STR$ = "42" : STR.WIDTH = 12
+GOSUB STR.PADL
+PRINT "PADL  ["; STR.STR$; "]"
+
+STR.STR$ = "TITLE" : STR.WIDTH = 12
+GOSUB STR.PADC
+PRINT "PADC  ["; STR.STR$; "]"
+
+## ---- 4b. STR.REPLACE swaps EVERY occurrence. The replacement may
+## ---- be shorter, longer, or "" to delete. Case sensitive, like
+## ---- GP.INSTR underneath it.
+
+STR.STR$ = "PATH/TO/FILE" : STR.FIND$ = "/" : STR.REPL$ = "."
+GOSUB STR.REPLACE
+PRINT "REPLACE  ["; STR.STR$; "]"
+
+STR.STR$ = "A,B,C" : STR.FIND$ = "," : STR.REPL$ = ""
+GOSUB STR.REPLACE
+PRINT "DELETE   ["; STR.STR$; "]"
+
+## ---- SAFE WHEN THE REPLACEMENT CONTAINS THE NEEDLE. "A" -> "AA" would
+## ---- never terminate if the output were re-scanned; this one builds a
+## ---- new string and never looks at what it has already emitted.
+
+STR.STR$ = "AAA" : STR.FIND$ = "A" : STR.REPL$ = "AA"
+GOSUB STR.REPLACE
+PRINT "GROWING  ["; STR.STR$; "]"
+
+## ---- An EMPTY needle leaves the string alone rather than hanging.
+
+STR.STR$ = "UNTOUCHED" : STR.FIND$ = "" : STR.REPL$ = "X"
+GOSUB STR.REPLACE
+PRINT "EMPTY    ["; STR.STR$; "]"
+
+## ---- 4c. STR.SPLICE edits by POSITION rather than by content: it replaces STR.CUT
+## ---- characters at STR.AT with STR.SUB$. One routine covers all three of insert,
+## ---- overwrite and delete, because they are the same operation with a different
+## ---- count -- 0 to insert, LEN(STR.SUB$) to overwrite, and an empty STR.SUB$ to
+## ---- delete.
+
+STR.STR$ = "ABCDEFGH" : STR.AT = 3 : STR.CUT = 0 : STR.SUB$ = "xy"
+GOSUB STR.SPLICE
+PRINT "INSERT   ["; STR.STR$; "]"
+
+STR.STR$ = "ABCDEFGH" : STR.AT = 3 : STR.CUT = 2 : STR.SUB$ = "xy"
+GOSUB STR.SPLICE
+PRINT "OVERWRITE["; STR.STR$; "]"
+
+STR.STR$ = "ABCDEFGH" : STR.AT = 3 : STR.CUT = 2 : STR.SUB$ = ""
+GOSUB STR.SPLICE
+PRINT "DELETE   ["; STR.STR$; "]"
+
+## ---- BASIC, LIKE THE PADS, and for the same reason: an insert GROWS the string, and
+## ---- the in-place routines below only ever get the BLOCK, never the variable slot.
+## ---- Past the end appends and below 1 clamps to 1, both falling out of LEFT$ and
+## ---- MID$ rather than being tested for.
+
+STR.STR$ = "ABCDE" : STR.AT = 99 : STR.CUT = 0 : STR.SUB$ = "!"
+GOSUB STR.SPLICE
+PRINT "APPEND   ["; STR.STR$; "]"
+
+## ---- 5. GP.STRPTR hands the address of [ActLen][Data] to machine code:
+## ---- length AT that address, first character at +1, capacity at -2.
+## ---- With GP.CALL that lets ML fill a BASIC string and set its length.
+
+SAMPLE$ = "ABC"
+PTR = GP.STRPTR(SAMPLE$)
+PRINT "LEN VIA PTR  ->"; PEEK(PTR)
+PRINT "CAPACITY     ->"; PEEK(PTR - 2)
+PRINT "FIRST CHAR   ->"; CHR$(PEEK(PTR + 1))
+
+## ---- 6. GP.CALL takes 8 bit registers and that address is 16 bits, so it has to be
+## ---- split -- GP.HIBYTE the page, GP.LOBYTE the offset within it:
+## ----
+## ----     GP.CALL $A000, GP.LOBYTE(PTR), GP.HIBYTE(PTR)
+## ----
+## ---- DO NOT WRITE "PTR AND 255": AND is 16 bit SIGNED and the string heap always
+## ---- lives above 32767, so it raises OUT OF RANGE instead of masking. Both are
+## ---- composite and cost no runtime bytes.
+
+PRINT "PTR          ->"; PTR
+PRINT "SPLIT     HI ->"; GP.HIBYTE(PTR); " LO"; GP.LOBYTE(PTR)
+
+## ---- The long form is exactly what they compile to:
+
+PTR.HI = INT(PTR / 256)
+PRINT "SAME AS   HI ->"; PTR.HI; " LO"; PTR - PTR.HI * 256

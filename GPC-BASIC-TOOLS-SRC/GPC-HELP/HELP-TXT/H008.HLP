@@ -86,35 +86,7 @@
 .
 =EXAMPLE PROGRAM
 .
-.  LOOPS.EXP.BL -- runnable, in the GPC-BASIC folder
-.  IF.EXP.BL -- runnable, in the GPC-BASIC folder
-.  SELECT.EXP.BL -- runnable, in the GPC-BASIC folder
-.  UNWIND.EXP.BL -- runnable, in the GPC-BASIC folder
-.  STRINGS.EXP.BL -- runnable, in the GPC-BASIC folder
-.  STRUSING.EXP.BL -- runnable, in the GPC-BASIC folder
-.  ARRAYS.EXP.BL -- runnable, in the GPC-BASIC folder
-.  SCREEN.EXP.BL -- runnable, in the GPC-BASIC folder
-.  ISO.EXP.BL -- runnable, in the GPC-BASIC folder
-.  MLCALL.EXP.BL -- runnable, in the GPC-BASIC folder
-.  ASM.EXP.BL -- runnable, in the GPC-BASIC folder
-.  MENU.EXP.BL -- runnable, in the GPC-BASIC folder
-.  MENUDEMO.EXP.BL -- runnable, in the GPC-BASIC folder
-.  MENUTO.EXP.BL -- runnable, in the GPC-BASIC folder
-.  MENUBUILD.EXP.BL -- runnable, in the GPC-BASIC folder
-.  KV.EXP.BL -- runnable, in the GPC-BASIC folder
-.  KVBIN.EXP.BL -- runnable, in the GPC-BASIC folder
-.  GUI.EXP.BL -- runnable, in the GPC-BASIC folder
-.  STASHVRAM.EXP.BL -- runnable, in the GPC-BASIC folder
-.  FORM.EXP.BL -- runnable, in the GPC-BASIC folder
-.  BMXVIEW.EXP.BL -- runnable, in the GPC-BASIC folder
-.  BMXPAL.EXP.BL -- runnable, in the GPC-BASIC folder
-.  BMXSPD.EXP.BL -- runnable, in the GPC-BASIC folder
-.  SORT.EXP.BL -- runnable, in the GPC-BASIC folder
-.  STRCTST.EXP.BL -- runnable, in the GPC-BASIC folder
-.  STRTST.EXP.BL -- runnable, in the GPC-BASIC folder
-.  SPLITT.EXP.BL -- runnable, in the GPC-BASIC folder
-.  USINGT.EXP.BL -- runnable, in the GPC-BASIC folder
-.  MENUTST.EXP.BL -- runnable, in the GPC-BASIC folder
+.  Every example has a row under EXAMPLE PROGRAMS, at the end of the index.
 .
 =SEE ALSO
 .

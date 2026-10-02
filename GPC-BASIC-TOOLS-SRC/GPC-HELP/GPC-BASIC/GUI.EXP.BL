@@ -1,0 +1,163 @@
+## GUI.EXP.BL -- the four dialogs, over a screen they have to put back.
+##
+## The page underneath is drawn ONCE, at the start, and never repainted.
+## That is the demonstration: every dialog saves the cells it covers and
+## restores them, so if the numbered rows are still whole at the end,
+## GUI.OPEN and GUI.CLOSE did their job. A hole left anywhere is a bug you
+## can see without being told where to look.
+##
+## UPPER CASE THROUGHOUT, and that is not a style choice. On the charset
+## the machine boots with, GP.PRINTAT turns ASCII lower case into the
+## graphics half of the font -- see the note in GUI.INC.BL. ISO mode would
+## fix the letters and break the frame, so a demo of a BOX stays here.
+#SAVEAS "@:GUI.PRG"
+## STASH reaches its saved cells with GP.ASM and a {VAR} operand, and GPC
+## resolves those from the symbol file. It has to come BEFORE the #INCLUDEs --
+## after them BASLOAD stops with SYMFILE NOT ALLOWED.
+#SYMFILE "@:GUI.SYM"
+#INCLUDE "GPB.INC.BL"
+## THE LIBRARY IN LOW MEMORY. To run a module below from a RAM bank instead,
+## put its #INCLUDE inside a GP.BANKED region -- BANKED-OR-NOT.md has the rules.
+#INCLUDE "THEME.INC.BL"
+## STASH is not optional even though nothing here names it: GUI.OPEN calls
+## STASH.SAVE, and BASLOAD resolves every label in the build, not the ones a
+## path can reach. Without it the tokenise stops at LABEL NOT FOUND.
+#INCLUDE "STASH.INC.BL"
+#INCLUDE "APPSYS.INC.BL"
+#INCLUDE "BANKMGR.INC.BL"
+#INCLUDE "MENU.INC.BANKED.BL"
+#INCLUDE "MENU.INC.BL"
+#INCLUDE "LINEINPUT.INC.BL"
+#INCLUDE "GUI.INC.BL"
+#INCLUDE "COMBO.INC.BL"
+#INCLUDE "CHECK.INC.BL"
+## The dialogs. It goes in LAST: a verb is compiled before any call to it,
+## and this one calls every module above.
+#INCLUDE "GUI-DIALOGS.INC.BL"
+
+## A spare RAM bank for the saved cells. Bank 0 belongs to the KERNAL --
+## the keyboard layout lives there -- so a program picks anything above it.
+#DEFINE DEMO.BANK 8
+
+GOSUB APPSYS.STARTUP
+GOSUB BANKMGR.INIT
+THEME.ID% = 0 : GOSUB THEME.SELECT
+## Every dialog verb starts from a clean slate, and this is where it is told
+## which bank that slate saves the screen into.
+GP.SUB DLGRESET, DEMO.BANK
+
+DIM DEMO.MENU$(4)
+DIM GUI.LIST.ITEM$(20)
+
+GOSUB DEMO.PAGE
+
+## ---- 1. ASKYNEX -- a title, two lines and a yes/no -------------------
+
+DEMO.YN = GP.FN(ASKYNEX, "CONFIRM", "THE DISK HAS NOT BEEN SAVED.", "CARRY ON AND LOSE THE CHANGES?", "", 1, 0)
+
+## ---- 1b. the same verb, asking OK/CANCEL instead ---------------------
+##
+## The last argument. The keys become O and C, RETURN also accepts, and the
+## answer comes back the same way -- so a caller that only wants different
+## wording does not get a different interface with it.
+
+DEMO.OKC = GP.FN(ASKYNEX, "REBUILD", "THE INDEX WILL BE REBUILT.", "", "", 1, 1)
+
+## ---- 2. INPUTBOXEX -- a question and a line of typing ----------------
+##
+## The answer is the line as it was left. GUI.OK says whether it was typed
+## or the dialog was cancelled, which an empty line on its own cannot.
+
+DEMO.NAME$ = GP.FN(INPUTBOXEX, "OPEN", "NAME OF THE FILE TO OPEN:", "", "", "TEST.MD", 24, 0)
+DEMO.OK = GUI.OK
+
+## ---- 3. PICKMENUEX -- a question and a list --------------------------
+##
+## The rows are the menu's popup slot. They carry their own leading space:
+## the menu prints at the left edge of the highlight, so the inset is the
+## caller's to choose. DEMO.MENU$ keeps them for the report at the end.
+
+DEMO.MENU$(1) = " SAVE AND QUIT"
+DEMO.MENU$(2) = " QUIT ANYWAY"
+DEMO.MENU$(3) = " BACK TO WORK"
+DEMO.MENU$(4) = " ABOUT THIS DEMO"
+GP.SUB MENU.BEGIN, MENU.POPUP
+FOR DEMO.R = 1 TO 4
+    GP.SUB MENU.ITEM, DEMO.MENU$(DEMO.R)
+NEXT DEMO.R
+## No message. A list of choices under a title that asks the question does
+## not also need to be told it is a list of choices -- and it exercises
+## GUI.SIZE's empty-header path, where the blank spacer row goes away too.
+DEMO.SEL = GP.FN(PICKMENUEX, "WHAT NOW", "", "", "", 1, 0)
+
+## ---- 4. LISTBOXEX -- a list longer than the box it is in -------------
+##
+## The other three show their whole list at once and answer with one row.
+## This one does neither: twenty items seen six at a time, as many marked
+## as you like with SPACE, and the count in the bottom frame edge saying
+## where the window is. Marks and the start row are cleared on every call,
+## so one run never reports the run before it.
+
+FOR DEMO.R = 1 TO 20
+    GUI.LIST.ITEM$(DEMO.R) = " REPORT " + MID$(STR$(DEMO.R), 2) + ".TXT"
+NEXT DEMO.R
+DEMO.LSEL = GP.FN(LISTBOXEX, "BACKUP", "SPACE MARKS THE ONES TO BACK UP.", "", "", 20, 6, 1)
+DEMO.MARKED = GUI.LISTBOX.MARKED
+
+## ---- what came back, on the page that survived ----------------------
+##
+## GP.PRINTAT, not PRINT: PRINT would scroll the very page the dialogs
+## went to the trouble of preserving.
+
+DEMO.LINE$ = "YN ANSWERED NO "
+IF DEMO.YN THEN DEMO.LINE$ = "YN ANSWERED YES"
+GP.PRINTAT 4, 20, DEMO.LINE$, THEME.CLR(THEME.WARN)
+
+DEMO.LINE$ = "TEXT CANCELLED                    "
+IF DEMO.OK THEN DEMO.LINE$ = "TEXT GAVE " + DEMO.NAME$ + "            "
+GP.PRINTAT 4, 21, DEMO.LINE$, THEME.CLR(THEME.WARN)
+
+DEMO.LINE$ = "MENU CANCELLED                    "
+IF DEMO.SEL > 0 THEN DEMO.LINE$ = "MENU CHOSE" + DEMO.MENU$(DEMO.SEL) + "          "
+GP.PRINTAT 4, 22, DEMO.LINE$, THEME.CLR(THEME.WARN)
+
+DEMO.LINE$ = "OK/CANCEL ANSWERED CANCEL"
+IF DEMO.OKC THEN DEMO.LINE$ = "OK/CANCEL ANSWERED OK    "
+GP.PRINTAT 4, 23, DEMO.LINE$, THEME.CLR(THEME.WARN)
+
+DEMO.LINE$ = "LISTBOX CANCELLED             "
+IF DEMO.LSEL > 0 THEN DEMO.LINE$ = "LISTBOX MARKED " + MID$(STR$(DEMO.MARKED), 2) + " OF 20     "
+GP.PRINTAT 4, 24, DEMO.LINE$, THEME.CLR(THEME.WARN)
+
+GP.PRINTAT 4, 25, "ANY KEY TO FINISH.", THEME.CLR(THEME.DIMMED)
+DEMO.WAIT:
+GET DEMO.K$
+IF DEMO.K$ = "" THEN GOTO DEMO.WAIT
+
+GOSUB APPSYS.RESTORE
+PRINT CHR$(147);
+PRINT "BYE."
+END
+
+## ***********************************************************************
+## **  DEMO.PAGE -- something with a pattern in it, drawn once.
+## **
+## **  The numbered rows are the point. A dialog that fails to restore
+## **  leaves a rectangle of blank in the middle of them, and nobody has
+## **  to be told which rows to check.
+## ***********************************************************************
+
+DEMO.PAGE:
+    GP.FILL 0, 0, 80, 30, ASC(" "), THEME.CLR(THEME.PAGE)
+    GP.FILL 0, 0, 80, 1, ASC(" "), THEME.CLR(THEME.TITLE)
+    GP.PRINTAT 2, 0, "ASKYNEX, INPUTBOXEX, PICKMENUEX, LISTBOXEX", THEME.CLR(THEME.TITLE)
+    FOR DEMO.R = 2 TO 18
+        DEMO.LINE$ = ""
+        FOR DEMO.C = 0 TO 8
+            DEMO.LINE$ = DEMO.LINE$ + MID$(STR$(DEMO.R), 2) + "........"
+        NEXT DEMO.C
+        GP.PRINTAT 0, DEMO.R, LEFT$(DEMO.LINE$, 78), THEME.CLR(THEME.DIMMED)
+    NEXT DEMO.R
+    GP.PRINTAT 2, 26, "EACH DIALOG SAVES WHAT IT COVERS.", THEME.CLR(THEME.TEXT)
+    GP.PRINTAT 2, 27, "THE NUMBERED ROWS MUST SURVIVE ALL FOUR.", THEME.CLR(THEME.TEXT)
+    RETURN

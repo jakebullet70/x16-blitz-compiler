@@ -1,0 +1,129 @@
+## ***********************************************************************
+## **
+## **  ARRAYS.EXP.BL -- the GP.BASIC array set.
+## **
+## **  SORT.RUN    SORT.INC.BL, shell sort a string array in place
+## **  GP.COMP     function, case-insensitive compare
+## **  GP.ARRPTR   function, the address of element zero
+## **  GP.HIBYTE / GP.LOBYTE  composite, splitting that address
+## **
+## **  GP.SORT WAS A KEYWORD AND IS NOT ANY MORE -- it is SORT.INC.BL, the same shell
+## **  sort in GP.ASM. That is why this file needs a #SYMFILE: the module reaches BASIC's
+## **  variables through {VAR}, and the compiler resolves those from BASLOAD's record of
+## **  the crunched names.
+## **
+## **  Build:  copy GPC-BASIC/GPB.INC.BL, GPC-BASIC/SORT.INC.BL and this
+## **          file into source/drive/, then
+## **            python source/gpc/build_basl.py ARRAYS.EXP.BL ARRAYS.PRG
+## **          and compile ARRAYS.PRG with GPC.BIN.
+## **
+## **  Compile-only: the ROM cannot RUN a PRG containing GP tokens.
+## **
+## ***********************************************************************
+#SAVEAS "@:ARRAYS.PRG"
+#SYMFILE "@:ARRAYS.SYM"
+#INCLUDE "GPB.INC.BL"
+#INCLUDE "SORT.INC.BL"
+
+## ---- 1. SORT.RUN. The array goes in as an ADDRESS from GP.ARRPTR, and THE EMPTY
+## ---- PARENTHESES ARE REQUIRED: A$ and A$() are different variables, so without them
+## ---- the compiler finds the scalar. A BASL subroutine cannot be handed an array, which
+## ---- is why the address is the interface and GP.ARRPTR stayed a keyword.
+
+DIM FRUIT$(5)
+FRUIT$(0) = "PEAR"
+FRUIT$(1) = "APPLE"
+FRUIT$(2) = "MANGO"
+FRUIT$(3) = "FIG"
+FRUIT$(4) = "DATE"
+FRUIT$(5) = "CHERRY"
+
+SORT.PTR = GP.ARRPTR(FRUIT$()) : SORT.DESCEND = 0 : SORT.NOCASE = 0
+GOSUB SORT.RUN
+PRINT "ASCENDING  ";
+FOR I = 0 TO 5 : PRINT FRUIT$(I); " "; : NEXT
+PRINT
+
+## ---- SORT.DESCEND non-zero reverses it. The flags are sticky -- they are
+## ---- ordinary variables, not arguments -- so set both every time rather
+## ---- than inheriting whatever the last call left behind.
+
+SORT.PTR = GP.ARRPTR(FRUIT$()) : SORT.DESCEND = 1 : SORT.NOCASE = 0
+GOSUB SORT.RUN
+PRINT "DESCENDING ";
+FOR I = 0 TO 5 : PRINT FRUIT$(I); " "; : NEXT
+PRINT
+
+## ---- SORT.NOCASE non-zero ignores case. Without it every upper case
+## ---- letter sorts before every lower case one, because that is what the
+## ---- PETSCII codes say.
+
+DIM NAME$(3)
+NAME$(0) = "delta"
+NAME$(1) = "Bravo"
+NAME$(2) = "alpha"
+NAME$(3) = "Charlie"
+
+SORT.PTR = GP.ARRPTR(NAME$()) : SORT.DESCEND = 0 : SORT.NOCASE = 0
+GOSUB SORT.RUN
+PRINT "CASE SENSITIVE ";
+FOR I = 0 TO 3 : PRINT NAME$(I); " "; : NEXT
+PRINT
+
+SORT.PTR = GP.ARRPTR(NAME$()) : SORT.DESCEND = 0 : SORT.NOCASE = 1
+GOSUB SORT.RUN
+PRINT "CASE FOLDED    ";
+FOR I = 0 TO 3 : PRINT NAME$(I); " "; : NEXT
+PRINT
+
+## ---- Elements never assigned are empty strings and sort to the front. NOT garbage:
+## ---- the sort reads a zero pointer as "", as the runtime does everywhere else.
+
+DIM SPARSE$(4)
+SPARSE$(0) = "ZULU"
+SPARSE$(1) = "ALPHA"
+SORT.PTR = GP.ARRPTR(SPARSE$()) : SORT.DESCEND = 0 : SORT.NOCASE = 0
+GOSUB SORT.RUN
+PRINT "WITH EMPTIES   ";
+FOR I = 0 TO 4 : PRINT "["; SPARSE$(I); "]"; : NEXT
+PRINT
+## ---- 2. GP.COMP -- the equality test plain "=" cannot express. Returns
+## ---- -1 if the first sorts before the second, 0 if they match, 1 after.
+
+IF GP.COMP("Hello", "HELLO") = 0 THEN PRINT "GP.COMP  SAME IGNORING CASE"
+IF "Hello" <> "HELLO" THEN PRINT "PLAIN =  DIFFERENT, AS IT SHOULD BE"
+PRINT "GP.COMP ABC/ABD ->"; GP.COMP("ABC", "ABD")
+PRINT "GP.COMP ABD/ABC ->"; GP.COMP("ABD", "ABC")
+
+## ---- 3. GP.ARRPTR -- the address of element ZERO, for machine code
+## ---- driven by GP.CALL: fill, checksum, min/max, sprite batching.
+## ---- The 3 byte header is already skipped. STRIDE IS YOURS: 2 bytes per
+## ---- element for a string array, 6 for a numeric one.
+
+ARRAY.PTR = GP.ARRPTR(FRUIT$())
+PRINT "ARRPTR ->"; ARRAY.PTR
+
+## ---- Splitting it for GP.CALL: GP.HIBYTE the page, GP.LOBYTE the offset within it. Do
+## ---- NOT write "P AND 255" -- AND is 16 bit SIGNED and this address is normally above
+## ---- 32767, so it raises OUT OF RANGE rather than masking.
+
+PRINT "SPLIT   HI"; GP.HIBYTE(ARRAY.PTR); " LO"; GP.LOBYTE(ARRAY.PTR)
+
+## ---- The long form still works and is exactly what those two compile
+## ---- to -- they are COMPOSITE keywords, adding no runtime code at all.
+
+ADDR.HI = INT(ARRAY.PTR / 256)
+ADDR.LO = ARRAY.PTR - ADDR.HI * 256
+PRINT "SAME AS HI"; ADDR.HI; " LO"; ADDR.LO
+
+## ---- Each element is a POINTER to that string's block, laid out as GP.STRPTR's:
+## ---- length AT the address, text from +1, the block itself starting 2 earlier.
+
+BLOCK = PEEK(ARRAY.PTR) + PEEK(ARRAY.PTR + 1) * 256
+PRINT "ELEMENT 0 LEN"; PEEK(BLOCK + 2); " FIRST "; CHR$(PEEK(BLOCK + 3))
+
+## ---- Element 1 is two bytes further on -- add index*stride yourself,
+## ---- because GP.ARRPTR(A$(1)) is deliberately a syntax error.
+
+BLOCK = PEEK(ARRAY.PTR + 2) + PEEK(ARRAY.PTR + 3) * 256
+PRINT "ELEMENT 1 LEN"; PEEK(BLOCK + 2); " FIRST "; CHR$(PEEK(BLOCK + 3))

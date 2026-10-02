@@ -1,0 +1,350 @@
+## ***********************************************************************
+## **  KV.EXP.BL -- every routine in KV.INC.BL. Tests T1 and T3 of
+## **  docs/blitz/KV-STORE.PLAN.md.
+## **
+## **  No GP commands. The same source compiles under GPC and runs tokenised
+## **  in stock BASIC.
+## **
+## **  A case's BAD is a sum, one digit a check. WRONG BANK counts the calls
+## **  that returned with a bank other than KV.HOMEBANK, read as PEEK(0).
+## **
+## **  WARNING: WRITES KVT.BIN TO THE DRIVE. KVNONE.BIN MUST NOT EXIST.
+## ***********************************************************************
+#SAVEAS "@:KV.PRG"
+#INCLUDE "KV.INC.BL"
+
+T.FAILS = 0
+T.BAD = 0
+T.WRONG = 0
+
+## =======================================================================
+## 1..3  INIT formats a bank with no header, keeps a store it finds, and
+## refuses another version.
+## =======================================================================
+BANK KV.BANK
+POKE KV.BASE, 0
+BANK 1
+GOSUB KV.INIT
+GOSUB T.BANK
+IF KV.OK <> -1 THEN T.BAD = T.BAD + 1
+T.ADDR = KV.BASE + 8
+GOSUB T.PEEK
+IF T.BYTE <> 2 THEN T.BAD = T.BAD + 10
+T.ADDR = KV.BASE + 10
+GOSUB T.PEEK
+IF T.BYTE <> 64 THEN T.BAD = T.BAD + 100
+IF KV.HOMEBANK <> 1 THEN T.BAD = T.BAD + 1000
+T.NAME$ = "INIT.FORMAT"
+GOSUB T.REPORT
+
+KV.KEY$ = "KEEP"
+KV.VALUE$ = "ME"
+GOSUB KV.PUT
+GOSUB KV.INIT
+GOSUB T.BANK
+IF KV.OK <> -1 THEN T.BAD = T.BAD + 1
+KV.KEY$ = "KEEP"
+GOSUB KV.GET
+GOSUB T.BANK
+IF KV.VALUE$ <> "ME" THEN T.BAD = T.BAD + 10
+T.NAME$ = "INIT.KEEPS"
+GOSUB T.REPORT
+
+T.ADDR = KV.BASE + 9
+T.BYTE = 2
+GOSUB T.POKE
+GOSUB KV.INIT
+GOSUB T.BANK
+IF KV.OK <> 0 THEN T.BAD = T.BAD + 1
+GOSUB T.PEEK
+IF T.BYTE <> 2 THEN T.BAD = T.BAD + 10
+T.BYTE = 1
+GOSUB T.POKE
+GOSUB KV.INIT
+GOSUB T.BANK
+IF KV.OK <> -1 THEN T.BAD = T.BAD + 100
+T.NAME$ = "INIT.VERSION"
+GOSUB T.REPORT
+
+## =======================================================================
+## 4..9  PUT and GET: a first write, a rewrite, a long key, a long value,
+## an empty value, an empty key.
+## =======================================================================
+GOSUB KV.WIPE
+GOSUB T.BANK
+KV.KEY$ = "COLOR"
+KV.VALUE$ = "RED"
+GOSUB KV.PUT
+GOSUB T.BANK
+IF KV.OK <> -1 THEN T.BAD = T.BAD + 1
+IF KV.SLOT <> 1 THEN T.BAD = T.BAD + 10
+KV.VALUE$ = ""
+KV.SLOT = 0
+GOSUB KV.GET
+GOSUB T.BANK
+IF KV.OK <> -1 THEN T.BAD = T.BAD + 100
+IF KV.SLOT <> 1 THEN T.BAD = T.BAD + 1000
+IF KV.VALUE$ <> "RED" THEN T.BAD = T.BAD + 10000
+T.NAME$ = "PUT.GET"
+GOSUB T.REPORT
+
+KV.KEY$ = "COLOR"
+KV.VALUE$ = "BLUE"
+GOSUB KV.PUT
+GOSUB T.BANK
+IF KV.SLOT <> 1 THEN T.BAD = T.BAD + 1
+KV.VALUE$ = ""
+GOSUB KV.GET
+GOSUB T.BANK
+IF KV.VALUE$ <> "BLUE" THEN T.BAD = T.BAD + 10
+KV.KEY$ = "SIZE"
+KV.VALUE$ = "LARGE"
+GOSUB KV.PUT
+GOSUB T.BANK
+IF KV.SLOT <> 2 THEN T.BAD = T.BAD + 100
+T.NAME$ = "REWRITE"
+GOSUB T.REPORT
+
+KV.KEY$ = "ABCDEFGHIJ"
+KV.VALUE$ = "CUT"
+GOSUB KV.PUT
+GOSUB T.BANK
+IF KV.SLOT <> 3 THEN T.BAD = T.BAD + 1
+KV.KEY$ = "ABCDEFGH"
+KV.VALUE$ = ""
+GOSUB KV.GET
+GOSUB T.BANK
+IF KV.VALUE$ <> "CUT" THEN T.BAD = T.BAD + 10
+IF KV.SLOT <> 3 THEN T.BAD = T.BAD + 100
+T.NAME$ = "LONG.KEY"
+GOSUB T.REPORT
+
+T.TEXT$ = ""
+FOR T.INDEX = 1 TO 12
+    T.TEXT$ = T.TEXT$ + "0123456789"
+NEXT T.INDEX
+KV.KEY$ = "LONG"
+KV.VALUE$ = T.TEXT$
+GOSUB KV.PUT
+GOSUB T.BANK
+IF KV.OK <> -1 THEN T.BAD = T.BAD + 1
+KV.VALUE$ = ""
+GOSUB KV.GET
+GOSUB T.BANK
+IF LEN(KV.VALUE$) <> 119 THEN T.BAD = T.BAD + 10
+IF KV.VALUE$ <> LEFT$(T.TEXT$, 119) THEN T.BAD = T.BAD + 100
+T.NAME$ = "LONG.VALUE"
+GOSUB T.REPORT
+
+KV.KEY$ = "EMPTY"
+KV.VALUE$ = ""
+GOSUB KV.PUT
+GOSUB T.BANK
+IF KV.OK <> -1 THEN T.BAD = T.BAD + 1
+KV.VALUE$ = "JUNK"
+GOSUB KV.GET
+GOSUB T.BANK
+IF KV.OK <> -1 THEN T.BAD = T.BAD + 10
+IF KV.VALUE$ <> "" THEN T.BAD = T.BAD + 100
+T.NAME$ = "EMPTY.VALUE"
+GOSUB T.REPORT
+
+KV.KEY$ = ""
+KV.VALUE$ = "X"
+GOSUB KV.PUT
+GOSUB T.BANK
+IF KV.OK <> 0 THEN T.BAD = T.BAD + 1
+IF KV.SLOT <> 0 THEN T.BAD = T.BAD + 10
+T.NAME$ = "EMPTY.KEY"
+GOSUB T.REPORT
+
+## =======================================================================
+## 10..12  a missing key, DEL, and AT. Slots now: 1 COLOR, 2 SIZE,
+## 3 ABCDEFGH, 4 LONG, 5 EMPTY.
+## =======================================================================
+KV.KEY$ = "NOPE"
+KV.VALUE$ = "JUNK"
+GOSUB KV.GET
+GOSUB T.BANK
+IF KV.OK <> 0 THEN T.BAD = T.BAD + 1
+IF KV.VALUE$ <> "" THEN T.BAD = T.BAD + 10
+IF KV.SLOT <> 0 THEN T.BAD = T.BAD + 100
+KV.SLOT = 99
+GOSUB KV.FIND
+GOSUB T.BANK
+IF KV.SLOT <> 0 THEN T.BAD = T.BAD + 1000
+T.NAME$ = "MISSING"
+GOSUB T.REPORT
+
+KV.KEY$ = "SIZE"
+GOSUB KV.DEL
+GOSUB T.BANK
+IF KV.OK <> -1 THEN T.BAD = T.BAD + 1
+GOSUB KV.FIND
+GOSUB T.BANK
+IF KV.SLOT <> 0 THEN T.BAD = T.BAD + 10
+GOSUB KV.DEL
+GOSUB T.BANK
+IF KV.OK <> 0 THEN T.BAD = T.BAD + 100
+KV.KEY$ = "COLOR"
+GOSUB KV.GET
+GOSUB T.BANK
+IF KV.VALUE$ <> "BLUE" THEN T.BAD = T.BAD + 1000
+T.NAME$ = "DEL"
+GOSUB T.REPORT
+
+KV.SLOT = 3
+GOSUB KV.AT
+GOSUB T.BANK
+IF KV.OK <> -1 THEN T.BAD = T.BAD + 1
+IF KV.KEY$ <> "ABCDEFGH" THEN T.BAD = T.BAD + 10
+IF KV.VALUE$ <> "CUT" THEN T.BAD = T.BAD + 100
+KV.SLOT = 2
+GOSUB KV.AT
+GOSUB T.BANK
+IF KV.OK <> 0 THEN T.BAD = T.BAD + 1000
+KV.SLOT = 0
+GOSUB KV.AT
+GOSUB T.BANK
+IF KV.OK <> 0 THEN T.BAD = T.BAD + 10000
+KV.SLOT = 64
+GOSUB KV.AT
+GOSUB T.BANK
+IF KV.OK <> 0 THEN T.BAD = T.BAD + 100000
+T.NAME$ = "AT"
+GOSUB T.REPORT
+
+## =======================================================================
+## 13..14  a full store: 63 puts, a refused 64th, a rewrite while full, a
+## freed slot reused, and the time of a missing-key FIND.
+## =======================================================================
+GOSUB KV.WIPE
+GOSUB T.BANK
+T.MISS = 0
+FOR T.INDEX = 1 TO 63
+    KV.KEY$ = "K" + MID$(STR$(T.INDEX), 2)
+    KV.VALUE$ = KV.KEY$
+    GOSUB KV.PUT
+    GOSUB T.BANK
+    IF KV.OK <> -1 THEN T.MISS = T.MISS + 1
+NEXT T.INDEX
+IF T.MISS <> 0 THEN T.BAD = T.BAD + 1
+KV.KEY$ = "K64"
+KV.VALUE$ = "K64"
+GOSUB KV.PUT
+GOSUB T.BANK
+IF KV.OK <> 0 THEN T.BAD = T.BAD + 10
+IF KV.SLOT <> 0 THEN T.BAD = T.BAD + 100
+KV.KEY$ = "K5"
+KV.VALUE$ = "FIVE"
+GOSUB KV.PUT
+GOSUB T.BANK
+IF KV.SLOT <> 5 THEN T.BAD = T.BAD + 1000
+KV.KEY$ = "K1"
+GOSUB KV.DEL
+GOSUB T.BANK
+KV.KEY$ = "K64"
+KV.VALUE$ = "K64"
+GOSUB KV.PUT
+GOSUB T.BANK
+IF KV.SLOT <> 1 THEN T.BAD = T.BAD + 10000
+T.NAME$ = "FULL"
+GOSUB T.REPORT
+
+## ---- every key starts with K, so each slot takes a second compare.
+KV.KEY$ = "KNONE"
+T.START = TI
+FOR T.INDEX = 1 TO 10
+    GOSUB KV.FIND
+NEXT T.INDEX
+T.ELAPSED = TI - T.START
+GOSUB T.BANK
+IF KV.SLOT <> 0 THEN T.BAD = T.BAD + 1
+T.NAME$ = "FIND.MISS"
+GOSUB T.REPORT
+PRINT "  10 MISSES, 63 SLOTS FULL:"; T.ELAPSED; "JIFFIES"
+
+## =======================================================================
+## 15  the stubs.
+## =======================================================================
+KV.KEY$ = "NUM"
+KV.NUM = 5
+GOSUB KV.PUTNUM
+GOSUB T.BANK
+IF KV.OK <> 0 THEN T.BAD = T.BAD + 1
+GOSUB KV.GETNUM
+GOSUB T.BANK
+IF KV.OK <> 0 THEN T.BAD = T.BAD + 10
+T.NAME$ = "STUBS"
+GOSUB T.REPORT
+
+## =======================================================================
+## 16..17  SAVE, WIPE, LOAD, and a LOAD of a missing file.
+## =======================================================================
+GOSUB KV.WIPE
+GOSUB T.BANK
+KV.KEY$ = "SAVED"
+KV.VALUE$ = "YES"
+GOSUB KV.PUT
+KV.FNAME$ = "KVT.BIN"
+GOSUB KV.SAVE
+GOSUB T.BANK
+GOSUB KV.WIPE
+KV.KEY$ = "SAVED"
+GOSUB KV.GET
+IF KV.OK <> 0 THEN T.BAD = T.BAD + 1
+GOSUB KV.LOAD
+GOSUB T.BANK
+IF KV.OK <> -1 THEN T.BAD = T.BAD + 10
+GOSUB KV.GET
+IF KV.VALUE$ <> "YES" THEN T.BAD = T.BAD + 100
+T.NAME$ = "SAVE.LOAD"
+GOSUB T.REPORT
+
+KV.FNAME$ = "KVNONE.BIN"
+GOSUB KV.LOAD
+GOSUB T.BANK
+IF KV.OK <> 0 THEN T.BAD = T.BAD + 1
+KV.KEY$ = "SAVED"
+GOSUB KV.GET
+IF KV.VALUE$ <> "YES" THEN T.BAD = T.BAD + 10
+T.NAME$ = "LOAD.MISSING"
+GOSUB T.REPORT
+
+PRINT
+PRINT "FAILS"; T.FAILS
+END
+
+## =======================================================================
+## Helpers.
+## =======================================================================
+
+T.REPORT:
+    IF T.BAD = 0 AND T.WRONG = 0 THEN PRINT "PASS "; T.NAME$
+    IF T.BAD <> 0 OR T.WRONG <> 0 THEN GOSUB T.FAIL
+    T.BAD = 0
+    T.WRONG = 0
+    RETURN
+
+T.FAIL:
+    PRINT "FAIL "; T.NAME$; " BAD"; T.BAD; " WRONG BANK"; T.WRONG
+    T.FAILS = T.FAILS + 1
+    RETURN
+
+## ---- the bank one call returned with, against KV.HOMEBANK.
+T.BANK:
+    IF PEEK(0) <> KV.HOMEBANK THEN T.WRONG = T.WRONG + 1
+    RETURN
+
+## ---- T.BYTE at T.ADDR in bank KV.BANK, read or written.
+T.PEEK:
+    BANK KV.BANK
+    T.BYTE = PEEK(T.ADDR)
+    BANK KV.HOMEBANK
+    RETURN
+
+T.POKE:
+    BANK KV.BANK
+    POKE T.ADDR, T.BYTE
+    BANK KV.HOMEBANK
+    RETURN

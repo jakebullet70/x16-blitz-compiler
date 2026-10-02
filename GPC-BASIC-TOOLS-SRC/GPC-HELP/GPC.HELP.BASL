@@ -69,6 +69,9 @@ HELP.GUIEND:
 ## line table into HELP.TBANK and its text into the banks from HELP.TEXTBANK.
 ## Every scroll after that paints one row out of them.
 ##
+## An index row can also name an example program in the GPC-BASIC folder. That
+## file is read as it stands and painted in syntax colour: see HELP.SRC.LOAD.
+##
 ## The content is HELP-TXT/ beside the program: GPC.HELP.IDX and one .HLP per
 ## topic, built by MKHELP.PY from GPC-BASIC/. Nothing here parses markdown,
 ## measures a string or wraps a line.
@@ -124,6 +127,28 @@ HELP.GUIEND:
 ## HELP.MAXLINES, and OUT OF MEMORY is what it raises.
 #DEFINE HELP.RECSIZE 4
 #DEFINE HELP.KINDBANK 16
+
+## The kinds past the .HLP markers: a line of an example program, and one of
+## them inside its GP.ASM block.
+#DEFINE HELP.KIND.SOURCE 4
+#DEFINE HELP.KIND.ASMLINE 5
+
+## The index row type of an example program. 1 is a topic and 2 a section.
+#DEFINE HELP.IX.EXAMPLE 3
+
+## The keyword table, and above it what the source painter works in: seven inks
+## from HELP.SYN.INKTABLE, the line at $BE00 and a class a column at $BF00.
+## HELP.SRC.SCAN and HELP.SRC.PAINT spell the three addresses out, so change
+## them there as well.
+#DEFINE HELP.KEYBANK 23
+#DEFINE HELP.SYN.INKTABLE $BDF0
+
+## A source line is stored whole, up to HELP.SRC.MAXWIDE. LEFT and RIGHT move
+## HELP.SRC.STEP columns. HELP.SRC.LEFTCAP is the furthest the left edge goes:
+## the painter counts columns in one byte, and 176 + 79 is 255.
+#DEFINE HELP.SRC.MAXWIDE 250
+#DEFINE HELP.SRC.STEP 8
+#DEFINE HELP.SRC.LEFTCAP 176
 
 ## VERA and the KERNAL, for HELP.PAGE.SHIFT. A #DEFINE takes a signed int16, so
 ## an address is written in hex, and it refuses a digit anywhere in the name, so
@@ -187,6 +212,8 @@ HELP.GUIEND:
 #DEFINE HELP.K.PGDN 2
 #DEFINE HELP.K.HOME 19
 #DEFINE HELP.K.END 4
+#DEFINE HELP.K.LEFT 157
+#DEFINE HELP.K.RIGHT 29
 
 GOSUB HELP.BOOT
 GP.IF HELP.OK = 0 THEN
@@ -226,6 +253,9 @@ HELP.BOOT:
     ## The splash art. The compiler puts it there; BANKMGR has to be told.
     IF GP.FN(BANKMGR.CLAIM.BANK, HELP.BANBANK) = 0 THEN GOTO HELP.BANK.FAILED
 
+    ## The keyword table, put there by the compiler like the splash art.
+    IF GP.FN(BANKMGR.CLAIM.BANK, HELP.KEYBANK) = 0 THEN GOTO HELP.BANK.FAILED
+
     ## The topic text. HELP.PAGE.LOAD fills them.
     FOR HELP.I = 0 TO HELP.TEXTBANKS - 1
         IF GP.FN(BANKMGR.CLAIM.BANK, HELP.TEXTBANK + HELP.I) = 0 THEN GOTO HELP.BANK.FAILED
@@ -234,6 +264,9 @@ HELP.BOOT:
     ## Asked after the mode change. APPSYS.STARTUP reported the old screen.
     GOSUB GUI.SCREEN
     HELP.COLS = GUI.SCREEN.COLS : HELP.ROWS = GUI.SCREEN.ROWS
+
+    ## After the mode change as well: it reads the text layer's map.
+    GOSUB HELP.SYN.SETUP
 
     ## Row 0 is the title and the last row the hint.
     HELP.VIEW = HELP.ROWS - 2
@@ -428,6 +461,7 @@ HELP.IDXROW:
     HELP.IX.N = HELP.IX.N + 1 : HELP.KIND = 0
     IF HELP.TAG$ = "T" THEN HELP.KIND = 1
     IF HELP.TAG$ = "S" THEN HELP.KIND = 2
+    IF HELP.TAG$ = "E" THEN HELP.KIND = HELP.IX.EXAMPLE
     HELP.T$ = HELP.FLD$(5) : HELP.TL = LEN(HELP.T$)
     IF HELP.TL > HELP.IXWIDE THEN HELP.TL = HELP.IXWIDE
     ## A row that will not fit is dropped whole rather than half written.
@@ -688,7 +722,10 @@ HELP.START.AT:
 
 HELP.PG.CLAMP:
     HELP.IXR = HELP.GO : GOSUB HELP.IXREAD
-    HELP.PG.MAX = HELP.IXLINES - HELP.VIEW
+    HELP.PG.TOTAL = HELP.IXLINES
+    ## An example is as long as its file was when it loaded.
+    IF HELP.IXTYPE = HELP.IX.EXAMPLE THEN HELP.PG.TOTAL = HELP.PG.LINES
+    HELP.PG.MAX = HELP.PG.TOTAL - HELP.VIEW
     IF HELP.PG.FROM > HELP.PG.MAX THEN HELP.PG.FROM = HELP.PG.MAX
     IF HELP.PG.FROM < 0 THEN HELP.PG.FROM = 0
     RETURN
@@ -701,6 +738,7 @@ HELP.TOPIC.ENTER:
     ## Once per topic, not once per scroll. Everything below draws out of this
     ## bank.
     GOSUB HELP.PAGE.LOAD
+    IF HELP.SRC.MODE <> 0 AND HELP.PG.LINES = 0 THEN GOTO HELP.SRC.MISSING
     HELP.REDRAW = 1 : HELP.SHIFT = 0
 HELP.PAGE.LOOP:
     GP.IF HELP.REDRAW <> 0 THEN
@@ -725,7 +763,14 @@ HELP.PAGE.LOOP:
         GP.CASE HELP.K.HOME
             HELP.PG.FROM = 0
         GP.CASE HELP.K.END
-            HELP.IXR = HELP.GO : GOSUB HELP.IXREAD : HELP.PG.FROM = HELP.IXLINES
+            ## Past the end. HELP.PG.CLAMP brings it back to the last page.
+            HELP.PG.FROM = HELP.MAXLINES
+        GP.CASE HELP.K.LEFT
+            HELP.SRC.DIR = 0 - 1
+            GOSUB HELP.SRC.SIDE
+        GP.CASE HELP.K.RIGHT
+            HELP.SRC.DIR = 1
+            GOSUB HELP.SRC.SIDE
         GP.CASE 76, 108
             GOSUB HELP.LINKS
         GP.CASE 84, 116
@@ -762,6 +807,8 @@ HELP.PAGE.LOOP:
 HELP.PAGE.LOAD:
     HELP.HASCODE = 0
     HELP.PG.LINES = 0 : HELP.LINKN = 0 : HELP.ATTOPIC = 0
+    HELP.SRC.MODE = 0
+    HELP.SRC.LEFT = 0
     ## The link menu is built as the topic loads, one popup row a cross reference.
     GP.SUB MENU.BEGIN, MENU.POPUP
     ## The text starts at the bottom of the first text bank.
@@ -769,6 +816,7 @@ HELP.PAGE.LOAD:
     HELP.PG.BANKIX = 0
     HELP.RECP = HELP.WIN
     HELP.IXR = HELP.GO : GOSUB HELP.IXREAD
+    IF HELP.IXTYPE = HELP.IX.EXAMPLE THEN GOTO HELP.SRC.LOAD
     HELP.TOPICNUM = HELP.IXTOPIC
     IF HELP.TOPICNUM < 1 THEN RETURN
     GOSUB HELP.FILENAME
@@ -822,11 +870,14 @@ HELP.LOAD.CLOSE:
 
 ## One line into the bank, its kind beside it so no row is parsed twice. The
 ## body is truncated to what a row can show. In: HELP.SP the address of the
-## first body character, HELP.W how many, HELP.KIND.
+## first body character, HELP.W how many, HELP.KIND. Out: HELP.W as stored.
 HELP.LOAD.STORE:
     ## Ordinary text starts at column 2, which is the widest a row can be. Link
-    ## rows indent to 5 and are clamped where they are drawn.
-    IF HELP.W > HELP.COLS - 2 THEN HELP.W = HELP.COLS - 2
+    ## rows indent to 5 and are clamped where they are drawn. A source line is
+    ## kept whole, for LEFT and RIGHT to bring into view.
+    HELP.STORE.WIDE = HELP.COLS - 2
+    IF HELP.SRC.MODE <> 0 THEN HELP.STORE.WIDE = HELP.SRC.MAXWIDE
+    IF HELP.W > HELP.STORE.WIDE THEN HELP.W = HELP.STORE.WIDE
     ## A line that will not fit starts the next text bank.
     GP.IF HELP.PG.P + HELP.W > HELP.BANKSIZE THEN
         GP.IF HELP.PG.BANKIX < HELP.TEXTBANKS - 1 THEN
@@ -863,7 +914,8 @@ HELP.LOAD.STORE:
 ## blob: SYS clobbers zTemp0 reaching it.
 ##
 ## $00 is saved and put back, so the interpreter finds the bank as it left it. A
-## line is at most 78 bytes, so the count fits in X and Y never wraps.
+## line is at most HELP.SRC.MAXWIDE bytes, so the count fits in X and Y never
+## wraps.
 ## ============================================================================
 HELP.STORE.ASM:
     #REM 1
@@ -936,8 +988,10 @@ HELP.PAGE.DRAW:
     GP.IF HELP.SHIFT <> 0 THEN
         GOSUB HELP.PAGE.SHIFT
     GP.ELSE
-        GP.FILL 0, 1, HELP.COLS, HELP.VIEW, 32, THEME.CLR(THEME.PAGE)
+        ## A sideways move paints over every cell it shows, so nothing is cleared.
+        IF HELP.SRC.SIDEWAYS = 0 THEN GP.FILL 0, 1, HELP.COLS, HELP.VIEW, 32, THEME.CLR(THEME.PAGE)
     GP.ENDIF
+    HELP.SRC.SIDEWAYS = 0
     FOR HELP.R = 0 TO HELP.VIEW - 1
         HELP.LN = HELP.PG.FROM + HELP.R + 1
         HELP.Y = 1 + HELP.R
@@ -1030,7 +1084,7 @@ HELP.PAGE.REF:
 
 ## One row, out of the bank. HELP.LN is the line and HELP.Y the screen row. The
 ## row must be clear already: the full draw fills the region and a slide fills
-## the one row it exposed.
+## the one row it exposed. A line of an example goes to HELP.SRC.ROW.
 HELP.PAGE.ROW:
     IF HELP.LN < 1 THEN RETURN
     IF HELP.LN > HELP.PG.LINES THEN RETURN
@@ -1044,6 +1098,7 @@ HELP.PAGE.ROW:
     HELP.KINDBYTE = PEEK(HELP.REC + 3)
     HELP.ROW.BANKIX = INT(HELP.KINDBYTE / HELP.KINDBANK)
     HELP.KIND = HELP.KINDBYTE - HELP.ROW.BANKIX * HELP.KINDBANK
+    IF HELP.KIND >= HELP.KIND.SOURCE THEN GOTO HELP.SRC.ROW
     HELP.ATTR = THEME.CLR(THEME.TEXT)
     HELP.INDENT = 2
     GP.IF HELP.KIND = 1 THEN
@@ -1069,16 +1124,714 @@ HELP.PAGE.ROW:
     RETURN
 
 ## Only what this topic can do. A topic with no ":" lines gets no X in its
-## footer.
+## footer, and an example no wider than the page gets no LEFT and RIGHT.
 HELP.PAGE.STATUS:
     HELP.HINT$ = "T theme   ESC back"
     IF HELP.HASCODE <> 0 THEN HELP.HINT$ = "X export code   " + HELP.HINT$
     IF HELP.LINKN > 0 THEN HELP.HINT$ = "L links   " + HELP.HINT$
+    IF HELP.SRC.MODE <> 0 AND HELP.SRC.LEFTMAX > 0 THEN HELP.HINT$ = "LEFT RIGHT scroll   " + HELP.HINT$
     HELP.NUMV = HELP.PG.FROM + 1 : GOSUB HELP.NUMSTR
     HELP.NOTE$ = "line " + HELP.NUM$
     HELP.NUMV = HELP.PG.LINES : GOSUB HELP.NUMSTR
     HELP.NOTE$ = HELP.NOTE$ + " of " + HELP.NUM$
+    GP.IF HELP.SRC.LEFT > 0 THEN
+        HELP.NUMV = HELP.SRC.LEFT + 1
+        GOSUB HELP.NUMSTR
+        HELP.NOTE$ = "column " + HELP.NUM$ + "   " + HELP.NOTE$
+    GP.ENDIF
     GOSUB HELP.STATUSBAR
+    RETURN
+
+
+## ============================================================================
+## An example program, read as source
+##
+## An index row of type HELP.IX.EXAMPLE names a file in the GPC-BASIC folder. It
+## loads into the same banks as a topic, every line whole, and each row is
+## painted in syntax colour by HELP.SRC.SCAN and HELP.SRC.PAINT.
+## ============================================================================
+
+## The keywords, one a line. HELP.SRC.PAINT walks the bank's records in order,
+## takes the first HELP.SYN.STATEMENTS% as statements and the rest as functions,
+## and stops at the first match, so the common words lead. REM is not here:
+## HELP.SRC.SCAN finds it. A GP. word needs no line either.
+## WARNING: these two must stay the first groups in HELP.KEYBANK, in this order.
+## A word over eight characters is never looked up.
+GP.BANKEDSTR HELP.KEYBANK HELP.KW.STATEMENT
+  "IF"
+  "THEN"
+  "GOTO"
+  "GOSUB"
+  "RETURN"
+  "FOR"
+  "TO"
+  "NEXT"
+  "STEP"
+  "PRINT"
+  "AND"
+  "OR"
+  "NOT"
+  "END"
+  "POKE"
+  "DIM"
+  "INPUT"
+  "GET"
+  "ON"
+  "OPEN"
+  "CLOSE"
+  "DATA"
+  "READ"
+  "RESTORE"
+  "LET"
+  "DEF"
+  "SYS"
+  "STOP"
+  "BANK"
+  "LOAD"
+  "SAVE"
+  "LINPUT"
+  "BINPUT"
+  "SCREEN"
+  "COLOR"
+  "LOCATE"
+  "CLS"
+  "RETURNS"
+  "BANNER"
+  "BASLOAD"
+  "BLOAD"
+  "BOOT"
+  "BSAVE"
+  "BVERIFY"
+  "BVLOAD"
+  "CHAR"
+  "CLR"
+  "CMD"
+  "CODEX"
+  "CONT"
+  "DOS"
+  "EDIT"
+  "EXEC"
+  "FMCHORD"
+  "FMDRUM"
+  "FMFREQ"
+  "FMINIT"
+  "FMINST"
+  "FMNOTE"
+  "FMPAN"
+  "FMPLAY"
+  "FMPOKE"
+  "FMVIB"
+  "FMVOL"
+  "FRAME"
+  "GEOS"
+  "GO"
+  "HBLOAD"
+  "HELP"
+  "I2CPOKE"
+  "KEYMAP"
+  "LINE"
+  "LIST"
+  "MENU"
+  "MOD"
+  "MON"
+  "MOUSE"
+  "MOVSPR"
+  "NEW"
+  "OLD"
+  "OVAL"
+  "POWEROFF"
+  "PSET"
+  "PSGCHORD"
+  "PSGFREQ"
+  "PSGINIT"
+  "PSGNOTE"
+  "PSGPAN"
+  "PSGPLAY"
+  "PSGVOL"
+  "PSGWAV"
+  "REBOOT"
+  "RECT"
+  "REN"
+  "RESET"
+  "RING"
+  "RUN"
+  "SLEEP"
+  "SPRITE"
+  "SPRMEM"
+  "TEST"
+  "TILE"
+  "VERIFY"
+  "VLOAD"
+  "VPOKE"
+  "WAIT"
+GP.ENDBANKEDSTR
+
+GP.BANKEDSTR HELP.KEYBANK HELP.KW.FUNCTION
+  "LEN"
+  "MID$"
+  "LEFT$"
+  "RIGHT$"
+  "CHR$"
+  "ASC"
+  "STR$"
+  "VAL"
+  "INT"
+  "PEEK"
+  "ABS"
+  "SGN"
+  "RND"
+  "FRE"
+  "POS"
+  "SQR"
+  "LOG"
+  "EXP"
+  "COS"
+  "SIN"
+  "TAN"
+  "ATN"
+  "USR"
+  "FN"
+  "TAB"
+  "SPC"
+  "PI"
+  "VPEEK"
+  "HEX$"
+  "BIN$"
+  "RPT$"
+  "STRPTR"
+  "JOY"
+  "MX"
+  "MY"
+  "MB"
+  "MWHEEL"
+  "POINTER"
+  "I2CPEEK"
+  "TATTR"
+  "TDATA"
+GP.ENDBANKEDSTR
+
+## The syntax inks, a row a theme in THEME.ID% order. Six foreground colours as
+## hex digits: plain text, statement, function, string, number, comment. The
+## background is the theme's page colour.
+GP.BANKEDSTR HELP.KEYBANK HELP.SYN.INK
+  "1ADE8C"
+  "FE78D5"
+  "046285"
+  "1E78D5"
+  "1E78D5"
+GP.ENDBANKEDSTR
+
+## Every variable the two blobs name, made here: {VAR} needs a slot that already
+## exists, so this routine stays above them. The map figures are HELP.PAGE.SHIFT's.
+HELP.SYN.SETUP:
+    HELP.SYN.KEYBANK% = HELP.KEYBANK
+    HELP.SYN.STATEMENTS% = GP.BSTRCOUNT(HELP.KW.STATEMENT)
+    HELP.SYN.WORDS% = HELP.SYN.STATEMENTS% + GP.BSTRCOUNT(HELP.KW.FUNCTION)
+    HELP.SYN.SOURCE% = 0
+    HELP.SYN.TEXTBANK% = 0
+    HELP.SYN.LENGTH% = 0
+    HELP.SYN.FIRST% = 0
+    HELP.SYN.ASMLINE% = 0
+    HELP.SYN.TOKSTART% = 0
+    HELP.SYN.TOKEND% = 0
+    HELP.SYN.TOKLEN% = 0
+    HELP.SYN.DOTTED% = 0
+    HELP.SYN.RECORD% = 0
+    HELP.SYN.LEFT% = 0
+    HELP.SYN.RIGHT% = 0
+    HELP.SYN.VLO% = 0
+    HELP.SYN.VMID% = 0
+    HELP.SYN.VHI% = 0
+    HELP.SRC.STRIDE = 64 * 2 ^ INT((PEEK(HELPK.LCONFIG) AND 48) / 16)
+    HELP.SRC.MAPBASE = PEEK(HELPK.LMAPBASE) * 512
+    RETURN
+
+## The theme's six inks over its page colour, into the table HELP.SRC.PAINT
+## reads. Every theme change comes through here.
+HELP.SYN.INKS:
+    HELP.SYN.ROW$ = GP.BSTR(HELP.SYN.INK, THEME.ID%)
+    HELP.SYN.PAPER = THEME.CLR(THEME.PAGE) AND 240
+    BANK HELP.KEYBANK
+    FOR HELP.SYN.SLOT = 0 TO 5
+        HELP.SYN.DIGIT = GP.INSTR("0123456789ABCDEF", MID$(HELP.SYN.ROW$, HELP.SYN.SLOT + 1, 1)) - 1
+        POKE HELP.SYN.INKTABLE + HELP.SYN.SLOT, HELP.SYN.PAPER + HELP.SYN.DIGIT
+    NEXT HELP.SYN.SLOT
+    ## Class 6 is a word the table does not hold, and takes the plain ink.
+    POKE HELP.SYN.INKTABLE + 6, PEEK(HELP.SYN.INKTABLE)
+    RETURN
+
+## The file an example row names, read into the banks. The row's text is two
+## spaces and the file name, which ends at the first space or the end of the
+## row. The folder beside the program is tried first and the one in /GPC/
+## second.
+HELP.SRC.LOAD:
+    HELP.SRC.MODE = 1
+    GOSUB HELP.IXTEXT
+    HELP.SRC.FILE$ = MID$(HELP.ROW$, 3)
+    HELP.CUT = GP.INSTR(HELP.SRC.FILE$, " ")
+    IF HELP.CUT > 0 THEN HELP.SRC.FILE$ = LEFT$(HELP.SRC.FILE$, HELP.CUT - 1)
+    HELP.SRC.FOLDER$ = "//GPC-BASIC/:"
+    GOSUB HELP.SRC.READ
+    IF HELP.PG.LINES > 0 THEN GOTO HELP.SRC.LOADED
+    HELP.SRC.FOLDER$ = "//GPC/GPC-BASIC/:"
+    GOSUB HELP.SRC.READ
+HELP.SRC.LOADED:
+    ## How far RIGHT can go: until the longest line's end is on the page, in
+    ## whole steps. HELP.SRC.PAINT counts columns in one byte, which is the cap.
+    HELP.SRC.LEFTMAX = INT((HELP.SRC.WIDEST - HELP.COLS + HELP.SRC.STEP) / HELP.SRC.STEP) * HELP.SRC.STEP
+    IF HELP.SRC.LEFTMAX < 0 THEN HELP.SRC.LEFTMAX = 0
+    IF HELP.SRC.LEFTMAX > HELP.SRC.LEFTCAP THEN HELP.SRC.LEFTMAX = HELP.SRC.LEFTCAP
+    RETURN
+
+## One attempt, from HELP.SRC.FOLDER$. No line has a marker: each is stored
+## whole, as HELP.KIND.SOURCE or HELP.KIND.ASMLINE. HELP.PG.LINES stays 0 when
+## the file is not there.
+HELP.SRC.READ:
+    HELP.NAME$ = HELP.SRC.FOLDER$ + HELP.SRC.FILE$
+    GOSUB HELP.PAGE.LOADING
+    HELP.TITLE$ = HELP.SRC.FILE$
+    HELP.SRC.INASM = 0
+    HELP.SRC.WIDEST = 0
+    OPEN HELP.CHAN, 8, HELP.CHAN, HELP.NAME$ + ",S,R"
+HELP.SRC.READ.LINE:
+    LINPUT# HELP.CHAN, HELP.LINE$, 10
+    HELP.ST = ST
+    IF (HELP.ST AND 2) <> 0 THEN GOTO HELP.LOAD.CLOSE
+    HELP.PG.LINES = HELP.PG.LINES + 1
+    HELP.LP = GP.STRPTR(HELP.LINE$)
+    HELP.LL = LEN(HELP.LINE$)
+    IF HELP.LL > 0 THEN IF PEEK(HELP.LP + HELP.LL) = 13 THEN HELP.LL = HELP.LL - 1
+    GOSUB HELP.SRC.ASMSTATE
+    HELP.SP = HELP.LP + 1
+    HELP.W = HELP.LL
+    GOSUB HELP.LOAD.STORE
+    IF HELP.W > HELP.SRC.WIDEST THEN HELP.SRC.WIDEST = HELP.W
+    IF HELP.PG.LINES >= HELP.MAXLINES THEN GOTO HELP.LOAD.CLOSE
+    ## Bit 6 is the end. HELP.IDXLOAD has the note on ST.
+    IF (HELP.ST AND 64) = 0 THEN GOTO HELP.SRC.READ.LINE
+    GOTO HELP.LOAD.CLOSE
+
+## HELP.KIND for the line in HELP.LINE$: HELP.KIND.ASMLINE between GP.ASM and
+## GP.ENDASM, HELP.KIND.SOURCE everywhere else and for those two lines. Either
+## keyword counts only as the first word on its line, so a comment that names
+## one changes nothing.
+HELP.SRC.ASMSTATE:
+    HELP.SRC.WORD$ = "GP.ENDASM"
+    GOSUB HELP.SRC.LEADS
+    IF HELP.SRC.FOUND <> 0 THEN HELP.SRC.INASM = 0
+    HELP.KIND = HELP.KIND.SOURCE
+    IF HELP.SRC.INASM <> 0 THEN HELP.KIND = HELP.KIND.ASMLINE
+    HELP.SRC.WORD$ = "GP.ASM"
+    GOSUB HELP.SRC.LEADS
+    IF HELP.SRC.FOUND <> 0 THEN HELP.SRC.INASM = 1
+    RETURN
+
+## HELP.SRC.FOUND is 1 when HELP.SRC.WORD$ is the first thing on HELP.LINE$,
+## with only spaces in front of it.
+HELP.SRC.LEADS:
+    HELP.SRC.FOUND = 0
+    HELP.SRC.AT = GP.INSTR(HELP.LINE$, HELP.SRC.WORD$)
+    IF HELP.SRC.AT = 0 THEN RETURN
+    IF HELP.SRC.AT > LEN(HELP.SPACES$) THEN RETURN
+    IF LEFT$(HELP.LINE$, HELP.SRC.AT - 1) = LEFT$(HELP.SPACES$, HELP.SRC.AT - 1) THEN HELP.SRC.FOUND = 1
+    RETURN
+
+## The example was in neither folder. Say so, then go back the way ESC does.
+## Reached by GOTO from HELP.TOPIC, so the RETURN is that routine's.
+HELP.SRC.MISSING:
+    HELP.MSG.ONE$ = "Not found: " + HELP.SRC.FILE$
+    HELP.MSG.TWO$ = "Examples are read from the GPC-BASIC folder."
+    GOSUB HELP.SAY
+    GOSUB HELP.BACK.POP
+    IF HELP.NAV = 2 THEN RETURN
+    GOTO HELP.TOPIC.ENTER
+
+## LEFT and RIGHT. HELP.SRC.DIR is -1 or 1. A source page moves HELP.SRC.STEP
+## columns and repaints in place. A topic page has nothing off to the side.
+HELP.SRC.SIDE:
+    IF HELP.SRC.MODE = 0 THEN RETURN
+    HELP.SRC.WAS = HELP.SRC.LEFT
+    HELP.SRC.LEFT = HELP.SRC.LEFT + HELP.SRC.DIR * HELP.SRC.STEP
+    IF HELP.SRC.LEFT > HELP.SRC.LEFTMAX THEN HELP.SRC.LEFT = HELP.SRC.LEFTMAX
+    IF HELP.SRC.LEFT < 0 THEN HELP.SRC.LEFT = 0
+    IF HELP.SRC.LEFT = HELP.SRC.WAS THEN RETURN
+    HELP.SRC.SIDEWAYS = 1
+    HELP.REDRAW = 1
+    RETURN
+
+## One source row. HELP.A, HELP.W, HELP.KIND and HELP.ROW.BANKIX are the line's
+## record as HELP.PAGE.ROW read it, and HELP.Y is the screen row. The text
+## starts one column in, like the index.
+HELP.SRC.ROW:
+    HELP.SYN.SOURCE% = HELP.A
+    HELP.SYN.LENGTH% = HELP.W
+    HELP.SYN.TEXTBANK% = HELP.TEXTBANK + HELP.ROW.BANKIX
+    HELP.SYN.ASMLINE% = 0
+    IF HELP.KIND = HELP.KIND.ASMLINE THEN HELP.SYN.ASMLINE% = 1
+    HELP.SYN.LEFT% = HELP.SRC.LEFT
+    HELP.SYN.RIGHT% = HELP.SRC.LEFT + HELP.COLS - 1
+    HELP.SC.ADDR = HELP.SRC.MAPBASE + HELP.Y * HELP.SRC.STRIDE + 2
+    GOSUB HELP.SC.SPLIT
+    HELP.SYN.VLO% = HELP.SC.LO
+    HELP.SYN.VMID% = HELP.SC.MID
+    HELP.SYN.VHI% = HELP.SC.BANK + HELPK.UP
+    GOSUB HELP.SRC.SCAN
+    GOSUB HELP.SRC.PAINT
+    RETURN
+
+## ============================================================================
+## The line into the buffer, then a class for every column of it.
+##
+##   in   HELP.SYN.SOURCE%     the line's address in its text bank
+##        HELP.SYN.TEXTBANK%   that bank
+##        HELP.SYN.LENGTH%     its length, HELP.SRC.MAXWIDE at most
+##        HELP.SYN.ASMLINE%    1 inside a GP.ASM block
+##   out  the text at $BE00 and the classes at $BF00, both in HELP.KEYBANK
+##
+## The classes: 0 plain, 1 statement, 2 function, 3 string, 4 number,
+## 5 comment, 6 a word HELP.SRC.PAINT has still to look up.
+##
+## A word is letters, digits and dots, with the $ or % that types it. REM is
+## the one word looked at here. It turns the rest of the line into a comment,
+## except on an assembly line, where it is a statement and ";" starts the
+## comment. A "#" that leads the line is a directive, and "##" is a comment
+## anywhere.
+##
+## zTemp0 is the source pointer. X is the column from the scan on.
+## ============================================================================
+HELP.SRC.SCAN:
+    #REM 1
+    GP.ASM
+    REM CLD
+    REM LDA {HELP.SYN.SOURCE%}       ; the line -> zTemp0
+    REM STA $2C
+    REM LDX #1
+    REM LDA {HELP.SYN.SOURCE%},X
+    REM STA $2D
+    REM LDA $00                      ; the bank we were handed, to put back
+    REM PHA
+    REM ; ---- the line, out of its text bank and into the buffer ----
+    REM LDX {HELP.SYN.KEYBANK%}
+    REM LDY #0
+    REM FLP: CPY {HELP.SYN.LENGTH%}
+    REM BEQ FEND
+    REM LDA {HELP.SYN.TEXTBANK%}
+    REM STA $00
+    REM LDA ($2C),Y
+    REM STX $00
+    REM STA $BE00,Y
+    REM INY
+    REM BNE FLP
+    REM FEND: STX $00
+    REM LDA #0                       ; the end marker every loop below stops on
+    REM STA $BE00,Y
+    REM ; ---- the first column that is not a space ----
+    REM LDY #0
+    REM FSP: LDA $BE00,Y
+    REM CMP #$20
+    REM BNE FGOT
+    REM INY
+    REM BNE FSP
+    REM FGOT: STY {HELP.SYN.FIRST%}
+    REM LDX #0
+    REM BRA MAIN
+    REM ; ---- a number: digits, a dot, and the letters of hex ----
+    REM NUMBER: LDA #4
+    REM STA $BF00,X
+    REM INX
+    REM LDA $BE00,X
+    REM CMP #$2E
+    REM BEQ NUMBER
+    REM JSR ISDIG
+    REM BCC NUMBER
+    REM JSR ISLET
+    REM BCC NUMBER
+    REM BRA MAIN
+    REM ; ---- a string, to its closing quote or the end of the line ----
+    REM STRING: LDA #3
+    REM STA $BF00,X
+    REM INX
+    REM LDA $BE00,X
+    REM BEQ MAIN
+    REM CMP #$22
+    REM BNE STRING
+    REM LDA #3                       ; the closing quote
+    REM BRA PUTONE
+    REM PLAIN: LDA #0
+    REM PUTONE: STA $BF00,X
+    REM INX
+    REM ; ---- what the next column starts ----
+    REM MAIN: CPX {HELP.SYN.LENGTH%}
+    REM BCS DONE
+    REM LDA $BE00,X
+    REM CMP #$22                     ; a quote
+    REM BEQ STRING
+    REM CMP #$24                     ; $ and % lead a number
+    REM BEQ NUMBER
+    REM CMP #$25
+    REM BEQ NUMBER
+    REM CMP #$23                     ; #
+    REM BEQ HASH
+    REM CMP #$3B                     ; ;
+    REM BEQ SEMI
+    REM JSR ISDIG
+    REM BCC NUMBER
+    REM JSR ISLET
+    REM BCS PLAIN
+    REM JMP WORD
+    REM ; ---- two of them are a comment, one leading the line is a directive ----
+    REM HASH: LDA $BE01,X
+    REM CMP #$23
+    REM BEQ REST
+    REM CPX {HELP.SYN.FIRST%}
+    REM BNE PLAIN
+    REM DIRLP: LDA #1
+    REM STA $BF00,X
+    REM INX
+    REM LDA $BE00,X
+    REM JSR ISLET
+    REM BCC DIRLP
+    REM BRA MAIN
+    REM SEMI: LDA {HELP.SYN.ASMLINE%}
+    REM BEQ PLAIN
+    REM ; ---- a comment, from X to the end of the line ----
+    REM REST: LDA #5
+    REM RESTLP: STA $BF00,X
+    REM INX
+    REM CPX {HELP.SYN.LENGTH%}
+    REM BCC RESTLP
+    REM DONE: LDX {HELP.SYN.LENGTH%}     ; a class 6 word must end with the line
+    REM STZ $BF00,X
+    REM PLA
+    REM STA $00
+    REM RTS
+    REM ; ---- carry clear when A is a digit. A is kept. ----
+    REM ISDIG: PHA
+    REM SEC
+    REM SBC #$30
+    REM CMP #10
+    REM PLA
+    REM RTS
+    REM ; ---- carry clear when A is a letter of either case. A is kept. ----
+    REM ISLET: PHA
+    REM AND #$DF
+    REM SEC
+    REM SBC #$41
+    REM CMP #26
+    REM PLA
+    REM RTS
+    REM ; ---- a word, marked class 6 from its first column to its last ----
+    REM WORD: STX {HELP.SYN.TOKSTART%}
+    REM WLP: LDA #6
+    REM STA $BF00,X
+    REM INX
+    REM LDA $BE00,X
+    REM JSR ISLET
+    REM BCC WLP
+    REM JSR ISDIG
+    REM BCC WLP
+    REM CMP #$2E                     ; .
+    REM BEQ WLP
+    REM CMP #$24                     ; $
+    REM BEQ WLP
+    REM CMP #$25                     ; %
+    REM BEQ WLP
+    REM ; ---- three letters long and they fold to R, E, M ----
+    REM TXA
+    REM SEC
+    REM SBC {HELP.SYN.TOKSTART%}
+    REM CMP #3
+    REM BNE WOUT
+    REM LDY {HELP.SYN.TOKSTART%}
+    REM LDA $BE00,Y
+    REM AND #$DF
+    REM CMP #$52
+    REM BNE WOUT
+    REM LDA $BE01,Y
+    REM AND #$DF
+    REM CMP #$45
+    REM BNE WOUT
+    REM LDA $BE02,Y
+    REM AND #$DF
+    REM CMP #$4D
+    REM BNE WOUT
+    REM LDA {HELP.SYN.ASMLINE%}
+    REM BNE REMKEY
+    REM LDX {HELP.SYN.TOKSTART%}     ; the comment starts at the R
+    REM JMP REST
+    REM REMKEY: LDA #1
+    REM STA $BF00,Y
+    REM STA $BF01,Y
+    REM STA $BF02,Y
+    REM WOUT: JMP MAIN
+    GP.ENDASM
+    #REM 0
+    RETURN
+
+## ============================================================================
+## The words looked up, then the row painted.
+##
+##   in   the text at $BE00 and the classes at $BF00, as HELP.SRC.SCAN left them
+##        HELP.SYN.LEFT%       the first column shown
+##        HELP.SYN.RIGHT%      one past the last, 255 at most
+##        HELP.SYN.VLO% .VMID% .VHI%   the row's first cell, as VERA takes it
+##
+## A class 6 word becomes a statement when GP. leads it, or when the table holds
+## it among the statements. It becomes a function when the table holds it among
+## the functions. Any other stays at 6, and ink 6 is the plain ink. An assembly
+## line is not looked up at all.
+##
+## The table is the GP.BSTR image: a count at $A000, then two bytes a record
+## from $A002, the offset from $A000 to the record's length byte. zTemp1 walks
+## that directory and zTemp2 is the record.
+##
+## The row is padded with spaces as far as HELP.SYN.RIGHT%, so it needs no
+## clearing first.
+## ============================================================================
+HELP.SRC.PAINT:
+    #REM 1
+    GP.ASM
+    REM CLD
+    REM LDA $00                      ; the bank we were handed, to put back
+    REM PHA
+    REM LDA {HELP.SYN.KEYBANK%}
+    REM STA $00
+    REM LDA {HELP.SYN.ASMLINE%}
+    REM BEQ WFIRST
+    REM JMP PAINT
+    REM WFIRST: LDX #0
+    REM ; ---- the next class 6 word, from X ----
+    REM WSCAN: CPX {HELP.SYN.LENGTH%}
+    REM BCC WLOOK
+    REM JMP PAINT
+    REM WLOOK: LDA $BF00,X
+    REM CMP #6
+    REM BEQ WFOUND
+    REM INX
+    REM BNE WSCAN
+    REM WFOUND: STX {HELP.SYN.TOKSTART%}
+    REM STZ {HELP.SYN.DOTTED%}
+    REM WEND: LDA $BE00,X
+    REM CMP #$2E
+    REM BNE WNODOT
+    REM STA {HELP.SYN.DOTTED%}
+    REM WNODOT: INX
+    REM LDA $BF00,X
+    REM CMP #6
+    REM BEQ WEND
+    REM STX {HELP.SYN.TOKEND%}
+    REM LDA {HELP.SYN.DOTTED%}
+    REM BEQ WTABLE
+    REM ; ---- a dotted word is a statement only when G, P and a dot lead it ----
+    REM LDY {HELP.SYN.TOKSTART%}
+    REM LDA $BE00,Y
+    REM AND #$DF
+    REM CMP #$47
+    REM BNE WSCAN
+    REM LDA $BE01,Y
+    REM AND #$DF
+    REM CMP #$50
+    REM BNE WSCAN
+    REM LDA $BE02,Y
+    REM CMP #$2E
+    REM BNE WSCAN
+    REM LDA #1
+    REM JMP WPAINT
+    REM ; ---- no keyword is one character, or longer than eight ----
+    REM WTABLE: TXA
+    REM SEC
+    REM SBC {HELP.SYN.TOKSTART%}
+    REM STA {HELP.SYN.TOKLEN%}
+    REM CMP #2
+    REM BCC WSCAN
+    REM CMP #9
+    REM BCS WSCAN
+    REM LDA #$02                     ; the directory -> zTemp1
+    REM STA $2E
+    REM LDA #$A0
+    REM STA $2F
+    REM STZ {HELP.SYN.RECORD%}
+    REM ; ---- the record -> zTemp2, and the directory on to the next ----
+    REM RECLP: LDY #0
+    REM LDA ($2E),Y
+    REM STA $30
+    REM INY
+    REM LDA ($2E),Y
+    REM CLC
+    REM ADC #$A0
+    REM STA $31
+    REM CLC
+    REM LDA $2E
+    REM ADC #2
+    REM STA $2E
+    REM LDA $2F
+    REM ADC #0
+    REM STA $2F
+    REM LDA ($30)                    ; the length byte, then the letters from 1
+    REM CMP {HELP.SYN.TOKLEN%}
+    REM BNE RECNXT
+    REM LDY #1
+    REM LDX {HELP.SYN.TOKSTART%}
+    REM CMPLP: LDA $BE00,X
+    REM CMP #$61                     ; lower case folds to upper
+    REM BCC CMPGO
+    REM AND #$DF
+    REM CMPGO: CMP ($30),Y
+    REM BNE RECNXT
+    REM INX
+    REM INY
+    REM CPX {HELP.SYN.TOKEND%}
+    REM BNE CMPLP
+    REM LDA #1                       ; found: the record number says which kind
+    REM LDY {HELP.SYN.RECORD%}
+    REM CPY {HELP.SYN.STATEMENTS%}
+    REM BCC WPAINT
+    REM LDA #2
+    REM BRA WPAINT
+    REM RECNXT: INC {HELP.SYN.RECORD%}
+    REM LDA {HELP.SYN.RECORD%}
+    REM CMP {HELP.SYN.WORDS%}
+    REM BNE RECLP
+    REM LDX {HELP.SYN.TOKEND%}       ; not in the table
+    REM JMP WSCAN
+    REM ; ---- class A over the whole word ----
+    REM WPAINT: LDX {HELP.SYN.TOKSTART%}
+    REM WPLP: STA $BF00,X
+    REM INX
+    REM CPX {HELP.SYN.TOKEND%}
+    REM BNE WPLP
+    REM JMP WSCAN
+    REM ; ---- the row: a character and its ink, a cell ----
+    REM PAINT: STZ $9F25
+    REM LDA {HELP.SYN.VLO%}
+    REM STA $9F20
+    REM LDA {HELP.SYN.VMID%}
+    REM STA $9F21
+    REM LDA {HELP.SYN.VHI%}
+    REM STA $9F22
+    REM LDX {HELP.SYN.LEFT%}
+    REM CELL: CPX {HELP.SYN.LENGTH%}
+    REM BCS PAD
+    REM LDA $BE00,X
+    REM STA $9F23
+    REM LDY $BF00,X
+    REM LDA $BDF0,Y
+    REM STA $9F23
+    REM INX
+    REM CPX {HELP.SYN.RIGHT%}
+    REM BCC CELL
+    REM BCS PDONE
+    REM PAD: LDA #$20
+    REM STA $9F23
+    REM LDA $BDF0
+    REM STA $9F23
+    REM INX
+    REM CPX {HELP.SYN.RIGHT%}
+    REM BCC PAD
+    REM PDONE: PLA
+    REM STA $00
+    GP.ENDASM
+    #REM 0
     RETURN
 
 
@@ -1262,6 +2015,7 @@ HELP.THEME.SET:
 HELP.THEME.BARS:
     THEME.ATTR% = THEME.CLR(THEME.TITLE)  : GOSUB THEME.HI : HELP.BAR.TOP = THEME.INV%
     THEME.ATTR% = THEME.CLR(THEME.DIMMED) : GOSUB THEME.HI : HELP.BAR.BOT = THEME.INV%
+    GOSUB HELP.SYN.INKS
     RETURN
 
 ## The bars are filled once a page. Filling a row and printing over it leaves

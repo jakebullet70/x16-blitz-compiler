@@ -1,0 +1,71 @@
+## SPLITT -- exercise STR.SPLIT
+## STRINGS.INC.BL reaches BASIC's variables through {VAR}, so this program needs a
+## #SYMFILE. It goes BEFORE the #INCLUDEs.
+#SYMFILE "@:SPLITT.SYM"
+#INCLUDE "GPB.INC.BL"
+#INCLUDE "STRINGS.INC.BL"
+#SAVEAS "@:SPLITT.PRG"
+
+STR.DELIM$ = ","
+
+STR.STR$ = "ALPHA,BETA,GAMMA"
+GOSUB STR.SPLIT
+PRINT "S1 N="; STR.N;
+FOR I = 1 TO STR.N : PRINT " ["; STR.FIELD$(I); "]"; : NEXT
+PRINT
+
+## empty fields must survive
+STR.STR$ = "A,,C"
+GOSUB STR.SPLIT
+PRINT "S2 N="; STR.N;
+FOR I = 1 TO STR.N : PRINT " ["; STR.FIELD$(I); "]"; : NEXT
+PRINT
+
+## trailing delimiter -> two fields, second empty
+STR.STR$ = "A,"
+GOSUB STR.SPLIT
+PRINT "S3 N="; STR.N; " ["; STR.FIELD$(1); "]["; STR.FIELD$(2); "]"
+
+## leading delimiter
+STR.STR$ = ",A"
+GOSUB STR.SPLIT
+PRINT "S4 N="; STR.N; " ["; STR.FIELD$(1); "]["; STR.FIELD$(2); "]"
+
+## no delimiter at all -> one field, the whole string
+STR.STR$ = "SOLO"
+GOSUB STR.SPLIT
+PRINT "S5 N="; STR.N; " ["; STR.FIELD$(1); "]"
+
+## empty input -> one empty field
+STR.STR$ = ""
+GOSUB STR.SPLIT
+PRINT "S6 N="; STR.N; " ["; STR.FIELD$(1); "]"
+
+## multi-character delimiter
+STR.DELIM$ = "::"
+STR.STR$ = "X::Y::Z"
+GOSUB STR.SPLIT
+PRINT "S7 N="; STR.N;
+FOR I = 1 TO STR.N : PRINT " ["; STR.FIELD$(I); "]"; : NEXT
+PRINT
+
+## hitting the limit -- remainder lands in the last field, nothing lost
+STR.DELIM$ = ","
+STR.MAX = 3
+STR.STR$ = "1,2,3,4,5"
+GOSUB STR.SPLIT
+PRINT "S8 N="; STR.N;
+FOR I = 1 TO STR.N : PRINT " ["; STR.FIELD$(I); "]"; : NEXT
+PRINT
+STR.MAX = 0
+
+## the real use: parse a row, then pad the fields into columns
+STR.STR$ = "AMMO,7,READY"
+GOSUB STR.SPLIT
+FOR I = 1 TO STR.N
+  STR.STR$ = STR.FIELD$(I) : STR.WIDTH = 8
+  GOSUB STR.PADR
+  PRINT "["; STR.STR$; "]";
+NEXT
+PRINT
+POWEROFF

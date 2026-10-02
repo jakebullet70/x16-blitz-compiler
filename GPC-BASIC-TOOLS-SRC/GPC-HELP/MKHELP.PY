@@ -7,6 +7,8 @@
 #      GPC-BASIC/GP-BASIC.GLOBALS.md    the name register
 #      GPC-BASIC/GP-BASIC.FILES.md      what is in the box, file by file
 #      GPC-BASIC/*.INC.BL               the banner header of every module
+#      GPC-BASIC/*.EXP.BL               the name, banner gloss and length of
+#                                       every example program
 #
 #  Writes, beside this script:
 #      HELP-TXT/H001.HLP ... Hnnn.HLP   one file per topic -- see layout()
@@ -49,6 +51,11 @@
 #  header (not selectable), T a topic, S a section inside one. The topic
 #  number names the file. The viewer loads the index at startup and never
 #  reads it again; a topic costs one OPEN and nothing else.
+#
+#  Type E is an example program. Its text is two spaces and the file name. The
+#  viewer opens that file from the GPC-BASIC folder and shows it as source, so
+#  no .HLP is written for it. A topic's EXAMPLE PROGRAM block holds a cross
+#  reference to each example's row, and the gloss is in that reference.
 #
 #  LINE ENDINGS ARE LF and the viewer strips a trailing CR, so a checkout that
 #  converts them still reads. .gitattributes marks them -text anyway.
@@ -97,6 +104,17 @@ IDX_BANK = 8192
 TOPIC_LINES = 2048
 TEXT_BANKS = 8
 LINE_WIDE = 78
+
+# The cross references the viewer's link menu holds for one topic. It is
+# HELP.MAXPICK in GPC.HELP.BASL; change them together.
+TOPIC_LINKS = 20
+
+# The heading over the example rows, which close the index.
+EXAMPLES_NAME = "EXAMPLE PROGRAMS"
+
+# A topic links this many examples at most. With the 12 see-also rows a topic
+# can carry that fills the link menu. A topic naming more points at the index.
+EXAMPLE_LINKS = 8
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DEFAULT_SRC = os.path.normpath(os.path.join(HERE, "..", "..", "GPC-BASIC"))
@@ -453,6 +471,42 @@ def examples_in(md_text):
         if m.group(1) not in out:
             out.append(m.group(1))
     return out
+
+
+class Example(object):
+    """An example program: an index row of its own, opened by the viewer as source."""
+
+    def __init__(self, name, title, count):
+        self.key = name           # the file name, and all the index row shows
+        self.title = title        # what a cross reference shows
+        self.count = count        # lines in the file
+        self.ordinal = 0
+
+
+def find_examples(src):
+    """Every *.EXP.BL in `src`, by name.
+
+    The gloss is what follows "NAME --" in the file's banner, up to the first
+    full stop. An example with no such line is referred to by name alone.
+    """
+    found = []
+    for name in sorted(os.listdir(src)):
+        if not re.match(r"^[A-Z0-9]+\.EXP\.BL$", name):
+            continue
+        with open(os.path.join(src, name), "r", encoding="utf-8",
+                  errors="replace") as fh:
+            body = fh.read().splitlines()
+        title = name
+        gloss_re = re.compile(re.escape(name) + r"\s+--\s+(.+)$")
+        for ln in body[:12]:
+            m = gloss_re.search(ln)
+            if m:
+                gloss = to_ascii(m.group(1)).split(". ")[0].strip(" *.")
+                if gloss:
+                    title = name + "  " + gloss
+                break
+        found.append(Example(name, title, len(body)))
+    return found
 
 
 # ---------------------------------------------------------------------------
@@ -887,8 +941,12 @@ def build_banners(mods, names):
 #  See also, examples, layout, index
 # ---------------------------------------------------------------------------
 
-def add_tails(topics):
-    """The example pointer and the see-also block, on the end of every topic."""
+def add_tails(topics, examples):
+    """The example pointer and the see-also block, on the end of every topic.
+
+    `examples` is name -> Example. An example in it becomes a cross reference
+    to its index row. One the folder does not hold stays a line of text.
+    """
     have = set(t.key for t in topics)
     # A module topic answers to its file name AND to the section that documents it.
     for t in topics:
@@ -903,9 +961,16 @@ def add_tails(topics):
             e.lines = t.lines
             e.secs = t.secs
             e.header("EXAMPLE PROGRAM")
+            if len(exs) > EXAMPLE_LINKS:
+                e.text("Every example has a row under %s, at the end of the "
+                       "index." % EXAMPLES_NAME, indent="    ", first="  ")
+                exs = []
             for x in exs:
-                e.text(x + "   -- runnable, in the GPC-BASIC folder",
-                       indent="    ", first="  ")
+                if x in examples:
+                    e.lines.append(">@@%s@@|" % x)
+                else:
+                    e.text(x + "   -- runnable, in the GPC-BASIC folder",
+                           indent="    ", first="  ")
             t.lines, t.secs = e.lines, e.secs
 
         # A section 4 topic answers to two keys -- "4.8" and "STRCASE.INC.BL"
@@ -990,9 +1055,10 @@ def hlp_name(n):
     return "H%03d.HLP" % n
 
 
-def build_index(files, topics, nosections=False):
+def build_index(files, topics, examples, nosections=False):
     """
-    The HELP.IDX rows, in master index order, and the ordinal of each topic.
+    The HELP.IDX rows, in master index order, and the ordinal of each topic
+    and each example.
 
     A row is "type|topic|section|lines|text". The topic number names the file
     -- H007.HLP -- so no row carries a file NAME, which would be another 60
@@ -1020,6 +1086,14 @@ def build_index(files, topics, nosections=False):
             for sec_title, off in t.secs:
                 rows.append(["S", t.number, off + 1, n,
                              fit("     " + sec_title)])
+    # WARNING: the viewer takes an E row's file name from column 3 to the next
+    # space, so the two leading spaces are part of the format. The gloss stays
+    # out of the row: the index bank has no room for 29 of them.
+    if examples:
+        rows.append(["H", 0, 0, 0, fit(EXAMPLES_NAME)])
+        for ex in examples:
+            ex.ordinal = len(rows) + 1
+            rows.append(["E", 0, 0, ex.count, fit("  " + ex.key)])
     return rows
 
 
@@ -1153,7 +1227,10 @@ def write_md(out, files, topics, mdname="GPC-HELP.md", cmdline=None, mods=None):
                 else:
                     L.append(ln)
             L.append("")
-            refs = [ln for ln in t.lines if ln.startswith(">")]
+            # The body already names the topic's examples, so only the
+            # references to other topics are listed.
+            refs = [ln for ln in t.lines if ln.startswith(">")
+                    and not EXP_RE.match(ln.split("|", 1)[1])]
             if refs:
                 L.append("*See also: " +
                          ", ".join(ln.split("|", 1)[1] for ln in refs) + "*")
@@ -1227,10 +1304,13 @@ def main():
     topics += build_globals(src)
     topics += build_files(src)
 
-    add_tails(topics)
+    examples = find_examples(src)
+    byname = dict((ex.key, ex) for ex in examples)
+    add_tails(topics, byname)
     byord = resolve_module_keys(topics)
+    byord.update(byname)
     files = layout(topics)
-    rows = build_index(files, topics, args.nosections)
+    rows = build_index(files, topics, examples, args.nosections)
     substitute(topics, byord)
 
     # The see-also substitution changed text, never line counts, so the layout
@@ -1257,13 +1337,24 @@ def main():
                   "Nothing written." % (t.title, len(t.lines), TOPIC_LINES,
                                         text_banks(t), TEXT_BANKS))
         return 1
+    # WARNING: the viewer shows a cross reference its link menu has no room for,
+    # and L cannot reach it. So a topic with too many is never written.
+    too_linked = [t for t in topics
+                  if len([ln for ln in t.lines if ln.startswith(">")]) > TOPIC_LINKS]
+    if not args.md_only and too_linked:
+        for t in too_linked:
+            print("  TOPIC HAS TOO MANY LINKS: %s, %d of %d. Nothing written."
+                  % (t.title, len([ln for ln in t.lines if ln.startswith(">")]),
+                     TOPIC_LINKS))
+        return 1
     if not args.md_only:
         write_hlp(out, files)
         write_idx(out, rows)
     write_md(out, files, topics, args.md_name, cmdline,
              os.path.relpath(mods).replace("\\", "/") if mods != src else None)
     print("")
-    print("  %d topics, %d index rows" % (len(topics), len(rows)))
+    print("  %d topics, %d examples, %d index rows"
+          % (len(topics), len(examples), len(rows)))
 
     if not args.md_only:
         big = max(topics, key=lambda t: len(t.lines))

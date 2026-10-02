@@ -20,6 +20,7 @@ be selected; topics are indented under them, sections under those.
 |---|---|---|
 | up / down | move the highlight | scroll a line |
 | PgUp / PgDn | a screen at a time | a screen at a time |
+| left / right | | an example program, eight columns sideways |
 | HOME / END | first entry / last | top / bottom |
 | RETURN | open the topic | -- |
 | `/` or `F` | find | |
@@ -38,6 +39,13 @@ each entry, because folding in place would rewrite the index itself.
 the syntax block and every example in it - and writes them with a header
 naming where they came from. `BASLOAD` it.
 
+**An example program opens as source.** The index ends with EXAMPLE PROGRAMS,
+a row for each `.EXP.BL` in `GPC-BASIC/`, and a topic's EXAMPLE PROGRAM block
+links to the same rows. The viewer reads the file itself and paints it in
+syntax colour: statements, functions, strings, numbers and comments. Left and
+right scroll a file wider than the page. `X` is not offered, because the file
+is already source.
+
 ## What is in it
 
 | category | topics | from |
@@ -50,6 +58,7 @@ naming where they came from. `BASLOAD` it.
 | The traps | 1 | `GP-BASIC.md` section 6 |
 | Compiler known bugs | 1 | `GP-BASIC.md` section 8 |
 | Memory and limits | 3 | `GP-BASIC.md` section 7 |
+| Example programs | 29 files | `GPC-BASIC/*.EXP.BL`, read as they stand |
 
 A topic is never split. The viewer holds up to 2,048 lines and eight banks of
 text, and `MKHELP.PY` refuses to write a topic past either.
@@ -89,12 +98,16 @@ line in the generated header stays reproducible.
 `HELP-TXT/GPC.HELP.IDX` and `GPC-HELP.md`. `MKHELPWIN.PY` reads `GPC-HELP.md`
 and writes `GPC-HELP.WIN.md`.
 
-**Everything the viewer reads is in the one subfolder**, opened through the
+**The topics and the index are in the one subfolder**, opened through the
 CMD path syntax `//HELP-TXT/:NAME` - what CMDR-DOS documents, and what a real
 SD card wants; the emulator would also take a plain `HELP-TXT/NAME`, which is
-the form that would not port. A run that produces fewer topics than the last
-one deletes the orphans. `--src` and `--out` move either end. `--nosections`
-leaves the section rows out of the index.
+the form that would not port. The example programs are not copied: the viewer
+opens `//GPC-BASIC/:NAME`, and `//GPC/GPC-BASIC/:NAME` when that is not there.
+`MKHELP.PY` writes only their index rows.
+
+A run that produces fewer topics than the last one deletes the orphans.
+`--src` and `--out` move either end. `--nosections` leaves the section rows
+out of the index.
 
 **It exits non-zero if a character had no ASCII mapping**, listing the code
 points. That check exists because a minus one written with U+2212, the
@@ -218,9 +231,27 @@ for 432 bytes of p-code.
 **The line table** fills bank 9, four bytes a line - offset low, offset high,
 length, kind - for up to 2,048 lines. The offset is into the line's own text
 bank, and the kind byte's high nibble says which of the eight that is. A line
-that would straddle two banks starts the next one. A line is truncated at 78
-characters, because no row can show more. The longest topic today is 854
+that would straddle two banks starts the next one. A topic line is truncated
+at 78 characters, because no row can show more. The longest topic today is 854
 lines, in four banks.
+
+**An example program** loads into the same banks. Each line is stored whole,
+up to 250 characters, with kind 4, or kind 5 between `GP.ASM` and `GP.ENDASM`.
+Its length is the file's, not the index row's.
+
+**The keyword table** is bank 23 (`HELP.KEYBANK`): 147 words of `GP.BANKEDSTR`
+text, one a record, statements first and functions after them. The top of the
+same bank is the painter's workspace: seven inks at `$BDF0`, the line at
+`$BE00` and a class for each column at `$BF00`. A theme change rewrites the
+inks from the theme's row of `HELP.SYN.INK`.
+
+**A source row is two `GP.ASM` blobs.** `HELP.SRC.SCAN` copies the line out of
+its text bank and gives every column a class: plain, statement, function,
+string, number, comment, or a word still to be looked up. `HELP.SRC.PAINT`
+looks those words up, then writes the row to VERA, a character and its ink a
+cell, padded to the right edge. A word that starts `GP.` is a statement
+without a table entry. On a line inside a `GP.ASM` block `REM` is a statement,
+`;` starts the comment and no word is looked up.
 
 **The index bank** holds nine bytes a row at the front - text offset low and
 high, length, type, topic, section line low and high, topic length low and
@@ -229,9 +260,9 @@ records and 6,302 for text. The viewer drops rows past either limit, so
 `MKHELP.PY` refuses to write an index that does not fit. Today's index is 166
 rows and 5,572 bytes of text.
 
-There is no list control, and none is wanted: the section and cross-reference
-pickers are at most 12 items, which fit a screen, so `MENU.POPUP` does the
-job.
+There is no list control, and none is wanted: the cross-reference picker is at
+most 20 items, 12 topics and 8 examples, which fit a screen, so `MENU.POPUP`
+does the job.
 
 ### A one-line scroll slides the text in VRAM; it does not repaint it
 

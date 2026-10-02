@@ -68,9 +68,9 @@
 .
 =EXAMPLE PROGRAM
 .
-.  STRINGS.EXP.BL -- runnable, in the GPC-BASIC folder
-.  STRCTST.EXP.BL -- runnable, in the GPC-BASIC folder
-.  STRTST.EXP.BL -- runnable, in the GPC-BASIC folder
+>192|STRINGS.EXP.BL  the GP.BASIC string set
+>191|STRCTST.EXP.BL  STRCASE.INC.BL, eight cases
+>193|STRTST.EXP.BL  the parts of STRINGS.INC.BL that STRCTST and
 .
 =SEE ALSO
 .

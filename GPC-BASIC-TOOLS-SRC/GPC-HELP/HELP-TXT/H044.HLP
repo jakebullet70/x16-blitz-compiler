@@ -137,7 +137,7 @@
 .
 =EXAMPLE PROGRAM
 .
-.  GUI.EXP.BL -- runnable, in the GPC-BASIC folder
+>174|GUI.EXP.BL  the four dialogs, over a screen they have to put back
 .
 =SEE ALSO
 .

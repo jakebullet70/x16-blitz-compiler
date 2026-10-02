@@ -174,7 +174,7 @@
 .
 =EXAMPLE PROGRAM
 .
-.  KVBIN.EXP.BL -- runnable, in the GPC-BASIC folder
+>178|KVBIN.EXP.BL  every routine in KVBIN.INC.BL
 .
 =SEE ALSO
 .

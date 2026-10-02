@@ -81,7 +81,7 @@
 .
 =EXAMPLE PROGRAM
 .
-.  FORM.EXP.BL -- runnable, in the GPC-BASIC folder
+>173|FORM.EXP.BL  three fields you can move between, LINEINPUT style
 .
 =SEE ALSO
 .

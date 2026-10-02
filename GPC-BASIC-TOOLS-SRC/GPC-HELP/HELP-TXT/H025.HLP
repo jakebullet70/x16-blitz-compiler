@@ -187,7 +187,7 @@
 .
 =EXAMPLE PROGRAM
 .
-.  ASM.EXP.BL -- runnable, in the GPC-BASIC folder
+>169|ASM.EXP.BL  GP.ASM / GP.ENDASM, inline 65C02 assembly
 .
 =SEE ALSO
 .

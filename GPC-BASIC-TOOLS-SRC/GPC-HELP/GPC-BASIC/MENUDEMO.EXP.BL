@@ -1,0 +1,51 @@
+## MENUDEMO -- MENUTO.VERT drawn the way an application would draw it.
+##
+## Cursor keys move, RETURN chooses, N L O C Q are hotkeys, ESC cancels,
+## and the SNES pad in port 1 drives it too. KEEPMARK leaves the chosen row
+## highlighted after it returns.
+##
+## Compile SHARED: the rows are kept in bank 62.
+#INCLUDE "GPB.INC.BL"
+## THE LIBRARY IN LOW MEMORY. To run a module below from a RAM bank instead,
+## put its #INCLUDE inside a GP.BANKED region -- BANKED-OR-NOT.md has the rules.
+#INCLUDE "BANKMGR.INC.BL"
+#INCLUDE "THEME.INC.BL"
+#INCLUDE "MENU.INC.BANKED.BL"
+#INCLUDE "MENU.INC.BL"
+#SAVEAS "@:MENUDEMO.PRG"
+
+#DEFINE DEMO.LEFT 7
+#DEFINE DEMO.TOP 5
+
+GOSUB BANKMGR.INIT
+THEME.ID% = 0
+GOSUB THEME.SELECT
+
+GP.SUB MENU.BEGIN, MENU.POPUP
+GP.SUB MENU.ITEM, " &NEW GAME"
+GP.SUB MENU.ITEM, " &LOAD"
+GP.SUB MENU.ITEM, " &OPTIONS"
+GP.SUB MENU.ITEM, " &CREDITS"
+GP.SUB MENU.ITEM, " &QUIT"
+
+## ---- The page and the title bar. None of this is the menu's business:
+## ---- the menu draws its rows and its own frame, and the application
+## ---- keeps its own look around them.
+
+GP.FILL 0, 0, 80, 30, ASC(" "), THEME.CLR(THEME.PAGE)
+GP.FILL 0, 0, 80, 1, ASC(" "), THEME.CLR(THEME.TITLE)
+GP.PRINTAT 2, 0, "GP.BASIC DEMONSTRATION", THEME.CLR(THEME.TITLE)
+GP.PRINTAT 2, 20, "CURSOR KEYS, RETURN, OR N L O C Q", THEME.CLR(THEME.DIMMED)
+
+MENU.ATTR = THEME.CLR(THEME.TEXT)
+MENU.HIATTR = THEME.CLR(THEME.HILITE)
+MENU.SEPATTR = THEME.CLR(THEME.BORDER)
+MENU.FLAGS = MENU.KEEPMARK + MENU.GAMEPAD
+GP.SUB MENU.SELECTED, 1
+
+DEMO.PICK = GP.FN(MENUTO.VERT, DEMO.TOP, DEMO.LEFT, MENU.THIN)
+
+DEMO.SAID$ = "CANCELLED"
+IF DEMO.PICK > 0 THEN DEMO.SAID$ = "CHOSE ROW" + STR$(DEMO.PICK)
+GP.PRINTAT 2, 22, DEMO.SAID$, THEME.CLR(THEME.WARN)
+END

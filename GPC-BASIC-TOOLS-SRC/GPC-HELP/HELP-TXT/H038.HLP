@@ -240,8 +240,8 @@
 .
 =EXAMPLE PROGRAM
 .
-.  MENUTO.EXP.BL -- runnable, in the GPC-BASIC folder
-.  MENUBUILD.EXP.BL -- runnable, in the GPC-BASIC folder
+>183|MENUTO.EXP.BL  MENUTO.VERT and MENUTO.BAR by hand
+>181|MENUBUILD.EXP.BL  MENU.INC.BL's builder, read back
 .
 =SEE ALSO
 .

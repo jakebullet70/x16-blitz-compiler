@@ -107,9 +107,9 @@
 .
 =EXAMPLE PROGRAM
 .
-.  BMXVIEW.EXP.BL -- runnable, in the GPC-BASIC folder
-.  BMXPAL.EXP.BL -- runnable, in the GPC-BASIC folder
-.  BMXSPD.EXP.BL -- runnable, in the GPC-BASIC folder
+>172|BMXVIEW.EXP.BL  a BMX bitmap viewer, in about thirty lines
+>170|BMXPAL.EXP.BL
+>171|BMXSPD.EXP.BL
 .
 =SEE ALSO
 .

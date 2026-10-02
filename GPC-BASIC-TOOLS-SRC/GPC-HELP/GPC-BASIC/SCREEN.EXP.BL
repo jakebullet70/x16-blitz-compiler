@@ -1,0 +1,127 @@
+## ***********************************************************************
+## **
+## **  SCREEN.EXP.BL -- the GP.BASIC text drawing set.
+## **
+## **  GP.BOX      statement, a frame in one of four styles
+## **  GP.FILL     statement, a rectangle of one character
+## **  GP.PRINTAT  statement, text at a position
+## **  STASH.INC.BL          save a rectangle and put it back -- a module
+## **                        now, not the GP.STASH / GP.RESTR keywords
+## **
+## **  Build:  copy GPC-BASIC/GPB.INC.BL and this file into source/drive/, then
+## **            python source/gpc/build_basl.py SCREEN.EXP.BL SCREEN.PRG
+## **          and compile SCREEN.PRG with GPC.BIN.
+## **
+## **  Compile-only: the ROM cannot RUN a PRG containing GP tokens.
+## **
+## ***********************************************************************
+## THE TWO DIRECTIVES COME FIRST. STASH.INC.BL reaches BASIC's variables
+## from inside GP.ASM through {VAR}, and the compiler resolves those out of
+## BASLOAD's #SYMFILE -- which has to be declared before the #INCLUDEs that
+## need it, or the compile stops with {} NEEDS #SYMFILE.
+#SAVEAS "@:SCREEN.PRG"
+#SYMFILE "@:SCREEN.SYM"
+#INCLUDE "GPB.INC.BL"
+#INCLUDE "STASH.INC.BL"
+
+## NOTE ON NAMES: BASLOAD gives 64 significant characters, so PANEL.COL and PANEL.ROW
+## really are different variables. The BUILT-IN BASIC gives TWO -- rewrite this as a
+## plain .bas and R30 and R31 become one variable, silently. A reason to write BASL.
+
+## ***********************************************************************
+## **  1. GP.FILL and GP.BOX. These write STRAIGHT INTO VERA and never call the KERNAL,
+## **  which is why they are several times faster than the PRINT they replace.
+## ***********************************************************************
+
+CLS
+COLOR 1,0
+
+## ---- Clear a panel, then frame it. GP.BOX draws the FRAME ONLY, so the
+## ---- fill goes first. Colour is background * 16 + foreground: 6 * 16 + 1
+## ---- is white on blue.
+
+PANEL.COL = 6 * 16 + 1
+GP.FILL 4, 2, 32, 9, ASC(" "), PANEL.COL
+GP.BOX 4, 2, 32, 9, 1, PANEL.COL
+GP.PRINTAT 6, 3, "GP.BASIC SCREEN DEMO", PANEL.COL
+
+## ---- The character is PETSCII, converted here. ASC() and CHR$() give you
+## ---- exactly what you would PRINT -- there is no screen-code arithmetic
+## ---- to do. CHR$(160) is the solid block, CHR$(166) the dither.
+
+GP.FILL 6, 5, 28, 1, 160, 2 * 16 + 15
+GP.FILL 6, 6, 28, 1, 166, 2 * 16 + 15
+
+## ---- All four border styles. The chequered dither and the shaded thick corners were
+## ---- deleted on 2026-09-01 and the rest renumbered down, so this is 0 to 3 now:
+## ----   0 solid   1 single line   2 rounded corners   3 thick
+
+FOR STYLE.N = 0 TO 3
+  GP.BOX 6 + STYLE.N * 5, 8, 4, 3, STYLE.N, PANEL.COL
+  GP.PRINTAT 7 + STYLE.N * 5, 9, CHR$(48 + STYLE.N), PANEL.COL
+NEXT
+
+## ---- THE COLOUR IS OPTIONAL, and omitting it means "whatever COLOR last set" -- read
+## ---- from the KERNAL, so there is no second notion of colour to keep in step. 255 is
+## ---- a REAL colour (light grey on light grey), not a "leave it alone" marker.
+
+COLOR 5, 0
+GP.PRINTAT 4, 12, "NO COLOUR ARGUMENT - FOLLOWS COLOR"
+COLOR 1, 0
+
+## ---- GP.BOX's two optionals cannot be skipped over. Write the style if
+## ---- you want the colour:  GP.BOX X,Y,W,H,,7 is a syntax error.
+
+GP.BOX 40, 2, 20, 5, 0, 3 * 16 + 0
+GP.PRINTAT 42, 4, "STYLE 0 IS SOLID", 3 * 16 + 0
+
+## ***********************************************************************
+## **  2. WHAT WILL SURPRISE YOU ONCE.  None of these move the cursor that
+## **  PRINT uses, because none of them go near the KERNAL. A plain PRINT
+## **  after a GP.PRINTAT carries on from wherever the KERNAL still thinks
+## **  the cursor is. LOCATE first if you want to mix the two.
+## ***********************************************************************
+
+LOCATE 1, 14
+PRINT "PLAIN PRINT, POSITIONED WITH LOCATE FIRST"
+
+## ---- Nothing is clipped. Off the right edge wraps into the next row and
+## ---- off the bottom writes past the end of the screen map, so keep the
+## ---- rectangle on the screen yourself. Zero width or height draws
+## ---- nothing at all, which is the case a COMPUTED size reaches.
+
+PANEL.W = 0
+GP.FILL 0, 20, PANEL.W, 4, ASC("X")
+
+## ***********************************************************************
+## **  3. STASH.INC.BL -- draw over the screen and put it back.
+## **
+## **  It carries a 4-byte header (w, h, x, y), so the restore needs only the bank.
+## **  A bank is 8K and a cell 2 bytes, so 4094 cells fit: stash panels, not whole
+## **  screens. STASH.SAVE says so in STASH.OK.
+## ***********************************************************************
+
+STASH.BANK = 2
+STASH.X = 4 : STASH.Y = 2 : STASH.W = 32 : STASH.H = 9
+GOSUB STASH.SAVE
+
+GP.FILL 8, 4, 24, 5, ASC(" "), 2 * 16 + 1
+GP.BOX 8, 4, 24, 5, 3, 2 * 16 + 1
+GP.PRINTAT 10, 6, "A DIALOG OVER THE PANEL", 2 * 16 + 1
+
+## ---- Anything at all to pause, then put the panel back exactly as it was.
+
+FOR PAUSE.N = 1 TO 4000 : NEXT
+
+STASH.BANK = 2 : STASH.MOVE = 0
+GOSUB STASH.RESTORE
+
+## ---- STASH.MOVE = 1 with a new STASH.X and STASH.Y pastes it somewhere
+## ---- ELSE instead, which is copy-and-paste for nothing extra.
+
+STASH.BANK = 2 : STASH.MOVE = 1
+STASH.X = 44 : STASH.Y = 8
+GOSUB STASH.RESTORE
+
+LOCATE 1, 22
+PRINT "DONE"

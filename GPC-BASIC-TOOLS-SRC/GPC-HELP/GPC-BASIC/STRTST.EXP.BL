@@ -1,0 +1,212 @@
+## ***********************************************************************
+## **  STRTST.EXP.BL -- the parts of STRINGS.INC.BL that STRCTST and
+## **  SPLITT do not reach: the three trims and STR.SPLICE.
+## **  Thirty-three cases.
+## **
+## **  THE TRIM CASES CAME FROM STRCTST.EXP.BL, unchanged except for the
+## **  call shape -- the routines moved, the fixtures did not.
+## **
+## **  Both the TEXT and the LENGTH are compared every time. They are not
+## **  the same test: the trims write the length byte, and a string whose
+## **  length says 6 but whose block still holds "ABCDEFGH" prints
+## **  correctly and is still wrong.
+## ***********************************************************************
+#SAVEAS "@:STRTST.PRG"
+#SYMFILE "@:STRTST.SYM"
+#INCLUDE "GPB.INC.BL"
+#INCLUDE "STRINGS.INC.BL"
+
+T.FAILS = 0
+
+## =======================================================================
+## 0. CONTROL -- assignment COPIES rather than sharing a block.
+## =======================================================================
+T.A$ = "  hi  " : T.B$ = T.A$
+STR.PTR = GP.STRPTR(T.A$)
+GOSUB STR.TRIM
+T.BAD = 0
+IF T.A$ <> "hi" THEN T.BAD = T.BAD + 1
+IF T.B$ <> "  hi  " THEN T.BAD = T.BAD + 10
+T.WANT$ = "hi/  hi  " : T.GOT$ = T.A$ + "/" + T.B$
+T.NAME$ = "CONTROL" : GOSUB T.REPORT
+
+## =======================================================================
+## 1..5  the three trims, and each leaving the OTHER end alone.
+## =======================================================================
+T.SRC$ = "   both ends   " : T.OP = 0
+T.WANT$ = "both ends" : T.NAME$ = "TRIM" : GOSUB T.RUN
+
+T.SRC$ = "   leading only" : T.OP = 1
+T.WANT$ = "leading only" : T.NAME$ = "LTRIM" : GOSUB T.RUN
+
+T.SRC$ = "trailing only   " : T.OP = 2
+T.WANT$ = "trailing only" : T.NAME$ = "RTRIM" : GOSUB T.RUN
+
+T.SRC$ = "   both ends   " : T.OP = 1
+T.WANT$ = "both ends   " : T.NAME$ = "LTRIM.ONLY" : GOSUB T.RUN
+
+T.SRC$ = "   both ends   " : T.OP = 2
+T.WANT$ = "   both ends" : T.NAME$ = "RTRIM.ONLY" : GOSUB T.RUN
+
+## =======================================================================
+## 6..12  the trim edges. Empty, all spaces, nothing to do, one space.
+## =======================================================================
+T.SRC$ = "" : T.OP = 0
+T.WANT$ = "" : T.NAME$ = "EMPTY.TRIM" : GOSUB T.RUN
+
+T.SRC$ = "     " : T.OP = 0
+T.WANT$ = "" : T.NAME$ = "ALLSPACE" : GOSUB T.RUN
+
+T.SRC$ = "     " : T.OP = 1
+T.WANT$ = "" : T.NAME$ = "ALLSPACE.L" : GOSUB T.RUN
+
+T.SRC$ = "     " : T.OP = 2
+T.WANT$ = "" : T.NAME$ = "ALLSPACE.R" : GOSUB T.RUN
+
+T.SRC$ = " " : T.OP = 0
+T.WANT$ = "" : T.NAME$ = "ONE.SPACE" : GOSUB T.RUN
+
+T.SRC$ = "nothing to trim" : T.OP = 0
+T.WANT$ = "nothing to trim" : T.NAME$ = "NOOP.TRIM" : GOSUB T.RUN
+
+## ---- a SINGLE leading space is the CPY #1 boundary in the slide ----
+T.SRC$ = " one space in front" : T.OP = 1
+T.WANT$ = "one space in front" : T.NAME$ = "LTRIM.ONE" : GOSUB T.RUN
+
+## ---- 200 characters: the slide moves 190 bytes ----
+T.SRC$ = RPT$(32, 10) + RPT$(98, 190) : T.OP = 1
+T.WANT$ = RPT$(98, 190) : T.NAME$ = "LONG.LTRIM" : GOSUB T.RUN
+
+## =======================================================================
+## 13..17  SPLICE, the three operations plus the no-op.
+## =======================================================================
+T.SRC$ = "ABCDEFGH" : T.AT = 3 : T.CUT = 0 : T.SUB$ = "xy"
+T.WANT$ = "ABxyCDEFGH" : T.NAME$ = "INSERT" : GOSUB T.SPL
+
+T.SRC$ = "ABCDEFGH" : T.AT = 3 : T.CUT = 2 : T.SUB$ = "xy"
+T.WANT$ = "ABxyEFGH" : T.NAME$ = "OVERWRITE" : GOSUB T.SPL
+
+T.SRC$ = "ABCDEFGH" : T.AT = 3 : T.CUT = 2 : T.SUB$ = ""
+T.WANT$ = "ABEFGH" : T.NAME$ = "DELETE" : GOSUB T.SPL
+
+T.SRC$ = "ABCDEFGH" : T.AT = 3 : T.CUT = 4 : T.SUB$ = "z"
+T.WANT$ = "ABzGH" : T.NAME$ = "SHORTEN" : GOSUB T.SPL
+
+T.SRC$ = "ABCDEFGH" : T.AT = 3 : T.CUT = 0 : T.SUB$ = ""
+T.WANT$ = "ABCDEFGH" : T.NAME$ = "NOOP.SPLICE" : GOSUB T.SPL
+
+## =======================================================================
+## 18..23  the position edges. LEFT$ of 0 and MID$ past the end are what
+##         make the clamps fall out rather than be tested for.
+## =======================================================================
+T.SRC$ = "ABCDE" : T.AT = 1 : T.CUT = 1 : T.SUB$ = "z"
+T.WANT$ = "zBCDE" : T.NAME$ = "AT.FIRST" : GOSUB T.SPL
+
+T.SRC$ = "ABCDE" : T.AT = 1 : T.CUT = 0 : T.SUB$ = "z"
+T.WANT$ = "zABCDE" : T.NAME$ = "INSERT.FIRST" : GOSUB T.SPL
+
+T.SRC$ = "ABCDE" : T.AT = 5 : T.CUT = 1 : T.SUB$ = "z"
+T.WANT$ = "ABCDz" : T.NAME$ = "AT.LAST" : GOSUB T.SPL
+
+T.SRC$ = "ABCDEFGH" : T.AT = 5 : T.CUT = 4 : T.SUB$ = ""
+T.WANT$ = "ABCD" : T.NAME$ = "CUT.TO.END" : GOSUB T.SPL
+
+T.SRC$ = "ABCDE" : T.AT = 1 : T.CUT = 5 : T.SUB$ = ""
+T.WANT$ = "" : T.NAME$ = "CUT.ALL" : GOSUB T.SPL
+
+T.SRC$ = "ABCDE" : T.AT = 3 : T.CUT = 99 : T.SUB$ = ""
+T.WANT$ = "AB" : T.NAME$ = "CUT.CLAMP" : GOSUB T.SPL
+
+## =======================================================================
+## 24..27  past the end APPENDS, below 1 clamps to 1, and an empty string
+##         has no position 1 to be past.
+## =======================================================================
+T.SRC$ = "ABCDE" : T.AT = 6 : T.CUT = 0 : T.SUB$ = "z"
+T.WANT$ = "ABCDEz" : T.NAME$ = "APPEND" : GOSUB T.SPL
+
+T.SRC$ = "ABCDE" : T.AT = 99 : T.CUT = 0 : T.SUB$ = "z"
+T.WANT$ = "ABCDEz" : T.NAME$ = "APPEND.FAR" : GOSUB T.SPL
+
+T.SRC$ = "ABCDE" : T.AT = 0 : T.CUT = 1 : T.SUB$ = "z"
+T.WANT$ = "zBCDE" : T.NAME$ = "AT.CLAMP" : GOSUB T.SPL
+
+T.SRC$ = "" : T.AT = 1 : T.CUT = 0 : T.SUB$ = "XY"
+T.WANT$ = "XY" : T.NAME$ = "EMPTY.SPLICE" : GOSUB T.SPL
+
+## =======================================================================
+## 28..29  LONG. Growing past the block it was born with is the case the
+##         assembly version could not do at all.
+## =======================================================================
+T.SRC$ = RPT$(65, 200) : T.AT = 100 : T.CUT = 0 : T.SUB$ = RPT$(66, 20)
+T.WANT$ = RPT$(65, 99) + RPT$(66, 20) + RPT$(65, 101) : T.NAME$ = "GROW.LONG" : GOSUB T.SPL
+
+T.SRC$ = RPT$(65, 5) + RPT$(66, 10) + RPT$(67, 185) : T.AT = 6 : T.CUT = 10 : T.SUB$ = "xy"
+T.WANT$ = RPT$(65, 5) + "xy" + RPT$(67, 185) : T.NAME$ = "LONG.SPLICE" : GOSUB T.SPL
+
+## =======================================================================
+## 30. NEIGHBOURS. The trims write through a pointer, so a wrong length or
+##     an off-by-one walks into whatever the heap put next door.
+## =======================================================================
+T.GUARD1$ = "AAAAAAAAAA"
+T.SUBJ$ = "   middle   "
+T.GUARD2$ = "ZZZZZZZZZZ"
+STR.PTR = GP.STRPTR(T.SUBJ$)
+GOSUB STR.TRIM
+T.BAD = 0
+IF T.SUBJ$ <> "middle" THEN T.BAD = T.BAD + 1
+IF T.GUARD1$ <> "AAAAAAAAAA" THEN T.BAD = T.BAD + 10
+IF T.GUARD2$ <> "ZZZZZZZZZZ" THEN T.BAD = T.BAD + 100
+T.WANT$ = "middle" : T.GOT$ = T.SUBJ$
+T.NAME$ = "NEIGHBOURS" : GOSUB T.REPORT
+
+## =======================================================================
+## 31. The two halves compose: splice a trimmed string.
+## =======================================================================
+STR.STR$ = "hi" : STR.WIDTH = 6
+GOSUB STR.PADC
+STR.AT = 3 : STR.CUT = 2 : STR.SUB$ = "HI"
+GOSUB STR.SPLICE
+T.BAD = 0
+IF STR.STR$ <> "  HI  " THEN T.BAD = 1
+T.WANT$ = "[  HI  ]" : T.GOT$ = "[" + STR.STR$ + "]"
+T.NAME$ = "PADC.SPLICE" : GOSUB T.REPORT
+
+PRINT "FAILS "; T.FAILS
+PRINT "DONE"
+END
+
+## ***********************************************************************
+## **  helpers
+## ***********************************************************************
+
+## ---- T.SRC$ through one of the trims, against T.WANT$ ----
+T.RUN:
+    T.GOT$ = T.SRC$
+    STR.PTR = GP.STRPTR(T.GOT$)
+    IF T.OP = 0 THEN GOSUB STR.TRIM
+    IF T.OP = 1 THEN GOSUB STR.LTRIM
+    IF T.OP = 2 THEN GOSUB STR.RTRIM
+    T.BAD = 0
+    IF LEN(T.WANT$) <> LEN(T.GOT$) THEN T.BAD = T.BAD + 10
+    IF T.WANT$ <> T.GOT$ THEN T.BAD = T.BAD + 1
+    GOSUB T.REPORT
+    RETURN
+
+## ---- T.SRC$ through STR.SPLICE, against T.WANT$ ----
+T.SPL:
+    STR.STR$ = T.SRC$
+    STR.AT = T.AT
+    STR.CUT = T.CUT
+    STR.SUB$ = T.SUB$
+    GOSUB STR.SPLICE
+    T.GOT$ = STR.STR$
+    T.BAD = 0
+    IF LEN(T.WANT$) <> LEN(T.GOT$) THEN T.BAD = T.BAD + 10
+    IF T.WANT$ <> T.GOT$ THEN T.BAD = T.BAD + 1
+    GOSUB T.REPORT
+    RETURN
+
+T.REPORT:
+    IF T.BAD = 0 THEN PRINT "PASS "; T.NAME$
+    IF T.BAD <> 0 THEN PRINT "FAIL "; T.NAME$; " BAD "; T.BAD; " WANT["; T.WANT$; "] GOT["; T.GOT$; "]" : T.FAILS = T.FAILS + 1
+    RETURN

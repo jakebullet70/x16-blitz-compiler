@@ -1,0 +1,105 @@
+## ***********************************************************************
+## **  STRCTST.EXP.BL -- STRCASE.INC.BL, eight cases.
+## **
+## **  THE FIRST RUN OF THIS FILE USED GP.UPPER / GP.LOWER AS THE ORACLE,
+## **  keyword against module, and every case matched. Those keywords are
+## **  gone now -- that is what the module is for -- so what is left is the
+## **  written-out expected answer for the same fixtures.
+## **
+## **  THE TRIM CASES MOVED WITH THE TRIMS, to STRTST.EXP.BL beside
+## **  STRINGS.INC.BL. This file is case work only.
+## **
+## **  Both the TEXT and the LENGTH are compared. They are not the same
+## **  test: a string whose length byte disagrees with its block prints
+## **  correctly and is still wrong.
+## ***********************************************************************
+#SAVEAS "@:STRCTST.PRG"
+#SYMFILE "@:STRCTST.SYM"
+#INCLUDE "GPB.INC.BL"
+#INCLUDE "STRCASE.INC.BL"
+
+T.FAILS = 0
+
+## =======================================================================
+## 0. CONTROL -- assignment COPIES rather than sharing a block. If it
+##    shared, T.GOT$ below would be the same block as T.SRC$ and half
+##    these cases would compare a string against itself.
+## =======================================================================
+T.A$ = "hello" : T.B$ = T.A$
+STRCASE.PTR = GP.STRPTR(T.A$) : STRCASE.MODE = STRCASE.UPPER
+GOSUB STRCASE.GO
+T.BAD = 0
+IF T.A$ <> "HELLO" THEN T.BAD = T.BAD + 1
+IF T.B$ <> "hello" THEN T.BAD = T.BAD + 10
+T.WANT$ = "HELLO/hello" : T.GOT$ = T.A$ + "/" + T.B$
+T.NAME$ = "CONTROL" : GOSUB T.REPORT
+
+## =======================================================================
+## 1..2  the two operations.
+## =======================================================================
+T.SRC$ = "Hello, World! 123 @#" : T.OP = STRCASE.UPPER
+T.WANT$ = "HELLO, WORLD! 123 @#" : T.NAME$ = "UPPER" : GOSUB T.RUN
+
+T.SRC$ = "Hello, World! 123 @#" : T.OP = STRCASE.LOWER
+T.WANT$ = "hello, world! 123 @#" : T.NAME$ = "LOWER" : GOSUB T.RUN
+
+## =======================================================================
+## 3..5  the edges. Empty and one character, neither of which the walk
+##       treats as a special case -- which is exactly why they are worth
+##       a fixture each.
+## =======================================================================
+T.SRC$ = "" : T.OP = STRCASE.UPPER
+T.WANT$ = "" : T.NAME$ = "EMPTY.UPPER" : GOSUB T.RUN
+
+T.SRC$ = "" : T.OP = STRCASE.LOWER
+T.WANT$ = "" : T.NAME$ = "EMPTY.LOWER" : GOSUB T.RUN
+
+T.SRC$ = "x" : T.OP = STRCASE.UPPER
+T.WANT$ = "X" : T.NAME$ = "ONE.CHAR" : GOSUB T.RUN
+
+## =======================================================================
+## 6. LONG. 200 characters walks Y from 200 down, which a twenty character
+##    fixture goes nowhere near.
+## =======================================================================
+T.SRC$ = RPT$(97, 200) : T.OP = STRCASE.UPPER
+T.WANT$ = RPT$(65, 200) : T.NAME$ = "LONG.UPPER" : GOSUB T.RUN
+
+## =======================================================================
+## 7. NEIGHBOURS. The module writes through a pointer, so an off-by-one
+##    walks into whatever the heap put next door.
+## =======================================================================
+T.GUARD1$ = "AAAAAAAAAA"
+T.SUBJ$ = "middle"
+T.GUARD2$ = "ZZZZZZZZZZ"
+STRCASE.PTR = GP.STRPTR(T.SUBJ$) : STRCASE.MODE = STRCASE.UPPER
+GOSUB STRCASE.GO
+T.BAD = 0
+IF T.SUBJ$ <> "MIDDLE" THEN T.BAD = T.BAD + 1
+IF T.GUARD1$ <> "AAAAAAAAAA" THEN T.BAD = T.BAD + 10
+IF T.GUARD2$ <> "ZZZZZZZZZZ" THEN T.BAD = T.BAD + 100
+T.WANT$ = "MIDDLE" : T.GOT$ = T.SUBJ$
+T.NAME$ = "NEIGHBOURS" : GOSUB T.REPORT
+
+PRINT "FAILS "; T.FAILS
+PRINT "DONE"
+END
+
+## ***********************************************************************
+## **  helpers
+## ***********************************************************************
+
+## ---- T.SRC$ through the module, against T.WANT$ ----
+T.RUN:
+    T.GOT$ = T.SRC$
+    STRCASE.PTR = GP.STRPTR(T.GOT$) : STRCASE.MODE = T.OP
+    GOSUB STRCASE.GO
+    T.BAD = 0
+    IF LEN(T.WANT$) <> LEN(T.GOT$) THEN T.BAD = T.BAD + 10
+    IF T.WANT$ <> T.GOT$ THEN T.BAD = T.BAD + 1
+    GOSUB T.REPORT
+    RETURN
+
+T.REPORT:
+    IF T.BAD = 0 THEN PRINT "PASS "; T.NAME$
+    IF T.BAD <> 0 THEN PRINT "FAIL "; T.NAME$; " BAD "; T.BAD; " WANT["; T.WANT$; "] GOT["; T.GOT$; "]" : T.FAILS = T.FAILS + 1
+    RETURN
