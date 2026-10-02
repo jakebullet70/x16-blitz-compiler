@@ -106,7 +106,7 @@ PROGRAMS = [
          shared=False,
          install=None, data=[], overlay=False),
 
-    #   EMBEDDED, and plain X16 BASIC like MANDEL: LANDER64.SRC.PRG runs in ROM BASIC.
+    #   EMBEDDED, and GP.BASIC like MANDELASM: LANDER64.SRC.PRG is compiler input only.
     dict(name="LANDER64",
          src=("GPC-BASIC-TOOLS-SRC/LANDER64", "LANDER64.BASL"),
          shared=False,

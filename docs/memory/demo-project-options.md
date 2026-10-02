@@ -54,10 +54,15 @@ radio and read-only value controls, `FORMTO.EVENT`, and SHIFT+TAB out of a text 
 
 **LANDER64 was built 2026-10-01**, outside the six. The user asked for a graphics C64 BASIC
 game with an open licence. It is a port of rosdec/lander64 (GPL-3.0, `contest/lander64.bas`) in
-`GPC-BASIC-TOOLS-SRC/LANDER64/`, with `LICENSE` beside it. Plain X16 BASIC, so `LANDER64.SRC.PRG`
-runs in ROM BASIC. It uses `SPRITE`/`SPRMEM`/`MOVSPR`, `JOY(0)` and `JOY(1)`, PSG noise, and
-`VPEEK` of the layer 1 map for the landing test. It has a `samplesbuild.py` entry, a `release.sh`
-entry and `USER-RUNS/lander64-demo.bat`. Not hand-tested yet. Other open-licence candidates
+`GPC-BASIC-TOOLS-SRC/LANDER64/`, with `LICENSE` beside it. The user wants it in GP.BASIC, not
+plain X16 BASIC: GP.DO, GP.IF, GP.SELECT, GP.CHAR, GP.PRINTAT and APPSYS, so
+`LANDER64.SRC.PRG` does not run in ROM BASIC and is not shipped. It uses `SPRITE`/`SPRMEM`/`MOVSPR`,
+`JOY(0)` and `JOY(1)`, PSG noise, and `VPEEK` of the layer 1 map for the landing test. Its exit
+left the noise on until [[gpc-psgvol-fmvol-inverted]] was fixed. Game over is a GUI-LITE
+`MSGBOX` with PLAY AGAIN and QUIT, which the user asked for. The user had every GP.DEFPROC
+removed: its routines are plain `GOSUB` targets that take and return values in variables. The title page asks E for EASY (6 jiffies a tick) or H for
+HARD (4, the first speed, which the user found a little fast). It has a `samplesbuild.py`
+entry, a `release.sh` entry and `USER-RUNS/lander64-demo.bat`. Other open-licence candidates
 found: Kidelyneen (EgonOlsen71, Unlicense), Ball and Paddle (alejsanc, Apache-2.0), Skyscrape64
 (croys, MIT). Magazine type-ins are publisher copyright, so they cannot ship.
 

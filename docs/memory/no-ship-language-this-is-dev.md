@@ -1,11 +1,11 @@
 ---
 name: no-ship-language-this-is-dev
-description: "Do not call anything shipped or released here; it is dev and test work, and do not build unless asked"
+description: "Do not call anything shipped or released here; do not build unless asked, except in a play-test loop, where every requested change is built at once"
 metadata: 
   node_type: memory
   type: feedback
   originSessionId: 5591d6bc-636d-4001-b0b0-d858156d6ec0
-  modified: 2026-09-01T07:13:14.301Z
+  modified: 2026-10-02T06:34:04.838Z
 ---
 
 **Never say "ship", "shipped" or "release" about this repo.** Corrected on
@@ -31,4 +31,14 @@ obviously needs a compile to be worth anything, and even when a build earlier in
 the same session was asked for. Make the edit, say what a build would tell us,
 and stop.
 
-Related: [[answer-the-question-asked]], [[user-runs-concurrent-agents-here]].
+**The exception is a play-test loop.** Corrected 2026-10-02, on LANDER64, after a speed option
+was edited in and left unbuilt: *"did you forget, its give and take, after interaction you auto
+build?"* When the user is running a program by hand and sends back a change to it, the edit is
+half the turn and the build is the other half. He cannot test the change without the PRG. Build
+that one sample in the background straight after the edit, then report the result.
+
+The rule still holds everywhere else: "commit and push" is not a build request, a refactor nobody
+is about to run is not one, and the help text is never regenerated unasked.
+
+Related: [[answer-the-question-asked]], [[user-runs-concurrent-agents-here]],
+[[run-builds-in-background]].

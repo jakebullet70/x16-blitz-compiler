@@ -299,8 +299,7 @@ SAMPLES = [
     },
     {
         "dir":   "LANDER64",
-        "files": [("GPC-BASIC-TOOLS-SRC/LANDER64/LANDER64.SRC.PRG",  "LANDER64.SRC.PRG"),
-                  ("GPC-BASIC-TOOLS-SRC/LANDER64/LANDER64.PRG",      "LANDER64.PRG"),
+        "files": [("GPC-BASIC-TOOLS-SRC/LANDER64/LANDER64.PRG",      "LANDER64.PRG"),
                   ("GPC-BASIC-TOOLS-SRC/LANDER64/LANDER64.BASL",     "LANDER64.BASL"),
                   ("GPC-BASIC-TOOLS-SRC/LANDER64/LICENSE",           "LICENSE"),
                   ("GPC-BASIC-TOOLS-SRC/LANDER64/readme.md",         "README.md")],

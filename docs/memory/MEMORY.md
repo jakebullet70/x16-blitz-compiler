@@ -19,13 +19,13 @@ again. See [memory-is-git-tracked](memory-is-git-tracked.md).
 - [BMXVIEW: two copies, one master](bmxview-two-copies-one-master.md) — BMXVIEWER/BMXVIEW.BASL is the program, GPC-BASIC/BMXVIEW.EXP.BL is the library sample; sync back, adjusting the #INCLUDE prefix
 - [Library working copy, then root](library-working-copy-then-root.md) — edit in GPC-BASIC-TOOLS-SRC/GPB-MODS-TESTING/GPC-BASIC/, drift runs BOTH ways; [test in GPBMODS first](test-in-gpbmods-before-spreading.md); [samples build in place](samples-build-in-place.md), never staged into source/drive/
 - [GUI only through verbs](gui-only-through-verbs.md) — no GOSUB GUI.* in a program; forms and pickers become verbs like MENU
-- [No ship language, no unasked builds](no-ship-language-this-is-dev.md) — [run builds in the background](run-builds-in-background.md), a typed message cancels an in-flight tool; [build, report, hand it back](build-report-dont-investigate.md)
+- [No ship language, no unasked builds](no-ship-language-this-is-dev.md) — except a play-test loop: a change the user sends back while running a program gets built at once; [run builds in the background](run-builds-in-background.md), a typed message cancels an in-flight tool; [build, report, hand it back](build-report-dont-investigate.md)
 - [Compile shared, not embedded](compile-shared-not-embedded.md) — SHARED is the p-code number; [release samples are the exception](release-samples-shape.md), own BASL plus a standalone EMBEDDED PRG; [shipped readmes fit 78 columns](release-readmes-fit-78-columns.md), they are read on the X16
 - [The compiler is GPC](name-the-compiler-gpc.md) — "Blitz" is a heritage nod; and [concurrent agents run here](user-runs-concurrent-agents-here.md), so re-read before any write
 - [Compact early, not at the end](compact-early-not-at-the-end.md) — remind the user to /compact at the end of EVERY turn that lands a step; cost is context size x turns
 
 ## Build and toolchain
-- [USER-RUNS demos broken by Build 127](user-runs-demos-broken-by-build-127.md) — runtimes back beside each sample; the tree moved to build 129 on 2026-10-01
+- [USER-RUNS demos broken by Build 127](user-runs-demos-broken-by-build-127.md) — runtimes back beside each sample; the tree moved to build 130 on 2026-10-01
 - [Tool home layout deferred](tool-home-layout-deferred.md) — /GPC/ + /BASIC-SRC/ is next-version; copy the nine tool files into every working folder; research in docs/blitz/TOOL-HOME-LAYOUT.RESEARCH.md
 - [Build toolchain location](build-toolchain-location.md) — make, 64tass, python are off-PATH in C:\8bitProgramming; build setup is in docs/BUILDING.md
 - [Git Bash sed strips CRLF](git-bash-sed-strips-crlf.md) — `sed -i` writes LF and `grep -c $'\r$'` lies; count with Python bytes
@@ -83,7 +83,7 @@ again. See [memory-is-git-tracked](memory-is-git-tracked.md).
 ## The CUA GUI library
 - [LISTS and DIR plan](lists-and-dir-plan.md) — lists read GP.BSTR-layout banks at run time; LIST.BANK and FILEPICK tested, LIST.SORT written and awaiting its run
 - [GUI-CUA phase 5 state](gui-cua-phase5-state.md) — written not verified; what is owed and what still drifts
-- [Demo project options](demo-project-options.md) — the six showcase ideas; #1 MANDELBROT-SPEED built and in release, #2 KV-BANKED parked, GUI-FIELD-EDIT works, LANDER64 built
+- [Demo project options](demo-project-options.md) — the six showcase ideas; #1 MANDELBROT-SPEED built and in release, #2 KV-BANKED parked, GUI-FIELD-EDIT works, LANDER64 built in GP.BASIC
 
 ## The BASL cruncher
 - [Folding onto a label line saves nothing](folding-onto-a-label-line-saves-nothing.md) — a bare label is not a BASIC line
@@ -106,6 +106,7 @@ again. See [memory-is-git-tracked](memory-is-git-tracked.md).
 - [FOR 1 TO 0 runs once](gpc-basic-for-loop-runs-once.md) — guard every FOR 1 TO LEN()
 - [Empty INPUT gives ""](gpc-input-empty-line.md) — FIXED 2026-09-29; ROM keeps the old value, a chosen divergence
 - [GPC JOY high byte diverges](gpc-joy-high-byte-diverges.md) — A/X/L/R came back at $8000-$1000, ROM gives $800-$100; FIXED in runtime build 129
+- [GPC PSGVOL and FMVOL were inverted](gpc-psgvol-fmvol-inverted.md) — the volume went to the ROM's attenuation call, 0 was full; FIXED in runtime build 130
 - [X16 BASIC conformance](blitz-x16-basic-conformance.md) — 4 real defects fixed; `SLEEP 0` returns at once and still diverges
 - [Interpreter LOAD chain is safe](x16-interpreter-load-chain-is-safe.md) — R49 moves VARTAB, a longer chained program runs clean
 - [No END crashes at exit](program-without-end-crashes.md) — runs off the last line into $ffff; end every test program with END

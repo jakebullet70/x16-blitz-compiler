@@ -3,9 +3,6 @@ rem ---------------------------------------------------------------------------
 rem  lander64-demo.bat -- the Lander64 port, in a VISIBLE window with sound.
 rem  The drive is the sample folder.
 rem
-rem    lander64-demo.bat          LANDER64.PRG, compiled by GPC
-rem    lander64-demo.bat BASIC    LANDER64.SRC.PRG in ROM BASIC
-rem
 rem  Cursor keys fly the ship. A gamepad plugged in plays as SNES port 1.
 rem  Source: GPC-BASIC-TOOLS-SRC\LANDER64\LANDER64.BASL. The PRG is compiled
 rem  EMBEDDED and needs no runtime file beside it. To rebuild it, from the
@@ -26,18 +23,14 @@ if not exist "%ROM%" (
 	echo ROM not found: "%ROM%"
 	exit /b 1
 )
-for %%P in (LANDER64.SRC.PRG LANDER64.PRG) do (
-	if not exist "%DRIVE%\%%P" (
-		echo.
-		echo   GPC-BASIC-TOOLS-SRC\LANDER64\%%P is not built.
-		echo   See the notes at the top of this file.
-		echo.
-		exit /b 1
-	)
+if not exist "%DRIVE%\LANDER64.PRG" (
+	echo.
+	echo   GPC-BASIC-TOOLS-SRC\LANDER64\LANDER64.PRG is not built.
+	echo   See the notes at the top of this file.
+	echo.
+	exit /b 1
 )
 
-set "PRG=LANDER64.PRG"
-if /i "%~1"=="BASIC" set "PRG=LANDER64.SRC.PRG"
-"%X16EMU%" -rom "%ROM%" -fsroot "%DRIVE%" -scale 2 -joy1 -prg "%DRIVE%\%PRG%" -run
+"%X16EMU%" -rom "%ROM%" -fsroot "%DRIVE%" -scale 2 -joy1 -prg "%DRIVE%\LANDER64.PRG" -run
 endlocal
 exit /b 0
