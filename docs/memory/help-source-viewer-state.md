@@ -1,6 +1,6 @@
 ---
 name: help-source-viewer-state
-description: "GPC.HELP shows example programs as coloured source; written and compiled clean 2026-10-02, never run on the X16; what is owed and how to re-check the blobs"
+description: "GPC.HELP shows example programs as coloured source; committed in 9e98e96 on 2026-10-02 and tested by the user in the emulator; how to re-check the blobs"
 metadata:
   node_type: memory
   type: project
@@ -10,12 +10,13 @@ metadata:
 
 GPC.HELP opens a `.EXP.BL` example as source, in syntax colour, with LEFT and RIGHT for wide lines.
 Written 2026-10-02 in `GPC-BASIC-TOOLS-SRC/GPC-HELP/GPC.HELP.BASL` (the "An example program, read as
-source" section), `MKHELP.PY` and `readme.md`. Uncommitted as of that date.
+source" section), `MKHELP.PY` and `readme.md`. Committed and pushed the same day as `9e98e96`.
 
-**State: built, not run.** On 2026-10-02 BASLOAD tokenised it and GPC compiled it SHARED with no
-error, so GPC accepts both `GP.ASM` blobs. Tokenised 52,341 bytes (was 41,597), `GPC.HELP.PRG`
-10,136 (was 8,286), `GPC.HELP.OVL` 24,333 (was 22,795). The viewer has not run on the X16. Each
-further step is the user's to call. See [[no-ship-language-this-is-dev]].
+**State: built, and tested by the user.** On 2026-10-02 BASLOAD tokenised it and GPC compiled it
+SHARED with no error, so GPC accepts both `GP.ASM` blobs. Tokenised 52,341 bytes (was 41,597),
+`GPC.HELP.PRG` 10,136 (was 8,286), `GPC.HELP.OVL` 24,333 (was 22,795). The user then tested help in
+the emulator and reported no fault. Claude has not run it. Each further step is the user's to call.
+See [[no-ship-language-this-is-dev]].
 
 **Content is in place, 2026-10-02.** `python MKHELP.PY`, run from `GPC-BASIC-TOOLS-SRC/GPC-HELP`,
 rewrote `HELP-TXT`: 76 topics, 29 examples, 196 of 210 index rows, 6,046 of 6,302 index characters,
@@ -23,15 +24,12 @@ so 256 are left. `GPC.HELP.IDX` and 22 `.HLP` files changed, and every change is
 turned into a cross reference, or the `E` rows. Topic 8 fell from 121 lines to 93. `GPC-HELP.md` did
 not change. `GPC-HELP-TESTING.md` and `GPC-HELP.WIN.md` were not regenerated.
 
-The 29 `.EXP.BL` files were copied from `GPC-BASIC/` into `GPC-HELP/GPC-BASIC/`, 138,667 bytes,
-untracked. The viewer opens `//GPC-BASIC/:NAME`, then `//GPC/GPC-BASIC/:NAME`. The copies are not
+The 29 `.EXP.BL` files were copied from `GPC-BASIC/` into `GPC-HELP/GPC-BASIC/`, 138,667 bytes, and
+are tracked. The viewer opens `//GPC-BASIC/:NAME`, then `//GPC/GPC-BASIC/:NAME`. The copies are not
 kept in step with the masters by anything.
 
-**Owed before it can be called working:**
-
-- Run it on the X16. No line of the change has executed.
-- The four ink rows in `HELP.SYN.INK` are MSEDIT's, with GRAY and CUSTOM given the dark row. Nobody
-  has looked at them on the X16.
+**Not known:** which themes the user's test covered. The four ink rows in `HELP.SYN.INK` are
+MSEDIT's, with GRAY and CUSTOM given the dark row.
 
 **The check that stands in for a build:** `python source/scratch/helpblobs.py`. It pulls the two
 blobs and the keyword table out of the `.BASL`, assembles them with 64tass, and runs them in a small

@@ -78,7 +78,7 @@ again. See [memory-is-git-tracked](memory-is-git-tracked.md).
 - [Editor: ASCII inside, PETSCII outside](gpc-editor-is-ascii-inside-petscii-outside.md) — why the font is re-ordered in VRAM; [ALT keys need the keymap](gpc-editor-alt-keys-need-the-keymap.md), in ISO mode ALT+F sends nothing
 - [VERA FX cache writes are aligned](vera-fx-cache-write-is-aligned.md) — the row renderer needs an EVEN column
 - [GPC-HELP scroll cost is the file read](gpc-help-scroll-cost-is-the-file-read.md) — FIXED 04/09/26: loaded once, table in bank 9 and text in 15-22, topics no longer split; the body below the fold is history
-- [HELP source viewer state](help-source-viewer-state.md) — built, index and examples in place, not run; [MSEDIT is the colouring master](msedit-is-the-syntax-colouring-master.md)
+- [HELP source viewer state](help-source-viewer-state.md) — committed in 9e98e96, the user tested it in the emulator; [MSEDIT is the colouring master](msedit-is-the-syntax-colouring-master.md)
 - [HOSTFS is not the DIR slowness](hostfs-is-not-the-dir-slowness.md) — XFMGR is much faster on the same host; the 2 s is our read loop. QUEUED after LISTS/DIR
 - [Bar and dropdown drive each other](menubar-menuhelp-cross-axis-exits.md) — DOWNEXIT and KEYEXIT are the two halves; [use the whole interface](menuhelp-use-the-whole-interface.md), build the library's own example first
 
