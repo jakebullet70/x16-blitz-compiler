@@ -75,8 +75,8 @@ Inside `tmp-emu.bat`:
 |---|---|---|
 | `GPC.PRG` | compiler front end, the program you run | yes |
 | `GPC.BIN` | compiler engine, loaded by `GPC.PRG` | yes |
-| `GPC.IMG.129.BIN`, `GP1.IMG.129.BIN` | the runtime and bank 1 code a self-contained program carries | yes |
-| `GPB.RT.129.BIN`, `GPC.RT.129.BIN`, `GP1.RT.129.BIN` | shared runtime with GP handlers, shared runtime without, and the bank 1 code both load | yes |
+| `GPC.IMG.130.BIN`, `GP1.IMG.130.BIN` | the runtime and bank 1 code a self-contained program carries | yes |
+| `GPB.RT.130.BIN`, `GPC.RT.130.BIN`, `GP1.RT.130.BIN` | shared runtime with GP handlers, shared runtime without, and the bank 1 code both load | yes |
 | `GPC.ERR.PRG`, `GPC.ERR.OVL` | maps a runtime error address to a source line, and its banked code | yes |
 | `GPC.HELP.PRG`, `GPC.HELP.OVL` | the on-machine reference, and its banked code | yes |
 | `BASLOAD-GPC.PRG`, `BASLOAD-GPC.BIN` | the streaming tokeniser and its engine | yes |

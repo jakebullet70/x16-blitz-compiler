@@ -14,6 +14,8 @@ import os,re,sys
 #
 #		- 	 0 params
 #		AX = 2 params, Y = 0, Carry clear
+#		AXV = AX, X = a 0-63 volume made a PSG attenuation, 63 - volume, as ROM BASIC's PSGVOL
+#		AXF = AX, X = a 0-63 volume made a YM attenuation, 0 is $7F, else 63 - volume, as ROM's FMVOL
 # 		A# = 2 params, XY = 16 bit value, Carry clear
 #		A$ = 2 params, XY = string, set voice from param 1
 #
@@ -27,7 +29,7 @@ FMDRUM 			!ym_playdrum 			AX
 FMINST 			!ym_loadpatch 			AXC
 FMVIB 			!bas_fmvib 				AX
 FMFREQ 			!bas_fmfreq 			A#
-FMVOL 			!ym_setatten 			AX
+FMVOL 			!ym_setatten 			AXF
 FMPAN 			!ym_setpan 				AX
 FMPLAY 			!bas_fmplaystring 		A$
 FMCHORD 		!bas_fmchordstring 		A$
@@ -35,7 +37,7 @@ FMPOKE 			!ym_write 				AX
 
 PSGINIT 		!psg_init 				-
 PSGNOTE 		!bas_psgnote 			AX
-PSGVOL			!psg_setatten 			AX
+PSGVOL			!psg_setatten 			AXV
 PSGWAV 			!bas_psgwav				AX
 PSGFREQ 		!bas_psgfreq 			A#
 PSGPAN 			!psg_setpan 			AX
@@ -79,6 +81,16 @@ for s in [x.strip() for x in src if x.strip() != ""]:
 		ha.write("\tjsr\t\tX16_Audio_Parameters8_String\n")
 	if setup.startswith("AX"):
 		ha.write("\tjsr\t\tX16_Audio_Parameters8_8\n")
+		if setup in ("AXV", "AXF"):
+			ha.write("\tpha\n")
+			ha.write("\ttxa\n")
+			if setup == "AXF":
+				ha.write("\tbne\t\t_X16AudioAudible\n")
+				ha.write("\tlda\t\t#$40\n")
+				ha.write("_X16AudioAudible:\n")
+			ha.write("\teor\t\t#$3F\n")
+			ha.write("\ttax\n")
+			ha.write("\tpla\n")
 		ha.write("\t{0}\n".format("sec" if setup.endswith("C") else "clc"))
 
 	ha.write("\tjsr\t\tX16_JSRFAR\n")

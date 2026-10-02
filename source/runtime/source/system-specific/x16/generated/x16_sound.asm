@@ -93,6 +93,14 @@ X16_Audio_FMVOL: ;; [!FMVOL]
 	.entercmd
 	phy
 	jsr		X16_Audio_Parameters8_8
+	pha
+	txa
+	bne		_X16AudioAudible
+	lda		#$40
+_X16AudioAudible:
+	eor		#$3F
+	tax
+	pla
 	clc
 	jsr		X16_JSRFAR
 	.word	X16A_ym_setatten
@@ -194,6 +202,11 @@ X16_Audio_PSGVOL: ;; [!PSGVOL]
 	.entercmd
 	phy
 	jsr		X16_Audio_Parameters8_8
+	pha
+	txa
+	eor		#$3F
+	tax
+	pla
 	clc
 	jsr		X16_JSRFAR
 	.word	X16A_psg_setatten

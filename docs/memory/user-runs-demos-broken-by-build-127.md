@@ -25,6 +25,10 @@ COLORTST, BMXVIEW, GPC.GUI, EDIT, GPC.ERR, GUI-LITE, MANDEL, MANDELASM and GUI-F
 LANDER64 was rebuilt separately at 129 (14,977 bytes EMBEDDED). KV-BANKED, CRUNCH and XBASE
 were not rebuilt.
 
+Later on 2026-10-01 the runtime moved to build 130 for PSGVOL and FMVOL (see
+[[gpc-psgvol-fmvol-inverted]]). The 129 files were replaced in the same 14 folders, and samplesbuild
+rebuilt the same 11 programs plus LANDER64. KV-BANKED, CRUNCH and XBASE were not rebuilt.
+
 Still open:
 - `help-demo.bat`, `gpcerr-demo.bat` and `gpc-gui-demo.bat` have not been re-run since.
 - EDIT.PRG, CRUNCH.PRG, COLORTST.PRG are embedded objects and never needed a runtime.
