@@ -147,6 +147,11 @@
 .      KV.INC.BL -- INIT GET PUT DEL FIND AT WIPE SAVE LOAD, strings in one
 .        RAM bank - SEC 4.20
 .
+.  Key-value store
+.      BASIC
+.      KVBIN.INC.BL -- CREATE INFO GET PUT DEL AT FIRST NEXT STOP EXPAND,
+.        strings in one file that every program shares - SEC 4.26
+.
 .  Keyboard
 .      BASIC
 .      KB.INC.BL -- KB.CLEARKB - SEC 4.14

@@ -234,6 +234,7 @@ Three implementations, and what each costs:
 | **Code in a bank** | ASM | `GP.BANKED` `GP.ENDBANKED` — p-code at `$A000`, out of the low-memory budget, see §3.12 |
 | **Bank ownership** | BASIC | `BANKMGR.INC.BL` — `INIT` `CLAIM` `GET.FREE.BANK` `RELEASE` `COUNT` · §4.13 |
 | **Key-value store** | BASIC | `KV.INC.BL` — `INIT` `GET` `PUT` `DEL` `FIND` `AT` `WIPE` `SAVE` `LOAD`, strings in one RAM bank · §4.20 |
+| **Key-value store** | BASIC | `KVBIN.INC.BL` — `CREATE` `INFO` `GET` `PUT` `DEL` `AT` `FIRST` `NEXT` `STOP` `EXPAND`, strings in one file that every program shares · §4.26 |
 | **Keyboard** | BASIC | `KB.INC.BL` — `KB.CLEARKB` · §4.14 |
 | **The drive** | BASIC | `FILEIO.INC.BL` — `STATUS` `EXISTS` `SIZE` `DELETE` `RENAME` `COPY` `MKDIR` `CHDIR` `SAVEARRAY` `LOADARRAY` · §4.15 |
 | **The drive** | BASIC | `FILEDIR.INC.BL` — `FILE.DIR.INIT` `OPEN` `NEXT`, into a bank or low RAM · §4.16 |
@@ -2547,6 +2548,8 @@ GOSUB KV.SAVE
 Strings stored by key in RAM bank 40. `KV.INIT` runs before any other routine. Every routine is a
 plain `GOSUB`, and `KV.OK` is -1 for success and 0 for failure.
 
+`KVBIN.INC.BL` (§4.26) keeps a store in a file that every program on the drive shares.
+
 **Plain BASL.** No `GP.*` keyword and no `GP.ASM`, so it needs neither `GPB.INC.BL` nor a
 `#SYMFILE`, and the same source tokenises for stock BASIC.
 
@@ -2656,7 +2659,7 @@ Any other key is offered to the buttons' marked letters.
 file, as `COMBO.INC.BL` does. A program that includes the GUI and leaves this one out stops with
 `LABEL NOT FOUND`.
 
-`GPBMODS` (§4.26) runs three boxes and a combo on one form, under DIALOG > CHECK BOX + COMBO.
+`GPBMODS` (§4.27) runs three boxes and a combo on one form, under DIALOG > CHECK BOX + COMBO.
 
 ---
 
@@ -2902,7 +2905,136 @@ leave it out (§3.11).
 
 ---
 
-### 4.26 `GPBMODS` — the harness that drives every module
+### 4.26 `KVBIN.INC.BL` — keys and values in one file of fixed records
+
+| Routine | in | out |
+|---|---|---|
+| `KVBIN.CREATE` | `KVBIN.NEWSLOTS` | `KVBIN.SLOTS` `KVBIN.OK` |
+| `KVBIN.INFO` | — | `KVBIN.SLOTS` `KVBIN.OK` |
+| `KVBIN.GET` | `KVBIN.KEY$` | `KVBIN.VALUE$` `KVBIN.SLOT` `KVBIN.OK` |
+| `KVBIN.PUT` | `KVBIN.KEY$` `KVBIN.VALUE$` | `KVBIN.SLOT` `KVBIN.OK` |
+| `KVBIN.DEL` | `KVBIN.KEY$` | `KVBIN.SLOT` `KVBIN.OK` |
+| `KVBIN.AT` | `KVBIN.SLOT` | `KVBIN.KEY$` `KVBIN.VALUE$` `KVBIN.OK` |
+| `KVBIN.FIRST` | — | `KVBIN.SLOT` `KVBIN.KEY$` `KVBIN.VALUE$` `KVBIN.OK` |
+| `KVBIN.NEXT` | — | `KVBIN.SLOT` `KVBIN.KEY$` `KVBIN.VALUE$` `KVBIN.OK` |
+| `KVBIN.STOP` | — | — |
+| `KVBIN.EXPAND` | `KVBIN.GROWBY` | `KVBIN.SLOTS` `KVBIN.OK` |
+
+```basic
+#INCLUDE "KVBIN.INC.BL"
+
+KVBIN.FNAME$ = "/SETTINGS.KVB"
+GOSUB KVBIN.INFO
+IF KVBIN.DOSERR = 62 THEN GOSUB KVBIN.CREATE
+KVBIN.KEY$ = "USER.NAME"
+KVBIN.VALUE$ = "STEVE"
+GOSUB KVBIN.PUT
+KVBIN.KEY$ = "USER.NAME"
+GOSUB KVBIN.GET
+IF KVBIN.OK THEN PRINT KVBIN.VALUE$
+```
+
+Strings stored by key in one file on the drive, for a few dozen settings that every program on the
+drive shares. Every routine is a plain `GOSUB`. There is no init routine. Outside a walk, a routine
+opens the file and closes it before it returns.
+
+`KV.INC.BL` (§4.20) keeps its store in one RAM bank inside one program. This store is a file, and
+every program that opens it reads and writes the same keys.
+
+**Plain BASL.** No `GP.*` keyword and no `GP.ASM`, so it needs neither `GPB.INC.BL` nor a
+`#SYMFILE`. The same source tokenises for ROM BASIC and compiles under GPC unchanged. Under GPC it
+needs runtime build 131 or later.
+
+**The file** is `KVBIN.FNAME$`, with its path if it has one, so the store can sit anywhere on the
+drive, such as the root. `KVBIN.DEVICE` is the drive, and 0 is 8. Every routine but `KVBIN.NEXT` and
+`KVBIN.STOP` reads both.
+
+**`KVBIN.OK` is -1 when the call is done and 0 when it is not.** `KVBIN.WHY` is 0 when it is done.
+When it is not, `KVBIN.WHY` gives the reason:
+
+| `KVBIN.WHY` | When |
+|---|---|
+| `KVBIN.WHY.NOFILE`, 1 | The drive refused the open. |
+| `KVBIN.WHY.NOTSTORE`, 2 | The file opened, and it does not start with a `*KVBIN` header of version 1, key length 12 and record length 128. |
+| `KVBIN.WHY.NOKEY`, 3 | `KVBIN.GET` or `KVBIN.DEL` found no slot with the key, or `KVBIN.AT` read a free slot. |
+| `KVBIN.WHY.FULL`, 4 | `KVBIN.PUT` of a new key found no free slot. |
+| `KVBIN.WHY.BADKEY`, 5 | `KVBIN.KEY$` is `""` for `KVBIN.GET`, `KVBIN.PUT` or `KVBIN.DEL`. The file is not opened. |
+
+`KVBIN.DOSERR` and `KVBIN.DOSMSG$` hold the drive's answer to the open. A number under 20 is
+success, and a missing file is 62.
+
+**Keys** are cut to 12 characters and hold any byte but `$00`. A key compares byte for byte.
+
+**Values** are cut to 115 characters and hold any byte but `$00`. An empty value is stored and reads
+back as `""`. A missing key gives `KVBIN.OK = 0`, `KVBIN.SLOT = 0` and `KVBIN.VALUE$ = ""`.
+
+**`KVBIN.PUT` keeps a key's slot.** A new key takes the first free slot. With none free, `KVBIN.WHY`
+is `KVBIN.WHY.FULL` and nothing is written. Call `KVBIN.EXPAND`, then `KVBIN.PUT` again.
+`KVBIN.DEL` frees the slot in place, and the other slots do not move.
+
+**`KVBIN.CREATE` makes a store of `KVBIN.NEWSLOTS` free slots**, 40 when it is 0, and replaces a
+file of the same name. `KVBIN.EXPAND` adds `KVBIN.GROWBY` free slots to the end of the file, 20
+when it is 0. Both leave the new count in `KVBIN.SLOTS`. `KVBIN.INFO` reads the count from the
+header.
+
+**`KVBIN.AT` reads slot `KVBIN.SLOT` and does not scan.** The slot is 1 to `KVBIN.SLOTS`, and the
+module does not check it. A free slot gives `KVBIN.OK = 0` and `""` for both strings.
+
+**A lookup scans from slot 1.** `KVBIN.GET`, `KVBIN.PUT` and `KVBIN.DEL` read one key a slot and
+stop at the key. A missing key and a new key read every slot. Measured in ROM BASIC on an SD image,
+on a store of 40 slots, 60 jiffies to the second: a scan costs about 1 jiffy a slot. `KVBIN.GET`
+takes 9 jiffies for a key in slot 3, and 39 to 44 for a key in slot 40 or a missing key. `KVBIN.PUT`
+of a new key takes 41. The walk below costs about 5 jiffies a slot.
+
+**`KVBIN.FIRST` and `KVBIN.NEXT` walk every slot in order**, free ones too. A free slot has
+`KVBIN.KEY$ = ""`. After the last slot `KVBIN.OK` is 0, `KVBIN.WHY` is 0 and the file is closed.
+When `KVBIN.FIRST` cannot open the store, `KVBIN.OK` is 0 and `KVBIN.WHY` holds the reason.
+
+```basic
+GOSUB KVBIN.FIRST
+SHOW.SLOT:
+    IF KVBIN.OK = 0 THEN GOTO SHOW.DONE
+    IF KVBIN.KEY$ <> "" THEN PRINT KVBIN.KEY$; " = "; KVBIN.VALUE$
+    GOSUB KVBIN.NEXT
+    GOTO SHOW.SLOT
+SHOW.DONE:
+```
+
+The file stays open between the calls. `KVBIN.SLOT` is the walk's place and `KVBIN.SLOTS` its end,
+so change neither. Call no other routine in the module until `KVBIN.NEXT` gives `KVBIN.OK = 0` or
+`KVBIN.STOP` has run. `KVBIN.STOP` ends a walk early.
+
+**WARNING: the module uses logical files 12 and 15.** Neither may be open when a routine is called.
+A routine opens both and closes both before it returns, and a walk holds both open from
+`KVBIN.FIRST` until it ends.
+
+The layout, for a program that reads the file without this module:
+
+```
+record n is at byte n*128 of the file, and is 128 bytes
+record 0, the header
++0..+5     "*KVBIN"
++6         the version, 1
++7         the key length, 12
++8         the record length, 128
++9, +10    the slot count, low byte first
++11..+127  $00
+record n, slot n
++0..+11    the key, padded with $00. $00 at +0 is a free slot
++12..+126  the value, padded with $00
++127       $00, so the value is a zero-terminated string
+```
+
+Regression test: [`KVBIN.EXP.BL`](KVBIN.EXP.BL), thirteen cases, every routine but `KVBIN.STOP`. It
+writes `KVBT.BIN` and `KVBJUNK.BIN` to the drive, and `KVBNONE.BIN` must not exist there.
+
+`GPC-BASIC-TOOLS-SRC/KV-BIN-STORE/` holds three programs on one `SETTINGS.KVB`: a registry editor in
+GP.BASIC (`KV-BIN-STORE.BASL`), a ROM BASIC program (`KVBIN-BASIC.BASL`) and a Prog8 program
+(`KVBIN-PROG8.P8`). In a release the folder is `SAMPLES/KV-BIN-STORE/`.
+
+---
+
+### 4.27 `GPBMODS` — the harness that drives every module
 
 `GPC-BASIC-TOOLS-SRC/GPB-MODS-TESTING/GPBMODS.BASL`. A menu bar of nine dropdowns whose rows reach nearly every
 public entry point in this section. It is the one program that holds all twenty-one modules at once, and
@@ -3024,9 +3156,11 @@ The convention is one dotted prefix per module, and nothing writes outside its o
 |---|---|
 | `GP.` | keywords, **not variables** — see below |
 | `STR.` | `STRINGS.INC.BL` |
+| `STR.USING.` | `STRUSING.INC.BL`, kept apart from the rest of `STR.` |
 | `THEME.` | `THEME.INC.BL` |
 | `APPSYS.` | `APPSYS.INC.BL` |
 | `LINEINPUT.` | `LINEINPUT.INC.BL` |
+| `KB.` | `KB.INC.BL` |
 | `MENU.` | `MENU.INC.BL`, and `MENUPULL.INC.BL`'s variables |
 | `MENUTO.` | the runners in `MENU.INC.BL` and `MENUPULL.INC.BL` |
 | `MENUPULL.` | `MENUPULL.INC.BL`'s labels |
@@ -3038,8 +3172,11 @@ The convention is one dotted prefix per module, and nothing writes outside its o
 | `SORT.` | `SORT.INC.BL` |
 | `STRCASE.` | `STRCASE.INC.BL` |
 | `BMX.` / `BMXK.` | `BMX.INC.BL` (variables / its KERNAL constants) |
+| `FILE.` / `FILE.DIR.` | `FILEIO.INC.BL` / `FILEDIR.INC.BL` |
 | `KV.` | `KV.INC.BL` |
+| `KVBIN.` | `KVBIN.INC.BL` |
 | `DOS.` | `DOS.INC.BL` |
+| `SV.` / `SVGC.` | `STASHVRAM.INC.BL` / `STASHVRAMGC.INC.BL` |
 | `MATH.` | `MATH.INC.BL` |
 | `MEM.` | `MEM.INC.BL`, its two KERNAL constants included |
 
@@ -3319,31 +3456,3 @@ the next read starts at a line boundary.
 
 **Do this** — a record cannot be one string. Make it N strings of 255, or keep it in a bank and
 copy out the part that is needed.
-
-### File I/O in a GP.DO key loop
-
-A save routine reached from inside a program's own `GP.DO` key loop **writes its file completely
-and correctly**, and then the program stops with
-
-```
-INPUT/OUTPUT ERROR @ $005B
-```
-
-The address is identical in every failing build, which says a clobbered instruction pointer rather
-than a real device error.
-
-Seven shapes have been compiled and probed. Do not bisect them again.
-
-| Shape | Result |
-|---|---|
-| `OPEN`/`PRINT#`/`CLOSE` at top level | passes |
-| four consecutive `PRINT#`, no `PRINT` between | passes |
-| the same inside `GP.DO` ... `GP.EXITDO` | passes |
-| the same behind a `GOSUB` inside a `GP.DO` | passes |
-| the same behind `GP.SELECT` then `GOSUB` inside a `GP.DO` | passes |
-| the real routine called from the top level of the same program | passes |
-| the real routine reached from the program's own `GP.DO` key loop | **fails** |
-
-**Do this** — a plain `PRINT` immediately after the `CLOSE` makes it pass. Channel 0 output runs
-`CLRCHN`; a non-zero channel runs `CHKOUT` and `READST` instead, so the suspect is channel state
-left behind rather than the file I/O.

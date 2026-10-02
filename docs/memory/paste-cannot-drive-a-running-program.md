@@ -31,6 +31,15 @@ have: the front end writes CR-terminated output, which the engine's sniffer misr
 compiled program, so one source tests both. The buffer holds 10 keys. This is how the empty-line
 INPUT fix was tested ([[gpc-input-empty-line]]).
 
+**The same call drives an unmodified program from the `-bas` driver** (2026-10-02). The driver
+is three direct-mode lines: `LOAD"NAME.PRG"`, `A$="keys"`, then one line that loops over `A$`
+with `POKE780,K:SYS65219` and ends in `:RUN`. The queue and the `RUN` must share a line. The
+paste goes through the same buffer, so a key queued on an earlier line is typed at the READY
+prompt. 10 keys a run, and a `/` in the string stands for RETURN. It drove a ROM BASIC program
+and a Prog8 PRG. The script is `source/scratch/runkeys.py DRIVE PRG KEYS`. `-echo` also logs
+every byte a program writes to a file or to the command channel, so a `P` seek and each record
+written show up between the screen lines.
+
 Chain-loading is fine in both directions: **a compiled GPC program chain-loads another compiled
 GPC program**, EMBEDDED or SHARED, with `LOAD "NAME"` and no `,8`.
 

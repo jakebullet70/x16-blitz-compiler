@@ -25,7 +25,7 @@ again. See [memory-is-git-tracked](memory-is-git-tracked.md).
 - [Compact early, not at the end](compact-early-not-at-the-end.md) — remind the user to /compact at the end of EVERY turn that lands a step; cost is context size x turns
 
 ## Build and toolchain
-- [USER-RUNS demos broken by Build 127](user-runs-demos-broken-by-build-127.md) — runtimes back beside each sample; the tree moved to build 130 on 2026-10-01
+- [USER-RUNS demos broken by Build 127](user-runs-demos-broken-by-build-127.md) — runtimes back beside each sample; the tree moved to build 131 on 2026-10-02
 - [Tool home layout deferred](tool-home-layout-deferred.md) — /GPC/ + /BASIC-SRC/ is next-version; copy the nine tool files into every working folder; research in docs/blitz/TOOL-HOME-LAYOUT.RESEARCH.md
 - [Build toolchain location](build-toolchain-location.md) — make, 64tass, python are off-PATH in C:\8bitProgramming; build setup is in docs/BUILDING.md
 - [Git Bash sed strips CRLF](git-bash-sed-strips-crlf.md) — `sed -i` writes LF and `grep -c $'\r$'` lies; count with Python bytes
@@ -35,8 +35,9 @@ again. See [memory-is-git-tracked](memory-is-git-tracked.md).
 - [GPC.ERR builds in its sample folder](gpcerr-builds-in-its-sample-folder.md) — never standalone
 - [Runtime storage is the golden RAM](runtime-storage-is-golden-ram.md) — $0400 to StorageEnd, which MOVES; a test routine goes at $0780; [tests share the product's memory](tests-share-the-products-memory.md)
 - [/GPC/NAME opens from any folder](gpc-home-path-form.md) — measured on R49 hostfs; the plain form works, no CMD syntax needed
-- [Paste can't drive a running program](paste-cannot-drive-a-running-program.md) — use a fixed-answer variant, or `POKE 780,K:SYS 65219` to queue keys. x16emu r49 runs tests, Box16 debugs
-- [File I/O dies in a GP.DO key loop](file-io-error-in-gpdo-key-loop.md) — the seven shapes already ruled out
+- [Paste can't drive a running program](paste-cannot-drive-a-running-program.md) — use a fixed-answer variant, or `POKE 780,K:SYS 65219` to queue keys; `source/scratch/runkeys.py` queues 10 from the driver line that ends in RUN. x16emu r49 runs tests, Box16 debugs
+- [File I/O dies in a GP.DO key loop](file-io-error-in-gpdo-key-loop.md) — FIXED in runtime build 131: CLS and COLOR passed garbage as the channel, PRINT# never ran CLRCHN; the help text and GPC.ERR's workaround were removed
+- [shared_test.py WARM step is stale](shared-test-warm-step-is-stale.md) — fails with `?RTC<nnn>` because the driver never loads bank 1; not a runtime fault, the repair is a two-run driver
 - [Retired keyword defers to runtime](retired-keyword-defers-to-runtime.md) — stale callers compile clean and explode
 
 ## GP.BASIC — the GP block and inline assembly
@@ -53,7 +54,7 @@ again. See [memory-is-git-tracked](memory-is-git-tracked.md).
 - [Scalar variable space caps at 4,096 bytes](scalar-variable-space-caps-at-4096.md) — 11-bit halved operand, now checked; [every scalar was allocated 6 bytes](every-scalar-allocated-six-bytes.md), FIXED 2026-09-20, GPBMODS 4,322 -> 3,482
 - [PROGRAM TOO BIG was the workspace](program-too-big-fires-early.md) — FIXED; a bank per table, 4,096 lines; [OUT OF MEMORY $02B8](gpbmods-out-of-memory-02b8.md) was StartRuntime never setting X
 - [SHARED p-code cap is RTBASE](gpc-shared-pcode-cap-is-rtbase.md) — 22,016 bytes, not $9F00; [the full slack table](gpc-blitz-runtime-slack-and-limits.md) — LOW FREE minus 4096 is the headroom
-- [Run-side workspace, read from the PRG](run-side-workspace-read-from-the-prg.md) — two bootstrap page numbers give the budget; [10 B cushion below GPBase](gpc-core-page-cushion-below-gpbase.md)
+- [Run-side workspace, read from the PRG](run-side-workspace-read-from-the-prg.md) — two bootstrap page numbers give the budget; [2 B cushion below GPBase](gpc-core-page-cushion-below-gpbase.md)
 - [Compiler-emitted bank switch](compiler-emitted-bank-switch.md) — .bgosub emitted, twins merged, shims deleted 2026-09-14; [banks work in progress](banks-work-in-progress.md) — ALL-BANKS done, HANDLER-BANK at step 28, both uncommitted
 - [Opcode numbers follow handler order](opcode-numbers-follow-handler-order.md) — moving a `;;` handler renumbers p-code; open a section per handler instead
 - [Library sizes owed to help](library-sizes-belong-in-help.md) — runtime 10,239 B CORE / 11,775 GP.BASIC embedded, none shared; GPC-BASIC costs only what you #INCLUDE
@@ -83,7 +84,8 @@ again. See [memory-is-git-tracked](memory-is-git-tracked.md).
 ## The CUA GUI library
 - [LISTS and DIR plan](lists-and-dir-plan.md) — lists read GP.BSTR-layout banks at run time; LIST.BANK and FILEPICK tested, LIST.SORT written and awaiting its run
 - [GUI-CUA phase 5 state](gui-cua-phase5-state.md) — written not verified; what is owed and what still drifts
-- [Demo project options](demo-project-options.md) — the six showcase ideas; #1 MANDELBROT-SPEED built and in release, #2 KV-BANKED parked, GUI-FIELD-EDIT works, LANDER64 built in GP.BASIC
+- [Demo project options](demo-project-options.md) — the six showcase ideas; #1 MANDELBROT-SPEED built and in release, #2 KV-BANKED parked, GUI-FIELD-EDIT works, LANDER64 built in GP.BASIC, KV-BIN-STORE in release with a ROM BASIC and a Prog8 version beside it; [KV-BANKED is out of this release](kv-banked-is-out-of-this-release.md), do not report on it
+- [CMDR-DOS modify mode, measured](cmdr-dos-modify-mode-measured.md) — `,M` overwrites in place, P seek takes NUL and 13, `,A` appends, paths work; KVBIN timings; passes under GPC from runtime build 131 on
 
 ## The BASL cruncher
 - [Folding onto a label line saves nothing](folding-onto-a-label-line-saves-nothing.md) — a bare label is not a BASIC line
@@ -145,7 +147,7 @@ again. See [memory-is-git-tracked](memory-is-git-tracked.md).
 - [Byte data type feasibility](byte-data-type-feasibility.md) — STUDY ONLY; the opcode space refuses byte SCALARS
 - [KERNAL preserves the RAM bank](kernal-preserves-ram-bank.md) — measure it in asm, PEEK(0) cannot see it
 - [X16 ROM internal calls](x16-rom-internal-calls.md) — verified R49 dispatcher/GC addresses and ZP pointers
-- [X16 toolchain](x16-toolchain.md) — 64tass and emulator paths on this machine
+- [X16 toolchain](x16-toolchain.md) — 64tass, emulator and Prog8 12.0.1 paths on this machine
 - [x16emu -echo doubling](x16emu-echo-doubling.md) — non-warp `-echo raw` prints every char TWICE
 - [Memory is git-tracked](memory-is-git-tracked.md) — versions with the project, via a junction that must survive renames
 - [Blitz-X16 prior attempt](blitz-x16-prior-attempt.md) — the earlier Prog8 self-hosted compiler, now deleted

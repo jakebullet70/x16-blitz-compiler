@@ -45,6 +45,41 @@ the settings are a KV bank saved as `SETTINGS.KV`. It is EMBEDDED and ships a `.
 `samplesbuild.py` entry `KV-BANKED` and `USER-RUNS/kvbanked-demo.bat`. It is not in `release.sh` yet.
 It is parked: it still calls the old `FORM.COMBOSEL`, `COMBO.ITEM$` and `FORM.COMBO` signature.
 
+**KV-BIN-STORE was written 2026-10-02**, outside the six, in `GPC-BASIC-TOOLS-SRC/KV-BIN-STORE/`
+(the user's folder name). It is a registry editor on `KVBIN.INC.BL`, a new plain-BASL module that
+keeps keys and values in one file of 128-byte records: a 12-byte key, a value of up to 115, both
+padded with `$00`. The user's idea is a small registry in the X16 root that many programs share,
+with the file name and path passed in. The module and `KVBIN.EXP.BL` are in the
+`GPB-MODS-TESTING/GPC-BASIC/` working copy, not in root. `KVBIN.EXP.BL` passes 13 of 13 in ROM
+BASIC, and 13 of 13 under GPC once the runtime was fixed, see [[file-io-error-in-gpdo-key-loop]].
+The editor has a `samplesbuild.py` entry and `USER-RUNS/kv-bin-store-demo.bat`. It was built
+EMBEDDED on 2026-10-02: PRG 22,417 bytes, OVL 26,893. A headless first run made `SETTINGS.KVB`
+with its six sample keys. The user ran it on 2026-10-02 and said it looks good, then asked for a
+shadow on every popup: `DLGSHADOW 1` follows `DLGRESET`, and the dropdowns had `MENU.SHADOW`
+already. It builds against runtime build 131.
+
+Later on 2026-10-02 the user asked for a ROM BASIC version and a Prog8 version in the same folder,
+all three in the release. Both are text programs with one menu line, `L LIST  G GET  P PUT
+D DELETE  Q QUIT`, on the same `SETTINGS.KVB`:
+- `KVBIN-BASIC.BASL` tokenises to `KVBIN-BASIC.PRG`, 3,444 bytes. It includes `KVBIN.INC.BL`,
+  which uses no GP keyword.
+- `KVBIN-PROG8.P8` compiles to `KVBIN-PROG8.PRG`, 3,855 bytes, with Prog8 12.0.1. Its `kvbin`
+  block is the module's Prog8 counterpart, on `diskio` (`f_open_w_seek`, `f_seek_w`).
+
+Each reads what the others wrote, and each makes a missing store. Tested headless with
+`runkeys.py`, see [[paste-cannot-drive-a-running-program]]. `samplesbuild.py` has entries
+`KVBIN-BASIC` (`kind="basic"`, tokenise only) and `KVBIN-PROG8` (`kind="prog8"`). `release.sh`
+ships the folder as `SAMPLES/KV-BIN-STORE/`, without `SETTINGS.KVB`. `USER-RUNS` has
+`kvbin-basic-demo.bat` and `kvbin-prog8-demo.bat`. `KVBIN.INC.BL` and `KVBIN.EXP.BL` are in root
+`GPC-BASIC/` and listed in `GP-BASIC.FILES.md`. The module is §4.26 of `GP-BASIC.md`, and the
+GPBMODS harness moved to §4.27. The help was rendered with it: 76 topics, 166 index rows, the
+topic is `H063.HLP`. `KVBIN.EXP.BL` calls every routine but `KVBIN.STOP`.
+The folder has a `readme.md` with a release cut. `release.sh stage` put all of it in
+`release/TMP` on 2026-10-02, at build 131, 345 files. No zip was made. The user has not run the
+two text programs by hand. `SETTINGS.KVB` and `SETTINGS.TXT` in the folder are run data and are
+not committed.
+See [[cmdr-dos-modify-mode-measured]].
+
 **GUI-FIELD-EDIT was built 2026-10-01**, outside the six. It is a fake video rental store form in
 `GPC-BASIC-TOOLS-SRC/GUI-FIELD-EDIT/`: 80x30, two columns, 26 controls plus the RENT and CANCEL
 buttons, and a summary `MSGBOX` after RENT. It drove the FORM library extension: per-control list state, `FORM.LIST`, `FORM.SEL n`,

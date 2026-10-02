@@ -1,37 +1,78 @@
-@STASHFILE.INC.BL -- a saved text rectangle, through a file.
+@STASH.INC.BL -- save a text rectangle, and put it back.
 .
-=STASHFILE.INC.BL
+=STASH.INC.BL
 .
-.  a saved text rectangle, through a file.
+.  save a text rectangle, and put it back.
 .
 =MODULE HEADER
 .
-:      STASH.FILE.SAVE   a rectangle of the screen, out to a file
-:      STASH.FILE.LOAD   a saved file, back where it came from
-:      STASH.FILE.PUT    a saved file, pasted somewhere else
+:      STASH.SAVE      copy a rectangle of the screen into a RAM bank
+:      STASH.RESTORE   copy it back, where it was or somewhere else
 .
-.  Requires, and does not #INCLUDE for you:
-:      GPB.INC.BL      GP.ASM
-:      STASH.INC.BL    which does the copying, and wants a #SYMFILE
+.  The same rectangle through a FILE is STASHFILE.INC.BL, built on this.
+.
+.  The program needs a #SYMFILE, before the includes and named after the
+.  source PRG. The assembly reaches BASIC's variables through {VAR} and
+.  BASLOAD crunches every name first; without one the compile stops with "{}
+.  NEEDS #SYMFILE".
+.
+:      #SAVEAS "@:MYPROG.PRG"
+:      #SYMFILE "@:MYPROG.SYM"
+:      #INCLUDE "GPB.INC.BL"
+:      #INCLUDE "STASH.INC.BL"
 .
 .  Usage:
-:      STASH.BANK = 8 : STASH.FILE$ = "PANEL.BIN"
+:      STASH.BANK = 8
 :      STASH.X = 10 : STASH.Y = 4 : STASH.W = 30 : STASH.H = 8
-:      GOSUB STASH.FILE.SAVE
-:      ...
-:      GOSUB STASH.FILE.LOAD
+:      GOSUB STASH.SAVE
+:      ... draw over it ...
+:      GOSUB STASH.RESTORE
 .
-:   in   STASH.FILE$    the name
-:        STASH.DEV      the device. 0 means 8
-:        STASH.BANK     the bank to stage through
-:        and, for SAVE, the geometry STASH.SAVE wants
+:   in   STASH.BANK     the RAM bank to keep the cells in. 1..255, and
+:                       it is yours: this writes the whole of it
+:        STASH.X  STASH.Y     top left, in CELLS
+:        STASH.W  STASH.H     size, in cells
 .
-.  The four header bytes go out with the cells, so loading one back needs
-.  nothing but the name.
+:        STASH.SLOT     byte offset into the bank. Default 0, which is what
+:                       every caller that never heard of it holds
 .
-.  BSAVE's end address is EXCLUSIVE, so this writes the header and the cells
-.  and no padding. The length is w h 2 + 4.
+:   out  STASH.OK       -1 if it fitted and was saved, 0 if not
+:        STASH.NEXT     the offset just past what was written
+.
+.  RESTORE needs only the bank: four header bytes go in first -- w, h, x, y
+.  -- so the rectangle describes itself. STASH.MOVE = 1 with STASH.X /
+.  STASH.Y pastes it somewhere else instead.
+.
+.  A bank is 8,192 bytes and a cell is two, so 4,094 cells fit -- 63x63, and
+.  NOT a whole 80x60 screen. Too big is refused before the first write, with
+.  STASH.OK = 0.
+.
+=MORE THAN ONE RECTANGLE IN A BANK
+.
+.  Feed STASH.NEXT back in as the next STASH.SLOT and the bank holds a stack
+.  of them, which is what nested dialogs want -- one bank for the lot rather
+.  than one bank a level. That is a bump allocator in two variables, and
+.  release is LIFO by remembering the offset. STASHVRAM.INC.BL allocates the
+.  same way.
+.
+=RESTORE READS THE SLOT IT IS GIVEN
+.
+.  Nothing checks that two saves do not overlap and nothing records which is
+.  which: the header describes a rectangle's SIZE, not its identity, so
+.  restoring the wrong offset restores whatever is there. The offsets are the
+.  caller's to keep straight, the same way the bank number already is.
+.
+.  A row's address is worked out in BASIC, once a row, and the row is copied
+.  in assembly. That keeps the assembly free of any pointer needing zero
+.  page: a blob runs with the interpreter live, so codePtr, zTemp0, NSStatus
+.  and the mantissas must survive it. The destination goes into the OPERAND
+.  of the store instead.
+.
+.  #REM 1 is load bearing: without it BASLOAD strips the body and the block
+.  reaches the compiler empty, refused as "block mismatch". #REM 0 restores
+.  the default.
 .
 =SEE ALSO
 .
->112|STASH.INC.BL -- save a text rectangle, and put it back.
+>117|STASHFILE.INC.BL -- a saved text rectangle, through a file.
+>95|4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM

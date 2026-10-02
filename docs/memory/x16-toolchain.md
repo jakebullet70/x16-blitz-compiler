@@ -8,8 +8,11 @@ metadata:
 ---
 
 Toolchain (Windows, use via Git Bash paths):
-- Java 19: `/c/dev/b4x/java19/bin/java.exe`
-- Prog8 compiler jar: `/c/dev/CmdrX16/dos_tools/BLITZ-COMPILER/prog8c.jar` (v12.2.1; also `C:\8bitProgramming\prog8-12.2.1\prog8c-12.2.1-all.jar`)
+- Java 17 (Temurin) is on PATH as `java`. Checked 2026-10-02.
+- Prog8 compiler jar: `C:\8bitProgramming\prog8\prog8c-12.0.1-all.jar`. The same folder holds
+  11.4.1, 12.0 and a 12.1 snapshot. The two 12.2.1 paths this note named are gone.
+  `samplesbuild.py` names the jar in `PROG8C`. It accepts a source named `NAME.P8` and writes
+  `NAME.prg`.
 - 64tass 1.60 at `/c/8bitProgramming/64tass-1.60` — Prog8 shells out to `64tass` by name, so put that dir on PATH.
 - Emulator: `/c/8bitProgramming/x16emu/x16emu.exe`; ships ROM symbol maps (`basic.sym`, `kernal.sym`, …) and `rom.bin`.
 

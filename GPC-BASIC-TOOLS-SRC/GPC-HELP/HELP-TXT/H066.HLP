@@ -1,125 +1,37 @@
-@5. Variables
+@STASHFILE.INC.BL -- a saved text rectangle, through a file.
 .
-=5. VARIABLES
+=STASHFILE.INC.BL
 .
-.BASL has one flat namespace. There are no locals, no scoping and no
-.parameters. Every variable in every #INCLUDEd module is visible to your
-.program and the reverse, and nothing warns you: a collision is a wrong
-.answer, not an error.
+.  a saved text rectangle, through a file.
 .
-.The convention is one dotted prefix per module, and nothing writes outside
-.its own prefix.
+=MODULE HEADER
 .
-=Prefixes already taken
+:      STASH.FILE.SAVE   a rectangle of the screen, out to a file
+:      STASH.FILE.LOAD   a saved file, back where it came from
+:      STASH.FILE.PUT    a saved file, pasted somewhere else
 .
-.  GP.
-.      OWNER: keywords, not variables -- see below
+.  Requires, and does not #INCLUDE for you:
+:      GPB.INC.BL      GP.ASM
+:      STASH.INC.BL    which does the copying, and wants a #SYMFILE
 .
-.  STR.
-.      OWNER: STRINGS.INC.BL
+.  Usage:
+:      STASH.BANK = 8 : STASH.FILE$ = "PANEL.BIN"
+:      STASH.X = 10 : STASH.Y = 4 : STASH.W = 30 : STASH.H = 8
+:      GOSUB STASH.FILE.SAVE
+:      ...
+:      GOSUB STASH.FILE.LOAD
 .
-.  STR.USING.
-.      OWNER: STRUSING.INC.BL, kept apart from the rest of STR.
+:   in   STASH.FILE$    the name
+:        STASH.DEV      the device. 0 means 8
+:        STASH.BANK     the bank to stage through
+:        and, for SAVE, the geometry STASH.SAVE wants
 .
-.  THEME.
-.      OWNER: THEME.INC.BL
+.  The four header bytes go out with the cells, so loading one back needs
+.  nothing but the name.
 .
-.  APPSYS.
-.      OWNER: APPSYS.INC.BL
-.
-.  LINEINPUT.
-.      OWNER: LINEINPUT.INC.BL
-.
-.  KB.
-.      OWNER: KB.INC.BL
-.
-.  MENU.
-.      OWNER: MENU.INC.BL, and MENUPULL.INC.BL's variables
-.
-.  MENUTO.
-.      OWNER: the runners in MENU.INC.BL and MENUPULL.INC.BL
-.
-.  MENUPULL.
-.      OWNER: MENUPULL.INC.BL's labels
-.
-.  GUI.
-.      OWNER: GUI.INC.BL
-.
-.  GUI.LISTBOX.
-.      OWNER: GUI-DIALOGS.INC.BL, kept apart from the rest of GUI.
-.
-.  DLG.
-.      OWNER: GUI-DIALOGS.INC.BL, the dialog verbs' arguments and internals
-.
-.  GL.
-.      OWNER: GUI-LITE.INC.BL
-.
-.  STASH. / STASH.FILE.
-.      OWNER: STASH.INC.BL / STASHFILE.INC.BL
-.
-.  SORT.
-.      OWNER: SORT.INC.BL
-.
-.  STRCASE.
-.      OWNER: STRCASE.INC.BL
-.
-.  BMX. / BMXK.
-.      OWNER: BMX.INC.BL (variables / its KERNAL constants)
-.
-.  FILE. / FILE.DIR.
-.      OWNER: FILEIO.INC.BL / FILEDIR.INC.BL
-.
-.  KV.
-.      OWNER: KV.INC.BL
-.
-.  DOS.
-.      OWNER: DOS.INC.BL
-.
-.  SV. / SVGC.
-.      OWNER: STASHVRAM.INC.BL / STASHVRAMGC.INC.BL
-.
-.  MATH.
-.      OWNER: MATH.INC.BL
-.
-.  MEM.
-.      OWNER: MEM.INC.BL, its two KERNAL constants included
-.
-.Use any other prefix for your own program: GAME., MAP., AIRLIFT.. A prefix
-.costs nothing at runtime -- BASLOAD crunches every identifier to a short
-.BASIC variable, so a long readable name and a two-letter one compile to the
-.same thing.
-.
-.Do not reuse a taken prefix for a name the module has not defined.
-.THEME.MINE is free today and is one library update from not being.
-.
-=GP.* is keywords, not variables
-.
-.GPB.INC.BL defines no variables. It is 27 keyword declarations and nothing
-.else.
-.
-:GP.A = 5 : REM SYNTAX ERROR -- GP.A is a keyword
-:X = GP.A : REM correct
-.
-.The value words are GP.A GP.X GP.Y GP.C, the registers after GP.CALL, and
-.that is all of them. They are keywords rather than variables because nothing
-.in the runtime can write a BASIC variable by name, so a command that returns
-.a value must return it through a keyword. X16's own ST, MX and MY work the
-.same way.
-.
-.The complete per-module in / out / internal register is GP-BASIC.GLOBALS.md,
-.with a script in SEC 6 of that file for re-checking it after a change.
+.  BSAVE's end address is EXCLUSIVE, so this writes the header and the cells
+.  and no padding. The length is w h 2 + 4.
 .
 =SEE ALSO
 .
->153|6. The traps, collected
->66|4.2 STRINGS.INC.BL -- string helpers
->85|4.10 STRUSING.INC.BL -- a number to a template
->65|4.1 THEME.INC.BL -- named colour roles
->74|4.3 APPSYS.INC.BL -- start politely, leave it as you found it
->75|4.4 LINEINPUT.INC.BL -- a positioned entry field
->91|4.14 KB.INC.BL -- the keyboard buffer, emptied
->77|4.6 MENU.INC.BL -- menus built a row at a time
->84|4.9 MENUPULL.INC.BL -- a dropdown under a bar item
->86|4.11 GUI.INC.BL -- the box that puts the screen back, and the form in 
->88|4.12 GUI-DIALOGS.INC.BL -- every dialog as a verb
->101|4.24 GUI-LITE.INC.BL -- a message box and a menu, in low memory
+>113|STASH.INC.BL -- save a text rectangle, and put it back.

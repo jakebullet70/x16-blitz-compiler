@@ -75,8 +75,8 @@ Inside `tmp-emu.bat`:
 |---|---|---|
 | `GPC.PRG` | compiler front end, the program you run | yes |
 | `GPC.BIN` | compiler engine, loaded by `GPC.PRG` | yes |
-| `GPC.IMG.130.BIN`, `GP1.IMG.130.BIN` | the runtime and bank 1 code a self-contained program carries | yes |
-| `GPB.RT.130.BIN`, `GPC.RT.130.BIN`, `GP1.RT.130.BIN` | shared runtime with GP handlers, shared runtime without, and the bank 1 code both load | yes |
+| `GPC.IMG.131.BIN`, `GP1.IMG.131.BIN` | the runtime and bank 1 code a self-contained program carries | yes |
+| `GPB.RT.131.BIN`, `GPC.RT.131.BIN`, `GP1.RT.131.BIN` | shared runtime with GP handlers, shared runtime without, and the bank 1 code both load | yes |
 | `GPC.ERR.PRG`, `GPC.ERR.OVL` | maps a runtime error address to a source line, and its banked code | yes |
 | `GPC.HELP.PRG`, `GPC.HELP.OVL` | the on-machine reference, and its banked code | yes |
 | `BASLOAD-GPC.PRG`, `BASLOAD-GPC.BIN` | the streaming tokeniser and its engine | yes |
@@ -119,6 +119,7 @@ BASL and none of the GPC-BASIC library modules, so a sample cannot be rebuilt wh
 | `COLORTST/` | `COLOR-TEST/` | `COLORTST.BASL`, `COLORTST.PRG` | edits a `THEME.INC.BL` theme against a mock of the GUI |
 | `GUI-LITE/` | `GUI-LITE/` | `GUI-LITE.BASL`, `GUI-LITE.PRG` | a message box and a menu that fit in low memory |
 | `MANDELBROT-SPEED/` | `MANDELBROT-SPEED/` | `MANDEL.BASL`, `MANDEL.SRC.PRG`, `MANDEL.PRG`, `MANDELASM.BASL`, `MANDELASM.PRG`, `README.md` | one Mandelbrot picture timed three ways |
+| `KV-BIN-STORE/` | `KV-BIN-STORE/` | `KV-BIN-STORE.BASL`, `KBS.TEXT.INC.BL`, `KV-BIN-STORE.PRG`, `KV-BIN-STORE.OVL`, `KVBIN-BASIC.BASL`, `KVBIN-BASIC.PRG`, `KVBIN-PROG8.P8`, `KVBIN-PROG8.PRG`, `README.md` | a registry file of keys and values, with a GPC-BASIC editor, a ROM BASIC program and a Prog8 program on the same store |
 
 MANDELBROT-SPEED on x16emu R49:
 

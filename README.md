@@ -26,11 +26,11 @@ same build.
 | --- | --- |
 | `GPC.PRG` | the compiler front end, the program you run |
 | `GPC.BIN` | the compiler engine, which `GPC.PRG` loads |
-| `GPC.IMG.130.BIN` | the runtime a self-contained program carries |
-| `GP1.IMG.130.BIN` | the bank 1 code a self-contained program carries |
-| `GPB.RT.130.BIN` | the shared runtime with the GP handlers |
-| `GPC.RT.130.BIN` | the shared runtime without the GP handlers |
-| `GP1.RT.130.BIN` | the bank 1 code both shared runtimes load |
+| `GPC.IMG.131.BIN` | the runtime a self-contained program carries |
+| `GP1.IMG.131.BIN` | the bank 1 code a self-contained program carries |
+| `GPB.RT.131.BIN` | the shared runtime with the GP handlers |
+| `GPC.RT.131.BIN` | the shared runtime without the GP handlers |
+| `GP1.RT.131.BIN` | the bank 1 code both shared runtimes load |
 | `GPC.ERR.PRG` | turns a runtime error address into a source line |
 | `GPC.ERR.OVL` | the banked code of `GPC.ERR.PRG` |
 | `GPC.HELP.PRG` | the GPC reference, on the X16 |
@@ -51,7 +51,7 @@ same build.
   `GPC-BASLOAD/`. `SRC/README.TXT` says how to rebuild them. Nothing in
   `SRC/` is needed to run GPC.
 - `SAMPLES/` holds `GPBMODS/`, `BMXVIEW/`, `COLORTST/`, `GUI-LITE/`,
-  `MANDELBROT-SPEED/` and `GUI-FIELD-EDIT/`.
+  `MANDELBROT-SPEED/`, `LANDER64/`, `GUI-FIELD-EDIT/` and `KV-BIN-STORE/`.
 
 The samples are there to be read and run. They cannot be rebuilt where they
 sit: their `#INCLUDE` lines need a `GPC-BASIC/` folder beside the source, and
@@ -59,7 +59,8 @@ a sample folder has none.
 
 Every sample carries its own runtime, so it runs from its own folder with
 nothing else on the drive. `GPBMODS.PRG` reads `GPBMODS.OVL` from beside it,
-and `GUI-FIELD-EDIT.PRG` reads `GUI-FIELD-EDIT.OVL`.
+`GUI-FIELD-EDIT.PRG` reads `GUI-FIELD-EDIT.OVL` and `KV-BIN-STORE.PRG` reads
+`KV-BIN-STORE.OVL`.
 
 `MANDELBROT-SPEED` draws one Mandelbrot picture three ways and times each.
 `MANDEL.SRC.PRG` runs in ROM BASIC, `MANDEL.PRG` is the same source compiled,
@@ -69,6 +70,12 @@ and `MANDELASM.PRG` has its inner loop in `GP.ASM`. Measured on x16emu R49:
 `GUI-FIELD-EDIT` is a video rental store checkout: one 80x30 form of 26
 controls and two buttons, with text fields, combos, a list box, check boxes,
 radio groups and read-only values. Its library code runs from banked regions.
+
+`KV-BIN-STORE` is a small registry: one file of fixed records that holds keys
+and values for every program on the drive. Three programs work on the same
+`SETTINGS.KVB`. `KV-BIN-STORE.PRG` is an editor in GPC-BASIC,
+`KVBIN-BASIC.PRG` runs in ROM BASIC and `KVBIN-PROG8.PRG` is written in
+Prog8. The BASIC module is `KVBIN.INC.BL` in `GPC-BASIC/`.
 
 ## Compiling a program
 
@@ -129,7 +136,7 @@ folder, or `/GPC/GPC.BIN` when the current folder has none. A shared compile
 first prints `** SHARED RUNTIME SELECTED, REMEMBER TO INCLUDE IT **`.
 
 `GPC.PRG` is itself a shared program that uses the GP handlers. It needs
-`GPB.RT.130.BIN` and `GP1.RT.130.BIN` (see [where the runtime files
+`GPB.RT.131.BIN` and `GP1.RT.131.BIN` (see [where the runtime files
 go](#where-the-runtime-files-go)).
 
 ### What the compiler prints
@@ -232,7 +239,7 @@ Then `LOAD "GPC.BIN",8` and `RUN`.
   and the object's `.OVL`.
 - A source it cannot read stops with `SOURCE NOT FOUND OR EMPTY`. One that
   does not load at `$0801` stops with `NOT A BASIC PRG FILE`.
-- A self-contained compile reads `GPC.IMG.130.BIN` and `GP1.IMG.130.BIN` from
+- A self-contained compile reads `GPC.IMG.131.BIN` and `GP1.IMG.131.BIN` from
   the current folder, or from `/GPC/`. Without them it prints
   `NO RUNTIME IMAGE` and writes nothing. A shared compile does not read them.
 
@@ -260,29 +267,29 @@ from a compatible build. Otherwise it loads one:
 
 | File | Loads at | Loaded for |
 | --- | --- | --- |
-| `GPB.RT.130.BIN` | `$6F00` | a `GPBASIC` program |
-| `GPC.RT.130.BIN` | `$7700` (`RTBASE`) | a `CORE` program |
-| `GP1.RT.130.BIN` | `$A000` in RAM bank 1 | every shared program |
+| `GPB.RT.131.BIN` | `$6F00` | a `GPBASIC` program |
+| `GPC.RT.131.BIN` | `$7700` (`RTBASE`) | a `CORE` program |
+| `GP1.RT.131.BIN` | `$A000` in RAM bank 1 | every shared program |
 
-`GPB.RT.130.BIN` holds the GP handlers and the core. `GPC.RT.130.BIN` holds
-the core only. `GP1.RT.130.BIN` holds the bank 1 code.
+`GPB.RT.131.BIN` holds the GP handlers and the core. `GPC.RT.131.BIN` holds
+the core only. `GP1.RT.131.BIN` holds the bank 1 code.
 
 The compiler chooses between the first two at compile time, and an edit to the
 program can change the choice. Keep all three files available.
 
 A shared program's workspace ends where the runtime starts: `$6F00` for
 `GPBASIC`, `$7700` for `CORE`. A `CORE` program uses the memory the GP
-handlers occupied, so the next `GPBASIC` program loads `GPB.RT.130.BIN` again.
+handlers occupied, so the next `GPBASIC` program loads `GPB.RT.131.BIN` again.
 
 #### Where the runtime files go
 
 The bootstrap looks in three places, in order: the current folder, `/GPC/`,
-then the root of the drive. It loads `GP1.RT.130.BIN` from the place the
+then the root of the drive. It loads `GP1.RT.131.BIN` from the place the
 runtime came from.
 
 A file that is not found prints `?RT`, the third letter of its name and the
-build number, then returns to BASIC: `?RTB130` for `GPB.RT.130.BIN`, `?RTC130`
-for `GPC.RT.130.BIN`, `?RT1130` for `GP1.RT.130.BIN`.
+build number, then returns to BASIC: `?RTB131` for `GPB.RT.131.BIN`, `?RTC131`
+for `GPC.RT.131.BIN`, `?RT1131` for `GP1.RT.131.BIN`.
 
 A shared object carries the file name of the runtime it was compiled against,
 so a runtime from another build is not found. Recompile every shared program
@@ -343,8 +350,8 @@ section 3.12 covers regions.
 answers with the BASIC line, the source file the line came from, and the
 nearest label above it.
 
-It is a shared program that uses the GP handlers, so it needs `GPB.RT.130.BIN`
-and `GP1.RT.130.BIN`. It needs `GPC.ERR.OVL` beside it. It runs on an 80x30
+It is a shared program that uses the GP handlers, so it needs `GPB.RT.131.BIN`
+and `GP1.RT.131.BIN`. It needs `GPC.ERR.OVL` beside it. It runs on an 80x30
 screen.
 
 | Menu | Items |
@@ -397,8 +404,8 @@ from `/GPC/HELP-TXT/` when there is none beside it. The folder name `HELP-TXT`
 is fixed. When the index does not load it prints
 `GPC.HELP: HELP-TXT/GPC.HELP.IDX WOULD NOT LOAD.` and ends.
 
-It is a shared program that uses the GP handlers, so it needs `GPB.RT.130.BIN`
-and `GP1.RT.130.BIN`. It needs `GPC.HELP.OVL` beside it.
+It is a shared program that uses the GP handlers, so it needs `GPB.RT.131.BIN`
+and `GP1.RT.131.BIN`. It needs `GPC.HELP.OVL` beside it.
 
 On the index:
 

@@ -316,6 +316,22 @@ SAMPLES = [
         "globs": [],
         "fake":  "GUI-FIELD-EDIT.PRG",
     },
+    {
+        # Three programs on one SETTINGS.KVB: GPC-BASIC, ROM BASIC and Prog8. The store
+        # itself is not shipped. The first run makes it.
+        "dir":   "KV-BIN-STORE",
+        "files": [("GPC-BASIC-TOOLS-SRC/KV-BIN-STORE/KV-BIN-STORE.PRG",  "KV-BIN-STORE.PRG"),
+                  ("GPC-BASIC-TOOLS-SRC/KV-BIN-STORE/KV-BIN-STORE.OVL",  "KV-BIN-STORE.OVL"),
+                  ("GPC-BASIC-TOOLS-SRC/KV-BIN-STORE/KV-BIN-STORE.BASL", "KV-BIN-STORE.BASL"),
+                  ("GPC-BASIC-TOOLS-SRC/KV-BIN-STORE/KBS.TEXT.INC.BL",   "KBS.TEXT.INC.BL"),
+                  ("GPC-BASIC-TOOLS-SRC/KV-BIN-STORE/KVBIN-BASIC.PRG",   "KVBIN-BASIC.PRG"),
+                  ("GPC-BASIC-TOOLS-SRC/KV-BIN-STORE/KVBIN-BASIC.BASL",  "KVBIN-BASIC.BASL"),
+                  ("GPC-BASIC-TOOLS-SRC/KV-BIN-STORE/KVBIN-PROG8.PRG",   "KVBIN-PROG8.PRG"),
+                  ("GPC-BASIC-TOOLS-SRC/KV-BIN-STORE/KVBIN-PROG8.P8",    "KVBIN-PROG8.P8"),
+                  ("GPC-BASIC-TOOLS-SRC/KV-BIN-STORE/readme.md",         "README.md")],
+        "globs": [],
+        "fake":  "KV-BIN-STORE.PRG",
+    },
 ]
 
 # THE DEVELOPER'S OWN FILES -- STAGED, NEVER SHIPPED.

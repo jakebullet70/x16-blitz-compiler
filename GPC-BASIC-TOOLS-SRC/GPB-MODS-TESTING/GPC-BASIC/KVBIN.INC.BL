@@ -1,0 +1,349 @@
+## ***********************************************************************
+## **  Plain BASL. It tokenises for stock BASIC and compiles under GPC
+## **  unchanged.
+## **
+## **  KVBIN.INC.BL -- keys and values in one file of fixed records
+## **
+## **  A few dozen settings that every program on the drive can share.
+## **
+## **      KVBIN.CREATE   a new store, every slot free
+## **      KVBIN.INFO     how many slots a store has
+## **      KVBIN.GET      a value by key
+## **      KVBIN.PUT      write a value by key
+## **      KVBIN.DEL      remove a key
+## **      KVBIN.AT       a key and its value by slot
+## **      KVBIN.FIRST    slot 1, then KVBIN.NEXT for each slot after it
+## **      KVBIN.STOP     end a FIRST and NEXT walk early
+## **      KVBIN.EXPAND   more free slots on the end
+## **
+## **      KVBIN.FNAME$ = "/SETTINGS.KVB"
+## **      KVBIN.KEY$ = "USER.NAME" : KVBIN.VALUE$ = "STEVE" : GOSUB KVBIN.PUT
+## **      KVBIN.KEY$ = "USER.NAME" : GOSUB KVBIN.GET
+## **      IF KVBIN.OK THEN PRINT KVBIN.VALUE$
+## **
+## **   in   KVBIN.FNAME$    the file, with its path if it has one
+## **        KVBIN.DEVICE    the drive. 0 is 8
+## **        KVBIN.KEY$      the key, cut to 12 characters
+## **        KVBIN.VALUE$    the value for PUT, cut to 115 characters
+## **        KVBIN.SLOT      the slot for AT, 1 to KVBIN.SLOTS
+## **        KVBIN.NEWSLOTS  the slots CREATE makes. 0 is 40
+## **        KVBIN.GROWBY    the slots EXPAND adds. 0 is 20
+## **
+## **   out  KVBIN.OK        -1 done, 0 not
+## **        KVBIN.WHY       why not, a KVBIN.WHY.* number. 0 when done
+## **        KVBIN.SLOT      the slot GET, PUT, DEL, FIRST and NEXT landed on
+## **        KVBIN.SLOTS     the store's slot count
+## **        KVBIN.KEY$      what AT, FIRST and NEXT read. "" is a free slot
+## **        KVBIN.VALUE$    what GET, AT, FIRST and NEXT read
+## **        KVBIN.DOSERR    the drive's answer to the open
+## **        KVBIN.DOSMSG$   its message
+## **
+## **  The file is records of 128 bytes. Record 0 is the header:
+## **      +0..+5   "*KVBIN"
+## **      +6       the version, 1
+## **      +7       the key length, 12
+## **      +8       the record length, 128
+## **      +9, +10  the slot count, low byte first
+## **  Record n is slot n:
+## **      +0..+11  the key, padded with $00. $00 at +0 is a free slot
+## **      +12..    the value, padded with $00
+## **  The last byte of a record is always $00, so the value at +12 is a
+## **  zero-terminated string.
+## **
+## **  A key and a value hold any byte but $00.
+## **
+## **  PUT keeps a key's slot. A new key takes the first free slot. With
+## **  none free, KVBIN.WHY is KVBIN.WHY.FULL and nothing is written: EXPAND,
+## **  then PUT again.
+## **
+## **  FIRST and NEXT hand back every slot in order, free ones too, and
+## **  KVBIN.OK is 0 after the last. The file stays open between the calls
+## **  and KVBIN.SLOT is the walk's place. Leave it alone, and call nothing
+## **  else here until NEXT gives KVBIN.OK 0 or STOP has run.
+## **
+## **  WARNING: every routine opens logical files 12 and 15, and closes them.
+## ***********************************************************************
+#IFNDEF KVBIN.DEFS
+#DEFINE KVBIN.DEFS 1
+
+## A new record length needs a new count of doublings in KVBIN.SETUP.
+#DEFINE KVBIN.RECLEN 128
+#DEFINE KVBIN.KEYLEN 12
+#DEFINE KVBIN.MAXLEN 115
+#DEFINE KVBIN.VERSION 1
+#DEFINE KVBIN.HEADLEN 11
+#DEFINE KVBIN.USUALSLOTS 40
+#DEFINE KVBIN.USUALGROW 20
+
+## The seek command names the data file by its secondary address, so the
+## logical file number and the secondary address are the same number.
+#DEFINE KVBIN.CHAN 12
+#DEFINE KVBIN.CMD 15
+
+#DEFINE KVBIN.WHY.NONE 0
+#DEFINE KVBIN.WHY.NOFILE 1
+#DEFINE KVBIN.WHY.NOTSTORE 2
+#DEFINE KVBIN.WHY.NOKEY 3
+#DEFINE KVBIN.WHY.FULL 4
+#DEFINE KVBIN.WHY.BADKEY 5
+
+## A drive error number under this is success.
+#DEFINE KVBIN.DOSOKMAX 20
+
+GOTO KVBIN.MODULE.END
+
+## ***********************************************************************
+## **  KVBIN.CREATE -- a new store of KVBIN.NEWSLOTS free slots. A file of
+## **  the same name is replaced.
+## ***********************************************************************
+KVBIN.CREATE:
+    GOSUB KVBIN.SETUP
+    KVBIN.OK = 0
+    KVBIN.WHY = KVBIN.WHY.NOFILE
+    KVBIN.SLOTS = KVBIN.NEWSLOTS
+    IF KVBIN.SLOTS = 0 THEN KVBIN.SLOTS = KVBIN.USUALSLOTS
+    OPEN KVBIN.CMD, KVBIN.DEVICE, KVBIN.CMD
+    OPEN KVBIN.CHAN, KVBIN.DEVICE, KVBIN.CHAN, "@:" + KVBIN.FNAME$ + ",S,W"
+    INPUT# KVBIN.CMD, KVBIN.DOSERR, KVBIN.DOSMSG$, KVBIN.DOSTRACK, KVBIN.DOSSECTOR
+    IF KVBIN.DOSERR >= KVBIN.DOSOKMAX THEN GOTO KVBIN.CLOSE
+    GOSUB KVBIN.MAKEHEAD
+    PRINT# KVBIN.CHAN, KVBIN.HEADER$;
+    FOR KVBIN.INDEX = 1 TO KVBIN.SLOTS
+        PRINT# KVBIN.CHAN, KVBIN.BLANK$;
+    NEXT KVBIN.INDEX
+    KVBIN.OK = -1
+    KVBIN.WHY = KVBIN.WHY.NONE
+    GOTO KVBIN.CLOSE
+
+KVBIN.INFO:
+    KVBIN.MODE$ = "R"
+    GOSUB KVBIN.OPEN
+    IF KVBIN.OK = 0 THEN RETURN
+    GOTO KVBIN.CLOSE
+
+## ---- the value stops one byte short of the record's end, so the read
+## ---- never reaches the end of the file.
+KVBIN.GET:
+    KVBIN.VALUE$ = ""
+    KVBIN.MODE$ = "R"
+    GOSUB KVBIN.FIND
+    IF KVBIN.OK = 0 THEN RETURN
+    IF KVBIN.SLOT = 0 THEN GOTO KVBIN.MISSING
+    BINPUT# KVBIN.CHAN, KVBIN.TEXT$, KVBIN.MAXLEN
+    GOSUB KVBIN.TRIM
+    KVBIN.VALUE$ = KVBIN.TEXT$
+    GOTO KVBIN.CLOSE
+
+KVBIN.PUT:
+    KVBIN.MODE$ = "M"
+    GOSUB KVBIN.FIND
+    IF KVBIN.OK = 0 THEN RETURN
+    IF KVBIN.SLOT = 0 THEN KVBIN.SLOT = KVBIN.FREESLOT
+    IF KVBIN.SLOT = 0 THEN GOTO KVBIN.NOROOM
+    KVBIN.RECORD$ = KVBIN.PADKEY$ + LEFT$(KVBIN.VALUE$, KVBIN.MAXLEN)
+    KVBIN.RECORD$ = LEFT$(KVBIN.RECORD$ + KVBIN.BLANK$, KVBIN.RECLEN)
+    GOTO KVBIN.WRITE
+
+KVBIN.DEL:
+    KVBIN.MODE$ = "M"
+    GOSUB KVBIN.FIND
+    IF KVBIN.OK = 0 THEN RETURN
+    IF KVBIN.SLOT = 0 THEN GOTO KVBIN.MISSING
+    KVBIN.RECORD$ = KVBIN.BLANK$
+    GOTO KVBIN.WRITE
+
+KVBIN.AT:
+    KVBIN.MODE$ = "R"
+    GOSUB KVBIN.OPEN
+    IF KVBIN.OK = 0 THEN RETURN
+    KVBIN.OFFSET = KVBIN.SLOT * KVBIN.RECLEN
+    GOSUB KVBIN.SEEK
+    BINPUT# KVBIN.CHAN, KVBIN.RECORD$, KVBIN.RECLEN - 1
+    GOSUB KVBIN.SPLIT
+    IF KVBIN.KEY$ = "" THEN GOTO KVBIN.MISSING
+    GOTO KVBIN.CLOSE
+
+## ---- the rest of the header record is read and dropped, which leaves the
+## ---- file at slot 1.
+KVBIN.FIRST:
+    KVBIN.MODE$ = "R"
+    GOSUB KVBIN.OPEN
+    IF KVBIN.OK = 0 THEN RETURN
+    BINPUT# KVBIN.CHAN, KVBIN.RECORD$, KVBIN.RECLEN - KVBIN.HEADLEN
+    KVBIN.SLOT = 0
+    GOTO KVBIN.NEXT
+
+KVBIN.NEXT:
+    KVBIN.OK = 0
+    KVBIN.WHY = KVBIN.WHY.NONE
+    IF KVBIN.SLOT >= KVBIN.SLOTS THEN GOTO KVBIN.CLOSE
+    KVBIN.SLOT = KVBIN.SLOT + 1
+    BINPUT# KVBIN.CHAN, KVBIN.RECORD$, KVBIN.RECLEN
+    GOSUB KVBIN.SPLIT
+    KVBIN.OK = -1
+    RETURN
+
+KVBIN.STOP:
+    GOTO KVBIN.CLOSE
+
+## ***********************************************************************
+## **  KVBIN.EXPAND -- KVBIN.GROWBY free slots added to the end of the
+## **  file, then the header's slot count written again.
+## ***********************************************************************
+KVBIN.EXPAND:
+    KVBIN.MODE$ = "R"
+    GOSUB KVBIN.OPEN
+    IF KVBIN.OK = 0 THEN RETURN
+    CLOSE KVBIN.CHAN
+    KVBIN.ADDED = KVBIN.GROWBY
+    IF KVBIN.ADDED = 0 THEN KVBIN.ADDED = KVBIN.USUALGROW
+    OPEN KVBIN.CHAN, KVBIN.DEVICE, KVBIN.CHAN, KVBIN.FNAME$ + ",S,A"
+    FOR KVBIN.INDEX = 1 TO KVBIN.ADDED
+        PRINT# KVBIN.CHAN, KVBIN.BLANK$;
+    NEXT KVBIN.INDEX
+    CLOSE KVBIN.CHAN
+    KVBIN.SLOTS = KVBIN.SLOTS + KVBIN.ADDED
+    GOSUB KVBIN.MAKEHEAD
+    OPEN KVBIN.CHAN, KVBIN.DEVICE, KVBIN.CHAN, KVBIN.FNAME$ + ",S,M"
+    PRINT# KVBIN.CHAN, LEFT$(KVBIN.HEADER$, KVBIN.HEADLEN);
+    GOTO KVBIN.CLOSE
+
+## ***********************************************************************
+## **  Internals.
+## ***********************************************************************
+
+## ---- once a run: a zero byte, and a record of them. 1 doubled 7 times is
+## ---- KVBIN.RECLEN.
+KVBIN.SETUP:
+    IF KVBIN.DEVICE = 0 THEN KVBIN.DEVICE = 8
+    IF KVBIN.READY THEN RETURN
+    KVBIN.ZERO$ = CHR$(0)
+    KVBIN.BLANK$ = KVBIN.ZERO$
+    FOR KVBIN.INDEX = 1 TO 7
+        KVBIN.BLANK$ = KVBIN.BLANK$ + KVBIN.BLANK$
+    NEXT KVBIN.INDEX
+    KVBIN.READY = -1
+    RETURN
+
+## ---- the store open in KVBIN.MODE$, "R" to read or "M" to read and write,
+## ---- with its header read. With KVBIN.OK 0 it is closed again.
+KVBIN.OPEN:
+    GOSUB KVBIN.SETUP
+    KVBIN.OK = 0
+    KVBIN.WHY = KVBIN.WHY.NOFILE
+    OPEN KVBIN.CMD, KVBIN.DEVICE, KVBIN.CMD
+    OPEN KVBIN.CHAN, KVBIN.DEVICE, KVBIN.CHAN, KVBIN.FNAME$ + ",S," + KVBIN.MODE$
+    INPUT# KVBIN.CMD, KVBIN.DOSERR, KVBIN.DOSMSG$, KVBIN.DOSTRACK, KVBIN.DOSSECTOR
+    IF KVBIN.DOSERR >= KVBIN.DOSOKMAX THEN GOTO KVBIN.CLOSE
+    KVBIN.WHY = KVBIN.WHY.NOTSTORE
+    BINPUT# KVBIN.CHAN, KVBIN.HEADER$, KVBIN.HEADLEN
+    IF LEN(KVBIN.HEADER$) < KVBIN.HEADLEN THEN GOTO KVBIN.CLOSE
+    IF LEFT$(KVBIN.HEADER$, 6) <> "*KVBIN" THEN GOTO KVBIN.CLOSE
+    IF ASC(MID$(KVBIN.HEADER$, 7, 1)) <> KVBIN.VERSION THEN GOTO KVBIN.CLOSE
+    IF ASC(MID$(KVBIN.HEADER$, 8, 1)) <> KVBIN.KEYLEN THEN GOTO KVBIN.CLOSE
+    IF ASC(MID$(KVBIN.HEADER$, 9, 1)) <> KVBIN.RECLEN THEN GOTO KVBIN.CLOSE
+    KVBIN.SLOTS = ASC(MID$(KVBIN.HEADER$, 10, 1)) + 256 * ASC(MID$(KVBIN.HEADER$, 11, 1))
+    KVBIN.OK = -1
+    KVBIN.WHY = KVBIN.WHY.NONE
+    RETURN
+
+## ---- the store open in KVBIN.MODE$ and scanned for KVBIN.KEY$. An empty
+## ---- key would match a free slot, so it is refused before the open.
+KVBIN.FIND:
+    KVBIN.OK = 0
+    KVBIN.WHY = KVBIN.WHY.BADKEY
+    IF KVBIN.KEY$ = "" THEN RETURN
+    GOSUB KVBIN.OPEN
+    IF KVBIN.OK = 0 THEN RETURN
+    GOTO KVBIN.SCAN
+
+## ---- the slot holding KVBIN.KEY$ into KVBIN.SLOT, and the first free slot
+## ---- into KVBIN.FREESLOT, 0 for none. The scan stops on a hit, with the
+## ---- file at that slot's value.
+KVBIN.SCAN:
+    KVBIN.SLOT = 0
+    KVBIN.FREESLOT = 0
+    KVBIN.PADKEY$ = LEFT$(LEFT$(KVBIN.KEY$, KVBIN.KEYLEN) + KVBIN.BLANK$, KVBIN.KEYLEN)
+    FOR KVBIN.EACH = 1 TO KVBIN.SLOTS
+        KVBIN.OFFSET = KVBIN.EACH * KVBIN.RECLEN
+        GOSUB KVBIN.SEEK
+        BINPUT# KVBIN.CHAN, KVBIN.FOUNDKEY$, KVBIN.KEYLEN
+        IF KVBIN.FREESLOT = 0 THEN IF LEFT$(KVBIN.FOUNDKEY$, 1) = KVBIN.ZERO$ THEN KVBIN.FREESLOT = KVBIN.EACH
+        IF KVBIN.FOUNDKEY$ = KVBIN.PADKEY$ THEN KVBIN.SLOT = KVBIN.EACH
+        IF KVBIN.SLOT > 0 THEN RETURN
+    NEXT KVBIN.EACH
+    RETURN
+
+## ---- the file moved to byte KVBIN.OFFSET. PRINT# ends the command with a
+## ---- RETURN, which the drive drops.
+KVBIN.SEEK:
+    KVBIN.OFFSETPAGE = INT(KVBIN.OFFSET / 256)
+    KVBIN.OFFSETLOW = KVBIN.OFFSET - KVBIN.OFFSETPAGE * 256
+    KVBIN.OFFSETHIGH = INT(KVBIN.OFFSETPAGE / 256)
+    KVBIN.OFFSETMID = KVBIN.OFFSETPAGE - KVBIN.OFFSETHIGH * 256
+    KVBIN.SEEKCMD$ = "P" + CHR$(KVBIN.CHAN) + CHR$(KVBIN.OFFSETLOW) + CHR$(KVBIN.OFFSETMID)
+    PRINT# KVBIN.CMD, KVBIN.SEEKCMD$ + CHR$(KVBIN.OFFSETHIGH) + KVBIN.ZERO$
+    RETURN
+
+## ---- KVBIN.RECORD$ over slot KVBIN.SLOT.
+KVBIN.WRITE:
+    KVBIN.OFFSET = KVBIN.SLOT * KVBIN.RECLEN
+    GOSUB KVBIN.SEEK
+    PRINT# KVBIN.CHAN, KVBIN.RECORD$;
+    GOTO KVBIN.CLOSE
+
+## ---- KVBIN.RECORD$ into KVBIN.KEY$ and KVBIN.VALUE$. A free slot, and a
+## ---- slot past the end of the file, give "" for both.
+KVBIN.SPLIT:
+    KVBIN.KEY$ = ""
+    KVBIN.VALUE$ = ""
+    IF KVBIN.RECORD$ = "" THEN RETURN
+    IF LEFT$(KVBIN.RECORD$, 1) = KVBIN.ZERO$ THEN RETURN
+    KVBIN.TEXT$ = LEFT$(KVBIN.RECORD$, KVBIN.KEYLEN)
+    GOSUB KVBIN.TRIM
+    KVBIN.KEY$ = KVBIN.TEXT$
+    KVBIN.TEXT$ = MID$(KVBIN.RECORD$, KVBIN.KEYLEN + 1)
+    GOSUB KVBIN.TRIM
+    KVBIN.VALUE$ = KVBIN.TEXT$
+    RETURN
+
+## ---- KVBIN.TEXT$ cut at its first $00. Every byte after the first $00 is
+## ---- $00, so the cut is found by halving.
+KVBIN.TRIM:
+    KVBIN.KEPT = 0
+    KVBIN.LIMIT = LEN(KVBIN.TEXT$)
+KVBIN.TRIM.HALVE:
+    IF KVBIN.KEPT >= KVBIN.LIMIT THEN GOTO KVBIN.TRIM.CUT
+    KVBIN.MIDDLE = INT((KVBIN.KEPT + KVBIN.LIMIT) / 2)
+    IF MID$(KVBIN.TEXT$, KVBIN.MIDDLE + 1, 1) = KVBIN.ZERO$ THEN KVBIN.LIMIT = KVBIN.MIDDLE
+    IF KVBIN.LIMIT > KVBIN.MIDDLE THEN KVBIN.KEPT = KVBIN.MIDDLE + 1
+    GOTO KVBIN.TRIM.HALVE
+KVBIN.TRIM.CUT:
+    KVBIN.TEXT$ = LEFT$(KVBIN.TEXT$, KVBIN.KEPT)
+    RETURN
+
+## ---- KVBIN.HEADER$, a whole record, for a store of KVBIN.SLOTS slots.
+KVBIN.MAKEHEAD:
+    KVBIN.SLOTSHIGH = INT(KVBIN.SLOTS / 256)
+    KVBIN.HEADER$ = "*KVBIN" + CHR$(KVBIN.VERSION) + CHR$(KVBIN.KEYLEN) + CHR$(KVBIN.RECLEN)
+    KVBIN.HEADER$ = KVBIN.HEADER$ + CHR$(KVBIN.SLOTS - KVBIN.SLOTSHIGH * 256) + CHR$(KVBIN.SLOTSHIGH)
+    KVBIN.HEADER$ = LEFT$(KVBIN.HEADER$ + KVBIN.BLANK$, KVBIN.RECLEN)
+    RETURN
+
+KVBIN.MISSING:
+    KVBIN.OK = 0
+    KVBIN.WHY = KVBIN.WHY.NOKEY
+    GOTO KVBIN.CLOSE
+
+KVBIN.NOROOM:
+    KVBIN.OK = 0
+    KVBIN.WHY = KVBIN.WHY.FULL
+    GOTO KVBIN.CLOSE
+
+KVBIN.CLOSE:
+    CLOSE KVBIN.CHAN
+    CLOSE KVBIN.CMD
+    RETURN
+
+KVBIN.MODULE.END:
+#ENDIF

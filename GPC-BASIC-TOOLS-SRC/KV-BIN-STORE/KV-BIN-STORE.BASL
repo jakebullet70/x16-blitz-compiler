@@ -1,0 +1,806 @@
+#SAVEAS "@:KV-BIN-STORE.SRC.PRG"
+#SYMFILE "@:KV-BIN-STORE.SRC.SYM"
+#INCLUDE "GPC-BASIC/GPB.INC.BL"
+#INCLUDE "GPC-BASIC/STASH.INC.BL"
+#INCLUDE "GPC-BASIC/DOS.INC.BL"
+#INCLUDE "GPC-BASIC/KVBIN.INC.BL"
+
+## ***********************************************************************
+## **
+## **  KV-BIN-STORE.BASL -- a registry editor for a KVBIN store, the file of
+## **  fixed records that KVBIN.INC.BL keeps keys and values in.
+## **
+## **  The keys are listed on the left and the bar's key is shown whole on
+## **  the right, read from the file as the bar moves. FILE makes, opens and
+## **  expands a store and moves it to and from a text file. KEY adds,
+## **  edits, deletes and looks up. The status line names each store call
+## **  and the jiffies it took.
+## **
+## **  Every library module that can be banked runs from a GP.BANKED region,
+## **  and the program's text is in a GP.BANKEDSTR bank. STASH and MENUKEY
+## **  hold a BANK statement and stay in low RAM. DOS and KVBIN are in low
+## **  RAM too.
+## **
+## ***********************************************************************
+
+## ---- The banks. All here, above the regions: BASLOAD resolves a #DEFINE only
+## ---- once it has read it. A new bank needs a claim in KBS.CLAIM.BANKS.
+#DEFINE KBS.UTILCODE 4
+#DEFINE KBS.MENUCODE 5
+#DEFINE KBS.GUICODE 6
+#DEFINE KBS.FORMCODE 7
+#DEFINE KBS.TEXTBANK 8
+
+## ---- Screen mode 1 is 80x30. The list is on the left, a line down, and the
+## ---- panel on the right.
+#DEFINE KBS.MODE 1
+#DEFINE KBS.SPACE 32
+#DEFINE KBS.VLINE 221
+#DEFINE KBS.BARX 1
+#DEFINE KBS.TITLEROW 2
+#DEFINE KBS.LISTX 2
+#DEFINE KBS.LISTTOP 5
+#DEFINE KBS.LISTROWS 20
+#DEFINE KBS.LISTWIDTH 17
+#DEFINE KBS.DIVIDERX 22
+#DEFINE KBS.PANELX 24
+#DEFINE KBS.PANELWIDTH 54
+#DEFINE KBS.LABELWIDTH 9
+#DEFINE KBS.VALUELINES 3
+
+## ---- KBS.MAXSLOTS is the two arrays' size. KBS.EDITLEN is the widest field
+## ---- an input box holds on this screen.
+#DEFINE KBS.MAXSLOTS 100
+#DEFINE KBS.EDITLEN 70
+#DEFINE KBS.NAMELEN 40
+#DEFINE KBS.TEXTCHAN 2
+
+## ---- The bar's items and each dropdown's rows, counted as KBS.TEXT.INC.BL
+## ---- lists them. A separator is a row.
+#DEFINE KBS.ITEM.FILE 1
+#DEFINE KBS.ITEM.KEY 2
+#DEFINE KBS.ITEM.VIEW 3
+#DEFINE KBS.ITEM.HELP 4
+#DEFINE KBS.FILEROW.NEW 1
+#DEFINE KBS.FILEROW.OPEN 2
+#DEFINE KBS.FILEROW.EXPAND 3
+#DEFINE KBS.FILEROW.EXPORT 5
+#DEFINE KBS.FILEROW.IMPORT 6
+#DEFINE KBS.FILEROW.EXIT 8
+#DEFINE KBS.KEYROW.NEW 1
+#DEFINE KBS.KEYROW.EDIT 2
+#DEFINE KBS.KEYROW.DELETE 3
+#DEFINE KBS.KEYROW.GET 5
+#DEFINE KBS.VIEWROW.USED 1
+#DEFINE KBS.VIEWROW.ALL 2
+#DEFINE KBS.VIEWROW.READ 4
+#DEFINE KBS.HELPROW.KEYS 1
+#DEFINE KBS.HELPROW.LAYOUT 2
+
+#DEFINE KBS.KEY.RETURN 13
+#DEFINE KBS.KEY.DOWN 17
+#DEFINE KBS.KEY.UP 145
+#DEFINE KBS.KEY.HOME 19
+#DEFINE KBS.KEY.END 4
+#DEFINE KBS.KEY.PAGEDOWN 2
+#DEFINE KBS.KEY.PAGEUP 130
+#DEFINE KBS.KEY.INSERT 148
+#DEFINE KBS.KEY.DELETE 25
+#DEFINE KBS.KEY.BACKSPACE 20
+
+GOTO KBS.LIBEND
+
+## ---- The utilities. THEME is first in line for every region after it: they
+## ---- read its role numbers, which are #DEFINEs.
+GP.BANKED KBS.UTILCODE
+#INCLUDE "GPC-BASIC/APPSYS.INC.BL"
+#INCLUDE "GPC-BASIC/BANKMGR.INC.BL"
+#INCLUDE "GPC-BASIC/STASHVRAM.INC.BL"
+#INCLUDE "GPC-BASIC/THEME.INC.BL"
+GP.ENDBANKED
+
+GP.BANKED KBS.MENUCODE
+#INCLUDE "GPC-BASIC/MENU.INC.BANKED.BL"
+#INCLUDE "GPC-BASIC/MENU.INC.BL"
+#INCLUDE "GPC-BASIC/MENUPULL.INC.BL"
+GP.ENDBANKED
+
+GP.BANKED KBS.GUICODE
+#INCLUDE "GPC-BASIC/LINEINPUT.INC.BL"
+#INCLUDE "GPC-BASIC/GUI.INC.BL"
+GP.ENDBANKED
+
+## ---- The dialog verbs, and the two controls they call. After the GUI, whose
+## ---- #DEFINEs they read, and above every caller: a verb is compiled before
+## ---- its calls.
+GP.BANKED KBS.FORMCODE
+#INCLUDE "GPC-BASIC/COMBO.INC.BL"
+#INCLUDE "GPC-BASIC/CHECK.INC.BL"
+#INCLUDE "GPC-BASIC/GUI-DIALOGS.INC.BL"
+GP.ENDBANKED
+
+## ---- MENUKEY comes after the last region: its closing GOTO lands on the line
+## ---- after it, and a GOTO onto a GP.BANKED line is refused.
+#INCLUDE "GPC-BASIC/MENUKEY.INC.BL"
+
+#INCLUDE "KBS.TEXT.INC.BL"
+
+KBS.LIBEND:
+
+DIM KBS.KEYAT$(KBS.MAXSLOTS)
+DIM KBS.SLOTOFROW%(KBS.MAXSLOTS)
+KBS.PAD$ = "            "
+
+## ---- APPSYS.STARTUP before the SCREEN: it records the screen APPSYS.RESTORE
+## ---- puts back. The size is asked after the mode change.
+GOSUB APPSYS.STARTUP
+SCREEN KBS.MODE
+GP.CALL APPSYS.SCRMODE, 0, 0, 0, 1
+KBS.SCREENCOLS% = GP.X
+KBS.SCREENROWS% = GP.Y
+THEME.ID% = 0
+GOSUB THEME.SELECT
+
+## ---- The claims, then the menus, then a free bank: the first MENU.BEGIN
+## ---- claims MENU.TEXTBANK, and GET.FREE.BANK must not hand out any of them.
+GOSUB KBS.CLAIM.BANKS
+GOSUB KBS.MENU.BUILD
+GOSUB BANKMGR.GET.FREE.BANK
+GP.SUB DLGRESET, BANKMGR.BANK
+GP.SUB DLGSHADOW, 1
+
+## ---- The page goes up empty first, for the first dialog to stand on.
+KBS.FILE$ = GP.BSTR(KBS.TEXT.NAMES, 0)
+KBS.TEXTFILE$ = GP.BSTR(KBS.TEXT.NAMES, 1)
+GOSUB KBS.DRAW.PAGE
+GOSUB KBS.FIRST.STORE
+GOSUB KBS.READ.STORE
+GOSUB KBS.DRAW.PAGE
+
+## ---- ALT with a bar hot key types that key until MENU.KEYS.OFF.
+GOSUB MENU.KEYS.ON
+
+KBS.MAIN:
+    GET KBS.KEYTEXT$
+    KBS.KEYCODE = 0
+    IF KBS.KEYTEXT$ <> "" THEN KBS.KEYCODE = ASC(KBS.KEYTEXT$)
+    GOSUB KBS.TAKE.KEY
+    IF KBS.QUIT% = 0 THEN GOTO KBS.MAIN
+
+GOSUB MENU.KEYS.OFF
+GOSUB APPSYS.RESTORE
+END
+
+
+## ***********************************************************************
+## **  KBS.CLAIM.BANKS -- every bank named in this source, told to BANKMGR.
+## ***********************************************************************
+KBS.CLAIM.BANKS:
+    GOSUB BANKMGR.INIT
+    GP.SUB BANKMGR.CLAIM.BANK, KBS.UTILCODE
+    GP.SUB BANKMGR.CLAIM.BANK, KBS.MENUCODE
+    GP.SUB BANKMGR.CLAIM.BANK, KBS.GUICODE
+    GP.SUB BANKMGR.CLAIM.BANK, KBS.FORMCODE
+    GP.SUB BANKMGR.CLAIM.BANK, KBS.TEXTBANK
+    RETURN
+
+
+## ***********************************************************************
+## **  KBS.MENU.BUILD -- the bar and its four dropdowns, built once.
+## **
+## **  The bar goes first: MENU.BEGIN on the bar empties every dropdown.
+## ***********************************************************************
+KBS.MENU.BUILD:
+    MENU.DROPSTYLE = MENU.ROUND
+    MENU.SHADOW = 1
+    GP.SUB MENU.BEGIN, MENU.BAR
+    FOR KBS.MENUROW = 0 TO GP.BSTRCOUNT(KBS.TEXT.BAR) - 1
+        GP.SUB MENU.ITEM, GP.BSTR(KBS.TEXT.BAR, KBS.MENUROW)
+    NEXT KBS.MENUROW
+    GP.SUB MENU.BEGIN, MENU.DROP + KBS.ITEM.FILE
+    FOR KBS.MENUROW = 0 TO GP.BSTRCOUNT(KBS.TEXT.FILEMENU) - 1
+        GP.SUB MENU.ITEM, GP.BSTR(KBS.TEXT.FILEMENU, KBS.MENUROW)
+    NEXT KBS.MENUROW
+    GP.SUB MENU.BEGIN, MENU.DROP + KBS.ITEM.KEY
+    FOR KBS.MENUROW = 0 TO GP.BSTRCOUNT(KBS.TEXT.KEYMENU) - 1
+        GP.SUB MENU.ITEM, GP.BSTR(KBS.TEXT.KEYMENU, KBS.MENUROW)
+    NEXT KBS.MENUROW
+    GP.SUB MENU.BEGIN, MENU.DROP + KBS.ITEM.VIEW
+    FOR KBS.MENUROW = 0 TO GP.BSTRCOUNT(KBS.TEXT.VIEWMENU) - 1
+        GP.SUB MENU.ITEM, GP.BSTR(KBS.TEXT.VIEWMENU, KBS.MENUROW)
+    NEXT KBS.MENUROW
+    GP.SUB MENU.BEGIN, MENU.DROP + KBS.ITEM.HELP
+    FOR KBS.MENUROW = 0 TO GP.BSTRCOUNT(KBS.TEXT.HELPMENU) - 1
+        GP.SUB MENU.ITEM, GP.BSTR(KBS.TEXT.HELPMENU, KBS.MENUROW)
+    NEXT KBS.MENUROW
+    RETURN
+
+
+## ***********************************************************************
+## **  KBS.TAKE.KEY -- every key comes here first. The menu has first call
+## **  on it, and what the menu leaves moves the bar or acts on its key.
+## **
+## **   in   KBS.KEYCODE   the key GET gave, 0 for none
+## **   out  KBS.QUIT%     -1 once EXIT has been answered for leaving
+## ***********************************************************************
+KBS.TAKE.KEY:
+    KBS.CHOSEN% = GP.FN(MENU.KEY, KBS.KEYCODE)
+    IF KBS.CHOSEN% > 0 THEN GOTO KBS.MENU.CHOSEN
+    IF KBS.CHOSEN% = 0 THEN RETURN
+    GP.SELECT KBS.KEYCODE
+        GP.CASE KBS.KEY.DOWN
+            KBS.MOVETO = KBS.CURSOR% + 1
+            GOSUB KBS.MOVE.CURSOR
+        GP.CASE KBS.KEY.UP
+            KBS.MOVETO = KBS.CURSOR% - 1
+            GOSUB KBS.MOVE.CURSOR
+        GP.CASE KBS.KEY.PAGEDOWN
+            KBS.MOVETO = KBS.CURSOR% + KBS.LISTROWS
+            GOSUB KBS.MOVE.CURSOR
+        GP.CASE KBS.KEY.PAGEUP
+            KBS.MOVETO = KBS.CURSOR% - KBS.LISTROWS
+            GOSUB KBS.MOVE.CURSOR
+        GP.CASE KBS.KEY.HOME
+            KBS.MOVETO = 1
+            GOSUB KBS.MOVE.CURSOR
+        GP.CASE KBS.KEY.END
+            KBS.MOVETO = KBS.ROWS%
+            GOSUB KBS.MOVE.CURSOR
+        GP.CASE KBS.KEY.RETURN
+            GOSUB KBS.EDIT.VALUE
+        GP.CASE KBS.KEY.INSERT
+            GOSUB KBS.NEW.KEY
+        GP.CASE KBS.KEY.DELETE, KBS.KEY.BACKSPACE
+            GOSUB KBS.DELETE.KEY
+    GP.ENDSEL
+    RETURN
+
+KBS.MENU.CHOSEN:
+    GP.SELECT MENU.PICKBAR
+        GP.CASE KBS.ITEM.FILE
+            GOSUB KBS.FILE.CHOSEN
+        GP.CASE KBS.ITEM.KEY
+            GOSUB KBS.KEY.CHOSEN
+        GP.CASE KBS.ITEM.VIEW
+            GOSUB KBS.VIEW.CHOSEN
+        GP.CASE KBS.ITEM.HELP
+            GOSUB KBS.HELP.CHOSEN
+    GP.ENDSEL
+    RETURN
+
+KBS.FILE.CHOSEN:
+    GP.SELECT KBS.CHOSEN%
+        GP.CASE KBS.FILEROW.NEW
+            GOSUB KBS.NEW.STORE
+        GP.CASE KBS.FILEROW.OPEN
+            GOSUB KBS.OPEN.STORE
+        GP.CASE KBS.FILEROW.EXPAND
+            GOSUB KBS.EXPAND.STORE
+        GP.CASE KBS.FILEROW.EXPORT
+            GOSUB KBS.EXPORT.TEXT
+        GP.CASE KBS.FILEROW.IMPORT
+            GOSUB KBS.IMPORT.TEXT
+        GP.CASE KBS.FILEROW.EXIT
+            KBS.QUIT% = GP.FN(ASKYN, GP.BSTR(KBS.TEXT.ASK, 13))
+    GP.ENDSEL
+    RETURN
+
+KBS.KEY.CHOSEN:
+    GP.SELECT KBS.CHOSEN%
+        GP.CASE KBS.KEYROW.NEW
+            GOSUB KBS.NEW.KEY
+        GP.CASE KBS.KEYROW.EDIT
+            GOSUB KBS.EDIT.VALUE
+        GP.CASE KBS.KEYROW.DELETE
+            GOSUB KBS.DELETE.KEY
+        GP.CASE KBS.KEYROW.GET
+            GOSUB KBS.GET.KEY
+    GP.ENDSEL
+    RETURN
+
+## ---- The bar stays on its slot when the view changes or the store is read
+## ---- again, if the new list still shows that slot.
+KBS.VIEW.CHOSEN:
+    KBS.WANTSLOT = 0
+    IF KBS.CURSOR% > 0 THEN KBS.WANTSLOT = KBS.SLOTOFROW%(KBS.CURSOR%)
+    IF KBS.CHOSEN% = KBS.VIEWROW.USED THEN KBS.SHOWALL% = 0
+    IF KBS.CHOSEN% = KBS.VIEWROW.ALL THEN KBS.SHOWALL% = -1
+    IF KBS.CHOSEN% = KBS.VIEWROW.READ THEN GOSUB KBS.READ.STORE
+    GOSUB KBS.BUILD.ROWS
+    GOSUB KBS.SELECT.SLOT
+    GOTO KBS.DRAW.PAGE
+
+KBS.HELP.CHOSEN:
+    IF KBS.CHOSEN% = KBS.HELPROW.KEYS THEN GP.SUB MSGBOXEX, GP.BSTR(KBS.TEXT.HELPKEYS, 0), GP.BSTR(KBS.TEXT.HELPKEYS, 1), GP.BSTR(KBS.TEXT.HELPKEYS, 2), GP.BSTR(KBS.TEXT.HELPKEYS, 3), ""
+    IF KBS.CHOSEN% = KBS.HELPROW.LAYOUT THEN GP.SUB MSGBOXEX, GP.BSTR(KBS.TEXT.HELPFILE, 0), GP.BSTR(KBS.TEXT.HELPFILE, 1), GP.BSTR(KBS.TEXT.HELPFILE, 2), GP.BSTR(KBS.TEXT.HELPFILE, 3), ""
+    RETURN
+
+
+## ***********************************************************************
+## **  The store as a whole: the first one, a new one, another one, more
+## **  slots.
+## ***********************************************************************
+
+## ---- With no KBS.FILE$ on the drive, offer to make it and put the sample
+## ---- keys in.
+KBS.FIRST.STORE:
+    IF GP.FN(DOSX.EXISTS, KBS.FILE$) THEN RETURN
+    IF GP.FN(ASKYN, KBS.FILE$ + GP.BSTR(KBS.TEXT.ASK, 14)) = 0 THEN RETURN
+    KVBIN.FNAME$ = KBS.FILE$
+    KVBIN.NEWSLOTS = 0
+    GOSUB KVBIN.CREATE
+    IF KVBIN.OK = 0 THEN RETURN
+    FOR KBS.INDEX = 0 TO GP.BSTRCOUNT(KBS.TEXT.SAMPLEKEYS) - 1
+        KVBIN.KEY$ = GP.BSTR(KBS.TEXT.SAMPLEKEYS, KBS.INDEX)
+        KVBIN.VALUE$ = GP.BSTR(KBS.TEXT.SAMPLEVALUES, KBS.INDEX)
+        GOSUB KVBIN.PUT
+    NEXT KBS.INDEX
+    RETURN
+
+KBS.NEW.STORE:
+    KBS.NAME$ = GP.FN(INPUTBOX, GP.BSTR(KBS.TEXT.ASK, 0), KBS.FILE$, KBS.NAMELEN)
+    IF GUI.OK = 0 THEN RETURN
+    IF KBS.NAME$ = "" THEN RETURN
+    KBS.REPLACE% = -1
+    IF GP.FN(DOSX.EXISTS, KBS.NAME$) THEN KBS.REPLACE% = GP.FN(ASKYN, KBS.NAME$ + GP.BSTR(KBS.TEXT.ASK, 2))
+    IF KBS.REPLACE% = 0 THEN RETURN
+    KBS.FILE$ = KBS.NAME$
+    KVBIN.FNAME$ = KBS.FILE$
+    KVBIN.NEWSLOTS = 0
+    KBS.STARTED = TI
+    GOSUB KVBIN.CREATE
+    KBS.JIFFIES = TI - KBS.STARTED
+    KBS.ACTION$ = GP.BSTR(KBS.TEXT.SAY, 0) + KBS.FILE$
+    GOSUB KBS.SAY.RESULT
+    GOSUB KBS.LOAD.STORE
+    GOTO KBS.DRAW.PAGE
+
+KBS.OPEN.STORE:
+    KBS.NAME$ = GP.FN(INPUTBOX, GP.BSTR(KBS.TEXT.ASK, 1), KBS.FILE$, KBS.NAMELEN)
+    IF GUI.OK = 0 THEN RETURN
+    IF KBS.NAME$ = "" THEN RETURN
+    KBS.FILE$ = KBS.NAME$
+    GOSUB KBS.READ.STORE
+    GOTO KBS.DRAW.PAGE
+
+KBS.EXPAND.STORE:
+    IF KBS.SLOTS% = 0 THEN GOTO KBS.SAY.NOSTORE
+    IF KBS.SLOTS% + KVBIN.USUALGROW > KBS.MAXSLOTS THEN GOTO KBS.SAY.TOOBIG
+    IF GP.FN(ASKYN, GP.BSTR(KBS.TEXT.ASK, 3)) = 0 THEN RETURN
+    KVBIN.GROWBY = 0
+    KBS.STARTED = TI
+    GOSUB KVBIN.EXPAND
+    KBS.JIFFIES = TI - KBS.STARTED
+    KBS.ACTION$ = GP.BSTR(KBS.TEXT.SAY, 6) + KBS.FILE$
+    GOSUB KBS.SAY.RESULT
+    IF KVBIN.OK THEN GOSUB KBS.GROW.LIST
+    GOTO KBS.DRAW.PAGE
+
+## ---- The slots EXPAND added, free, on the end of the list.
+KBS.GROW.LIST:
+    FOR KBS.SLOT = KBS.SLOTS% + 1 TO KVBIN.SLOTS
+        KBS.KEYAT$(KBS.SLOT) = ""
+    NEXT KBS.SLOT
+    KBS.SLOTS% = KVBIN.SLOTS
+    GOTO KBS.BUILD.ROWS
+
+
+## ***********************************************************************
+## **  KBS.READ.STORE -- KBS.FILE$ read into the list, and the status line
+## **  told how it went.
+## ***********************************************************************
+KBS.READ.STORE:
+    KVBIN.FNAME$ = KBS.FILE$
+    KBS.STARTED = TI
+    GOSUB KBS.LOAD.STORE
+    KBS.JIFFIES = TI - KBS.STARTED
+    KBS.ACTION$ = GP.BSTR(KBS.TEXT.SAY, 1) + KBS.FILE$
+    IF KBS.SLOTS% > 0 THEN KBS.ACTION$ = KBS.ACTION$ + "  " + STR$(KBS.SLOTS%) + GP.BSTR(KBS.TEXT.SAY, 13)
+    GOTO KBS.SAY.RESULT
+
+## ---- Every slot's key into KBS.KEYAT$(), "" for a free one.
+## ----
+## ----  out  KBS.SLOTS%   the store's slot count, 0 when it did not open
+KBS.LOAD.STORE:
+    KBS.SLOTS% = 0
+    GOSUB KVBIN.FIRST
+KBS.LOAD.SLOT:
+    IF KVBIN.OK = 0 THEN GOTO KBS.LOAD.DONE
+    IF KVBIN.SLOT <= KBS.MAXSLOTS THEN KBS.KEYAT$(KVBIN.SLOT) = KVBIN.KEY$
+    GOSUB KVBIN.NEXT
+    GOTO KBS.LOAD.SLOT
+KBS.LOAD.DONE:
+    IF KVBIN.WHY = KVBIN.WHY.NONE THEN KBS.SLOTS% = KVBIN.SLOTS
+    IF KBS.SLOTS% > KBS.MAXSLOTS THEN KBS.SLOTS% = KBS.MAXSLOTS
+    KBS.CURSOR% = 1
+    KBS.TOP% = 1
+    GOTO KBS.BUILD.ROWS
+
+
+## ***********************************************************************
+## **  One key: new, edited, deleted, looked up.
+## ***********************************************************************
+
+KBS.NEW.KEY:
+    IF KBS.SLOTS% = 0 THEN GOTO KBS.SAY.NOSTORE
+    KBS.NEWKEY$ = GP.FN(INPUTBOXEX, GP.BSTR(KBS.TEXT.ASK, 5), GP.BSTR(KBS.TEXT.ASK, 6), "", "", "", KVBIN.KEYLEN, 0)
+    IF GUI.OK = 0 THEN RETURN
+    IF KBS.NEWKEY$ = "" THEN RETURN
+    KBS.NEWVALUE$ = GP.FN(INPUTBOXEX, KBS.NEWKEY$, GP.BSTR(KBS.TEXT.ASK, 7), "", "", "", KBS.EDITLEN, 0)
+    IF GUI.OK = 0 THEN RETURN
+    GOTO KBS.PUT.KEY
+
+## ---- KBS.VALUE$ is the bar's value, as KBS.DRAW.DETAIL last read it. RETURN
+## ---- on a free slot adds a key.
+KBS.EDIT.VALUE:
+    IF KBS.CURSOR% < 1 THEN GOTO KBS.NEW.KEY
+    KBS.NEWKEY$ = KBS.KEYAT$(KBS.SLOTOFROW%(KBS.CURSOR%))
+    IF KBS.NEWKEY$ = "" THEN GOTO KBS.NEW.KEY
+    IF LEN(KBS.VALUE$) > KBS.EDITLEN THEN GOTO KBS.SAY.TOOLONG
+    KBS.NEWVALUE$ = GP.FN(INPUTBOXEX, KBS.NEWKEY$, GP.BSTR(KBS.TEXT.ASK, 7), "", "", KBS.VALUE$, KBS.EDITLEN, 0)
+    IF GUI.OK = 0 THEN RETURN
+    GOTO KBS.PUT.KEY
+
+## ---- in KBS.NEWKEY$ and KBS.NEWVALUE$. The bar lands on the key's slot.
+KBS.PUT.KEY:
+    KVBIN.KEY$ = KBS.NEWKEY$
+    KVBIN.VALUE$ = KBS.NEWVALUE$
+    GOSUB KBS.TIMED.PUT
+    IF KVBIN.WHY = KVBIN.WHY.FULL THEN GOSUB KBS.PUT.FULL
+    KBS.ACTION$ = GP.BSTR(KBS.TEXT.SAY, 2) + KBS.NEWKEY$
+    GOSUB KBS.SAY.RESULT
+    IF KVBIN.OK THEN GOSUB KBS.PUT.DONE
+    GOTO KBS.DRAW.PAGE
+
+KBS.TIMED.PUT:
+    KBS.STARTED = TI
+    GOSUB KVBIN.PUT
+    KBS.JIFFIES = TI - KBS.STARTED
+    RETURN
+
+## ---- The store has no free slot. Offer 20 more, and put again. A refusal
+## ---- leaves KVBIN.WHY saying the store is full.
+KBS.PUT.FULL:
+    IF KBS.SLOTS% + KVBIN.USUALGROW > KBS.MAXSLOTS THEN RETURN
+    IF GP.FN(ASKYN, GP.BSTR(KBS.TEXT.ASK, 4)) = 0 THEN RETURN
+    KVBIN.GROWBY = 0
+    GOSUB KVBIN.EXPAND
+    IF KVBIN.OK = 0 THEN RETURN
+    GOSUB KBS.GROW.LIST
+    GOTO KBS.TIMED.PUT
+
+## ---- A store longer than the list can put a key past the list's end.
+KBS.PUT.DONE:
+    IF KVBIN.SLOT > KBS.MAXSLOTS THEN RETURN
+    KBS.KEYAT$(KVBIN.SLOT) = LEFT$(KBS.NEWKEY$, KVBIN.KEYLEN)
+    KBS.WANTSLOT = KVBIN.SLOT
+    GOSUB KBS.BUILD.ROWS
+    GOTO KBS.SELECT.SLOT
+
+KBS.DELETE.KEY:
+    IF KBS.CURSOR% < 1 THEN RETURN
+    KBS.DELETESLOT = KBS.SLOTOFROW%(KBS.CURSOR%)
+    KBS.NEWKEY$ = KBS.KEYAT$(KBS.DELETESLOT)
+    IF KBS.NEWKEY$ = "" THEN RETURN
+    IF GP.FN(ASKYN, GP.BSTR(KBS.TEXT.ASK, 8) + KBS.NEWKEY$ + GP.BSTR(KBS.TEXT.ASK, 9)) = 0 THEN RETURN
+    KVBIN.KEY$ = KBS.NEWKEY$
+    KBS.STARTED = TI
+    GOSUB KVBIN.DEL
+    KBS.JIFFIES = TI - KBS.STARTED
+    KBS.ACTION$ = GP.BSTR(KBS.TEXT.SAY, 4) + KBS.NEWKEY$
+    GOSUB KBS.SAY.RESULT
+    IF KVBIN.OK THEN KBS.KEYAT$(KBS.DELETESLOT) = ""
+    GOSUB KBS.BUILD.ROWS
+    GOTO KBS.DRAW.PAGE
+
+## ---- KEY / GET BY NAME: the call another program makes. The bar goes to
+## ---- the key when the list shows its slot.
+KBS.GET.KEY:
+    IF KBS.SLOTS% = 0 THEN GOTO KBS.SAY.NOSTORE
+    KBS.NEWKEY$ = GP.FN(ASKTEXT, GP.BSTR(KBS.TEXT.ASK, 10), KVBIN.KEYLEN)
+    IF KBS.NEWKEY$ = "" THEN RETURN
+    KVBIN.KEY$ = KBS.NEWKEY$
+    KBS.STARTED = TI
+    GOSUB KVBIN.GET
+    KBS.JIFFIES = TI - KBS.STARTED
+    KBS.ACTION$ = GP.BSTR(KBS.TEXT.SAY, 3) + KBS.NEWKEY$
+    GOSUB KBS.SAY.RESULT
+    IF KVBIN.OK = 0 THEN GOTO KBS.DRAW.STATUS
+    KBS.WANTSLOT = KVBIN.SLOT
+    GOSUB KBS.SELECT.SLOT
+    GOTO KBS.DRAW.PAGE
+
+
+## ***********************************************************************
+## **  The store to and from a text file, a line a key: KEY)!(VALUE.
+## **
+## **  A line ends in RETURN and LINE FEED, so the file opens in an editor
+## **  on another machine. The import drops the LINE FEED and takes a file
+## **  whose lines end in RETURN alone.
+## ***********************************************************************
+
+KBS.EXPORT.TEXT:
+    IF KBS.SLOTS% = 0 THEN GOTO KBS.SAY.NOSTORE
+    KBS.NAME$ = GP.FN(INPUTBOX, GP.BSTR(KBS.TEXT.ASK, 11), KBS.TEXTFILE$, KBS.NAMELEN)
+    IF GUI.OK = 0 THEN RETURN
+    IF KBS.NAME$ = "" THEN RETURN
+    KBS.TEXTFILE$ = KBS.NAME$
+    KBS.LINES% = 0
+    KBS.STARTED = TI
+    OPEN KBS.TEXTCHAN, 8, KBS.TEXTCHAN, "@:" + KBS.TEXTFILE$ + ",S,W"
+    FOR KBS.SLOT = 1 TO KBS.SLOTS%
+        IF KBS.KEYAT$(KBS.SLOT) <> "" THEN GOSUB KBS.EXPORT.SLOT
+    NEXT KBS.SLOT
+    CLOSE KBS.TEXTCHAN
+    KBS.JIFFIES = TI - KBS.STARTED
+    KBS.ACTION$ = GP.BSTR(KBS.TEXT.SAY, 8) + STR$(KBS.LINES%) + GP.BSTR(KBS.TEXT.SAY, 9) + KBS.TEXTFILE$
+    GOSUB KBS.SAY.TIMED
+    GOTO KBS.DRAW.STATUS
+
+KBS.EXPORT.SLOT:
+    KVBIN.SLOT = KBS.SLOT
+    GOSUB KVBIN.AT
+    IF KVBIN.OK = 0 THEN RETURN
+    PRINT# KBS.TEXTCHAN, KVBIN.KEY$ + ")!(" + KVBIN.VALUE$; CHR$(13); CHR$(10);
+    KBS.LINES% = KBS.LINES% + 1
+    RETURN
+
+## ---- A key in the file replaces the store's value for it. The store's
+## ---- other keys stay. The first PUT that fails ends the import.
+KBS.IMPORT.TEXT:
+    IF KBS.SLOTS% = 0 THEN GOTO KBS.SAY.NOSTORE
+    KBS.NAME$ = GP.FN(INPUTBOX, GP.BSTR(KBS.TEXT.ASK, 12), KBS.TEXTFILE$, KBS.NAMELEN)
+    IF GUI.OK = 0 THEN RETURN
+    IF KBS.NAME$ = "" THEN RETURN
+    IF GP.FN(DOSX.EXISTS, KBS.NAME$) = 0 THEN GOTO KBS.SAY.NOTEXT
+    KBS.TEXTFILE$ = KBS.NAME$
+    KBS.LINES% = 0
+    KBS.SKIPPED% = 0
+    KBS.STOPPED% = 0
+    KBS.STARTED = TI
+    OPEN KBS.TEXTCHAN, 8, KBS.TEXTCHAN, KBS.TEXTFILE$ + ",S,R"
+KBS.IMPORT.LINE:
+    LINPUT# KBS.TEXTCHAN, KBS.TEXTLINE$
+    KBS.LINESTATUS% = ST
+    GOSUB KBS.IMPORT.PARSE
+    IF KBS.STOPPED% <> 0 THEN GOTO KBS.IMPORT.DONE
+    IF (KBS.LINESTATUS% AND 66) = 0 THEN GOTO KBS.IMPORT.LINE
+KBS.IMPORT.DONE:
+    CLOSE KBS.TEXTCHAN
+    KBS.JIFFIES = TI - KBS.STARTED
+    KBS.ACTION$ = GP.BSTR(KBS.TEXT.SAY, 10) + STR$(KBS.LINES%) + GP.BSTR(KBS.TEXT.SAY, 11) + KBS.TEXTFILE$
+    IF KBS.SKIPPED% > 0 THEN KBS.ACTION$ = KBS.ACTION$ + "  " + STR$(KBS.SKIPPED%) + GP.BSTR(KBS.TEXT.SAY, 12)
+    IF KBS.STOPPED% <> 0 THEN GOSUB KBS.SAY.RESULT
+    IF KBS.STOPPED% = 0 THEN GOSUB KBS.SAY.TIMED
+    GOSUB KBS.LOAD.STORE
+    GOTO KBS.DRAW.PAGE
+
+## ---- KBS.TEXTLINE$ into the store. A line with no )!( after a key is
+## ---- counted and skipped.
+KBS.IMPORT.PARSE:
+    IF LEFT$(KBS.TEXTLINE$, 1) = CHR$(10) THEN KBS.TEXTLINE$ = MID$(KBS.TEXTLINE$, 2)
+    IF KBS.TEXTLINE$ = "" THEN RETURN
+    KBS.SPLITAT = GP.INSTR(KBS.TEXTLINE$, ")!(")
+    IF KBS.SPLITAT < 2 THEN KBS.SKIPPED% = KBS.SKIPPED% + 1
+    IF KBS.SPLITAT < 2 THEN RETURN
+    KVBIN.KEY$ = LEFT$(KBS.TEXTLINE$, KBS.SPLITAT - 1)
+    KVBIN.VALUE$ = MID$(KBS.TEXTLINE$, KBS.SPLITAT + 3)
+    GOSUB KVBIN.PUT
+    IF KVBIN.OK THEN KBS.LINES% = KBS.LINES% + 1
+    IF KVBIN.OK = 0 THEN KBS.STOPPED% = -1
+    RETURN
+
+
+## ***********************************************************************
+## **  The list: which slot each row shows, and where the bar is.
+## ***********************************************************************
+
+## ---- KBS.SLOTOFROW%() from KBS.KEYAT$() and the view. The bar and the top
+## ---- row are pulled back inside the new list.
+## ----
+## ----  out  KBS.ROWS%   rows in the list
+## ----       KBS.USED%   slots holding a key
+KBS.BUILD.ROWS:
+    KBS.ROWS% = 0
+    KBS.USED% = 0
+    IF KBS.SLOTS% = 0 THEN GOTO KBS.BUILD.ROWS.DONE
+    FOR KBS.SLOT = 1 TO KBS.SLOTS%
+        KBS.ISUSED% = (KBS.KEYAT$(KBS.SLOT) <> "")
+        IF KBS.ISUSED% THEN KBS.USED% = KBS.USED% + 1
+        IF KBS.ISUSED% OR KBS.SHOWALL% THEN GOSUB KBS.ADD.ROW
+    NEXT KBS.SLOT
+KBS.BUILD.ROWS.DONE:
+    IF KBS.CURSOR% > KBS.ROWS% THEN KBS.CURSOR% = KBS.ROWS%
+    IF KBS.CURSOR% < 1 THEN KBS.CURSOR% = 1
+    IF KBS.ROWS% = 0 THEN KBS.CURSOR% = 0
+    GOTO KBS.KEEP.VISIBLE
+
+KBS.ADD.ROW:
+    KBS.ROWS% = KBS.ROWS% + 1
+    KBS.SLOTOFROW%(KBS.ROWS%) = KBS.SLOT
+    RETURN
+
+## ---- The bar onto the row showing slot KBS.WANTSLOT. With no such row it
+## ---- stays where it is.
+KBS.SELECT.SLOT:
+    IF KBS.ROWS% = 0 THEN RETURN
+    FOR KBS.ROW = 1 TO KBS.ROWS%
+        IF KBS.SLOTOFROW%(KBS.ROW) = KBS.WANTSLOT THEN KBS.CURSOR% = KBS.ROW
+    NEXT KBS.ROW
+    GOTO KBS.KEEP.VISIBLE
+
+## ---- KBS.TOP% moved so the bar's row is one of the KBS.LISTROWS on screen.
+KBS.KEEP.VISIBLE:
+    IF KBS.CURSOR% < KBS.TOP% THEN KBS.TOP% = KBS.CURSOR%
+    IF KBS.CURSOR% > KBS.TOP% + KBS.LISTROWS - 1 THEN KBS.TOP% = KBS.CURSOR% - KBS.LISTROWS + 1
+    IF KBS.TOP% < 1 THEN KBS.TOP% = 1
+    RETURN
+
+## ---- The bar to row KBS.MOVETO, held inside the list. The two rows it
+## ---- leaves and lands on are drawn again, or the whole list if it
+## ---- scrolled, and the panel reads the new slot.
+KBS.MOVE.CURSOR:
+    IF KBS.ROWS% = 0 THEN RETURN
+    IF KBS.MOVETO < 1 THEN KBS.MOVETO = 1
+    IF KBS.MOVETO > KBS.ROWS% THEN KBS.MOVETO = KBS.ROWS%
+    IF KBS.MOVETO = KBS.CURSOR% THEN RETURN
+    KBS.LEFTROW = KBS.CURSOR%
+    KBS.LEFTTOP = KBS.TOP%
+    KBS.CURSOR% = KBS.MOVETO
+    GOSUB KBS.KEEP.VISIBLE
+    IF KBS.TOP% <> KBS.LEFTTOP THEN GOSUB KBS.DRAW.LIST
+    IF KBS.TOP% = KBS.LEFTTOP THEN GOSUB KBS.DRAW.MOVED
+    GOSUB KBS.DRAW.DETAIL
+    IF KBS.DETAILREAD% = 0 THEN RETURN
+    KBS.ACTION$ = GP.BSTR(KBS.TEXT.SAY, 5) + STR$(KBS.SHOWNSLOT)
+    GOSUB KBS.SAY.RESULT
+    GOTO KBS.DRAW.STATUS
+
+KBS.DRAW.MOVED:
+    KBS.ROW = KBS.LEFTROW
+    GOSUB KBS.DRAW.ROW
+    KBS.ROW = KBS.CURSOR%
+    GOTO KBS.DRAW.ROW
+
+
+## ***********************************************************************
+## **  The status line's text.
+## **
+## **   in   KBS.ACTION$   what was done
+## **        KBS.JIFFIES   how long it took
+## **   out  KBS.STATUS$
+## **
+## **  KBS.SAY.RESULT adds why the last store call failed, if it did.
+## ***********************************************************************
+KBS.SAY.RESULT:
+    IF KVBIN.WHY <> KVBIN.WHY.NONE THEN KBS.ACTION$ = KBS.ACTION$ + "   " + GP.BSTR(KBS.TEXT.WHY, KVBIN.WHY - 1)
+    IF KVBIN.WHY = KVBIN.WHY.NOFILE THEN KBS.ACTION$ = KBS.ACTION$ + ": " + KVBIN.DOSMSG$
+KBS.SAY.TIMED:
+    KBS.STATUS$ = KBS.ACTION$ + "   " + MID$(STR$(KBS.JIFFIES), 2) + GP.BSTR(KBS.TEXT.SAY, 7)
+    RETURN
+
+KBS.SAY.NOSTORE:
+    GP.SUB MSGBOX, GP.BSTR(KBS.TEXT.TELL, 0)
+    RETURN
+
+KBS.SAY.TOOBIG:
+    GP.SUB MSGBOX, GP.BSTR(KBS.TEXT.TELL, 1)
+    RETURN
+
+KBS.SAY.TOOLONG:
+    GP.SUB MSGBOX, GP.BSTR(KBS.TEXT.TELL, 2)
+    RETURN
+
+KBS.SAY.NOTEXT:
+    GP.SUB MSGBOX, KBS.NAME$ + GP.BSTR(KBS.TEXT.TELL, 3)
+    RETURN
+
+
+## ***********************************************************************
+## **  KBS.DRAW.PAGE -- the whole screen: the bar, the list, the panel, the
+## **  count and the status line.
+## ***********************************************************************
+KBS.DRAW.PAGE:
+    GP.FILL 0, 0, KBS.SCREENCOLS%, KBS.SCREENROWS%, KBS.SPACE, THEME.CLR(THEME.PAGE)
+    GP.FILL 0, 0, KBS.SCREENCOLS%, 1, KBS.SPACE, THEME.CLR(THEME.BAR)
+    GP.SUB MENU.DRAWBAR, 0, KBS.BARX, MENU.NOBOX
+    GP.PRINTAT KBS.LISTX, KBS.TITLEROW, GP.BSTR(KBS.TEXT.PAGE, 0), THEME.CLR(THEME.TITLE)
+    GP.PRINTAT KBS.SCREENCOLS% - 2 - LEN(KBS.FILE$), KBS.TITLEROW, KBS.FILE$, THEME.CLR(THEME.DIMMED)
+    GP.PRINTAT KBS.LISTX, KBS.LISTTOP - 1, GP.BSTR(KBS.TEXT.PAGE, 1), THEME.CLR(THEME.DIMMED)
+    GP.FILL KBS.DIVIDERX, KBS.LISTTOP - 1, 1, KBS.LISTROWS + 1, KBS.VLINE, THEME.CLR(THEME.BORDER)
+    GOSUB KBS.DRAW.LIST
+    GOSUB KBS.DRAW.DETAIL
+    GOSUB KBS.DRAW.COUNT
+    GP.PRINTAT KBS.LISTX, KBS.SCREENROWS% - 3, GP.BSTR(KBS.TEXT.PAGE, 8), THEME.CLR(THEME.DIMMED)
+    GOTO KBS.DRAW.STATUS
+
+KBS.DRAW.STATUS:
+    GP.FILL 0, KBS.SCREENROWS% - 1, KBS.SCREENCOLS%, 1, KBS.SPACE, THEME.CLR(THEME.BAR)
+    IF KBS.STATUS$ <> "" THEN GP.PRINTAT 2, KBS.SCREENROWS% - 1, LEFT$(KBS.STATUS$, KBS.SCREENCOLS% - 4), THEME.CLR(THEME.BAR)
+    RETURN
+
+KBS.DRAW.COUNT:
+    KBS.COUNTLINE$ = GP.BSTR(KBS.TEXT.PAGE, 7)
+    IF KBS.SLOTS% > 0 THEN GOSUB KBS.COUNT.TEXT
+    GP.FILL KBS.LISTX, KBS.SCREENROWS% - 4, KBS.SCREENCOLS% - 4, 1, KBS.SPACE, THEME.CLR(THEME.PAGE)
+    GP.PRINTAT KBS.LISTX, KBS.SCREENROWS% - 4, KBS.COUNTLINE$, THEME.CLR(THEME.TEXT)
+    RETURN
+
+KBS.COUNT.TEXT:
+    KBS.COUNTLINE$ = MID$(STR$(KBS.USED%), 2) + GP.BSTR(KBS.TEXT.PAGE, 3) + STR$(KBS.SLOTS%) + GP.BSTR(KBS.TEXT.PAGE, 4)
+    KBS.VIEWTEXT = 5
+    IF KBS.SHOWALL% THEN KBS.VIEWTEXT = 6
+    KBS.COUNTLINE$ = KBS.COUNTLINE$ + GP.BSTR(KBS.TEXT.PAGE, KBS.VIEWTEXT)
+    RETURN
+
+KBS.DRAW.LIST:
+    FOR KBS.LINE = 0 TO KBS.LISTROWS - 1
+        KBS.ROW = KBS.TOP% + KBS.LINE
+        GOSUB KBS.DRAW.ROW
+    NEXT KBS.LINE
+    RETURN
+
+## ---- List row KBS.ROW: the slot number and its key, in the bar's colour
+## ---- when the bar is on it. A row past the end of the list is blanked.
+KBS.DRAW.ROW:
+    KBS.ROWY% = KBS.LISTTOP + KBS.ROW - KBS.TOP%
+    IF KBS.ROW > KBS.ROWS% THEN GOTO KBS.DRAW.ROW.BLANK
+    KBS.DRAWSLOT = KBS.SLOTOFROW%(KBS.ROW)
+    KBS.ROWKEY$ = KBS.KEYAT$(KBS.DRAWSLOT)
+    KBS.ROWATTR = THEME.CLR(THEME.TEXT)
+    IF KBS.ROWKEY$ = "" THEN KBS.ROWATTR = THEME.CLR(THEME.DIMMED)
+    IF KBS.ROWKEY$ = "" THEN KBS.ROWKEY$ = GP.BSTR(KBS.TEXT.PAGE, 2)
+    IF KBS.ROW = KBS.CURSOR% THEN KBS.ROWATTR = THEME.CLR(THEME.HILITE)
+    KBS.ROWTEXT$ = RIGHT$("  " + MID$(STR$(KBS.DRAWSLOT), 2), 3) + "  " + LEFT$(KBS.ROWKEY$ + KBS.PAD$, KVBIN.KEYLEN)
+    GP.PRINTAT KBS.LISTX, KBS.ROWY%, KBS.ROWTEXT$, KBS.ROWATTR
+    RETURN
+
+KBS.DRAW.ROW.BLANK:
+    GP.FILL KBS.LISTX, KBS.ROWY%, KBS.LISTWIDTH, 1, KBS.SPACE, THEME.CLR(THEME.PAGE)
+    RETURN
+
+
+## ***********************************************************************
+## **  KBS.DRAW.DETAIL -- the panel: the bar's slot, read from the file.
+## **
+## **   out  KBS.SHOWNSLOT     the slot the panel shows
+## **        KBS.VALUE$        its value, "" for a free slot
+## **        KBS.DETAILREAD%   -1 when the file was read
+## **        KBS.JIFFIES       how long the read took
+## **
+## **  A free slot is not read: KBS.KEYAT$() already says it is free.
+## ***********************************************************************
+KBS.DRAW.DETAIL:
+    GP.FILL KBS.PANELX, KBS.LISTTOP - 1, KBS.PANELWIDTH, KBS.LISTROWS + 1, KBS.SPACE, THEME.CLR(THEME.PAGE)
+    KBS.DETAILREAD% = 0
+    KBS.VALUE$ = ""
+    IF KBS.CURSOR% < 1 THEN RETURN
+    KBS.SHOWNSLOT = KBS.SLOTOFROW%(KBS.CURSOR%)
+    KBS.LABELATTR = THEME.CLR(THEME.DIMMED)
+    KBS.TEXTATTR = THEME.CLR(THEME.TEXT)
+    GP.PRINTAT KBS.PANELX, KBS.LISTTOP + 1, GP.BSTR(KBS.TEXT.PANEL, 1), KBS.LABELATTR
+    GP.PRINTAT KBS.PANELX + KBS.LABELWIDTH, KBS.LISTTOP + 1, MID$(STR$(KBS.SHOWNSLOT), 2), KBS.TEXTATTR
+    GP.PRINTAT KBS.PANELX, KBS.LISTTOP + 2, GP.BSTR(KBS.TEXT.PANEL, 2), KBS.LABELATTR
+    GP.PRINTAT KBS.PANELX + KBS.LABELWIDTH, KBS.LISTTOP + 2, MID$(STR$(KBS.SHOWNSLOT * KVBIN.RECLEN), 2), KBS.TEXTATTR
+    IF KBS.KEYAT$(KBS.SHOWNSLOT) = "" THEN GOTO KBS.DRAW.DETAIL.FREE
+
+    KVBIN.SLOT = KBS.SHOWNSLOT
+    KBS.STARTED = TI
+    GOSUB KVBIN.AT
+    KBS.JIFFIES = TI - KBS.STARTED
+    KBS.DETAILREAD% = -1
+    IF KVBIN.OK = 0 THEN RETURN
+    KBS.VALUE$ = KVBIN.VALUE$
+    GP.PRINTAT KBS.PANELX, KBS.LISTTOP, GP.BSTR(KBS.TEXT.PANEL, 0), KBS.LABELATTR
+    GP.PRINTAT KBS.PANELX + KBS.LABELWIDTH, KBS.LISTTOP, KVBIN.KEY$, THEME.CLR(THEME.TITLE)
+    GP.PRINTAT KBS.PANELX, KBS.LISTTOP + 3, GP.BSTR(KBS.TEXT.PANEL, 3), KBS.LABELATTR
+    GP.PRINTAT KBS.PANELX + KBS.LABELWIDTH, KBS.LISTTOP + 3, MID$(STR$(LEN(KBS.VALUE$)), 2) + GP.BSTR(KBS.TEXT.PANEL, 4), KBS.TEXTATTR
+    GP.PRINTAT KBS.PANELX, KBS.LISTTOP + 5, GP.BSTR(KBS.TEXT.PANEL, 5), KBS.LABELATTR
+    FOR KBS.LINE = 0 TO KBS.VALUELINES - 1
+        IF KBS.LINE * KBS.PANELWIDTH < LEN(KBS.VALUE$) THEN GP.PRINTAT KBS.PANELX, KBS.LISTTOP + 6 + KBS.LINE, MID$(KBS.VALUE$, KBS.LINE * KBS.PANELWIDTH + 1, KBS.PANELWIDTH), KBS.TEXTATTR
+    NEXT KBS.LINE
+    RETURN
+
+KBS.DRAW.DETAIL.FREE:
+    GP.PRINTAT KBS.PANELX, KBS.LISTTOP, GP.BSTR(KBS.TEXT.PANEL, 6), KBS.LABELATTR
+    RETURN

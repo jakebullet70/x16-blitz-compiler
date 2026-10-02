@@ -1,134 +1,120 @@
-@1. The prefixes that are taken
+@5. Variables
 .
-=1. THE PREFIXES THAT ARE TAKEN
+=5. VARIABLES
+.
+.BASL has one flat namespace. There are no locals, no scoping and no
+.parameters. Every variable in every #INCLUDEd module is visible to your
+.program and the reverse, and nothing warns you: a collision is a wrong
+.answer, not an error.
+.
+.The convention is one dotted prefix per module, and nothing writes outside
+.its own prefix.
+.
+=Prefixes already taken
 .
 .  GP.
-.      OWNER: GPB.INC.BL
-.      WHAT IT IS: keywords, not variables -- see SEC 2, this one is
-.        different
+.      OWNER: keywords, not variables -- see below
 .
 .  STR.
 .      OWNER: STRINGS.INC.BL
-.      WHAT IT IS: string helpers
 .
 .  STR.USING.
-.      OWNER: STRUSING.INC.BL
-.      WHAT IT IS: a number to a template, kept apart from the rest of STR.
+.      OWNER: STRUSING.INC.BL, kept apart from the rest of STR.
 .
 .  THEME.
 .      OWNER: THEME.INC.BL
-.      WHAT IT IS: colour roles
 .
 .  APPSYS.
 .      OWNER: APPSYS.INC.BL
-.      WHAT IT IS: screen save/restore, panels to disk
 .
 .  LINEINPUT.
 .      OWNER: LINEINPUT.INC.BL
-.      WHAT IT IS: entry fields
 .
 .  KB.
 .      OWNER: KB.INC.BL
-.      WHAT IT IS: the keyboard drain
 .
 .  MENU.
-.      OWNER: MENU.INC.BL
-.      WHAT IT IS: menus: the row store, the popup and the bar.
-.        MENUPULL.INC.BL's variables too
+.      OWNER: MENU.INC.BL, and MENUPULL.INC.BL's variables
 .
 .  MENUTO.
-.      OWNER: MENU.INC.BL MENUPULL.INC.BL
-.      WHAT IT IS: the runners, called with GP.FN
+.      OWNER: the runners in MENU.INC.BL and MENUPULL.INC.BL
 .
 .  MENUPULL.
-.      OWNER: MENUPULL.INC.BL
-.      WHAT IT IS: a dropdown under a bar item: labels and one constant
+.      OWNER: MENUPULL.INC.BL's labels
 .
 .  GUI.
 .      OWNER: GUI.INC.BL
-.      WHAT IT IS: the box the dialogs sit in, and the form and controls
-.        inside it
 .
 .  GUI.LISTBOX.
-.      OWNER: GUI-DIALOGS.INC.BL
-.      WHAT IT IS: the listbox dialog's answer, kept apart from the rest of
-.        GUI.
+.      OWNER: GUI-DIALOGS.INC.BL, kept apart from the rest of GUI.
 .
 .  DLG.
-.      OWNER: GUI-DIALOGS.INC.BL
-.      WHAT IT IS: the dialog verbs: their arguments, and their internals
+.      OWNER: GUI-DIALOGS.INC.BL, the dialog verbs' arguments and internals
 .
 .  GL.
 .      OWNER: GUI-LITE.INC.BL
-.      WHAT IT IS: the message box and menu verbs: their arguments, the open
-.        boxes, and the VERA and key constants
 .
-.  STASH.
-.      OWNER: STASH.INC.BL
-.      WHAT IT IS: a text rectangle into a RAM bank, and back
-.
-.  STASH.FILE.
-.      OWNER: STASHFILE.INC.BL
-.      WHAT IT IS: the same rectangle through a file, kept apart from the
-.        rest of STASH.
+.  STASH. / STASH.FILE.
+.      OWNER: STASH.INC.BL / STASHFILE.INC.BL
 .
 .  SORT.
 .      OWNER: SORT.INC.BL
-.      WHAT IT IS: shell sort a string array in place
 .
 .  STRCASE.
 .      OWNER: STRCASE.INC.BL
-.      WHAT IT IS: case, rewriting a string in place
 .
-.  BMX.
-.      OWNER: BMX.INC.BL
-.      WHAT IT IS: BMX bitmap loading
+.  BMX. / BMXK.
+.      OWNER: BMX.INC.BL (variables / its KERNAL constants)
 .
-.  BMXK.
-.      OWNER: BMX.INC.BL
-.      WHAT IT IS: its KERNAL/VERA constants, kept apart from its variables
-.
-.  FILE.
-.      OWNER: FILEIO.INC.BL
-.      WHAT IT IS: the drive: status, exists, delete, rename, directories
-.
-.  FILE.DIR.
-.      OWNER: FILEDIR.INC.BL
-.      WHAT IT IS: reading a directory, kept apart from the rest of FILE.
-.
-.  DOS.
-.      OWNER: DOS.INC.BL
-.      WHAT IT IS: the drive's command channel, the smaller alternative to
-.        FILE.
-.
-.  SV.
-.      OWNER: STASHVRAM.INC.BL
-.      WHAT IT IS: the VRAM store. SVGC. is STASHVRAMGC.INC.BL's one constant
+.  FILE. / FILE.DIR.
+.      OWNER: FILEIO.INC.BL / FILEDIR.INC.BL
 .
 .  KV.
 .      OWNER: KV.INC.BL
-.      WHAT IT IS: keys and values in one RAM bank
+.
+.  KVBIN.
+.      OWNER: KVBIN.INC.BL
+.
+.  DOS.
+.      OWNER: DOS.INC.BL
+.
+.  SV. / SVGC.
+.      OWNER: STASHVRAM.INC.BL / STASHVRAMGC.INC.BL
 .
 .  MATH.
 .      OWNER: MATH.INC.BL
-.      WHAT IT IS: the smaller and the larger of two numbers
 .
 .  MEM.
-.      OWNER: MEM.INC.BL
-.      WHAT IT IS: a block copied, a block filled, and the two KERNAL
-.        constants
+.      OWNER: MEM.INC.BL, its two KERNAL constants included
 .
-.Pick anything else for your own program. AIRLIFT., GAME., MAP. -- a prefix
-.costs nothing at runtime because BASLOAD crunches every identifier down to a
-.short BASIC variable, so a long readable name and a two-letter one compile
-.to exactly the same thing.
+.Use any other prefix for your own program: GAME., MAP., AIRLIFT.. A prefix
+.costs nothing at runtime -- BASLOAD crunches every identifier to a short
+.BASIC variable, so a long readable name and a two-letter one compile to the
+.same thing.
 .
 .Do not reuse a taken prefix for a name the module has not defined.
-.THEME.MINE looks free today; it is one library update away from not being.
+.THEME.MINE is free today and is one library update from not being.
+.
+=GP.* is keywords, not variables
+.
+.GPB.INC.BL defines no variables. It is 27 keyword declarations and nothing
+.else.
+.
+:GP.A = 5 : REM SYNTAX ERROR -- GP.A is a keyword
+:X = GP.A : REM correct
+.
+.The value words are GP.A GP.X GP.Y GP.C, the registers after GP.CALL, and
+.that is all of them. They are keywords rather than variables because nothing
+.in the runtime can write a BASIC variable by name, so a command that returns
+.a value must return it through a keyword. X16's own ST, MX and MY work the
+.same way.
+.
+.The complete per-module in / out / internal register is GP-BASIC.GLOBALS.md,
+.with a script in SEC 6 of that file for re-checking it after a change.
 .
 =SEE ALSO
 .
->9|2. Using it
+>154|6. The traps, collected
 >66|4.2 STRINGS.INC.BL -- string helpers
 >85|4.10 STRUSING.INC.BL -- a number to a template
 >65|4.1 THEME.INC.BL -- named colour roles

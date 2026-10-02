@@ -60,6 +60,9 @@
 .Every routine is a plain GOSUB, and KV.OK is -1 for success and 0 for
 .failure.
 .
+.KVBIN.INC.BL (SEC 4.26) keeps a store in a file that every program on the
+.drive shares.
+.
 .Plain BASL. No GP.* keyword and no GP.ASM, so it needs neither GPB.INC.BL
 .nor a #SYMFILE, and the same source tokenises for stock BASIC.
 .
@@ -132,6 +135,7 @@
 .
 =SEE ALSO
 .
+>108|4.26 KVBIN.INC.BL -- keys and values in one file of fixed records
 >57|3.12 Code in a bank
 >90|4.13 BANKMGR.INC.BL -- who owns which RAM bank
 >97|4.20 KV.INC.BL -- keys and values in one RAM bank

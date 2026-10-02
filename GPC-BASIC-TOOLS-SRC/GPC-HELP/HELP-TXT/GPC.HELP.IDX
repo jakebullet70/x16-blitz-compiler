@@ -23,12 +23,12 @@ S|5|82|116|     A failed run deletes its own output
 S|5|98|116|     #GPC -- a directive channel BASLOAD never has to understand
 S|5|111|116|     Where the old ceiling still binds
 T|6|0|16|  4. The tools
-T|7|0|130|  5. GPC-BASIC/ -- the library
-T|8|0|115|  6. GPC-BASIC/ -- the examples
+T|7|0|135|  5. GPC-BASIC/ -- the library
+T|8|0|121|  6. GPC-BASIC/ -- the examples
 T|9|0|25|  7. The documents
 H|0|0|0|GP.* CORE KEYWORDS
-T|10|0|206|  3. Command reference
-S|10|8|206|     At a glance -- where each part comes from
+T|10|0|211|  3. Command reference
+S|10|8|211|     At a glance -- where each part comes from
 T|11|0|38|  3.1 Loops
 T|12|0|77|  3.2 Multi-way branch
 T|13|0|46|  3.3 Machine code
@@ -96,7 +96,7 @@ T|48|0|70|  4.16 FILEDIR.INC.BL -- a directory, into a bank or into low RAM
 T|49|0|51|  4.17 COMBO.INC.BL -- a drop-down list that folds into one row
 T|50|0|74|  4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM
 T|51|0|41|  4.19 STASHVRAMGC.INC.BL -- close the holes in a STASHVRAM store
-T|52|0|136|  4.20 KV.INC.BL -- keys and values in one RAM bank
+T|52|0|140|  4.20 KV.INC.BL -- keys and values in one RAM bank
 T|53|0|65|  4.21 CHECK.INC.BL -- a check box, [X] or [ ]
 T|54|0|37|  4.22 MATH.INC.BL -- the smaller and the larger of two numbers
 T|55|0|46|  4.23 MEM.INC.BL -- a block copied, a block filled
@@ -107,62 +107,62 @@ T|59|0|14|  4.24.3 CLOSEBOX
 T|60|0|31|  4.25 DOS.INC.BL -- a drive command, and a test for a file
 T|61|0|25|  4.25.1 DOSX
 T|62|0|21|  4.25.2 DOSX.EXISTS
-T|63|0|158|  4.26 GPBMODS -- the harness that drives every module
-S|63|61|158|     Thirteen banks
-S|63|119|158|     The text is in a bank
-S|63|136|158|     The room it runs in
-T|64|0|77|  STASH.INC.BL -- save a text rectangle, and put it back.
-S|64|6|77|     MODULE HEADER
-S|64|49|77|     MORE THAN ONE RECTANGLE IN A BANK
-S|64|57|77|     RESTORE READS THE SLOT IT IS GIVEN
-T|65|0|36|  STASHFILE.INC.BL -- a saved text rectangle, through a file.
-S|65|6|36|     MODULE HEADER
+T|63|0|181|  4.26 KVBIN.INC.BL -- keys and values in one file of fixed records
+T|64|0|158|  4.27 GPBMODS -- the harness that drives every module
+S|64|61|158|     Thirteen banks
+S|64|119|158|     The text is in a bank
+S|64|136|158|     The room it runs in
+T|65|0|77|  STASH.INC.BL -- save a text rectangle, and put it back.
+S|65|6|77|     MODULE HEADER
+S|65|49|77|     MORE THAN ONE RECTANGLE IN A BANK
+S|65|57|77|     RESTORE READS THE SLOT IT IS GIVEN
+T|66|0|36|  STASHFILE.INC.BL -- a saved text rectangle, through a file.
+S|66|6|36|     MODULE HEADER
 H|0|0|0|GLOBALS AND NAMING
-T|66|0|124|  5. Variables
-S|66|12|124|     Prefixes already taken
-S|66|94|124|     GP.* is keywords, not variables
-T|67|0|141|  1. The prefixes that are taken
-T|68|0|17|  2. GP.* is keywords, not variables -- and the difference bites
-T|69|0|854|  3. The modules
-S|69|7|854|     THEME.INC.BL -- named colour roles
-S|69|44|854|     APPSYS.INC.BL -- start politely, leave it as you found it
-S|69|67|854|     STRINGS.INC.BL -- string helpers
-S|69|97|854|     STRUSING.INC.BL -- a number to a template
-S|69|134|854|     KB.INC.BL -- the keyboard buffer, emptied
-S|69|147|854|     LINEINPUT.INC.BL -- a positioned entry field
-S|69|180|854|     BMX.INC.BL -- a BMX bitmap into VERA
-S|69|217|854|     FILEIO.INC.BL -- the drive: status, files, directories
-S|69|252|854|     FILEDIR.INC.BL -- a directory, into a bank or into low RAM
-S|69|296|854|     DOS.INC.BL -- a drive command, and a test for a file
-S|69|329|854|     STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM
-S|69|382|854|     KV.INC.BL -- keys and values in one RAM bank
-S|69|414|854|     MENU.INC.BL -- menus built a row at a time
-S|69|484|854|     MENUPULL.INC.BL -- a dropdown under a bar item
-S|69|512|854|     GUI.INC.BL -- four dialogs, in a box that puts the screen back
-S|69|601|854|     GUI-DIALOGS.INC.BL -- every dialog as a verb
-S|69|642|854|     GUI-LITE.INC.BL -- a message box and a menu, in low memory
-S|69|686|854|     STASH.INC.BL -- save a text rectangle, and put it back
-S|69|726|854|     STASHFILE.INC.BL -- a saved text rectangle, through a file
-S|69|734|854|     SORT.INC.BL -- shell sort a string array
-S|69|764|854|     STRCASE.INC.BL -- case, in place
-S|69|792|854|     MATH.INC.BL -- the smaller and the larger of two numbers
-S|69|812|854|     MEM.INC.BL -- a block copied, a block filled
-T|70|0|75|  4. Labels are global too
-S|70|42|75|     A module in a bank keeps its names
-T|71|0|25|  5. TRUE IS -1
-T|72|0|24|  6. Two more naming rules that are not about collisions
+T|67|0|127|  5. Variables
+S|67|12|127|     Prefixes already taken
+S|67|97|127|     GP.* is keywords, not variables
+T|68|0|141|  1. The prefixes that are taken
+T|69|0|17|  2. GP.* is keywords, not variables -- and the difference bites
+T|70|0|854|  3. The modules
+S|70|7|854|     THEME.INC.BL -- named colour roles
+S|70|44|854|     APPSYS.INC.BL -- start politely, leave it as you found it
+S|70|67|854|     STRINGS.INC.BL -- string helpers
+S|70|97|854|     STRUSING.INC.BL -- a number to a template
+S|70|134|854|     KB.INC.BL -- the keyboard buffer, emptied
+S|70|147|854|     LINEINPUT.INC.BL -- a positioned entry field
+S|70|180|854|     BMX.INC.BL -- a BMX bitmap into VERA
+S|70|217|854|     FILEIO.INC.BL -- the drive: status, files, directories
+S|70|252|854|     FILEDIR.INC.BL -- a directory, into a bank or into low RAM
+S|70|296|854|     DOS.INC.BL -- a drive command, and a test for a file
+S|70|329|854|     STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM
+S|70|382|854|     KV.INC.BL -- keys and values in one RAM bank
+S|70|414|854|     MENU.INC.BL -- menus built a row at a time
+S|70|484|854|     MENUPULL.INC.BL -- a dropdown under a bar item
+S|70|512|854|     GUI.INC.BL -- four dialogs, in a box that puts the screen back
+S|70|601|854|     GUI-DIALOGS.INC.BL -- every dialog as a verb
+S|70|642|854|     GUI-LITE.INC.BL -- a message box and a menu, in low memory
+S|70|686|854|     STASH.INC.BL -- save a text rectangle, and put it back
+S|70|726|854|     STASHFILE.INC.BL -- a saved text rectangle, through a file
+S|70|734|854|     SORT.INC.BL -- shell sort a string array
+S|70|764|854|     STRCASE.INC.BL -- case, in place
+S|70|792|854|     MATH.INC.BL -- the smaller and the larger of two numbers
+S|70|812|854|     MEM.INC.BL -- a block copied, a block filled
+T|71|0|75|  4. Labels are global too
+S|71|42|75|     A module in a bank keeps its names
+T|72|0|25|  5. TRUE IS -1
+T|73|0|24|  6. Two more naming rules that are not about collisions
 H|0|0|0|THE TRAPS
-T|73|0|76|  6. The traps, collected
+T|74|0|76|  6. The traps, collected
 H|0|0|0|COMPILER KNOWN BUGS
-T|74|0|92|  8. Known bugs
-S|74|8|92|     A string never gives memory back
-S|74|29|92|     BINPUT# stops at 255 bytes
-S|74|57|92|     File I/O in a GP.DO key loop
+T|75|0|55|  8. Known bugs
+S|75|8|55|     A string never gives memory back
+S|75|29|55|     BINPUT# stops at 255 bytes
 H|0|0|0|MEMORY AND LIMITS
-T|75|0|242|  7. Memory, and what the compiler tells you
-S|75|4|242|     What GPC prints when it finishes
-S|75|82|242|     What ships with the program
-S|75|116|242|     Removing dead code
-S|75|173|242|     OUT OF MEMORY
-S|75|198|242|     A region does not come out of it
-S|75|222|242|     Staying inside it
+T|76|0|242|  7. Memory, and what the compiler tells you
+S|76|4|242|     What GPC prints when it finishes
+S|76|82|242|     What ships with the program
+S|76|116|242|     Removing dead code
+S|76|173|242|     OUT OF MEMORY
+S|76|198|242|     A region does not come out of it
+S|76|222|242|     Staying inside it

@@ -12,7 +12,10 @@ Each `release/TMP/SAMPLES/<PROG>/` folder holds the program's own sources and a 
 own. The five are `GPBMODS`, `BMXVIEW`, `COLORTST`, `GUI-LITE` and `MANDELBROT-SPEED`, all built
 in their `GPC-BASIC-TOOLS-SRC` folders and copied by `release.sh` (the `SAMPLES` table).
 `MANDELBROT-SPEED` also ships `MANDEL.SRC.PRG`, the tokenised source that ROM BASIC runs, because
-the sample is a timing race against it.
+the sample is a timing race against it. `LANDER64`, `GUI-FIELD-EDIT` and `KV-BIN-STORE` were
+added after that list. `KV-BIN-STORE` ships three programs on one data file: the EMBEDDED
+editor with its `.OVL`, a ROM BASIC PRG with its BASL, and a Prog8 PRG with its `.P8`
+(the user's ask, 2026-10-02). Its `SETTINGS.KVB` does not ship. The first run makes it.
 
 - **Sources:** every file the compile needs that is not a `GPC-BASIC` library module, so
   `GPB-MENUS.BASL` beside `GPBMODS.BASL`, and the ten `ED-*.BASL` beside `EDIT.BASL`. The library

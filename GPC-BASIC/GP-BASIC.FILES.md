@@ -211,6 +211,7 @@ removes dead code, including a module costs its whole size whether or not it is 
 | `FILEDIR.INC.BL` | read a directory, into a RAM bank or into low RAM |
 | `DOS.INC.BL` | a smaller alternative to `FILEIO.INC.BL`: `DOSX` sends a command to the drive and returns the error, `DOSX.EXISTS` tests for a file. Include one of the two, not both |
 | `KV.INC.BL` | strings by key in one RAM bank, saved and loaded as one file. No `GP.ASM`, so no `#SYMFILE` |
+| `KVBIN.INC.BL` | keys and values in one file of fixed records, a few dozen settings that every program on the drive shares. No `GP.` keyword, so it also runs in ROM BASIC |
 | `MATH.INC.BL` | the smaller and the larger of two numbers, as a `GOSUB` or as a verb |
 | `MEM.INC.BL` | a block copied and a block filled, through the KERNAL. Low RAM and the I/O page only |
 
@@ -240,6 +241,7 @@ One `.EXP.BL` per topic. Several are also the regression test for the module the
 | `MENUTO.EXP.BL` | `MENUTO.VERT`, `MENUTO.BAR` and `MENUTO.PULLDOWN` by hand: box styles, hints, hot keys, disabled rows |
 | `MENUBUILD.EXP.BL` | the menu builder, read back and checked |
 | `KV.EXP.BL` | every routine in `KV.INC.BL`, checked |
+| `KVBIN.EXP.BL` | every routine in `KVBIN.INC.BL` but `KVBIN.STOP`, checked. Runs compiled and in ROM BASIC |
 | `GUI.EXP.BL` | the four dialogs, over a screen they have to put back |
 | `STASHVRAM.EXP.BL` | three panels nested in VRAM, a blob, and the compactor. Needs no `#SYMFILE`, which is the point |
 | `FORM.EXP.BL` | three fields you can move between, `LINEINPUT` style |

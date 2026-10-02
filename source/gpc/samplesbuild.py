@@ -22,6 +22,10 @@ GPCDIR  = os.path.join(ROOT, "source", "gpc")
 GPCHOME = os.path.join(ROOT, "GPC-BASIC-TOOLS-SRC", "GPC")
 ROOTABI = os.path.join(ROOT, "GPC-BASIC", "GPB.INC.BL")
 
+#   The Prog8 compiler shells out to 64tass by name, so its folder goes on the child's PATH.
+PROG8C  = r"C:\8bitProgramming\prog8\prog8c-12.0.1-all.jar"
+TASSDIR = r"C:\8bitProgramming\64tass-1.60"
+
 #
 #   One entry per program. Each builds in its src folder, which is the drive: its
 #   #INCLUDEs name GPC-BASIC/, and the folder needs GPC.BIN beside the master.
@@ -32,6 +36,8 @@ ROOTABI = os.path.join(ROOT, "GPC-BASIC", "GPB.INC.BL")
 #                folder, which is already the drive its demo bat mounts
 #       data     further files the install folder needs beside the object
 #       overlay  False fails the build when the compile writes a .OVL. Default True
+#       kind     "basic" tokenises and stops: NAME.PRG is the program ROM BASIC runs.
+#                "prog8" hands the master to the Prog8 compiler. Absent is a GPC compile
 #
 PROGRAMS = [
     #   EMBEDDED, so the object and its .OVL run with no runtime file beside them.
@@ -117,6 +123,31 @@ PROGRAMS = [
     dict(name="GUI-FIELD-EDIT",
          src=("GPC-BASIC-TOOLS-SRC/GUI-FIELD-EDIT", "GUI-FIELD-EDIT.BASL"),
          shared=False,
+         install=None, data=[]),
+
+    #   EMBEDDED and banked, the same shape as GUI-FIELD-EDIT.
+    dict(name="KV-BANKED",
+         src=("GPC-BASIC-TOOLS-SRC/KV-BANKED", "KV-BANKED.BASL"),
+         shared=False,
+         install=None, data=[]),
+
+    #   EMBEDDED and banked, the same shape as GUI-FIELD-EDIT. It makes its own
+    #   SETTINGS.KVB on the first run.
+    dict(name="KV-BIN-STORE",
+         src=("GPC-BASIC-TOOLS-SRC/KV-BIN-STORE", "KV-BIN-STORE.BASL"),
+         shared=False,
+         install=None, data=[]),
+
+    #   Plain X16 BASIC on the same SETTINGS.KVB, beside KV-BIN-STORE.
+    dict(name="KVBIN-BASIC",
+         src=("GPC-BASIC-TOOLS-SRC/KV-BIN-STORE", "KVBIN-BASIC.BASL"),
+         kind="basic", shared=False,
+         install=None, data=[]),
+
+    #   Prog8 on the same SETTINGS.KVB, beside KV-BIN-STORE.
+    dict(name="KVBIN-PROG8",
+         src=("GPC-BASIC-TOOLS-SRC/KV-BIN-STORE", "KVBIN-PROG8.P8"),
+         kind="prog8", shared=False,
          install=None, data=[]),
 ]
 
@@ -265,14 +296,74 @@ def stamp_buildnum(prog):
     print("   build number:", "%03d" % nextnum[0], flush=True)
 
 
+def mode_of(prog):
+    kind = prog.get("kind")
+    if kind == "basic":
+        return "ROM BASIC"
+    if kind == "prog8":
+        return "PROG8"
+    return "SHARED" if prog["shared"] else "EMBEDDED"
+
+
+def build_basic(prog, stem, drive):
+    #   The tokenised program is the product. Nothing is compiled.
+    name = prog["name"]
+    obj = os.path.join(drive, stem + ".PRG")
+    if os.path.exists(obj):
+        os.remove(obj)
+    if run([os.path.join(GPCDIR, "build_basl.py"), "--drive", drive,
+            prog["src"][1], stem + ".PRG"], name, obj) or not os.path.exists(obj):
+        print("!! tokenise FAILED for", name, flush=True)
+        return False
+    print("   tokenised:", format(os.path.getsize(obj), ","), "bytes", flush=True)
+    install(prog, stem, drive)
+    return True
+
+
+def build_prog8(prog, stem, drive):
+    #   prog8c writes NAME.prg, NAME.asm and a monitor list. They go to a scratch folder and
+    #   only the program comes back, as NAME.PRG.
+    name = prog["name"]
+    obj = os.path.join(drive, stem + ".PRG")
+    work = os.path.join(drive, "PROG8.TMP")
+    if os.path.exists(obj):
+        os.remove(obj)
+    shutil.rmtree(work, ignore_errors=True)
+    os.makedirs(work)
+    env = dict(os.environ)
+    env["PATH"] = TASSDIR + os.pathsep + env.get("PATH", "")
+    cmd = ["java", "-jar", PROG8C, "-target", "cx16", "-out", work,
+           os.path.join(drive, prog["src"][1])]
+    print("   ---- " + " ".join(cmd), flush=True)
+    done = subprocess.run(cmd, cwd=drive, env=env, stdout=subprocess.PIPE,
+                          stderr=subprocess.STDOUT, text=True, errors="replace")
+    made = os.path.join(work, stem + ".prg")
+    if done.returncode or not os.path.exists(made):
+        for line in done.stdout.splitlines()[-25:]:
+            print("   [%s] %s" % (name, line), flush=True)
+        print("!! Prog8 compile FAILED for", name, flush=True)
+        shutil.rmtree(work, ignore_errors=True)
+        return False
+    shutil.copy(made, obj)
+    shutil.rmtree(work, ignore_errors=True)
+    print("   compiled:", format(os.path.getsize(obj), ","), "bytes", flush=True)
+    install(prog, stem, drive)
+    return True
+
+
 def build(prog):
     name = prog["name"]
     stem = stem_of(prog["src"][1])
     print("=" * 70, flush=True)
-    print("==", name, "(%s)" % ("SHARED" if prog["shared"] else "EMBEDDED"), flush=True)
+    print("==", name, "(%s)" % mode_of(prog), flush=True)
+
+    drive = os.path.join(ROOT, *prog["src"][0].split("/"))
+    if prog.get("kind") == "basic":
+        return build_basic(prog, stem, drive)
+    if prog.get("kind") == "prog8":
+        return build_prog8(prog, stem, drive)
 
     stamp_buildnum(prog)
-    drive = os.path.join(ROOT, *prog["src"][0].split("/"))
     check_abi(drive)
     #   a changed .INC.BL is invisible to build_basl.py's up-to-date check
     junks = [stem + ".SRC.PRG", stem + ".PRG", stem + ".MAP", stem + ".SRC.SYM"]
@@ -335,8 +426,7 @@ if __name__ == "__main__":
     args = sys.argv[1:]
     if "--list" in args:
         for p in PROGRAMS:
-            print("%-10s %-42s %s" % (p["name"], "/".join(p["src"]),
-                                      "SHARED" if p["shared"] else "EMBEDDED"))
+            print("%-10s %-42s %s" % (p["name"], "/".join(p["src"]), mode_of(p)))
         raise SystemExit(0)
 
     wanted = [a.upper() for a in args]
