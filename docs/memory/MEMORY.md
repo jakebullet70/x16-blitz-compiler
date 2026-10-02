@@ -85,7 +85,7 @@ again. See [memory-is-git-tracked](memory-is-git-tracked.md).
 ## The CUA GUI library
 - [LISTS and DIR plan](lists-and-dir-plan.md) — lists read GP.BSTR-layout banks at run time; LIST.BANK and FILEPICK tested, LIST.SORT written and awaiting its run
 - [GUI-CUA phase 5 state](gui-cua-phase5-state.md) — written not verified; what is owed and what still drifts
-- [Demo project options](demo-project-options.md) — the six showcase ideas; #1 MANDELBROT-SPEED built and in release, #2 KV-BANKED parked, GUI-FIELD-EDIT works, LANDER64 built in GP.BASIC, KV-BIN-STORE in release with a ROM BASIC and a Prog8 version beside it; [KV-BANKED is out of this release](kv-banked-is-out-of-this-release.md), do not report on it
+- [Demo project options](demo-project-options.md) — the six showcase ideas; #1 MANDELBROT-SPEED built and in release, #2 KV-BANKED deleted, GUI-FIELD-EDIT works, LANDER64 built in GP.BASIC, KV-BIN-STORE in release with a ROM BASIC and a Prog8 version beside it; [KV-BANKED is out of this release](kv-banked-is-out-of-this-release.md), do not report on it
 - [CMDR-DOS modify mode, measured](cmdr-dos-modify-mode-measured.md) — `,M` overwrites in place, P seek takes NUL and 13, `,A` appends, paths work; KVBIN timings; passes under GPC from runtime build 131 on
 
 ## The BASL cruncher

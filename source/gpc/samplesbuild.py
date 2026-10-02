@@ -125,12 +125,6 @@ PROGRAMS = [
          shared=False,
          install=None, data=[]),
 
-    #   EMBEDDED and banked, the same shape as GUI-FIELD-EDIT.
-    dict(name="KV-BANKED",
-         src=("GPC-BASIC-TOOLS-SRC/KV-BANKED", "KV-BANKED.BASL"),
-         shared=False,
-         install=None, data=[]),
-
     #   EMBEDDED and banked, the same shape as GUI-FIELD-EDIT. It makes its own
     #   SETTINGS.KVB on the first run.
     dict(name="KV-BIN-STORE",

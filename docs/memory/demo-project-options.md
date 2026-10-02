@@ -39,11 +39,8 @@ per-cell `GP.ASM` blob, a 40x28 picture, a key to start, and APPSYS save and res
 ROM 6,048 jiffies, GPC 3,075 (1.97x), GP.ASM 284 (21.3x). Fixed-point maths in BASIC was slower
 both ways, so it was dropped. The folder `readme.md` holds the rest.
 
-**Number 2 was picked next, on 2026-10-01**, in `GPC-BASIC-TOOLS-SRC/KV-BANKED/` (the user's
-folder name). The library code runs from `GP.BANKED` regions, the text sits in `GP.BANKEDSTR`, and
-the settings are a KV bank saved as `SETTINGS.KV`. It is EMBEDDED and ships a `.OVL`. It has
-`samplesbuild.py` entry `KV-BANKED` and `USER-RUNS/kvbanked-demo.bat`. It is not in `release.sh` yet.
-It is parked: it still calls the old `FORM.COMBOSEL`, `COMBO.ITEM$` and `FORM.COMBO` signature.
+**Number 2 was picked next, on 2026-10-01**, and deleted on 2026-10-02 at the user's word. See
+[[kv-banked-is-out-of-this-release]]. KV-BIN-STORE is the settings sample.
 
 **KV-BIN-STORE was written 2026-10-02**, outside the six, in `GPC-BASIC-TOOLS-SRC/KV-BIN-STORE/`
 (the user's folder name). It is a registry editor on `KVBIN.INC.BL`, a new plain-BASL module that
