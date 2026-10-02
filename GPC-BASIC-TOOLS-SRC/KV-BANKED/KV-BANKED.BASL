@@ -1,0 +1,675 @@
+#SAVEAS "@:KV-BANKED.SRC.PRG"
+#SYMFILE "@:KV-BANKED.SRC.SYM"
+#INCLUDE "GPC-BASIC/GPB.INC.BL"
+#INCLUDE "GPC-BASIC/STASH.INC.BL"
+#INCLUDE "GPC-BASIC/KV.INC.BL"
+
+## ***********************************************************************
+## **
+## **  KV-BANKED.BASL -- a control panel for settings kept in a KV store.
+## **
+## **  The settings live in RAM bank KV.DEFBANK and go to disk as SETTINGS.KV.
+## **  FILE loads, saves and resets them, SETTINGS edits them in one form, and
+## **  the page under the bar lists the store slot by slot.
+## **
+## **  Every library module that can be banked runs from a GP.BANKED region,
+## **  and the program's text is in a GP.BANKEDSTR bank. STASH, KV and MENUKEY
+## **  hold a BANK statement and stay in low RAM.
+## **
+## ***********************************************************************
+
+## ---- The banks. All here, above the regions: BASLOAD resolves a #DEFINE only
+## ---- once it has read it. A new bank needs a claim in KVB.CLAIM.BANKS and a
+## ---- line in KVB.SHOW.ABOUT.
+#DEFINE KVB.UTILCODE 4
+#DEFINE KVB.MENUCODE 5
+#DEFINE KVB.GUICODE 6
+#DEFINE KVB.FORMCODE 7
+#DEFINE KVB.TEXTBANK 8
+
+## ---- Screen mode 1 is 80x30.
+#DEFINE KVB.MODE 1
+#DEFINE KVB.SPACE 32
+#DEFINE KVB.BARX 1
+
+## ---- The store's listing: a column is a slot number, its key and its value.
+#DEFINE KVB.LISTTOP 5
+#DEFINE KVB.COLUMNWIDTH 38
+#DEFINE KVB.KEYAT 6
+#DEFINE KVB.VALUEAT 16
+#DEFINE KVB.VALUEWIDTH 20
+
+## ---- The settings form.
+#DEFINE KVB.LABELWIDTH 12
+#DEFINE KVB.FIELDWIDTH 16
+#DEFINE KVB.FORMROWS 8
+#DEFINE KVB.COMBOWIDTH 12
+
+## ---- A setting's index into KVB.VALUE$(), KVB.TEXT.KEYS and KVB.TEXT.DEFAULTS.
+## ---- Both groups list the settings in this order.
+#DEFINE KVB.SETTING.NAME 0
+#DEFINE KVB.SETTING.MACHINE 1
+#DEFINE KVB.SETTING.THEME 2
+#DEFINE KVB.SETTING.CLOCK 3
+#DEFINE KVB.SETTING.CONFIRM 4
+#DEFINE KVB.SETTING.CLICK 5
+#DEFINE KVB.SETTING.LAST 5
+
+## ---- THEME.ID% 0 to 3, the rows of KVB.TEXT.THEMES. CUSTOM loads no colours,
+## ---- so the combo leaves it out.
+#DEFINE KVB.THEMES 4
+
+## ---- The bar's items and the FILE dropdown's rows, in their groups' order.
+#DEFINE KVB.ITEM.FILE 1
+#DEFINE KVB.ITEM.SETTINGS 2
+#DEFINE KVB.ITEM.HELP 3
+#DEFINE KVB.FILEROW.LOAD 1
+#DEFINE KVB.FILEROW.SAVE 2
+#DEFINE KVB.FILEROW.DEFAULTS 3
+#DEFINE KVB.FILEROW.EXIT 4
+
+GOTO KVB.LIBEND
+
+## ---- The utilities. THEME is first in line for every region after it: they
+## ---- read its role numbers, which are #DEFINEs.
+GP.BANKED KVB.UTILCODE
+#INCLUDE "GPC-BASIC/APPSYS.INC.BL"
+#INCLUDE "GPC-BASIC/BANKMGR.INC.BL"
+#INCLUDE "GPC-BASIC/STASHVRAM.INC.BL"
+#INCLUDE "GPC-BASIC/THEME.INC.BL"
+GP.ENDBANKED
+
+## ---- The menu builder and the dropdown runner. Before the GUI: COMBO and the
+## ---- dialog verbs read the MENU #DEFINEs.
+GP.BANKED KVB.MENUCODE
+#INCLUDE "GPC-BASIC/MENU.INC.BANKED.BL"
+#INCLUDE "GPC-BASIC/MENU.INC.BL"
+#INCLUDE "GPC-BASIC/MENUPULL.INC.BL"
+GP.ENDBANKED
+
+GP.BANKED KVB.GUICODE
+#INCLUDE "GPC-BASIC/LINEINPUT.INC.BL"
+#INCLUDE "GPC-BASIC/GUI.INC.BL"
+GP.ENDBANKED
+
+## ---- The form's controls and the dialog verbs. After the GUI, whose #DEFINEs
+## ---- they read, and above every caller: a verb is compiled before its calls.
+GP.BANKED KVB.FORMCODE
+#INCLUDE "GPC-BASIC/COMBO.INC.BL"
+#INCLUDE "GPC-BASIC/CHECK.INC.BL"
+#INCLUDE "GPC-BASIC/GUI-DIALOGS.INC.BL"
+GP.ENDBANKED
+
+## ---- MENUKEY reads the keyboard layout under BANK 0, so it stays in low RAM.
+## ---- It comes after the last region: its closing GOTO lands on the line after
+## ---- it, and a GOTO onto a GP.BANKED line is refused.
+#INCLUDE "GPC-BASIC/MENUKEY.INC.BL"
+
+## ---- The menus. A & marks the hot key.
+GP.BANKEDSTR KVB.TEXTBANK KVB.TEXT.BAR
+  " &FILE "
+  " &SETTINGS "
+  " &HELP "
+GP.ENDBANKEDSTR
+
+GP.BANKEDSTR KVB.TEXTBANK KVB.TEXT.FILEMENU
+  "&LOAD"
+  "&SAVE"
+  "&DEFAULTS"
+  "E&XIT"
+GP.ENDBANKEDSTR
+
+GP.BANKEDSTR KVB.TEXTBANK KVB.TEXT.SETTINGSMENU
+  "&EDIT SETTINGS"
+GP.ENDBANKEDSTR
+
+GP.BANKEDSTR KVB.TEXTBANK KVB.TEXT.HELPMENU
+  "&ABOUT"
+GP.ENDBANKEDSTR
+
+## ---- The settings, in KVB.SETTING.* order.
+GP.BANKEDSTR KVB.TEXTBANK KVB.TEXT.KEYS
+  "NAME"
+  "MACHINE"
+  "THEME"
+  "CLOCK"
+  "CONFIRM"
+  "CLICK"
+GP.ENDBANKEDSTR
+
+GP.BANKEDSTR KVB.TEXTBANK KVB.TEXT.DEFAULTS
+  "X16 USER"
+  "COMMANDER X16"
+  "0"
+  "ON"
+  "ON"
+  "OFF"
+GP.ENDBANKEDSTR
+
+GP.BANKEDSTR KVB.TEXTBANK KVB.TEXT.ON
+  "ON"
+GP.ENDBANKEDSTR
+
+GP.BANKEDSTR KVB.TEXTBANK KVB.TEXT.OFF
+  "OFF"
+GP.ENDBANKEDSTR
+
+GP.BANKEDSTR KVB.TEXTBANK KVB.TEXT.FILENAME
+  "SETTINGS.KV"
+GP.ENDBANKEDSTR
+
+## ---- The combo's rows, THEME.ID% 0 up. A row is shown as written, so no &.
+GP.BANKEDSTR KVB.TEXTBANK KVB.TEXT.THEMES
+  " X16"
+  " DARK"
+  " LIGHT"
+  " GRAY"
+GP.ENDBANKEDSTR
+
+## ---- The THEME label is padded to KVB.LABELWIDTH so the combo lines up with
+## ---- the fields.
+GP.BANKEDSTR KVB.TEXTBANK KVB.TEXT.FORM
+  "SETTINGS"
+  "TAB MOVES ON. SPACE FLIPS A BOX."
+  "RETURN ON THE THEME OPENS ITS LIST."
+  "USER NAME"
+  "MACHINE NAME"
+  "SHOW CLOCK"
+  "CONFIRM EXIT"
+  "KEY CLICK"
+  "THEME       "
+  "&OK"
+  "&CANCEL"
+GP.ENDBANKEDSTR
+
+GP.BANKEDSTR KVB.TEXTBANK KVB.TEXT.PAGE
+  "KV-BANKED  CONTROL PANEL"
+  "SLOT  KEY       VALUE"
+  " OF"
+  " SLOTS USED"
+  "   NOT SHOWN"
+  "   CHANGED SINCE THE LAST SAVE OR LOAD"
+  "ALT+LETTER OR ESC OPENS A MENU    ARROWS MOVE    RETURN CHOOSES"
+GP.ENDBANKEDSTR
+
+GP.BANKEDSTR KVB.TEXTBANK KVB.TEXT.BUILD
+  "BUILD 003"
+GP.ENDBANKEDSTR
+
+GP.BANKEDSTR KVB.TEXTBANK KVB.TEXT.ABOUT
+  "ABOUT KV-BANKED"
+  "CODE BANKS  UTILITIES"
+  "  MENUS"
+  "  GUI"
+  "  FORMS"
+  "TEXT BANKS  THIS PROGRAM"
+  "  MENU ROWS"
+  "DATA BANKS  SETTINGS"
+  "  DIALOG SAVES"
+GP.ENDBANKEDSTR
+
+GP.BANKEDSTR KVB.TEXTBANK KVB.TEXT.EXIT
+  "EXIT"
+  "THE SETTINGS HAVE CHANGED SINCE THE LAST SAVE."
+  "&SAVE"
+  "&DISCARD"
+  "&GO BACK"
+GP.ENDBANKEDSTR
+
+GP.BANKEDSTR KVB.TEXTBANK KVB.TEXT.ASKLEAVE
+  "LEAVE THE CONTROL PANEL?"
+GP.ENDBANKEDSTR
+
+GP.BANKEDSTR KVB.TEXTBANK KVB.TEXT.ASKDEFAULTS
+  "PUT EVERY SETTING BACK TO ITS DEFAULT?"
+GP.ENDBANKEDSTR
+
+## ---- What the status line says after each action.
+GP.BANKEDSTR KVB.TEXTBANK KVB.SAY.LOADED
+  "LOADED SETTINGS.KV"
+GP.ENDBANKEDSTR
+
+GP.BANKEDSTR KVB.TEXTBANK KVB.SAY.LOADED.FILLED
+  "LOADED SETTINGS.KV, MISSING SETTINGS SET TO DEFAULTS"
+GP.ENDBANKEDSTR
+
+GP.BANKEDSTR KVB.TEXTBANK KVB.SAY.NOFILE.DEFAULTS
+  "NO SETTINGS FILE, DEFAULTS SET"
+GP.ENDBANKEDSTR
+
+GP.BANKEDSTR KVB.TEXTBANK KVB.SAY.NOFILE.KEPT
+  "NO SETTINGS FILE, NOTHING CHANGED"
+GP.ENDBANKEDSTR
+
+GP.BANKEDSTR KVB.TEXTBANK KVB.SAY.BADFILE
+  "SETTINGS.KV IS NOT A SETTINGS FILE, DEFAULTS SET"
+GP.ENDBANKEDSTR
+
+GP.BANKEDSTR KVB.TEXTBANK KVB.SAY.SAVED
+  "SAVED TO SETTINGS.KV"
+GP.ENDBANKEDSTR
+
+GP.BANKEDSTR KVB.TEXTBANK KVB.SAY.DEFAULTS
+  "DEFAULTS SET"
+GP.ENDBANKEDSTR
+
+GP.BANKEDSTR KVB.TEXTBANK KVB.SAY.DEFAULTS.KEPT
+  "DEFAULTS NOT SET, NOTHING CHANGED"
+GP.ENDBANKEDSTR
+
+GP.BANKEDSTR KVB.TEXTBANK KVB.SAY.UPDATED
+  "SETTINGS CHANGED, NOT SAVED YET"
+GP.ENDBANKEDSTR
+
+GP.BANKEDSTR KVB.TEXTBANK KVB.SAY.UNCHANGED
+  "SETTINGS NOT CHANGED"
+GP.ENDBANKEDSTR
+
+KVB.LIBEND:
+
+DIM KVB.VALUE$(KVB.SETTING.LAST)
+DIM COMBO.ITEM$(KVB.THEMES)
+
+## ---- APPSYS.STARTUP before the SCREEN: it records the screen APPSYS.RESTORE
+## ---- puts back. The size is asked after the mode change.
+GOSUB APPSYS.STARTUP
+SCREEN KVB.MODE
+GP.CALL APPSYS.SCRMODE, 0, 0, 0, 1
+KVB.SCREENCOLS% = GP.X
+KVB.SCREENROWS% = GP.Y
+KVB.LISTROWS% = KVB.SCREENROWS% - KVB.LISTTOP - 4
+KVB.COLUMNS% = INT((KVB.SCREENCOLS% - 2) / KVB.COLUMNWIDTH)
+
+## ---- The claims, then the menus, then a free bank: the first MENU.BEGIN
+## ---- claims MENU.TEXTBANK, and GET.FREE.BANK must not hand out any of them.
+GOSUB KVB.CLAIM.BANKS
+GOSUB KVB.MENU.BUILD
+GOSUB BANKMGR.GET.FREE.BANK
+KVB.DIALOGBANK% = BANKMGR.BANK
+GP.SUB DLGRESET, KVB.DIALOGBANK%
+
+## ---- The defaults go in before the load, so a failed load can tell a missing
+## ---- file from a store it overwrote.
+GOSUB KV.INIT
+GOSUB KVB.PUT.DEFAULTS
+GOSUB KVB.LOAD.SETTINGS
+IF KVB.LOAD.KEPT% <> 0 THEN KVB.STATUS$ = GP.BSTR(KVB.SAY.NOFILE.DEFAULTS, 0)
+GOSUB KVB.APPLY.THEME
+GOSUB KVB.DRAW.PAGE
+
+## ---- ALT with a bar hot key types that key until MENU.KEYS.OFF.
+GOSUB MENU.KEYS.ON
+
+GP.DO
+    GET KVB.KEYTEXT$
+    KVB.KEYCODE = 0
+    IF KVB.KEYTEXT$ <> "" THEN KVB.KEYCODE = ASC(KVB.KEYTEXT$)
+    GOSUB KVB.MENU.KEY
+    IF KVB.QUIT% <> 0 THEN GP.EXITDO
+GP.LOOP
+
+GOSUB MENU.KEYS.OFF
+GOSUB APPSYS.RESTORE
+END
+
+
+## ***********************************************************************
+## **  KVB.CLAIM.BANKS -- every bank named in this source, told to BANKMGR.
+## **
+## **  A claim fails only when a bank is claimed twice, so none is checked.
+## **  KV.BANK is 0 until KV.INIT runs, so the store's claim names KV.DEFBANK,
+## **  the bank INIT takes.
+## ***********************************************************************
+KVB.CLAIM.BANKS:
+    GOSUB BANKMGR.INIT
+    GP.SUB BANKMGR.CLAIM.BANK, KVB.UTILCODE
+    GP.SUB BANKMGR.CLAIM.BANK, KVB.MENUCODE
+    GP.SUB BANKMGR.CLAIM.BANK, KVB.GUICODE
+    GP.SUB BANKMGR.CLAIM.BANK, KVB.FORMCODE
+    GP.SUB BANKMGR.CLAIM.BANK, KVB.TEXTBANK
+    GP.SUB BANKMGR.CLAIM.BANK, KV.DEFBANK
+    RETURN
+
+
+## ***********************************************************************
+## **  KVB.MENU.BUILD -- the bar and its three dropdowns, built once.
+## **
+## **  The bar goes first: MENU.BEGIN on the bar empties every dropdown.
+## ***********************************************************************
+KVB.MENU.BUILD:
+    MENU.DROPSTYLE = MENU.ROUND
+    MENU.SHADOW = 1
+    GP.SUB MENU.BEGIN, MENU.BAR
+    FOR KVB.MENUROW = 0 TO GP.BSTRCOUNT(KVB.TEXT.BAR) - 1
+        GP.SUB MENU.ITEM, GP.BSTR(KVB.TEXT.BAR, KVB.MENUROW)
+    NEXT KVB.MENUROW
+    GP.SUB MENU.BEGIN, MENU.DROP + KVB.ITEM.FILE
+    FOR KVB.MENUROW = 0 TO GP.BSTRCOUNT(KVB.TEXT.FILEMENU) - 1
+        GP.SUB MENU.ITEM, GP.BSTR(KVB.TEXT.FILEMENU, KVB.MENUROW)
+    NEXT KVB.MENUROW
+    GP.SUB MENU.BEGIN, MENU.DROP + KVB.ITEM.SETTINGS
+    FOR KVB.MENUROW = 0 TO GP.BSTRCOUNT(KVB.TEXT.SETTINGSMENU) - 1
+        GP.SUB MENU.ITEM, GP.BSTR(KVB.TEXT.SETTINGSMENU, KVB.MENUROW)
+    NEXT KVB.MENUROW
+    GP.SUB MENU.BEGIN, MENU.DROP + KVB.ITEM.HELP
+    FOR KVB.MENUROW = 0 TO GP.BSTRCOUNT(KVB.TEXT.HELPMENU) - 1
+        GP.SUB MENU.ITEM, GP.BSTR(KVB.TEXT.HELPMENU, KVB.MENUROW)
+    NEXT KVB.MENUROW
+    RETURN
+
+
+## ***********************************************************************
+## **  KVB.MENU.KEY -- every key comes here first.
+## **
+## **   in   KVB.KEYCODE   the key GET gave, 0 for none
+## **   out  KVB.QUIT%     -1 once EXIT has been answered for leaving
+## ***********************************************************************
+KVB.MENU.KEY:
+    KVB.CHOSEN% = GP.FN(MENU.KEY, KVB.KEYCODE)
+    IF KVB.CHOSEN% < 1 THEN RETURN
+    GP.SELECT MENU.PICKBAR
+        GP.CASE KVB.ITEM.FILE
+            GOSUB KVB.FILE.CHOSEN
+        GP.CASE KVB.ITEM.SETTINGS
+            GOSUB KVB.EDIT.SETTINGS
+        GP.CASE KVB.ITEM.HELP
+            GOSUB KVB.SHOW.ABOUT
+    GP.ENDSEL
+    RETURN
+
+KVB.FILE.CHOSEN:
+    GP.SELECT KVB.CHOSEN%
+        GP.CASE KVB.FILEROW.LOAD
+            GOSUB KVB.LOAD.CHOSEN
+        GP.CASE KVB.FILEROW.SAVE
+            GOSUB KVB.SAVE.CHOSEN
+        GP.CASE KVB.FILEROW.DEFAULTS
+            GOSUB KVB.DEFAULTS.CHOSEN
+        GP.CASE KVB.FILEROW.EXIT
+            GOSUB KVB.EXIT.CHOSEN
+    GP.ENDSEL
+    RETURN
+
+
+## ---- FILE / LOAD. A failed load keeps the store where it can.
+KVB.LOAD.CHOSEN:
+    GOSUB KVB.LOAD.SETTINGS
+    GOSUB KVB.APPLY.THEME
+    GOSUB KVB.DRAW.PAGE
+    RETURN
+
+KVB.SAVE.CHOSEN:
+    GOSUB KVB.SAVE.SETTINGS
+    GOSUB KVB.DRAW.PAGE
+    RETURN
+
+KVB.DEFAULTS.CHOSEN:
+    KVB.STATUS$ = GP.BSTR(KVB.SAY.DEFAULTS.KEPT, 0)
+    KVB.ANSWER% = GP.FN(ASKYN, GP.BSTR(KVB.TEXT.ASKDEFAULTS, 0))
+    GP.IF KVB.ANSWER% <> 0 THEN
+        GOSUB KVB.PUT.DEFAULTS
+        KVB.CHANGED% = -1
+        KVB.STATUS$ = GP.BSTR(KVB.SAY.DEFAULTS, 0)
+        GOSUB KVB.APPLY.THEME
+    GP.ENDIF
+    GOSUB KVB.DRAW.PAGE
+    RETURN
+
+
+## ***********************************************************************
+## **  KVB.EXIT.CHOSEN -- FILE / EXIT.
+## **
+## **  Unsaved changes ask SAVE, DISCARD or GO BACK. With none, the CONFIRM
+## **  setting decides whether to ask at all. A dialog puts the screen back
+## **  itself, so staying needs no redraw.
+## **
+## **   out  KVB.QUIT%   -1 to leave
+## ***********************************************************************
+KVB.EXIT.CHOSEN:
+    IF KVB.CHANGED% <> 0 THEN GOTO KVB.EXIT.UNSAVED
+    KV.KEY$ = GP.BSTR(KVB.TEXT.KEYS, KVB.SETTING.CONFIRM)
+    GOSUB KV.GET
+    KVB.QUIT% = -1
+    IF KV.VALUE$ = GP.BSTR(KVB.TEXT.ON, 0) THEN KVB.QUIT% = GP.FN(ASKYN, GP.BSTR(KVB.TEXT.ASKLEAVE, 0))
+    RETURN
+
+KVB.EXIT.UNSAVED:
+    KVB.ANSWER% = GP.FN(ASK3, GP.BSTR(KVB.TEXT.EXIT, 0), GP.BSTR(KVB.TEXT.EXIT, 1), GP.BSTR(KVB.TEXT.EXIT, 2), GP.BSTR(KVB.TEXT.EXIT, 3), GP.BSTR(KVB.TEXT.EXIT, 4), 1, 3)
+    IF KVB.ANSWER% = 1 THEN GOSUB KVB.SAVE.SETTINGS
+    IF KVB.ANSWER% < 3 THEN KVB.QUIT% = -1
+    RETURN
+
+
+## ***********************************************************************
+## **  KVB.EDIT.SETTINGS -- SETTINGS / EDIT SETTINGS, the one form.
+## **
+## **  OK writes every value back and selects the theme chosen. CANCEL
+## **  changes nothing.
+## **
+## **  WARNING: a form holds GUI.FORM.MAX controls, 8, and the OK and CANCEL
+## **  buttons are two of them. This one is full.
+## ***********************************************************************
+KVB.EDIT.SETTINGS:
+    GOSUB KVB.READ.SETTINGS
+    FOR KVB.INDEX = 1 TO KVB.THEMES
+        COMBO.ITEM$(KVB.INDEX) = GP.BSTR(KVB.TEXT.THEMES, KVB.INDEX - 1)
+    NEXT KVB.INDEX
+    GP.SUB FORM.BEGIN, GP.BSTR(KVB.TEXT.FORM, 0), GP.BSTR(KVB.TEXT.FORM, 1), GP.BSTR(KVB.TEXT.FORM, 2), KVB.FORMROWS, KVB.LABELWIDTH + 1 + KVB.FIELDWIDTH, GP.BSTR(KVB.TEXT.FORM, 9), GP.BSTR(KVB.TEXT.FORM, 10)
+
+    ## ---- Controls number 1 up in the order added. FORM.FIELD returns none.
+    GP.SUB FORM.FIELD, 0, GP.BSTR(KVB.TEXT.FORM, 3), KVB.LABELWIDTH, KVB.FIELDWIDTH, LEFT$(KVB.VALUE$(KVB.SETTING.NAME), KVB.FIELDWIDTH)
+    KVB.NAME.CTRL% = 1
+    GP.SUB FORM.FIELD, 1, GP.BSTR(KVB.TEXT.FORM, 4), KVB.LABELWIDTH, KVB.FIELDWIDTH, LEFT$(KVB.VALUE$(KVB.SETTING.MACHINE), KVB.FIELDWIDTH)
+    KVB.MACHINE.CTRL% = 2
+
+    KVB.TICKED% = (KVB.VALUE$(KVB.SETTING.CLOCK) = GP.BSTR(KVB.TEXT.ON, 0))
+    KVB.CLOCK.CTRL% = GP.FN(FORM.CHECK, 3, GP.BSTR(KVB.TEXT.FORM, 5), KVB.TICKED%)
+    KVB.TICKED% = (KVB.VALUE$(KVB.SETTING.CONFIRM) = GP.BSTR(KVB.TEXT.ON, 0))
+    KVB.CONFIRM.CTRL% = GP.FN(FORM.CHECK, 4, GP.BSTR(KVB.TEXT.FORM, 6), KVB.TICKED%)
+    KVB.TICKED% = (KVB.VALUE$(KVB.SETTING.CLICK) = GP.BSTR(KVB.TEXT.ON, 0))
+    KVB.CLICK.CTRL% = GP.FN(FORM.CHECK, 5, GP.BSTR(KVB.TEXT.FORM, 7), KVB.TICKED%)
+
+    GP.SUB FORM.COMBO, 7, GP.BSTR(KVB.TEXT.FORM, 8), KVB.COMBOWIDTH, KVB.THEMES, VAL(KVB.VALUE$(KVB.SETTING.THEME)) + 1
+
+    KVB.ACCEPTED% = GP.FN(FORMTO.RUN)
+    IF KVB.ACCEPTED% <> 0 THEN GOSUB KVB.TAKE.FORM
+    GP.SUB FORM.END
+
+    KVB.STATUS$ = GP.BSTR(KVB.SAY.UNCHANGED, 0)
+    GP.IF KVB.ACCEPTED% <> 0 THEN
+        GOSUB KVB.WRITE.SETTINGS
+        KVB.CHANGED% = -1
+        KVB.STATUS$ = GP.BSTR(KVB.SAY.UPDATED, 0)
+        GOSUB KVB.APPLY.THEME
+    GP.ENDIF
+    GOSUB KVB.DRAW.PAGE
+    RETURN
+
+## ---- The form's answers into KVB.VALUE$(). They are read before FORM.END.
+KVB.TAKE.FORM:
+    KVB.VALUE$(KVB.SETTING.NAME) = GP.FN(FORM.TEXT, KVB.NAME.CTRL%)
+    KVB.VALUE$(KVB.SETTING.MACHINE) = GP.FN(FORM.TEXT, KVB.MACHINE.CTRL%)
+    KVB.VALUE$(KVB.SETTING.CLOCK) = GP.BSTR(KVB.TEXT.OFF, 0)
+    IF GP.FN(FORM.CHECKED, KVB.CLOCK.CTRL%) THEN KVB.VALUE$(KVB.SETTING.CLOCK) = GP.BSTR(KVB.TEXT.ON, 0)
+    KVB.VALUE$(KVB.SETTING.CONFIRM) = GP.BSTR(KVB.TEXT.OFF, 0)
+    IF GP.FN(FORM.CHECKED, KVB.CONFIRM.CTRL%) THEN KVB.VALUE$(KVB.SETTING.CONFIRM) = GP.BSTR(KVB.TEXT.ON, 0)
+    KVB.VALUE$(KVB.SETTING.CLICK) = GP.BSTR(KVB.TEXT.OFF, 0)
+    IF GP.FN(FORM.CHECKED, KVB.CLICK.CTRL%) THEN KVB.VALUE$(KVB.SETTING.CLICK) = GP.BSTR(KVB.TEXT.ON, 0)
+    KVB.VALUE$(KVB.SETTING.THEME) = MID$(STR$(GP.FN(FORM.COMBOSEL) - 1), 2)
+    RETURN
+
+
+## ***********************************************************************
+## **  KVB.SHOW.ABOUT -- HELP / ABOUT: which bank holds what.
+## **
+## **  The numbers come from the #DEFINEs, so the box cannot disagree with
+## **  the build.
+## ***********************************************************************
+KVB.SHOW.ABOUT:
+    KVB.ABOUT.CODE$ = GP.BSTR(KVB.TEXT.ABOUT, 1) + STR$(KVB.UTILCODE) + GP.BSTR(KVB.TEXT.ABOUT, 2) + STR$(KVB.MENUCODE)
+    KVB.ABOUT.CODE$ = KVB.ABOUT.CODE$ + GP.BSTR(KVB.TEXT.ABOUT, 3) + STR$(KVB.GUICODE) + GP.BSTR(KVB.TEXT.ABOUT, 4) + STR$(KVB.FORMCODE)
+    KVB.ABOUT.TEXT$ = GP.BSTR(KVB.TEXT.ABOUT, 5) + STR$(KVB.TEXTBANK) + GP.BSTR(KVB.TEXT.ABOUT, 6) + STR$(MENU.TEXTBANK)
+    KVB.ABOUT.DATA$ = GP.BSTR(KVB.TEXT.ABOUT, 7) + STR$(KV.BANK) + GP.BSTR(KVB.TEXT.ABOUT, 8) + STR$(KVB.DIALOGBANK%)
+    GP.SUB MSGBOXEX, GP.BSTR(KVB.TEXT.ABOUT, 0), KVB.ABOUT.CODE$, KVB.ABOUT.TEXT$, KVB.ABOUT.DATA$, ""
+    RETURN
+
+
+## ***********************************************************************
+## **  KVB.LOAD.SETTINGS -- SETTINGS.KV into the store.
+## **
+## **   out  KVB.STATUS$      what happened
+## **        KVB.LOAD.KEPT%   -1 when there was no file and the store is as it was
+## **        KVB.CHANGED%     0 after a clean load, -1 when defaults filled in
+## **
+## **  The store holds every setting going in. That is how a missing file is
+## **  told apart from a store the load overwrote.
+## ***********************************************************************
+KVB.LOAD.SETTINGS:
+    KVB.LOAD.KEPT% = 0
+    KV.FNAME$ = GP.BSTR(KVB.TEXT.FILENAME, 0)
+    GOSUB KV.LOAD
+    IF KV.OK = 0 THEN GOTO KVB.LOAD.FAILED
+    GOSUB KVB.FILL.MISSING
+    KVB.CHANGED% = 0
+    KVB.STATUS$ = GP.BSTR(KVB.SAY.LOADED, 0)
+    IF KVB.FILLED% = 0 THEN RETURN
+    KVB.CHANGED% = -1
+    KVB.STATUS$ = GP.BSTR(KVB.SAY.LOADED.FILLED, 0)
+    RETURN
+
+## ---- WARNING: KV.LOAD loads the file over the store before it checks the
+## ---- header, so a file that is not a store leaves the bank holding it. With
+## ---- no file the bank is untouched and the NAME key is still there.
+KVB.LOAD.FAILED:
+    GOSUB KV.INIT
+    IF KV.OK = 0 THEN GOSUB KV.WIPE
+    KV.KEY$ = GP.BSTR(KVB.TEXT.KEYS, KVB.SETTING.NAME)
+    GOSUB KV.FIND
+    GP.IF KV.SLOT = 0 THEN
+        GOSUB KVB.PUT.DEFAULTS
+        KVB.CHANGED% = -1
+        KVB.STATUS$ = GP.BSTR(KVB.SAY.BADFILE, 0)
+        RETURN
+    GP.ENDIF
+    KVB.LOAD.KEPT% = -1
+    KVB.STATUS$ = GP.BSTR(KVB.SAY.NOFILE.KEPT, 0)
+    RETURN
+
+## ---- A disk error in KV.SAVE stops the program.
+KVB.SAVE.SETTINGS:
+    KV.FNAME$ = GP.BSTR(KVB.TEXT.FILENAME, 0)
+    GOSUB KV.SAVE
+    KVB.CHANGED% = 0
+    KVB.STATUS$ = GP.BSTR(KVB.SAY.SAVED, 0)
+    RETURN
+
+
+## ***********************************************************************
+## **  The store and KVB.VALUE$(), setting by setting.
+## ***********************************************************************
+
+## ---- An empty store, then every setting at its default.
+KVB.PUT.DEFAULTS:
+    GOSUB KV.WIPE
+    FOR KVB.INDEX = 0 TO KVB.SETTING.LAST
+        KV.KEY$ = GP.BSTR(KVB.TEXT.KEYS, KVB.INDEX)
+        GOSUB KVB.PUT.DEFAULT
+    NEXT KVB.INDEX
+    RETURN
+
+## ---- in KV.KEY$ and KVB.INDEX, the setting it is.
+KVB.PUT.DEFAULT:
+    KV.VALUE$ = GP.BSTR(KVB.TEXT.DEFAULTS, KVB.INDEX)
+    GOSUB KV.PUT
+    RETURN
+
+## ---- out KVB.FILLED%, how many settings the store lacked. Each now holds its default.
+KVB.FILL.MISSING:
+    KVB.FILLED% = 0
+    FOR KVB.INDEX = 0 TO KVB.SETTING.LAST
+        KV.KEY$ = GP.BSTR(KVB.TEXT.KEYS, KVB.INDEX)
+        GOSUB KV.FIND
+        GP.IF KV.SLOT = 0 THEN
+            KVB.FILLED% = KVB.FILLED% + 1
+            GOSUB KVB.PUT.DEFAULT
+        GP.ENDIF
+    NEXT KVB.INDEX
+    RETURN
+
+KVB.READ.SETTINGS:
+    FOR KVB.INDEX = 0 TO KVB.SETTING.LAST
+        KV.KEY$ = GP.BSTR(KVB.TEXT.KEYS, KVB.INDEX)
+        GOSUB KV.GET
+        KVB.VALUE$(KVB.INDEX) = KV.VALUE$
+    NEXT KVB.INDEX
+    RETURN
+
+KVB.WRITE.SETTINGS:
+    FOR KVB.INDEX = 0 TO KVB.SETTING.LAST
+        KV.KEY$ = GP.BSTR(KVB.TEXT.KEYS, KVB.INDEX)
+        KV.VALUE$ = KVB.VALUE$(KVB.INDEX)
+        GOSUB KV.PUT
+    NEXT KVB.INDEX
+    RETURN
+
+## ---- The THEME setting, selected. A value that is not a combo row is X16.
+KVB.APPLY.THEME:
+    KV.KEY$ = GP.BSTR(KVB.TEXT.KEYS, KVB.SETTING.THEME)
+    GOSUB KV.GET
+    KVB.THEMENUMBER = VAL(KV.VALUE$)
+    IF KVB.THEMENUMBER < 0 THEN KVB.THEMENUMBER = 0
+    IF KVB.THEMENUMBER >= KVB.THEMES THEN KVB.THEMENUMBER = 0
+    THEME.ID% = KVB.THEMENUMBER
+    GOSUB THEME.SELECT
+    RETURN
+
+
+## ***********************************************************************
+## **  KVB.DRAW.PAGE -- the whole screen: the bar, the store, the status line.
+## ***********************************************************************
+KVB.DRAW.PAGE:
+    GP.FILL 0, 0, KVB.SCREENCOLS%, KVB.SCREENROWS%, KVB.SPACE, THEME.CLR(THEME.PAGE)
+    GP.FILL 0, 0, KVB.SCREENCOLS%, 1, KVB.SPACE, THEME.CLR(THEME.BAR)
+    GP.SUB MENU.DRAWBAR, 0, KVB.BARX, MENU.NOBOX
+    GP.PRINTAT 2, 2, GP.BSTR(KVB.TEXT.PAGE, 0), THEME.CLR(THEME.TITLE)
+    KVB.BUILD$ = GP.BSTR(KVB.TEXT.BUILD, 0)
+    GP.PRINTAT KVB.SCREENCOLS% - 2 - LEN(KVB.BUILD$), 2, KVB.BUILD$, THEME.CLR(THEME.DIMMED)
+    GOSUB KVB.DRAW.STORE
+    GP.PRINTAT 2, KVB.SCREENROWS% - 2, GP.BSTR(KVB.TEXT.PAGE, 6), THEME.CLR(THEME.DIMMED)
+    GP.FILL 0, KVB.SCREENROWS% - 1, KVB.SCREENCOLS%, 1, KVB.SPACE, THEME.CLR(THEME.BAR)
+    GP.PRINTAT 2, KVB.SCREENROWS% - 1, KVB.STATUS$, THEME.CLR(THEME.BAR)
+    RETURN
+
+## ---- Every used slot, KV.AT over 1-63, down a column and on into the next.
+## ---- A slot past the last column is counted and not drawn.
+KVB.DRAW.STORE:
+    KVB.USED% = 0
+    KVB.HIDDEN% = 0
+    FOR KVB.SLOT = 1 TO KV.SLOTS - 1
+        KV.SLOT = KVB.SLOT
+        GOSUB KV.AT
+        IF KV.OK THEN GOSUB KVB.DRAW.SLOT
+    NEXT KVB.SLOT
+    KVB.COUNTLINE$ = MID$(STR$(KVB.USED%), 2) + GP.BSTR(KVB.TEXT.PAGE, 2) + STR$(KV.SLOTS - 1) + GP.BSTR(KVB.TEXT.PAGE, 3)
+    IF KVB.HIDDEN% > 0 THEN KVB.COUNTLINE$ = KVB.COUNTLINE$ + GP.BSTR(KVB.TEXT.PAGE, 4) + STR$(KVB.HIDDEN%)
+    IF KVB.CHANGED% <> 0 THEN KVB.COUNTLINE$ = KVB.COUNTLINE$ + GP.BSTR(KVB.TEXT.PAGE, 5)
+    GP.PRINTAT 2, KVB.SCREENROWS% - 3, KVB.COUNTLINE$, THEME.CLR(THEME.TEXT)
+    RETURN
+
+## ---- in KVB.SLOT, KV.KEY$ and KV.VALUE$ from KV.AT. A column's first slot
+## ---- draws the column's heading too.
+KVB.DRAW.SLOT:
+    KVB.COLUMN% = INT(KVB.USED% / KVB.LISTROWS%)
+    KVB.SLOTROW% = KVB.USED% - KVB.COLUMN% * KVB.LISTROWS%
+    KVB.USED% = KVB.USED% + 1
+    GP.IF KVB.COLUMN% >= KVB.COLUMNS% THEN
+        KVB.HIDDEN% = KVB.HIDDEN% + 1
+        RETURN
+    GP.ENDIF
+    KVB.X% = 2 + KVB.COLUMN% * KVB.COLUMNWIDTH
+    KVB.Y% = KVB.LISTTOP + KVB.SLOTROW%
+    IF KVB.SLOTROW% = 0 THEN GP.PRINTAT KVB.X%, KVB.LISTTOP - 1, GP.BSTR(KVB.TEXT.PAGE, 1), THEME.CLR(THEME.DIMMED)
+    GP.PRINTAT KVB.X% + 2, KVB.Y%, RIGHT$(STR$(KVB.SLOT), 2), THEME.CLR(THEME.DIMMED)
+    GP.PRINTAT KVB.X% + KVB.KEYAT, KVB.Y%, KV.KEY$, THEME.CLR(THEME.TITLE)
+    IF KV.VALUE$ <> "" THEN GP.PRINTAT KVB.X% + KVB.VALUEAT, KVB.Y%, LEFT$(KV.VALUE$, KVB.VALUEWIDTH), THEME.CLR(THEME.TEXT)
+    RETURN
