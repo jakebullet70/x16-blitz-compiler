@@ -474,6 +474,19 @@ TOKENISING HELLO.BASL ...
   variables out differently from the interpreter. `GP.STRPTR` returns the
   address of a GPC string block (`GPC-BASIC/GP-BASIC.md` section 3.4).
 
+## Known issues
+
+- `SLEEP n` in a compiled program waits n ticks of the 60 Hz clock. ROM BASIC
+  waits n+1 frames. `SLEEP 0`, and `SLEEP` with no argument, return at once
+  in a compiled program, where ROM BASIC waits for the next frame. A loop
+  paced by a bare `SLEEP` runs unpaced, with no error. Write `SLEEP 1`, which
+  waits for the next frame.
+- Inside a `GP.ASM` block, an operand that names a label starting with the
+  letter `A` stops the compile with `PASS 1 SYNTAX ERROR`. `BNE ACLP`,
+  `JSR ADDUP` and `LDA ARRAY` all fail. The error names the line that uses
+  the label, not the line that defines it. A bare `A` operand, as in `ASL A`,
+  is unaffected. Start the label with any other letter.
+
 ## License
 
 MIT. See [`LICENSE`](LICENSE). (c) 2023 paulscottrobson and contributors.
