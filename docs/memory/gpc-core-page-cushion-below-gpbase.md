@@ -5,7 +5,12 @@ metadata:
   node_type: memory
   type: project
   originSessionId: d7531322-9a88-4f9a-8bdd-54f6afe99cb4
+  modified: 2026-10-02T08:27:52.926Z
 ---
+
+**Re-measured 2026-10-02, build 131: 2 bytes left.** The cushion was 6 on build 130. The channel
+fix in [[file-io-error-in-gpdo-key-loop]] took 4. The next core change of 3 bytes or more needs
+room found first.
 
 **Re-measured 2026-09-30, build 128: 10 bytes left.** `FloatIsZero` ends at `$2FF6` below `GPBase
 $3000`; the banked error print took 9. See [[banked-error-address-unplaceable]].

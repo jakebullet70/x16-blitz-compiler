@@ -88,14 +88,3 @@ Both run in `source/drive/`, which needs `COLORTST.BASL` and the three modules i
 Shared, so `GPC.RT.nnn.BIN` must be on the drive at run time. 3,011 bytes of p-code.
 
 `color-demo.bat` in the project root builds nothing and just runs it.
-
-## Not here: saving the scheme to a file
-
-An `S` key wrote the lines to `SCHEME.TXT`. The file came out correct every time, and the program
-then stopped with `INPUT/OUTPUT ERROR @ $005B`.
-
-It is not the file I/O. `OPEN`/`PRINT#`/`CLOSE` in isolation, inside a `GP.DO`, behind a `GOSUB`,
-and behind a `GP.SELECT` all pass; so does the same routine called from the top level of this
-program. It reproduces only from inside the `GP.DO` key loop, and it stops reproducing as soon as a
-plain `PRINT` follows the `CLOSE` — which points at the channel state a bare `PRINT` resets, not at
-the sample.

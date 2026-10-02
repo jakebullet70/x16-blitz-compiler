@@ -16,12 +16,16 @@
 ;
 ;										Clear Screen Command
 ;
+;		The control codes in this file go through VectorPrintCharacter, which loads the channel.
+;		XPrintCharacterToChannel takes the channel in X, and X here is the float stack or a
+;		table index.
+;
 ; ************************************************************************************************
 
 CommandCls: ;; [!cls]
 		.entercmd
 		lda 	#147
-		jsr 	XPrintCharacterToChannel
+		jsr 	VectorPrintCharacter
 		.exitcmd
 
 ; ************************************************************************************************
@@ -67,7 +71,7 @@ CommandColor: ;; [!color]
 		beq 	_CCNoBGR 					; if so, change background
 		jsr 	_CCSetColour
 		lda 	#$01 						; swap FGR/BGR
-		jsr 	XPrintCharacterToChannel
+		jsr 	VectorPrintCharacter
 _CCNoBGR:
 		lda 	NSMantissa0
 		jsr 	_CCSetColour		
@@ -78,7 +82,7 @@ _CCSetColour:
 		and 	#15 						; look up in control codes table.
 		tax
 		lda 	_CCCommandTable,x
-		jsr 	XPrintCharacterToChannel
+		jsr 	VectorPrintCharacter
 		plx
 		rts
 

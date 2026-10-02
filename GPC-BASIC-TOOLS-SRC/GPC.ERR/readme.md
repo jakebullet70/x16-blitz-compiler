@@ -104,8 +104,8 @@ python source/gpc/samplesbuild.py GPC.ERR
 `samplesbuild.py` runs the same two steps and installs `GPC.ERR.PRG` and
 `GPC.ERR.OVL` into `GPC-BASIC-TOOLS-SRC/GPC-HELP/`. It copies no runtime, in
 either direction: `GPC.HELP` owns the `.RT.` files in that folder. This folder
-carries build 130 of the three, `GPC.RT.130.BIN`, `GPB.RT.130.BIN` and
-`GP1.RT.130.BIN`.
+carries build 131 of the three, `GPC.RT.131.BIN`, `GPB.RT.131.BIN` and
+`GP1.RT.131.BIN`.
 
 The object is SHARED. It loads `GPB.RT.nnn.BIN` off the drive when it runs,
 the runtime with the GP handlers rather than the core-only `GPC.RT.nnn.BIN`.
@@ -162,8 +162,8 @@ beside the source and are not part of the library.
 
 `source/gpc/gen_err_tokens.py` generates `ERRTOKEN.INC.BL`. The four lines in
 `GPC.INPUT` are source, object, map and `SHARED`. The folder also holds the
-runtimes a shared object loads: `GPB.RT.130.BIN`, `GPC.RT.130.BIN` and
-`GP1.RT.130.BIN`.
+runtimes a shared object loads: `GPB.RT.131.BIN`, `GPC.RT.131.BIN` and
+`GP1.RT.131.BIN`.
 
 Build outputs: `GPC.ERR.SRC.PRG`, `GPC.ERR.SRC.SYM` and `GPC.ERR.MAP`. Nothing
 under `GPC-BASIC-TOOLS-SRC/` is git-ignored, so the object and the overlay are

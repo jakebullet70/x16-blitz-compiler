@@ -525,10 +525,6 @@ not decided.
 WARNING: the map and the symbol file are LF only and `LINPUT#` defaults to delimiter 13. Every
 `LINPUT#` in GPC.ERR names 10.
 
-WARNING: file I/O reached from inside a `GP.DO` key loop stops the program with
-`INPUT/OUTPUT ERROR @ $005B`. Output to channel 0 clears it, so every `CLOSE` in GPC.ERR is followed
-by a space to channel 0.
-
 Phase 4 gave the real names and took 1,410 of those bytes. It cost nothing in the overlay, because
 none of its code is in a `GP.BANKED` region. Phase 5's bank loader is not needed for size either.
 

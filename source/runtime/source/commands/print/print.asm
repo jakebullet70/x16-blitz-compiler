@@ -25,12 +25,22 @@ GetChannel: ;; [getchannel]
 		jsr 	FloatSetByte
 		.exitcmd
 
+;
+;		The compiler emits this before and after every statement that names a channel, so each
+;		one ends with the channel released, as PRINT# and INPUT# do in ROM BASIC. A disk command
+;		runs when its channel is released, not when its last character arrives.
+;
 SetChannel: ;; [setchannel]
 		.entercmd
 		jsr 	FloatIntegerPart
 		lda 	NSMantissa0,x
 		sta 	currentChannel
 		dex
+		phx 								; the float stack
+		phy 								; the instruction pointer
+		jsr 	X16_CLRCHN
+		ply
+		plx
 		.exitcmd
 
 SetDefaultChannel:

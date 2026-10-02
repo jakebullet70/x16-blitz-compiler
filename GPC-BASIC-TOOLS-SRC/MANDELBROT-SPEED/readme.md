@@ -180,7 +180,7 @@ python source\gpc\samplesbuild.py MANDEL MANDELASM
   `MANDELASM.BASL` includes.
 - `GPC.BIN`, `GPC.PRG`, `BASLOAD-GPC.PRG` and `BASLOAD-GPC.BIN` are the
   compiler and tokeniser, for building on the machine.
-- `GPC.IMG.130.BIN`, `GP1.IMG.130.BIN` and `*.RT.130.BIN` are the runtime
+- `GPC.IMG.131.BIN`, `GP1.IMG.131.BIN` and `*.RT.131.BIN` are the runtime
   images the compiler embeds.
 - `GPC.INPUT` names the last compile's files. `GPC.PRG` writes it on every
   compile and `GPC.BIN` reads it.

@@ -32,8 +32,7 @@ XPrintCharacterToChannel:
 		bra 	_XPCSend
 _XPCNotDefault:		
 		jsr 	X16_CHKOUT 					; CHKOUT set channel
-		jsr 	X16_READST 					; check okay
-		bne 	_XPCError
+		bcs 	_XPCError 					; carry set: not open, or not open for output
 _XPCSend:		
 		pla 								; restore character
 		jsr 	X16_BSOUT 					; print

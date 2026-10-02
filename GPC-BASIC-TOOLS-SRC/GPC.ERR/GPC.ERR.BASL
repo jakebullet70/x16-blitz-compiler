@@ -913,7 +913,6 @@ ERR.SYM.PROFILE:
         IF ST <> 0 THEN GP.EXITDO
     GP.LOOP
     CLOSE 2
-    GOSUB ERR.CHANNEL.KICK
     IF ERR.TOTAL.FILES = 0 THEN RETURN
     FOR ERR.PROF.I = 0 TO ERR.TOTAL.FILES - 1
         ERR.TOTAL.LINES = ERR.TOTAL.LINES + ERR.FILE.LAST(ERR.PROF.I)
@@ -961,7 +960,6 @@ ERR.CODE.PROFILE:
         IF ST <> 0 THEN GP.EXITDO
     GP.LOOP
     CLOSE 2
-    GOSUB ERR.CHANNEL.KICK
     RETURN
 
 
@@ -1073,7 +1071,6 @@ ERR.MAP.SCAN:
         IF ST <> 0 THEN GP.EXITDO
     GP.LOOP
     CLOSE 2
-    GOSUB ERR.CHANNEL.KICK
     IF ERR.LAST.OFFSET >= 0 AND ERR.TARGET > ERR.LAST.OFFSET THEN ERR.PAST.END = -1
     RETURN
 
@@ -1158,7 +1155,6 @@ ERR.SYM.SCAN:
         IF ST <> 0 THEN GP.EXITDO
     GP.LOOP
     CLOSE 2
-    GOSUB ERR.CHANNEL.KICK
     RETURN
 
 
@@ -1210,20 +1206,6 @@ ERR.SYM.TRIM:
         IF RIGHT$(ERR.TRIM$, 1) <> " " THEN GP.EXITDO
         ERR.TRIM$ = LEFT$(ERR.TRIM$, LEN(ERR.TRIM$) - 1)
     GP.LOOP
-    RETURN
-
-
-## ===========================================================================
-## ERR.CHANNEL.KICK -- one character to channel 0 after every CLOSE.
-##
-## WARNING: file I/O reached from inside a GP.DO key loop finishes its work and
-## then stops the program with INPUT/OUTPUT ERROR @ $005B. Channel 0 output
-## runs CLRCHN and makes it go away. The menu loop IS that key loop, so every
-## CLOSE here is followed by this. The space lands wherever the cursor is and
-## ERR.PAINT draws over it.
-## ===========================================================================
-ERR.CHANNEL.KICK:
-    PRINT " ";
     RETURN
 
 

@@ -29,6 +29,12 @@ Later on 2026-10-01 the runtime moved to build 130 for PSGVOL and FMVOL (see
 [[gpc-psgvol-fmvol-inverted]]). The 129 files were replaced in the same 14 folders, and samplesbuild
 rebuilt the same 11 programs plus LANDER64. KV-BANKED, CRUNCH and XBASE were not rebuilt.
 
+On 2026-10-02 the runtime moved to build 131 for the channel fix (see
+[[file-io-error-in-gpdo-key-loop]]). The 130 files were replaced in 15 folders, KV-BIN-STORE now
+among them. samplesbuild rebuilt all 14 of its programs, KV-BANKED and KV-BIN-STORE included.
+Every program that was built on 130 came out the same size. CRUNCH and XBASE were not rebuilt.
+`shared_test.py` passes all but its WARM step, see [[shared-test-warm-step-is-stale]].
+
 Still open:
 - `help-demo.bat`, `gpcerr-demo.bat` and `gpc-gui-demo.bat` have not been re-run since.
 - EDIT.PRG, CRUNCH.PRG, COLORTST.PRG are embedded objects and never needed a runtime.

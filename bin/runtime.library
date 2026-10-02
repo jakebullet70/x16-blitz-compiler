@@ -5786,12 +5786,22 @@ GetChannel: ;; [getchannel]
 		jsr 	FloatSetByte
 		.exitcmd
 
+;
+;		The compiler emits this before and after every statement that names a channel, so each
+;		one ends with the channel released, as PRINT# and INPUT# do in ROM BASIC. A disk command
+;		runs when its channel is released, not when its last character arrives.
+;
 SetChannel: ;; [setchannel]
 		.entercmd
 		jsr 	FloatIntegerPart
 		lda 	NSMantissa0,x
 		sta 	currentChannel
 		dex
+		phx 								; the float stack
+		phy 								; the instruction pointer
+		jsr 	X16_CLRCHN
+		ply
+		plx
 		.exitcmd
 
 SetDefaultChannel:
@@ -9848,8 +9858,7 @@ XPrintCharacterToChannel:
 		bra 	_XPCSend
 _XPCNotDefault:		
 		jsr 	X16_CHKOUT 					; CHKOUT set channel
-		jsr 	X16_READST 					; check okay
-		bne 	_XPCError
+		bcs 	_XPCError 					; carry set: not open, or not open for output
 _XPCSend:		
 		pla 								; restore character
 		jsr 	X16_BSOUT 					; print
@@ -10332,12 +10341,16 @@ X16_Audio_PSGCHORD: ;; [!PSGCHORD]
 ;
 ;										Clear Screen Command
 ;
+;		The control codes in this file go through VectorPrintCharacter, which loads the channel.
+;		XPrintCharacterToChannel takes the channel in X, and X here is the float stack or a
+;		table index.
+;
 ; ************************************************************************************************
 
 CommandCls: ;; [!cls]
 		.entercmd
 		lda 	#147
-		jsr 	XPrintCharacterToChannel
+		jsr 	VectorPrintCharacter
 		.exitcmd
 
 ; ************************************************************************************************
@@ -10383,7 +10396,7 @@ CommandColor: ;; [!color]
 		beq 	_CCNoBGR 					; if so, change background
 		jsr 	_CCSetColour
 		lda 	#$01 						; swap FGR/BGR
-		jsr 	XPrintCharacterToChannel
+		jsr 	VectorPrintCharacter
 _CCNoBGR:
 		lda 	NSMantissa0
 		jsr 	_CCSetColour		
@@ -10394,7 +10407,7 @@ _CCSetColour:
 		and 	#15 						; look up in control codes table.
 		tax
 		lda 	_CCCommandTable,x
-		jsr 	XPrintCharacterToChannel
+		jsr 	VectorPrintCharacter
 		plx
 		rts
 
