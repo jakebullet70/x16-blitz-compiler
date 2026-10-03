@@ -25,7 +25,7 @@ CommandNEXT:
 		;		NEXT [variable]
 		;
 		jsr 	LookNextNonSpace 			; first letter of index variable, should be.
-		jsr 	CharIsAlpha 				; if not alpha , error
+		jsr 	CharIsNameStart 			; if no name, a bare NEXT
 		bcc 	_CNNoReferenceGiven
 		jsr 	GetNext
 		jsr 	GetReferenceTerm 			; figure out the reference.

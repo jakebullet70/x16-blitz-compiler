@@ -220,6 +220,9 @@ tree dirty.
 - `option.inc`: one directive, `#GPC` - see below
 - `response.inc`: one word: message 15 was `SYMFILE IO ERR`, so a stock
   BASLOAD reports the wrong error for a `#SAVEAS` with no argument
+- `symbol.inc`: the name check tests variables, where stock tests labels, and
+  the first character runs on past `Z` into `[ \ ] ^ _`, so `OUT OF VARIABLE
+  NAMES` comes after `_Z`. GPC reads those names; ROM BASIC cannot
 
 **Nothing downstream can tell the program was never in RAM.** GPC reads the
 two-byte line link, ORs its halves, tests for zero and never dereferences it

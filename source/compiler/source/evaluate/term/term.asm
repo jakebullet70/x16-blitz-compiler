@@ -49,10 +49,8 @@ CompileTerm:
 		cmp 	#"(" 						; check parenthesis
 		beq 	_CTBrackets
 
-		cmp 	#"A" 						; check variable/array ?
+		jsr 	CharIsNameStart 			; check variable/array ?
 		bcc 	_CTSyntax
-		cmp 	#"Z"+1
-		bcs 	_CTSyntax
 
 		jsr 	GetReferenceTerm 			; figure out what it is.
 		pha 								; save type on stack

@@ -29,7 +29,7 @@ CommandReadInputCommon:
 		sty 	stringPCode
 _CRLoop:				
 		jsr 	GetNextNonSpace 			; first char of identifier
-		jsr 	CharIsAlpha 				; check A-Z
+		jsr 	CharIsNameStart
 		bcc 	_CRSyntax
 		jsr 	GetReferenceTerm 			; get the variable.
 		pha 								; save type.

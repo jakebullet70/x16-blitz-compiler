@@ -134,8 +134,9 @@ AsmReadLow:
 		ldx 	#0
 		jsr 	LookNextNonSpace
 		beq 	_ARLNotLow 					; GP.ASM alone
-		jsr 	CharIsAlpha
+		jsr 	CharIsNameStart 			; a crunched LOW can start [ \ ] ^ or _
 		bcc 	_ARLNotLow 					; not a word: AsmRequireEOL refuses it
+		bra 	_ARLTake
 _ARLChar:
 		jsr 	LookNext
 		jsr 	CharIsAlpha

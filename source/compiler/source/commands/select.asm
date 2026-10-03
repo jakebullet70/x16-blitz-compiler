@@ -110,8 +110,8 @@ _CSCRoom:
 		;		GetReferenceTerm, which would accept an array element and emit its subscript
 		;		here, where no alternative can repeat it -- see the header.
 		;
-		jsr 	GetNextNonSpace 			; a variable starts with a letter; a digit, a quote
-		jsr 	CharIsAlpha 				; or a bracket cannot, which rejects expressions
+		jsr 	GetNextNonSpace 			; a variable starts with a name character; a digit,
+		jsr 	CharIsNameStart 			; a quote or a "(" cannot, which rejects expressions
 		bcs 	_CSCAlpha
 _CSCSyntax:
 		jmp 	SelectFailSyntax

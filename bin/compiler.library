@@ -1308,7 +1308,7 @@ _MCLSyntax: 								; syntax error.
 		;		Implied assignment ?
 		;
 _MCLCheckAssignment:
-		jsr 	CharIsAlpha 				; if not alpha then syntax error
+		jsr 	CharIsNameStart 			; if no name starts here then syntax error
 		bcc 	_MCLSyntax
 		jsr 	CommandLETHaveFirst  		; LET first character, do assign
 		stz 	deferErrors 				; assignment compiled OK -> disarm the deferral
@@ -4746,7 +4746,7 @@ CommandFOR:
 		;		FOR [variable]
 		;
 		jsr 	GetNextNonSpace 			; first letter of index variable, should be.
-		jsr 	CharIsAlpha 				; if not alpha , error
+		jsr 	CharIsNameStart 			; if no name, error
 		bcc 	_CFFail
 		jsr 	GetReferenceTerm 			; figure out the reference.
 		;
@@ -6226,8 +6226,8 @@ NotUnaryCompile:
 ; ************************************************************************************************
 
 AnyArrayCompile:
-		jsr 	GetNextNonSpace 			; a variable starts with a letter
-		jsr 	CharIsAlpha
+		jsr 	GetNextNonSpace
+		jsr 	CharIsNameStart
 		bcc 	SACFail
 		jsr 	ExtractVariableName 		; name in YX, type bits in X, "(" consumed if present
 		cpx 	#0
@@ -6437,6 +6437,26 @@ CharIsAlpha:
 
 ; ************************************************************************************************
 ;
+;			Check if a variable name may start here (CS = true, CC = false). A is kept.
+;
+;		A-Z, then [ \ ] ^ _ ($5B-$5F), which BASLOAD hands out as first characters once A-Z run
+;		out. Those five pack into 27-31 of ExtractVariableName's five bits. Outside a string or
+;		a REM, tokenised BASIC has no other use for them: ^ the operator is token $AE.
+;
+;		WARNING: names only. GP.ASM bodies are REM text, where a label or mnemonic must still
+;		start with a letter, so the assembler keeps CharIsAlpha.
+;
+; ************************************************************************************************
+
+CharIsNameStart:
+		cmp 	#"A"
+		bcc 	CCFalse
+		cmp 	#$5F+1 						; past "_"
+		bcs 	CCFalse
+		bra 	CCTrue
+
+; ************************************************************************************************
+;
 ;				Convert to hex-style, e.g. 0-9 => 0-9, A-Z 10-35, CS true, CC false
 ;
 ; ************************************************************************************************
@@ -6491,12 +6511,12 @@ ConvertHexStyle:
 		.section code
 
 ExtractVariableName:
-		jsr 	CharIsAlpha
+		jsr 	CharIsNameStart
 		bcc 	_IVSyntax
 		;
 		;		One or two character variable ?
 		;
-		and 	#31 						; reduce first character to 5 bits
+		and 	#31 						; reduce first character to 5 bits, A-Z 1-26, [-_ 27-31
 		sta 	zTemp1 						; we'll build it in zTemp1
 		stz 	zTemp1+1
 		;
@@ -7352,8 +7372,9 @@ AsmReadLow:
 		ldx 	#0
 		jsr 	LookNextNonSpace
 		beq 	_ARLNotLow 					; GP.ASM alone
-		jsr 	CharIsAlpha
+		jsr 	CharIsNameStart 			; a crunched LOW can start [ \ ] ^ or _
 		bcc 	_ARLNotLow 					; not a word: AsmRequireEOL refuses it
+		bra 	_ARLTake
 _ARLChar:
 		jsr 	LookNext
 		jsr 	CharIsAlpha
@@ -11310,8 +11331,8 @@ BStrReadHeader:
 		jsr 	GPBankReadNumber 			; the bank, into gpBankNumber -- shared with GP.BANKED
 		lda 	gpBankNumber 				; find it among this program's text banks or add it, and make
 		jsr 	BStrSelectBank 				; it the one the groups below go to
-		jsr 	GetNextNonSpace 			; a name starts with a letter
-		jsr 	CharIsAlpha
+		jsr 	GetNextNonSpace
+		jsr 	CharIsNameStart
 		bcc 	_BRHSyntax
 		jsr 	ExtractVariableName 		; X = first char + type bits, Y = second
 		cpx 	#32 						; any type bit at all is a syntax error
@@ -11418,7 +11439,7 @@ BankedStrCountCompile:
 ;
 BStrReadName:
 		jsr 	GetNextNonSpace
-		jsr 	CharIsAlpha
+		jsr 	CharIsNameStart
 		bcc 	_BRNSyntax
 		jsr 	ExtractVariableName 		; X = first char + type bits, Y = second
 		cpx 	#32 						; a group name carries no $, % or ( -- see the header
@@ -13957,7 +13978,7 @@ CommandBINPUTStream:
 
 LinputGetVariable:
 		jsr 	GetNextNonSpace
-		jsr 	CharIsAlpha
+		jsr 	CharIsNameStart
 		bcc 	LinputSyntax
 		jsr 	GetReferenceTerm 			; A = type, XY = the variable's address
 		pha
@@ -14339,7 +14360,7 @@ CommandNEXT:
 		;		NEXT [variable]
 		;
 		jsr 	LookNextNonSpace 			; first letter of index variable, should be.
-		jsr 	CharIsAlpha 				; if not alpha , error
+		jsr 	CharIsNameStart 			; if no name, a bare NEXT
 		bcc 	_CNNoReferenceGiven
 		jsr 	GetNext
 		jsr 	GetReferenceTerm 			; figure out the reference.
@@ -14666,7 +14687,7 @@ CommandReadInputCommon:
 		sty 	stringPCode
 _CRLoop:				
 		jsr 	GetNextNonSpace 			; first char of identifier
-		jsr 	CharIsAlpha 				; check A-Z
+		jsr 	CharIsNameStart
 		bcc 	_CRSyntax
 		jsr 	GetReferenceTerm 			; get the variable.
 		pha 								; save type.
@@ -15310,8 +15331,8 @@ _CSCRoom:
 		;		GetReferenceTerm, which would accept an array element and emit its subscript
 		;		here, where no alternative can repeat it -- see the header.
 		;
-		jsr 	GetNextNonSpace 			; a variable starts with a letter; a digit, a quote
-		jsr 	CharIsAlpha 				; or a bracket cannot, which rejects expressions
+		jsr 	GetNextNonSpace 			; a variable starts with a name character; a digit,
+		jsr 	CharIsNameStart 			; a quote or a "(" cannot, which rejects expressions
 		bcs 	_CSCAlpha
 _CSCSyntax:
 		jmp 	SelectFailSyntax
@@ -15684,10 +15705,8 @@ CompileTerm:
 		cmp 	#"(" 						; check parenthesis
 		beq 	_CTBrackets
 
-		cmp 	#"A" 						; check variable/array ?
+		jsr 	CharIsNameStart 			; check variable/array ?
 		bcc 	_CTSyntax
-		cmp 	#"Z"+1
-		bcs 	_CTSyntax
 
 		jsr 	GetReferenceTerm 			; figure out what it is.
 		pha 								; save type on stack

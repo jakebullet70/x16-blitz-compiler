@@ -107,7 +107,7 @@ CommandBINPUTStream:
 
 LinputGetVariable:
 		jsr 	GetNextNonSpace
-		jsr 	CharIsAlpha
+		jsr 	CharIsNameStart
 		bcc 	LinputSyntax
 		jsr 	GetReferenceTerm 			; A = type, XY = the variable's address
 		pha

@@ -105,6 +105,26 @@ CharIsAlpha:
 
 ; ************************************************************************************************
 ;
+;			Check if a variable name may start here (CS = true, CC = false). A is kept.
+;
+;		A-Z, then [ \ ] ^ _ ($5B-$5F), which BASLOAD hands out as first characters once A-Z run
+;		out. Those five pack into 27-31 of ExtractVariableName's five bits. Outside a string or
+;		a REM, tokenised BASIC has no other use for them: ^ the operator is token $AE.
+;
+;		WARNING: names only. GP.ASM bodies are REM text, where a label or mnemonic must still
+;		start with a letter, so the assembler keeps CharIsAlpha.
+;
+; ************************************************************************************************
+
+CharIsNameStart:
+		cmp 	#"A"
+		bcc 	CCFalse
+		cmp 	#$5F+1 						; past "_"
+		bcs 	CCFalse
+		bra 	CCTrue
+
+; ************************************************************************************************
+;
 ;				Convert to hex-style, e.g. 0-9 => 0-9, A-Z 10-35, CS true, CC false
 ;
 ; ************************************************************************************************

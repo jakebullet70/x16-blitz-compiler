@@ -25,7 +25,7 @@ CommandFOR:
 		;		FOR [variable]
 		;
 		jsr 	GetNextNonSpace 			; first letter of index variable, should be.
-		jsr 	CharIsAlpha 				; if not alpha , error
+		jsr 	CharIsNameStart 			; if no name, error
 		bcc 	_CFFail
 		jsr 	GetReferenceTerm 			; figure out the reference.
 		;

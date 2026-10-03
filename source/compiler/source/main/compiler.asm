@@ -226,7 +226,7 @@ _MCLSyntax: 								; syntax error.
 		;		Implied assignment ?
 		;
 _MCLCheckAssignment:
-		jsr 	CharIsAlpha 				; if not alpha then syntax error
+		jsr 	CharIsNameStart 			; if no name starts here then syntax error
 		bcc 	_MCLSyntax
 		jsr 	CommandLETHaveFirst  		; LET first character, do assign
 		stz 	deferErrors 				; assignment compiled OK -> disarm the deferral

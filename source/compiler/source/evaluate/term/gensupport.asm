@@ -227,8 +227,8 @@ NotUnaryCompile:
 ; ************************************************************************************************
 
 AnyArrayCompile:
-		jsr 	GetNextNonSpace 			; a variable starts with a letter
-		jsr 	CharIsAlpha
+		jsr 	GetNextNonSpace
+		jsr 	CharIsNameStart
 		bcc 	SACFail
 		jsr 	ExtractVariableName 		; name in YX, type bits in X, "(" consumed if present
 		cpx 	#0

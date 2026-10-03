@@ -20,12 +20,12 @@
 		.section code
 
 ExtractVariableName:
-		jsr 	CharIsAlpha
+		jsr 	CharIsNameStart
 		bcc 	_IVSyntax
 		;
 		;		One or two character variable ?
 		;
-		and 	#31 						; reduce first character to 5 bits
+		and 	#31 						; reduce first character to 5 bits, A-Z 1-26, [-_ 27-31
 		sta 	zTemp1 						; we'll build it in zTemp1
 		stz 	zTemp1+1
 		;

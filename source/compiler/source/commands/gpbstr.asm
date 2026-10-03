@@ -180,8 +180,8 @@ BStrReadHeader:
 		jsr 	GPBankReadNumber 			; the bank, into gpBankNumber -- shared with GP.BANKED
 		lda 	gpBankNumber 				; find it among this program's text banks or add it, and make
 		jsr 	BStrSelectBank 				; it the one the groups below go to
-		jsr 	GetNextNonSpace 			; a name starts with a letter
-		jsr 	CharIsAlpha
+		jsr 	GetNextNonSpace
+		jsr 	CharIsNameStart
 		bcc 	_BRHSyntax
 		jsr 	ExtractVariableName 		; X = first char + type bits, Y = second
 		cpx 	#32 						; any type bit at all is a syntax error
@@ -288,7 +288,7 @@ BankedStrCountCompile:
 ;
 BStrReadName:
 		jsr 	GetNextNonSpace
-		jsr 	CharIsAlpha
+		jsr 	CharIsNameStart
 		bcc 	_BRNSyntax
 		jsr 	ExtractVariableName 		; X = first char + type bits, Y = second
 		cpx 	#32 						; a group name carries no $, % or ( -- see the header
