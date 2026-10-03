@@ -1,64 +1,25 @@
 ---
 name: hlp-files-carry-hand-edits
-description: The committed HELP-TXT .HLP files hold hand edits the GPC-BASIC masters lack; a plain MKHELP.PY run reverts them
+description: The HELP-TXT .HLP files carry no hand edits; a plain MKHELP.PY run is the rebuild, three commands
 metadata: 
   node_type: memory
   type: project
   originSessionId: 422a7b37-5897-4def-9e69-98fb13f87ae9
-  modified: 2026-09-15T09:30:43.142Z
+  modified: 2026-10-03T00:00:00.000Z
 ---
 
-The committed `GPC-BASIC-TOOLS-SRC/GPC-HELP/HELP-TXT/*.HLP` files were trimmed by hand after they were last
-generated: H001, H002, H003, H011, H013, H015, H022 and others, as of 2026-09-13. The masters under
-`GPC-BASIC/` still hold the longer text, so `MKHELP.PY` over the tree puts it back. The index line
-counts were not updated for those edits; an untouched topic's file is one line longer than its
-`GPC.HELP.IDX` count.
+The committed `GPC-BASIC-TOOLS-SRC/GPC-HELP/HELP-TXT/*.HLP` files hold no hand edits. A plain
+`MKHELP.PY` run loses nothing, so a help rebuild is a render in place. The user confirmed it on
+2026-10-03 ("there are no hand edits anymore in help"), after a render-and-diff check on 2026-09-24
+matched the committed files.
 
-**Why:** found 2026-09-13, when a full regeneration for the dead-code and GP.FN help changes rewrote
-28 files and undid the trims.
+**How to apply:** three commands rebuild the content, after the module change is copied to root
+`GPC-BASIC/`:
 
-**How to apply:** to carry a master change into the help, render twice into scratch with `--src`
-and `--out`: old masters from `git archive`, new masters copied from the tree. `diff -u` the two
-outputs and `patch` the committed files. Take a whole file only where the committed copy equals a
-render of the old masters; the three `.md` files, the §7 and §8 topics and the index did. A `>n|`
-cross reference counts index rows from line 3 of the file. The generated header's command line
-always differs, so its hunk always fails; `-N -r -` skips it. `GPC-HELP-TESTING.md` is CRLF: strip
-the CRs from a copy, patch it, and put them back, or every hunk fails. H007 is hand-edited too. See [[no-ship-language-this-is-dev]].
+- `MKHELP.PY` from `GPC-BASIC-TOOLS-SRC/GPC-HELP`, which writes `HELP-TXT`, the index and
+  `GPC-HELP.md`;
+- `MKHELP.PY --mods GPC-BASIC-TOOLS-SRC/GPB-MODS-TESTING/GPC-BASIC --md-only --md-name GPC-HELP-TESTING.md`;
+- `MKHELPWIN.PY` from the repository root, which writes `GPC-HELP.WIN.md`.
 
-**A new topic renumbers every later file** (2026-09-15, the `KV.INC.BL` entry added two topics at
-H056, and every topic after it moved up two). A per-file-name diff then pairs the wrong topics.
-Instead, map old topic to new by the index `T` rows' titles, with the section number stripped, so a
-renumbered heading still matches. Then diff old render n against new render m and patch committed n
-into m. Snapshot `HELP-TXT` first, because the renames overwrite each other. Also on 2026-09-15,
-`GPC-HELP-TESTING.md` was stale rather than hand-edited: it had not been regenerated after commit
-867976c. Take it whole from a render with `--mods GPC-BASIC-TOOLS-SRC/GPB-MODS-TESTING/GPC-BASIC`, then put back
-the header's command line and the CRs.
-
-**The index can refuse a patch, and then it is carried row by row** (2026-09-15, the `CHECK.INC.BL`
-entry at H058). The committed `GPC.HELP.IDX` held a row the masters no longer make (`S` "Staying
-inside it" under topic 78). It also lacked a row they do make, from another session's uncommitted
-§7 work in `GP-BASIC.md`, so the renumbering hunk failed. Instead, match each committed row to an
-old-render row by type, topic and title with the section number stripped. Write the new render's
-topic number, offset and count, each plus that row's committed-minus-old difference. A committed
-row with no match keeps its numbers and only moves its topic number. Rows for a new topic are
-inserted, and `N|` gains one per new topic. In the same session a commit had to leave that other
-session's `GP-BASIC.md` hunks unstaged: `diff -u` the pre-edit snapshot against the file, and
-`git apply --cached` the result.
-
-**The carry-forward is off for a topic being rewritten** (2026-09-17). Under
-[[help-topic-writing-rules]] a topic that is edited is rewritten from its master, so its committed
-hand edits are discarded rather than patched back. Keep the diff-and-patch machinery above for the
-topics the change does not touch; those still lose their trims to a plain `MKHELP.PY` run.
-
-**The hand edits are gone, and the dance with them** (2026-09-24). Checked by rendering the masters
-at each candidate commit and diffing against the committed `HELP-TXT`. Baseline is `6d344c9`: 81 of
-83 files render byte for byte, and the two that do not, `H024` and `H063`, differ only in
-`GPC-BASIC-TOOLS-SRC/editor` against `GPC-BASIC-TOOLS-SRC/edit`, which `5fa24b2` patched in and the masters now carry. The
-index matched exactly. A plain `MKHELP.PY` run therefore loses nothing.
-
-**How to check before assuming a carry is owed:** `git archive <commit> GPC-BASIC | tar -x` into
-scratch, render with `--src` and `--out`, and count the files that match the committed ones. A
-baseline that matches nearly all of them means render in place with the plain default command,
-which also reproduces the generated header's command line. Three commands rebuild the content:
-`MKHELP.PY` from `GPC-BASIC-TOOLS-SRC/GPC-HELP`, then `MKHELP.PY --mods GPC-BASIC-TOOLS-SRC/GPB-MODS-TESTING/GPC-BASIC
---md-only --md-name GPC-HELP-TESTING.md` and `MKHELPWIN.PY` from the repository root.
+`GPC-HELP-TESTING.md` is CRLF. A new topic renumbers every later `.HLP` file. See
+[[help-topic-writing-rules]].

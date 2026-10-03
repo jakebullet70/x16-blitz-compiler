@@ -1295,6 +1295,36 @@ image for all 12,031 bytes of the GP-BASIC OUT cut, with the only differences th
 
 ## Wanted
 
+### `FILEPICK` wants MSEDIT's picker features — DONE 2026-10-03
+
+`PICKFILE` in `FILEPICK.INC.BL` does what MSEDIT's picker does: `..` and the directories, the
+folders toggle on F, delete on D, dot-files left out, MSEDIT's keys and MSEDIT's box. Blocks and
+type are shown. TURBO GPC's Open picks its file with it. Step 5 of The GUI in the editor in
+`docs/blitz/TURBO-GPC.PLAN.md` has the full behaviour.
+
+Still open:
+
+- **Capacity.** MSEDIT's picker holds 157 entries. TURBO's list space, `TURBO.PICK.BYTES`, is 6,144
+  bytes in bank 14 and holds 95.
+- **The overwrite question.** Save As is an input box and does not ask before it overwrites a
+  file. MSEDIT asks `Overwrite existing file? Y/N` when the name exists.
+
+The spec is `dos_tools/x16-MSEDIT`.
+
+### The library's remaining floats to `%` — OPEN, before release, raised 2026-10-03
+
+The TURBO GPC GUI change converts the 14 modules it touches, public names included: `BANKMGR`,
+`STASHVRAM`, `THEME`, `MENU.INC.BANKED`, `MENU`, `MENUPULL`, `GUI`, `COMBO`, `CHECK`,
+`GUI-DIALOGS`, `FILEIO`, `FILEDIR`, `FILEPICK` and `KVBIN`. It fixes their callers in the same
+pass. `docs/blitz/TURBO-GPC.PLAN.md` has the plan, under "The GUI in the editor".
+
+Every other library module is converted before the release. The projects that use them follow:
+GPBMODS, XBASE, GPB.HELP and GUIFRMT. `GPC-BASIC-TOOLS-SRC/GPB-MODS-TESTING/INT16-HANDOFF.md` has
+the rules and the hazards. Run `source/gpc/int16scan.py --check` after each module. A missed caller
+compiles clean and writes a different variable.
+
+A `%` saves 4 bytes a scalar and 4 bytes an array element. An address and a `FOR` index stay float.
+
 ### `FILEDIR` reads a directory too slowly — QUEUED, raised 2026-09-20
 
 A `FILEPICK` box takes about two seconds to appear, and most of that is `FILEDIR` pulling the

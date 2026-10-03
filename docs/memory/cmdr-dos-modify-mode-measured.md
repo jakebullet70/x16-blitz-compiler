@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: 5991fdbe-eb9a-440f-bf52-e169789d2edb
-  modified: 2026-10-02T08:27:41.452Z
+  modified: 2026-10-03T14:33:45.721Z
 ---
 
 Measured 2026-10-02 in ROM BASIC on x16emu R49, on both hostfs and an SD image, while building
@@ -23,6 +23,13 @@ Measured 2026-10-02 in ROM BASIC on x16emu R49, on both hostfs and an SD image, 
 
 **The trap:** an `,M` channel that has read to the end of the file takes no more reads or writes.
 `KVBIN` reads a value one byte short of the record's end, so `GET` and `AT` never reach it.
+
+**Second trap, seen 2026-10-03 on x16emu hostfs:** an `,S,M` open of a file that is not there
+makes an empty file and reports no error. `KVBIN.PUT` on a missing store therefore leaves a
+0-byte file, and every later call says `KVBIN.WHY.NOTSTORE`. `KVBIN.EXP.BL` tests only `GET` on a
+missing file (`,S,R`, error 62). TURBO works round it in `TURBO.SETTINGS.CHECK`: `KVBIN.INFO`
+first, then `KVBIN.CREATE` on 62 or on an empty header. Not checked on an SD image. The
+library itself is unchanged.
 
 **Timings on SD, ROM BASIC, jiffies (60 a second), 40 slots of 128 bytes:**
 

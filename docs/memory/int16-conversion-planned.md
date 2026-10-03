@@ -20,7 +20,15 @@ Handoff: `GPC-BASIC-TOOLS-SRC/GPB-MODS-TESTING/INT16-HANDOFF.md`. Tool: `source/
 splits the variable in two. See [[library-working-copy-then-root]], [[array-element-sizes-measured]],
 [[basload-label-and-variable-collide]].
 
-**2026-09-20: every byte figure here is wrong until the allocator is fixed.** A `%` saves
-nothing today -- every scalar is allocated 6 bytes whatever its type. Measured: 168 names
-converted, varspace moved by zero. See [[every-scalar-allocated-six-bytes]]. The job is
-still worth doing; it just pays after that fix, not before.
+A `%` scalar costs 2 bytes ([[every-scalar-allocated-six-bytes]]).
+
+**Scope decided 2026-10-03.** The TURBO GPC GUI change converts the 14 modules it touches, public
+names included ([[turbo-gpc-ide-plan]]). It fixes every caller in the same pass. The rest of the
+library is converted before the release. TODO.md, Wanted, has the entry.
+
+**A value the caller hands in can be an address, and int16scan cannot see it.** A `GP.BOX` style of
+256 or more is a glyph address. On 2026-10-03 a string heap address measured 40,692. Stored in an
+int16 it reads -24,844, and `GP.BOX` then draws nothing. The scan passed `MENU.STYLE%` and
+`GUI.STYLE%`, because the module never calls `GP.STRPTR` itself; MENUTO.EXP.BL does. Those
+variables, `DLG.STYLE` and `GUI.BOX.STYLE` are untyped again, each with a WARNING at its `GP.BOX`.
+Before converting a formal, check what callers may pass in, not only what the module assigns.

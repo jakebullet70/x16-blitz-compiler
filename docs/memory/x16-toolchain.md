@@ -19,3 +19,5 @@ Toolchain (Windows, use via Git Bash paths):
 Build a Prog8 program: `java -jar $PROG8C -target cx16 -out <dir> <src>.p8` → `<dir>/<name>.prg` (loads at `$0801`, BASIC stub SYSes to entry).
 
 Headless test (testbench mailbox): program writes result bytes to `$0400+` then executes `stp`. Derive entry = decimal SYS addr at prg file offset 8 (`od -An -c -j 8 -N 6 prg | tr -cd 0-9`, format `%04X`). Run: `printf 'RUN <entry>\nRQM 0400\n...' | x16emu -testbench -warp -prg <prg>`; RQM hex replies come after the `STP` line. The sibling `../BLITZ-COMPILER/scripts/` has `env.sh`, `build.sh`, `assert-mailbox.sh`, `tokenize.py` (text BASIC → tokenized `.prg`). See [[gpc-project]].
+
+The emulator takes Ctrl+F and its other command keys, Ctrl+V to paste among them, before the program sees them. `-noemucmdkeys` leaves them to the program; `USER-RUNS/turbo-gpc-demo.bat` passes it so the editor gets Ctrl+F. Found 2026-10-03.

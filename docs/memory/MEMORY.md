@@ -7,9 +7,9 @@ junction; re-make it first if a rename breaks it. See [memory-is-git-tracked](me
 - [Answer the question asked](answer-the-question-asked.md) — lead with the number asked for; [measure before changing code](measure-before-changing-code.md)
 - [Review findings must be reachable](review-findings-must-be-reachable.md) — drop anything only invalid source or a typo triggers
 - [Tech doc structure spec](tech-doc-structure-spec.md) — named sections, inputs/outputs/errors, never invent a detail
-- [Prose style is flat reference](prose-style-is-flat-reference.md) — `doc-style` owns the rules; [help topics are current behaviour only](help-topic-writing-rules.md); [HLP files carry hand edits](hlp-files-carry-hand-edits.md)
+- [Prose style is flat reference](prose-style-is-flat-reference.md) — `doc-style` owns the rules; [help topics are current behaviour only](help-topic-writing-rules.md); [HLP files carry no hand edits](hlp-files-carry-hand-edits.md), a plain MKHELP.PY run rebuilds
 - [Write readable code, user crunches](write-readable-code-user-crunches.md) — one statement a line, an unexplained SRC edit is the user's crunch pass; [comments light](comments-light-code-should-flow.md)
-- [Bounds checks are a luxury](bounds-checks-are-a-luxury.md) — no range checks in library routines; the contract states the limit
+- [Bounds checks are a luxury](bounds-checks-are-a-luxury.md) — no range checks in library routines; the contract states the limit; [a sweep of the older code is owed](guard-sweep-owed.md)
 - [Ask before writing asm](ask-before-writing-asm.md) — standing order: agree GP.ASM or 64tass first
 - [Keep Claude's files off the root](keep-claude-files-off-the-root.md) — source/drive and source/scratch are Claude's
 - [Commit to main directly](commit-to-main-directly.md) — solo repo, no branch; [never commit OASIS](never-commit-oasis.md), stage by name
@@ -17,6 +17,7 @@ junction; re-make it first if a rename breaks it. See [memory-is-git-tracked](me
 - [BMXVIEW: two copies, one master](bmxview-two-copies-one-master.md) — BMXVIEWER/BMXVIEW.BASL is the master; sync back, adjusting the #INCLUDE prefix
 - [Library working copy, then root](library-working-copy-then-root.md) — edit in GPB-MODS-TESTING/GPC-BASIC/, drift runs both ways; [test in GPBMODS first](test-in-gpbmods-before-spreading.md); [samples build in place](samples-build-in-place.md)
 - [GUI only through verbs](gui-only-through-verbs.md) — no GOSUB GUI.* in a program
+- [Library never hard-codes a bank](library-never-hard-codes-a-bank.md) — the program hands each module its place; banks are shared, no waste
 - [No ship language, no unasked builds](no-ship-language-this-is-dev.md) — a change sent back during a play-test gets built at once; [run builds in the background](run-builds-in-background.md); [build, report, hand it back](build-report-dont-investigate.md)
 - [Compile shared, not embedded](compile-shared-not-embedded.md) — SHARED is the p-code number; [release samples are the exception](release-samples-shape.md); [shipped readmes fit 78 columns](release-readmes-fit-78-columns.md)
 - [The compiler is GPC](name-the-compiler-gpc.md) — "Blitz" is a heritage nod; [concurrent agents run here](user-runs-concurrent-agents-here.md), re-read before any write
@@ -71,6 +72,7 @@ junction; re-make it first if a rename breaks it. See [memory-is-git-tracked](me
 - [BUILD ALL: a sixth GPC.INPUT line](gpc-input-sixth-line-chain.md) — agreed route, asm not written
 
 ## The editor sample
+- [TURBO GPC IDE plan](turbo-gpc-ide-plan.md) — a fresh GP.BASIC editor on MSEDIT's design, source in GPC-BASIC-TOOLS-SRC/TURBO-GPC; the library change is done (bank plus address, `%` in 14 modules); the GUI dialogs are in TURBO.BASL, save to VRAM, and TURBOTEST passes; the menu bar is built (Esc opens File, Exit is a row); the file picker is built and the keys follow Notepad++; setup code lives in the regions to keep workspace; DLGLABELS gives the library's buttons TURBO's case; the library is copied to root and help rebuilt; plan in docs/blitz/TURBO-GPC.PLAN.md
 - [Editor branch state, GUI next](gpc-editor-branch-and-gui-next.md) — the self-check lines to keep green
 - [ED-STORE 255.BASL is test data](editor-test-fixture-files.md) — the editor opens it; do not flag it
 - [The editor's slow RETURN](editor-return-is-the-line-table.md) — FIXED, the 2048-entry boundary is the trap; [the LINPUT# loader](gpc-editor-loader-linput-and-blob.md), ST=66 on a missing file
@@ -97,8 +99,10 @@ junction; re-make it first if a rename breaks it. See [memory-is-git-tracked](me
 - [BASIC RAM was the tokenise ceiling](basload-basic-ram-is-the-tokenise-ceiling.md) — REMOVED for build_basl.py only
 - [BASLOAD streams to a file](basload-streams-to-a-file.md) — SHIPPED; a failed run now deletes its own output
 - [BASLOAD runs from RAM unmodified](basload-runs-from-ram-unmodified.md) — the ROM source builds as a plain PRG
+- [BASLOAD name space, widened](basload-name-space-widened.md) — about 950 two-character names until 2026-10-03, now about 1,135; BASLOAD errors cleanly past `_Z`
 - [BASLOAD #DEFINE rejects digits and negatives](basload-define-rejects-digits.md) — INVALID PARAMETER, silent 6-byte PRG; unsigned only
 - [Labels and variables collide](basload-label-and-variable-collide.md) — DUPLICATE SYMBOL; the $ does not separate them
+- [A define eats a longer name](basload-define-eats-a-longer-name.md) — `#DEFINE X.W` turns `X.W%` into `44%`; SYNTAX ERROR at run time
 - [#AUTONUM breaks STRCASE](basload-autonum-breaks-strcase.md) — do not write it
 - [TRUE is -1](gpc-basl-true-is-minus-one.md) — why NOT needs -1, and the two spellings that break
 
@@ -143,9 +147,10 @@ junction; re-make it first if a rename breaks it. See [memory-is-git-tracked](me
 - [Dead-code elimination, measured](basl-dead-code-elimination-measured.md) — 691 B free by deleting two #INCLUDEs; plan in docs/blitz/DEAD-CODE-ELIMINATION.PLAN.md
 - [VRAM-to-VRAM memory_copy limits](vram-to-vram-memory-copy-limits.md) — 15,360 in one call; descending overlap is safe
 - [Array element sizes, measured](array-element-sizes-measured.md) — a `%` array is TWO bytes an element, untyped SIX
-- [INT16 conversion planned](int16-conversion-planned.md) — not started; int16scan.py is the check
+- [INT16 conversion planned](int16-conversion-planned.md) — the TURBO GUI change converts its 14 modules; the rest before release; int16scan.py is the check, but not for an address a caller hands in
 - [Byte data type feasibility](byte-data-type-feasibility.md) — STUDY ONLY; the opcode space refuses byte SCALARS
 - [KERNAL preserves the RAM bank](kernal-preserves-ram-bank.md) — measure it in asm, PEEK(0) cannot see it
+- [Change a called vector with one POKE](change-a-called-vector-with-one-poke.md) — the runtime polls STOP via $0328 every 16 words; two POKEs crash between them
 - [X16 ROM internal calls](x16-rom-internal-calls.md) — verified R49 dispatcher/GC addresses and ZP pointers
 - [X16 toolchain](x16-toolchain.md) — 64tass, emulator and Prog8 12.0.1 paths on this machine
 - [x16emu -echo doubling](x16emu-echo-doubling.md) — non-warp `-echo raw` prints every char TWICE
