@@ -59,14 +59,16 @@
 .make is named GPBFILE.* or GPBDIR, and the row that makes each one removes
 .it.
 .
-=Thirteen banks
+=Seventeen banks
 .
-.Ten are named at compile time. Nine are claimed from BANKMGR (SEC 4.13) at
-.startup, because the compiler picks them while the object is written and the
-.manager is told rather than asked. The tenth, 62, is claimed by the first
-.MENU.BEGIN when the bar is built, before any bank is allocated. Three more
-.are allocated at run time: the cells a dropdown covers, preset into
-.MENU.STASHBANK, the cells a dialog covers, and FILEDIR's directory buffer.
+.Thirteen are named at compile time. Twelve are claimed from BANKMGR (SEC
+.4.13) at startup, because the compiler picks them while the object is
+.written and the manager is told rather than asked. The thirteenth, 62, is
+.claimed by the first MENU.BEGIN when the bar is built, before any bank is
+.allocated. Four more come from BANKMGR.GET.FREE.BANK at startup: the STASH
+.panel's bank, the cells a dialog covers, FILEDIR's directory buffer, and
+.FILEPICK's list with the form item store. A dropdown saves the cells it
+.covers in VRAM.
 .
 .  bank 4, 5,632 bytes
 .      LINEINPUT GUI GUI-DIALOGS

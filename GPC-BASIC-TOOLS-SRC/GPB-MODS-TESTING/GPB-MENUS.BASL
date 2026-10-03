@@ -148,7 +148,7 @@ GP.ENDBANKEDSTR
 GMX.MENU.SETUP:
   GP.SUB MENU.SAVESCREEN, MENU.SAVE.VRAM
   MENU.DROPSTYLE = MENU.ROUND
-  MENU.SHADOW = 1
+  MENU.SHADOW% = 1
   ## ---
   GOSUB GMX.MENU.RESET
   ## --- the bar first: MENU.BEGIN on the bar slot empties every dropdown.
@@ -196,14 +196,14 @@ GMX.MENU.SETUP:
 
 
 ## ---- Every menu's colours, from the theme, which a panel may have changed.
-## ---- The LISTS panels set MENU.FLAGS, MENU.HINTW and MENU.GAP for their own
+## ---- The LISTS panels set MENU.FLAGS%, MENU.HINTW% and MENU.GAP% for their own
 ## ---- popups, and a dropdown runs with them too, so they go back to 0 here.
 ## ---- The bar is painted in the text colour, not the theme's BAR colour.
 GMX.MENU.RESET:
   GOSUB MENU.THEME
-  MENU.BARATTR = MENU.ATTR : MENU.BARHOT = MENU.HOTATTR
-  MENU.FLAGS = 0 : MENU.HINTW = 0
-  MENU.GAP = 0 : MENU.BARFLAGS = 0
+  MENU.BARATTR% = MENU.ATTR% : MENU.BARHOT% = MENU.HOTATTR%
+  MENU.FLAGS% = 0 : MENU.HINTW% = 0
+  MENU.GAP% = 0 : MENU.BARFLAGS% = 0
   RETURN
 
 

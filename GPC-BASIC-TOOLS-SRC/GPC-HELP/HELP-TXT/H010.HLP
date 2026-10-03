@@ -80,7 +80,7 @@
 .
 .  Colour roles
 .      BASIC
-.      THEME.INC.BL -- THEME.SELECT, THEME.CLR() - SEC 4.1
+.      THEME.INC.BL -- THEME.SELECT, THEME.CLR%() - SEC 4.1
 .
 .  String helpers
 .      BASIC+ASM
@@ -140,7 +140,8 @@
 .
 .  Bank ownership
 .      BASIC
-.      BANKMGR.INC.BL -- INIT CLAIM GET.FREE.BANK RELEASE COUNT - SEC 4.13
+.      BANKMGR.INC.BL -- INIT CLAIM GET.FREE.BANK RELEASE COUNT SPACE - SEC
+.        4.13
 .
 .  Key-value store
 .      BASIC

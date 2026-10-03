@@ -2,7 +2,11 @@
 
 ## 0. Read this first
 
-Written 2026-09-13. Nothing is converted yet.
+Written 2026-09-13. On 2026-10-03 the fourteen modules TURBO GPC's GUI uses were converted in
+the working copy, public names included: BANKMGR, STASHVRAM, THEME, MENU.INC.BANKED, MENU,
+MENUPULL, GUI, COMBO, CHECK, GUI-DIALOGS, FILEIO, FILEDIR, FILEPICK and KVBIN. GPBMODS and root's
+examples follow. The rest of the library is open: TODO.md, Wanted, "The library's remaining
+floats".
 
 The job: update the GPC-BASIC library code to use INTs where it can, then update the projects built
 with that code. In practice a numeric scalar that only ever holds a whole number from -32,768 to

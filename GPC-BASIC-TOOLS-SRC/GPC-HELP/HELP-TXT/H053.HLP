@@ -5,13 +5,13 @@
 =DESCRIPTION
 .
 .  CHECK.ADD
-.      IN: CHECK.X CHECK.Y CHECK.TEXT$ CHECK.ON
-.      OUT: CHECK.CTRL
+.      IN: CHECK.X% CHECK.Y% CHECK.TEXT$ CHECK.ON%
+.      OUT: CHECK.CTRL%
 .
-:CHECK.X = GUI.INNER.LEFT : CHECK.Y = GUI.INNER.TOP
-:CHECK.TEXT$ = "SHOW HIDDEN FILES" : CHECK.ON = -1
+:CHECK.X% = GUI.INNER.LEFT% : CHECK.Y% = GUI.INNER.TOP%
+:CHECK.TEXT$ = "SHOW HIDDEN FILES" : CHECK.ON% = -1
 :GOSUB CHECK.ADD
-:HIDDEN = CHECK.CTRL
+:HIDDEN = CHECK.CTRL%
 :REM ... run the form ...
 :IF (GUI.CTRL.FLAGS%(HIDDEN) AND GUI.CF.CHECKED) <> 0 THEN PRINT "TICKED"
 .
@@ -19,13 +19,13 @@
 .reached by GUI.FORM, which dispatches a GUI.CT.CHECK control to them by
 .name. The call goes between GUI.FORM.BEGIN and GUI.FORM.RUN.
 .
-.CHECK.X and CHECK.Y are the cell the [ goes in, and the caption starts four
-.cells to the right. CHECK.TEXT$ = "" draws a bare box. A non-zero CHECK.ON
-.starts the box ticked. CHECK.CTRL is the control's number, and 0 when the
-.form is already full.
+.CHECK.X% and CHECK.Y% are the cell the [ goes in, and the caption starts
+.four cells to the right. CHECK.TEXT$ = "" draws a bare box. A non-zero
+.CHECK.ON% starts the box ticked. CHECK.CTRL% is the control's number, and 0
+.when the form is already full.
 .
 .The state is a flag on the control, GUI.CF.CHECKED in GUI.CTRL.FLAGS%().
-.Keep CHECK.CTRL and test the flag after GUI.FORM.RUN. One form carries as
+.Keep CHECK.CTRL% and test the flag after GUI.FORM.RUN. One form carries as
 .many boxes as it has controls.
 .
 .  X

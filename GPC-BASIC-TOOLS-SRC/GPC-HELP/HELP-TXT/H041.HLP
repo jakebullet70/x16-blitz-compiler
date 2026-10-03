@@ -5,57 +5,72 @@
 =DESCRIPTION
 .
 .  N = GP.FN(MENUTO.PULLDOWN, barnum, style)
-.      IN: the popup slot, the bar MENUTO.BAR or MENU.DRAWBAR last drew,
-.        MENU.STASHBANK
-.      OUT: N MENU.EXITKEY MENU.NEXTBAR MENU.BARNUM MENU.SELX MENU.SELW
+.      IN: the popup slot, the bar MENUTO.BAR or MENU.DRAWBAR last drew
+.      OUT: N MENU.EXITKEY% MENU.NEXTBAR% MENU.BARNUM% MENU.SELX% MENU.SELW%
 .
-:MENU.BARFLAGS = MENU.DOWNEXIT
+.  GP.SUB MENU.SAVESCREEN, mode
+.      IN: MENU.SAVE.VRAM, the default, or MENU.SAVE.BANK
+.      OUT: where the screen under a dropdown is kept
+.
+:MENU.BARFLAGS% = MENU.DOWNEXIT
 :B = GP.FN(MENUTO.BAR, 0, 0, MENU.NOBOX)
 :GP.DO
 :    IF B = 0 THEN GP.EXITDO
 :    GOSUB MY.FILL
 :    N = GP.FN(MENUTO.PULLDOWN, B, MENU.ROUND)
-:    B = MENU.NEXTBAR
+:    B = MENU.NEXTBAR%
 :GP.LOOP
 .
 .MY.FILL is the caller's: MENU.BEGIN MENU.POPUP and the rows for bar item B.
 .
-.Requires MENU.INC.BL (SEC 4.6) and STASH.INC.BL (SEC 3.6), included by the
-.caller, and a #SYMFILE for STASH. A program with no dropdown leaves this
-.file out and does not carry STASH.
+.Requires MENU.INC.BL (SEC 4.6), STASH.INC.BL (SEC 3.6) and STASHVRAM.INC.BL
+.(SEC 4.18), included by the caller, BANKMGR.INC.BL above this file, and a
+.#SYMFILE for STASH. A program with no dropdown leaves this file out and does
+.not carry STASH.
 .
 .MENUTO.PULLDOWN marks bar item barnum, opens the popup slot under it and
 .runs it. A barnum out of range or disabled returns 0 and draws nothing. The
-.bar is the one last drawn, where it was drawn, read with MENU.GAP and
-.MENU.BARFLAGS as they are now. The item the last call marked is unmarked and
-.barnum is marked. It stays marked on the way out, in MENU.MARKED.
+.bar is the one last drawn, where it was drawn, read with MENU.GAP% and
+.MENU.BARFLAGS% as they are now. The item the last call marked is unmarked
+.and barnum is marked. It stays marked on the way out, in MENU.MARKED%.
 .
 .The dropdown's corner is the item's column on the row under the bar, moved
 .left if the box would run off the screen. The screen width comes from the
 .KERNAL's screen_mode. The style and colours are MENUTO.VERT's (SEC 4.6), and
-.the run adds MENU.KEYEXIT to MENU.FLAGS.
+.the run adds MENU.KEYEXIT to MENU.FLAGS%.
 .
 .  N
 .      the row, for RETURN or a hot key. Any other exit is 0
 .
-.  MENU.EXITKEY
+.  MENU.EXITKEY%
 .      the key that ended it
 .
-.  MENU.NEXTBAR
+.  MENU.NEXTBAR%
 .      the bar item LEFT or RIGHT walks to, stepping over disabled items as
 .        the bar does. With no live neighbour it is barnum. 0 for any other
 .        exit
 .
-.  MENU.BARNUM
+.  MENU.BARNUM%
 .      the bar's row count
 .
-.  MENU.SELX MENU.SELW
+.  MENU.SELX% MENU.SELW%
 .      the item's column and width
 .
-.The screen under the dropdown is saved first and put back after, in STASH
-.slot 0 of bank MENU.STASHBANK. Set it before the first call to choose the
-.bank. Left at 0, the first call takes one from BANKMGR.GET.FREE.BANK. If
-.none is free, the dropdown still runs and the screen is not put back.
+.The screen under the dropdown is saved first and put back after.
+.MENU.SAVESCREEN sets where.
+.
+.MENU.SAVE.VRAM keeps it in VRAM with STASHVRAM, and runs SV.START (SEC 4.18)
+.if nothing has. A program that uses STASHVRAM itself sets SV.MAX% with a
+.handle to spare for the menu.
+.
+.MENU.SAVE.BANK keeps it with STASH in MENU.STASHSIZE% bytes at
+.MENU.STASHADDR in bank MENU.STASHBANK%. A dropdown takes 4 + 2 * w * h
+.bytes, frame and shadow included. Set all three before the first call. Bank
+.0 at the first call takes MENUPULL.SAVEBYTES, 4,096 bytes, from
+.BANKMGR.SPACE (SEC 4.13).
+.
+.If there is no room either way, the dropdown still runs and the screen is
+.not put back.
 .
 .WARNING: MENUTO.PULLDOWN sets STASH.BANK, STASH.SLOT, STASH.MOVE, STASH.X,
 .STASH.Y, STASH.W and STASH.H. Set them again before the caller's own next
@@ -71,5 +86,7 @@
 .
 >77|4.6 MENU.INC.BL -- menus built a row at a time
 >41|3.6 Screen -- stash and restore
+>95|4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM
+>90|4.13 BANKMGR.INC.BL -- who owns which RAM bank
 >84|4.9 MENUPULL.INC.BL -- a dropdown under a bar item
 >113|STASH.INC.BL -- save a text rectangle, and put it back.

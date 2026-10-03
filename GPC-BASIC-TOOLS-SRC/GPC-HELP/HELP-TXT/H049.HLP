@@ -5,39 +5,50 @@
 =DESCRIPTION
 .
 .  COMBO.ADD
-.      IN: COMBO.X COMBO.Y COMBO.W COMBO.COUNT COMBO.SEL COMBO.BANK, over
-.        COMBO.ITEM$()
-.      OUT: COMBO.SEL
+.      IN: COMBO.X% COMBO.Y% COMBO.W% COMBO.SEL%
+.      OUT: COMBO.CTRL%
 .
-:COMBO.ITEM$(1) = " TEXAS"
-:COMBO.ITEM$(2) = " UTAH"
-:COMBO.X = GUI.INNER.LEFT : COMBO.Y = GUI.INNER.TOP
-:COMBO.W = 16 : COMBO.COUNT = 2 : COMBO.SEL = 1
-:GOSUB COMBO.ADD
-:REM ... run the form ... the answer is in COMBO.SEL
+:GP.SUB FORM.BEGIN, "TITLE", "MSG", "", 6, 40, "&OK", "&CANCEL"
+:GP.SUB FORM.ITEMS, MY.BANK%, MY.ADDR
+:STATE = GP.FN(FORM.COMBO, 1, "STATE", 6, 12, 1)
+:GP.SUB FORM.ITEM, "TEXAS"
+:GP.SUB FORM.ITEM, "OHIO"
+:IF GP.FN(FORMTO.RUN) THEN <OK>
+:SEL = GP.FN(FORM.SEL, STATE)
+:GP.SUB FORM.END
 .
-.Only COMBO.ADD is called by an application. COMBO.DRAW, COMBO.KEY and
-.COMBO.OPEN are reached by GUI.FORM, which dispatches a GUI.CT.COMBO control
-.to them by name. The call goes between GUI.OPEN and GUI.FORM.RUN.
+.A program reaches a combo through the FORM. verbs of GUI-DIALOGS.INC.BL (SEC
+.4.12). GUI.FORM dispatches a GUI.CT.COMBO control to COMBO.DRAW, COMBO.KEY
+.and COMBO.OPEN by name.
 .
-.COMBO.W is the width in cells, brackets included; 5 is the floor and
-.anything less is raised to it. COMBO.BANK is where the dropdown saves the
-.cells it covers, and 0 takes GUI.BANK -- which is what the dialog around it
-.is already using. The caller owns the DIM of COMBO.ITEM$().
+.COMBO.X% and COMBO.Y% are the closed control's top left, in cells. COMBO.W%
+.is the width, brackets included. 5 is the floor and anything less is raised
+.to it. COMBO.SEL% is the item showing, 1 up. COMBO.CTRL% is the control's
+.number, 0 if the form was full.
 .
-.One combo to a dialog, since there is one COMBO.ITEM$(). The dropdown is the
-.popup slot of MENU.INC.BL (SEC 4.6), loaded from COMBO.ITEM$() each time it
-.opens, so whatever the caller last built in that slot is gone after. An item
-.is a menu row: & marks a hot key and "-" is a separator. The MENU.* colours
-.and flags it sets are put back.
+.The items are the form's item store: GUI.ITEM.CLAIM after COMBO.ADD, then a
+.GUI.ITEM.ADD each. GUI.ITEM.SEAL draws the combo once they are in. The
+.choice is GUI.CTRL.SEL%(COMBO.CTRL%).
 .
-.A long list belongs in GUI.LISTBOX (SEC 4.12). The dropdown shows every item
-.at once, 32 at most, and does not scroll.
+.The dropdown saves the cells it covers where the dialog does, by
+.GUI.SAVEMODE% (SEC 4.11). In VRAM mode it takes a STASHVRAM handle of its
+.own and needs no bank. In bank mode it goes in the dialog's save space, bank
+.GUI.BANK% from GUI.STASHADDR, above the dialog's own save. Every combo on
+.the form opens into that one slot, one at a time. If there is no room either
+.way, the dropdown does not open.
 .
-.The dropdown is framed like the dialog behind it. With GUI.GLYPH non-zero it
-.draws from GUI.EDGE.H, GUI.EDGE.V, GUI.CORNER.TL, .TR, .BL and .BR, the same
-.six a dialog frames with, so a re-ordered charset gets its own frame here
-.too. With GUI.GLYPH = 0 the frame is GP.BOX style 1.
+.The dropdown is the popup slot of MENU.INC.BL (SEC 4.6), loaded from the
+.item store each time it opens, so whatever the caller last built in that
+.slot is gone after. An item is a menu row: & marks a hot key and "-" is a
+.separator. The MENU.* colours and flags it sets are put back.
+.
+.A long list belongs in a list control. The dropdown shows every item at
+.once, 32 at most, and does not scroll.
+.
+.The dropdown is framed like the dialog behind it. With GUI.GLYPH% non-zero
+.it draws from GUI.EDGE.H%, GUI.EDGE.V%, GUI.CORNER.TL%, .TR, .BL and .BR,
+.the same six a dialog frames with, so a re-ordered charset gets its own
+.frame here too. With GUI.GLYPH% = 0 the frame is GP.BOX style 1.
 .
 .It is required by GUI.INC.BL, which names COMBO.DRAW and COMBO.KEY. BASLOAD
 .resolves every label in a file, so a program that includes the GUI and
@@ -46,7 +57,7 @@
 .
 =SEE ALSO
 .
->77|4.6 MENU.INC.BL -- menus built a row at a time
 >88|4.12 GUI-DIALOGS.INC.BL -- every dialog as a verb
->94|4.17 COMBO.INC.BL -- a drop-down list that folds into one row
 >86|4.11 GUI.INC.BL -- the box that puts the screen back, and the form in 
+>77|4.6 MENU.INC.BL -- menus built a row at a time
+>94|4.17 COMBO.INC.BL -- a drop-down list that folds into one row

@@ -4,66 +4,76 @@
 .
 =DESCRIPTION
 .
+.  SV.START
+.      IN: SV.MAX%; 0 gives SV.START.HANDLES, 4
+.      OUT: SV.OK%, on the first call only
+.
 .  SV.INIT
-.      IN: SV.BASE SV.TOP SV.MAX
-.      OUT: SV.OK
+.      IN: SV.BASE SV.TOP SV.MAX%
+.      OUT: SV.OK%
 .
 .  SV.SAVE
-.      IN: SV.X SV.Y SV.W SV.H
-.      OUT: SV.HND SV.OK
+.      IN: SV.X% SV.Y% SV.W% SV.H%
+.      OUT: SV.HND% SV.OK%
 .
 .  SV.RESTORE
-.      IN: SV.HND SV.MOVE SV.X SV.Y
-.      OUT: SV.OK
+.      IN: SV.HND% SV.MOVE% SV.X% SV.Y%
+.      OUT: SV.OK%
 .
 .  SV.PUT
 .      IN: SV.ADDR SV.LEN
-.      OUT: SV.HND SV.OK
+.      OUT: SV.HND% SV.OK%
 .
 .  SV.GET
-.      IN: SV.HND SV.ADDR
-.      OUT: SV.OK
+.      IN: SV.HND% SV.ADDR
+.      OUT: SV.OK%
 .
 .  SV.FREE
-.      IN: SV.HND
-.      OUT: SV.OK
+.      IN: SV.HND%
+.      OUT: SV.OK%
 .
 .  SV.RESET
 .      IN: --
-.      OUT: SV.OK
+.      OUT: SV.OK%
 .
 :#INCLUDE "STASHVRAM.INC.BL"
 :
-:SV.MAX = 16 : DIM SV.PAGE%(16), SV.PAGES%(16)
-:GOSUB SV.INIT
-:SV.X = 10 : SV.Y = 5 : SV.W = 40 : SV.H = 12 : GOSUB SV.SAVE
-:IF SV.HND = 0 THEN <it did not fit>
+:SV.MAX% = 16 : GOSUB SV.START
+:SV.X% = 10 : SV.Y% = 5 : SV.W% = 40 : SV.H% = 12 : GOSUB SV.SAVE
+:IF SV.HND% = 0 THEN <it did not fit>
 :REM ... draw over it ...
 :GOSUB SV.RESTORE
 .
 .No GP.ASM, and so no #SYMFILE. The cells never leave VRAM: one data port
 .reads, the other writes, and the KERNAL's memory_copy moves between them
-.without stepping either. That is what STASH.INC.BL cannot do, and the reason
-.to reach for this one. It also executes no BANK, so unlike STASH it may live
-.inside a GP.BANKED region.
+.without stepping either. That is what STASH.INC.BL cannot do. It executes no
+.BANK, so it may live inside a GP.BANKED region.
+.
+.SV.START DIMs SV.PAGE% and SV.PAGES% to SV.MAX% and runs SV.INIT. Only the
+.first call does anything. SV.MAX% 0 gives SV.START.HANDLES, 4: a menu
+.dropdown, a dialog, a combo's dropdown and a message box over the dialog.
+.GUI.INC.BL, COMBO.INC.BL and MENUPULL.INC.BL call SV.START themselves, so
+.set SV.MAX% before the first box or dropdown opens. SV.INIT alone sets a new
+.window with every handle given back.
+.
+.WARNING: The compiler takes one DIM of an array, and it is in SV.START. A
+.program never DIMs SV.PAGE% or SV.PAGES% itself. It sets SV.MAX% and calls
+.GOSUB SV.START.
 .
 .SV.BASE and SV.TOP are the VRAM window in bytes, rounded in to whole
-.256-byte pages, and default to $04000 and $1AFFF. The caller DIMs the two
-.arrays to SV.MAX. SV.MOVE works as STASH.MOVE does: SV.RESTORE puts the
-.rectangle back where it came from when 0, at SV.X SV.Y when not. SV.HND is 1
-.to SV.MAX, or 0 if it did not fit. SV.ERROR$ says why when something is
-.refused, and is "" otherwise.
+.256-byte pages, and default to $04000 and $1AFFF. SV.MOVE% works as
+.STASH.MOVE does: SV.RESTORE puts the rectangle back where it came from when
+.0, at SV.X% SV.Y% when not. SV.HND% is 1 to SV.MAX%, or 0 if it did not fit.
+.SV.ERROR$ says why when something is refused, and is "" otherwise.
 .
-.Allocation is a bump pointer on 256-byte pages, released LIFO. Panels nest
-.and close in reverse and a log is append-only, so a hole only appears if a
-.caller frees out of order -- and then STASHVRAMGC.INC.BL (SEC 4.19) closes
-.it. Pages rather than bytes are what let a handle's address live in an
-.ordinary %: a page number reaches 511 where a 17-bit VRAM address would not.
+.Allocation is a bump pointer on 256-byte pages, released last in, first out.
+.A hole appears only when a caller frees out of order, and STASHVRAMGC.INC.BL
+.(SEC 4.19) closes it. A page number fits in a % and reaches 511. A 17-bit
+.VRAM address does not fit.
 .
-.There is one allocator and it is this one. SV.BASE and SV.TOP are the
-.caller's contract, checked only against the layer 1 map and the charset.
-.BMX.STASH defaults to $13000, inside the default window -- a program using
-.both must move one of them.
+.SV.BASE and SV.TOP are checked only against the layer 1 map and the charset.
+.BMX.STASH defaults to $13000, inside the default window. A program that uses
+.both moves one of them.
 .
 .A screen-mode change re-uploads the charset and can re-lay the map. Held
 .handles do not survive it; call SV.RESET after one.
@@ -73,3 +83,6 @@
 >96|4.19 STASHVRAMGC.INC.BL -- close the holes in a STASHVRAM store
 >95|4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM
 >113|STASH.INC.BL -- save a text rectangle, and put it back.
+>86|4.11 GUI.INC.BL -- the box that puts the screen back, and the form in 
+>94|4.17 COMBO.INC.BL -- a drop-down list that folds into one row
+>84|4.9 MENUPULL.INC.BL -- a dropdown under a bar item

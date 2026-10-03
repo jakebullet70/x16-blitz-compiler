@@ -6,26 +6,24 @@
 .
 .  MEM.COPY
 .      IN: MEM.SOURCE MEM.TARGET MEM.COUNT
-.      OUT: MEM.OK
+.      OUT: --
 .
 .  MEM.FILL
 .      IN: MEM.TARGET MEM.COUNT MEM.VALUE
-.      OUT: MEM.OK
+.      OUT: --
 .
 :#INCLUDE "GPB.INC.BL"
 :#INCLUDE "MEM.INC.BL"
 :
 :MEM.TARGET = 4096 : MEM.COUNT = 1000 : MEM.VALUE = 32
 :GOSUB MEM.FILL
-:IF MEM.OK = 0 THEN PRINT "REFUSED"
 .
 .The KERNAL's memory_copy and memory_fill. The verbs are MEM.BLOCKCOPY and
-.MEM.BLOCKFILL, and the two routines share MEM.TARGET, MEM.COUNT and MEM.OK.
+.MEM.BLOCKFILL, and the two routines share MEM.TARGET and MEM.COUNT.
 .
-.MEM.COUNT is 1 to 65535. Anything outside that is refused and MEM.OK comes
-.back 0, never truncated. A longer block goes a chunk at a time; a chunk size
-.above $4000 cannot be a #DEFINE, which is signed. STASHVRAMGC.INC.BL (SEC
-.4.19) is the worked example.
+.MEM.COUNT is 1 to 65535. It is not checked. A longer block goes a chunk at a
+.time; a chunk size above $4000 cannot be a #DEFINE, which is signed.
+.STASHVRAMGC.INC.BL (SEC 4.19) is the worked example.
 .
 .Regions may overlap with the target below the source.
 .

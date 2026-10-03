@@ -219,7 +219,7 @@ Three implementations, and what each costs:
 | **Routine calls** | ASM | `GP.FN` — the same call as a value, and it brings the GP block in |
 | **Screen** | ASM | `GP.BOX` `GP.FILL` `GP.PRINTAT` |
 | **Screen** | COMPOSITE | `GP.CHAR` — free, one cell in `GP.PRINTAT`'s shape running `GP.FILL`'s handler |
-| **Colour roles** | BASIC | `THEME.INC.BL` — `THEME.SELECT`, `THEME.CLR()` · §4.1 |
+| **Colour roles** | BASIC | `THEME.INC.BL` — `THEME.SELECT`, `THEME.CLR%()` · §4.1 |
 | **String helpers** | BASIC+ASM | `STRINGS.INC.BL` — `PADR` `PADL` `PADC` `SPLIT` `REPLACE` `SPLICE` `PET2SCR` `TRIM` `LTRIM` `RTRIM` · §4.2 |
 | **Screen etiquette, panels** | BASIC | `APPSYS.INC.BL` — `STARTUP` `RESTORE` `PANEL.SAVE/LOAD/PUT` `ISEMU` · §4.3 |
 | **Entry fields** | BASIC | `LINEINPUT.INC.BL` — `LINEINPUT.GET`, `LINEINPUT.ASK` · §4.4 |
@@ -232,7 +232,7 @@ Three implementations, and what each costs:
 | **Dialogs** | BASIC | `CHECK.INC.BL` — `CHECK.ADD`, a check box, `[X]` or `[ ]` · §4.21 |
 | **Dialogs** | BASIC | `GUI-LITE.INC.BL` — `MSGBOX` `PICKMENU` `CLOSEBOX`, in low memory, nothing banked · §4.24 |
 | **Code in a bank** | ASM | `GP.BANKED` `GP.ENDBANKED` — p-code at `$A000`, out of the low-memory budget, see §3.12 |
-| **Bank ownership** | BASIC | `BANKMGR.INC.BL` — `INIT` `CLAIM` `GET.FREE.BANK` `RELEASE` `COUNT` · §4.13 |
+| **Bank ownership** | BASIC | `BANKMGR.INC.BL` — `INIT` `CLAIM` `GET.FREE.BANK` `RELEASE` `COUNT` `SPACE` · §4.13 |
 | **Key-value store** | BASIC | `KV.INC.BL` — `INIT` `GET` `PUT` `DEL` `FIND` `AT` `WIPE` `SAVE` `LOAD`, strings in one RAM bank · §4.20 |
 | **Key-value store** | BASIC | `KVBIN.INC.BL` — `CREATE` `INFO` `GET` `PUT` `DEL` `AT` `FIRST` `NEXT` `STOP` `EXPAND`, strings in one file that every program shares · §4.26 |
 | **Keyboard** | BASIC | `KB.INC.BL` — `KB.CLEARKB` · §4.14 |
@@ -1158,7 +1158,7 @@ does not catch a fall-in.
 **Claim the bank**, or something else hands it out:
 
 ```basic
-BANKMGR.SET.BANK = MY.GUICODE : GOSUB BANKMGR.CLAIM
+BANKMGR.SET.BANK% = MY.GUICODE : GOSUB BANKMGR.CLAIM
 ```
 
 #### What fits
@@ -1327,7 +1327,7 @@ the first `#INCLUDE` and the second produces nothing.
 
 | Routine | in | out |
 |---|---|---|
-| `THEME.SELECT` | `THEME.ID%` | fills `THEME.CLR()` |
+| `THEME.SELECT` | `THEME.ID%` | fills `THEME.CLR%()` |
 | `THEME.NEXT` | `THEME.ID%` | the following theme, loaded |
 | `THEME.RESET` | `THEME.ID%` | the selected theme's shipped values, reloaded |
 | `THEME.SET` | `THEME.ATTR%` | issues `COLOR` — makes it the colour `PRINT` uses |
@@ -1341,22 +1341,22 @@ Five themes, `THEME.COUNT` of them:
 | 1 | `DARK` | black page, light grey text |
 | 2 | `LIGHT` | white page, black text |
 | 3 | `GRAY` | dark grey page, light blue frames. From the XFMGR file manager |
-| 4 | `CUSTOM` | whatever `THEME.CLR()` already holds |
+| 4 | `CUSTOM` | whatever `THEME.CLR%()` already holds |
 
 `THEME.NEXT` moves to the following one and wraps, which is what a program binds to a key. A cached
-attribute does not follow it: work out anything derived from `THEME.CLR()`, a reversed bar included,
+attribute does not follow it: work out anything derived from `THEME.CLR%()`, a reversed bar included,
 after every load.
 
-**`CUSTOM` loads nothing.** Selecting it leaves `THEME.CLR()` as it stands, so a program that lets
+**`CUSTOM` loads nothing.** Selecting it leaves `THEME.CLR%()` as it stands, so a program that lets
 the user change colours carries those changes into `CUSTOM` rather than discarding them. The one
 exception is a cold start — `CUSTOM` selected before any other theme has been loaded — where there
 is nothing to keep and it takes `X16`'s values. `THEME.RESET` goes back to those.
 
-`GPC-BASIC-TOOLS-SRC/color-test` edits the roles against a mock of the GUI and prints the `THEME.CLR()` lines
+`GPC-BASIC-TOOLS-SRC/color-test` edits the roles against a mock of the GUI and prints the `THEME.CLR%()` lines
 to paste back in here. **It carries its own `GPC-BASIC` folder and is still at nine roles**, so it
 offers `THEME.FOCUS` and `THEME.BAR` but not `THEME.SHADOW`.
 
-Roles, for indexing `THEME.CLR()`: `THEME.PAGE` `THEME.TEXT` `THEME.TITLE` `THEME.BORDER`
+Roles, for indexing `THEME.CLR%()`: `THEME.PAGE` `THEME.TEXT` `THEME.TITLE` `THEME.BORDER`
 `THEME.HILITE` `THEME.DIMMED` `THEME.WARN` `THEME.FOCUS` `THEME.BAR` `THEME.SHADOW`, and
 `THEME.SLOTS` = 10.
 
@@ -1366,23 +1366,23 @@ highlighted row of a list, and the control the TAB key has landed on. `THEME.BAR
 the band a menu bar or status line sits on, and `THEME.SHADOW` the tenth and newest, the colour
 a drop shadow is filled with.
 
-The module's own scalars are int16: `THEME.ID%`, `THEME.ATTR%` and `THEME.INV%`. `THEME.CLR()`
+The module's own scalars are int16: `THEME.ID%`, `THEME.ATTR%` and `THEME.INV%`. `THEME.CLR%()`
 is not — it stays an untyped array, and it is `DIM`med to `THEME.SLOTS - 1`, which is the last
 role and no element beyond it.
 
-Usage is `THEME.ID%`, one `GOSUB THEME.SELECT`, then `THEME.CLR(role)` wherever an attribute is
+Usage is `THEME.ID%`, one `GOSUB THEME.SELECT`, then `THEME.CLR%(role)` wherever an attribute is
 wanted:
 
 ```basic
 THEME.ID% = 1 : GOSUB THEME.SELECT
-GP.BOX 4,2,30,8, 2, THEME.CLR(THEME.BORDER)
-GP.PRINTAT 6,3, "TITLE", THEME.CLR(THEME.TITLE)
+GP.BOX 4,2,30,8, 2, THEME.CLR%(THEME.BORDER)
+GP.PRINTAT 6,3, "TITLE", THEME.CLR%(THEME.TITLE)
 ```
 
 The values are packed attributes, `background * 16 + foreground`, which is what `GP.BOX`, `GP.FILL`
 and `GP.PRINTAT` take. For `COLOR`, which takes the halves separately, use `THEME.SET`.
 
-`#DEFINE` substitutes at translation time, so `THEME.CLR(THEME.TITLE)` compiles to `THEME.CLR(2)`.
+`#DEFINE` substitutes at translation time, so `THEME.CLR%(THEME.TITLE)` compiles to `THEME.CLR%(2)`.
 The readable name costs no variable and no lookup.
 
 `THEME.CLR` is `DIM`med by the module. Do not `DIM` it in your own program.
@@ -1513,7 +1513,7 @@ certain.
 ```basic
 LINEINPUT.X = 10 : LINEINPUT.Y = 6
 LINEINPUT.LEN = 20
-LINEINPUT.ATTR = THEME.CLR(THEME.TEXT)
+LINEINPUT.ATTR = THEME.CLR%(THEME.TEXT)
 LINEINPUT.TEXT$ = ""
 GOSUB LINEINPUT.GET
 IF LINEINPUT.KEY = 27 THEN GOTO CANCELLED
@@ -1657,20 +1657,22 @@ the centred row-at-a-time path.
 | `GP.SUB MENU.ITEMX, text$, hint$, on` | the text, the hint, and `on`, tested `<> 0` | a row appended |
 | `GP.SUB MENU.SELECTED, n` | the row the next run opens on | — |
 | `R = GP.FN(MENU.HOTROW, slot, key)` | a slot and a key code | `R`, the first live row with that hot key, matched without case, or 0 |
-| `N = GP.FN(MENUTO.VERT, row, col, style)` | the popup slot, and the inputs below | `N`, 1 to the row count, or 0 for ESC. `MENU.EXITKEY` |
-| `N = GP.FN(MENUTO.BAR, row, col, style)` | the bar slot, `MENU.GAP` `MENU.BARFLAGS` | `N` `MENU.EXITKEY` `MENU.BARNUM` `MENU.SELX` `MENU.SELW` `MENU.MARKED` |
-| `GP.SUB MENU.DRAWBAR, row, col, style` | the bar slot, `MENU.MARKED` | the bar on screen, not run, with `MENU.MARKED` lit |
+| `N = GP.FN(MENUTO.VERT, row, col, style)` | the popup slot, and the inputs below | `N`, 1 to the row count, or 0 for ESC. `MENU.EXITKEY%` |
+| `N = GP.FN(MENUTO.BAR, row, col, style)` | the bar slot, `MENU.GAP%` `MENU.BARFLAGS%` | `N` `MENU.EXITKEY%` `MENU.BARNUM%` `MENU.SELX%` `MENU.SELW%` `MENU.MARKED%` |
+| `GP.SUB MENU.DRAWBAR, row, col, style` | the bar slot, `MENU.MARKED%` | the bar on screen, not run, with `MENU.MARKED%` lit |
 
 ```basic
 #INCLUDE "GPB.INC.BL"
 #INCLUDE "BANKMGR.INC.BL"
+#INCLUDE "THEME.INC.BL"
+#DEFINE MENU.TEXTBANK 62
 #INCLUDE "MENU.INC.BANKED.BL"
 #INCLUDE "MENU.INC.BL"
 
 GOSUB BANKMGR.INIT
-MENU.ATTR = 6 * 16 + 1
-MENU.HOTATTR = 6 * 16 + 7
-MENU.DISATTR = 6 * 16 + 12
+MENU.ATTR% = 6 * 16 + 1
+MENU.HOTATTR% = 6 * 16 + 7
+MENU.DISATTR% = 6 * 16 + 12
 GP.SUB MENU.BEGIN, MENU.POPUP
 GP.SUB MENU.ITEMX, "&ADD RECORD", "APPEND A BLANK RECORD", MENU.ON
 GP.SUB MENU.ITEMX, "&DEL RECORD", "", MENU.OFF
@@ -1680,9 +1682,9 @@ N = GP.FN(MENUTO.VERT, 4, 10, MENU.ROUND)
 IF N = 0 THEN <cancelled>
 ```
 
-Requires `GPB.INC.BL` and `BANKMGR.INC.BL`, with `BANKMGR.INIT` run before the first
-`MENU.BEGIN`, and a SHARED compile. `#INCLUDE "MENU.INC.BANKED.BL"` straight before
-`MENU.INC.BL`. Its groups are banked, so the program gets a `NAME.OVL` beside its `.PRG`.
+Requires `GPB.INC.BL`, `BANKMGR.INC.BL` and `THEME.INC.BL`, with `BANKMGR.INIT` run before the first
+`MENU.BEGIN`, and a SHARED compile. `#DEFINE MENU.TEXTBANK`, then `#INCLUDE "MENU.INC.BANKED.BL"`
+straight before `MENU.INC.BL`. Its groups are banked, so the program gets a `NAME.OVL` beside its `.PRG`.
 Ship both.
 
 A menu is built into a slot, then run from it. There are two slots, so the bar survives while its
@@ -1700,8 +1702,9 @@ a define means adding lines to the group to match. A define that does not match 
 loses rows off the end of a menu. `MENU.POOLBASE` is `MENU.BAR.MAX + MENU.POPUP.MAX`.
 
 The text and hints are kept in bank `MENU.TEXTBANK`, which the first `MENU.BEGIN` claims from
-`BANKMGR` (§4.13). It is 62 unless the program writes `#DEFINE MENU.TEXTBANK n` before the
-`#INCLUDE`. If another owner has claimed that bank, `MENU.OK` is 0 and every row is dropped.
+`BANKMGR` (§4.13). It has no default: the program writes `#DEFINE MENU.TEXTBANK n` before
+`#INCLUDE "MENU.INC.BANKED.BL"`. Nothing else may use that bank. If another owner has claimed it,
+`MENU.OK%` is 0 and every row is dropped.
 Text is cut to 30 characters and a hint to 50. `MENU.FLAG$()`, `MENU.HOTKEY$()` and
 `MENU.HOTCOL$()` are the module's own arrays, `DIM`med on the first `MENU.BEGIN`. Do not `DIM` them.
 
@@ -1715,13 +1718,14 @@ to open the bar item with that letter, or for an ALT+letter the program reads it
 
 `&` marks the hot key: `"SAVE &AS"` is stored as `SAVE AS` with hot key A at column 6. Only the
 first `&` counts, `&&` is a literal `&`, and a trailing `&` stays in the text. A hot key is matched
-without case, the first live row with it wins, and it chooses the row at once.
+without case, the first live row with it wins, and it chooses the row at once. A shifted PETSCII
+letter, 193 to 218, pairs with 65 to 90 as well.
 
 A row whose text is one hyphen, `"-"`, is a separator. It draws as a line of `MENU.SEPCHR`, still
 counts as a row, and the cursor steps over it.
 
 `MENU.ITEMX` with `on` 0 adds a disabled row. The cursor steps over it, its hot key and RETURN are
-refused, and it draws in `MENU.DISATTR`.
+refused, and it draws in `MENU.DISATTR%`.
 
 A caller keeping its rows in `GP.BANKEDSTR` groups (§3.10) can put the enable mask at index 0 of
 the hint group, `"1"` for on and `"0"` for off a row, and pass `VAL(MID$(GP.BSTR(HH, 0), I, 1))`
@@ -1733,24 +1737,24 @@ Set once by the caller, and read by every run:
 
 | in | |
 |---|---|
-| `MENU.ATTR` | the rows, `background * 16 + foreground` |
-| `MENU.HIATTR` | the highlighted row. 0 inverts `MENU.ATTR` |
-| `MENU.HOTATTR` | the hot key letter. 0 leaves it untinted. Only rows drawn in `MENU.ATTR` are tinted |
-| `MENU.DISATTR` | a disabled row. 0 is `MENU.ATTR` |
-| `MENU.SEPATTR` | separator lines and the frame. 0 is `MENU.ATTR` |
+| `MENU.ATTR%` | the rows, `background * 16 + foreground` |
+| `MENU.HIATTR%` | the highlighted row. 0 inverts `MENU.ATTR%` |
+| `MENU.HOTATTR%` | the hot key letter. 0 leaves it untinted. Only rows drawn in `MENU.ATTR%` are tinted |
+| `MENU.DISATTR%` | a disabled row. 0 is `MENU.ATTR%` |
+| `MENU.SEPATTR%` | separator lines and the frame. 0 is `MENU.ATTR%` |
 | `MENU.SEPCHR` | the separator glyph. 0 is `MENU.LINE`, 192, the stroke `GP.BOX` style 1 draws with |
-| `MENU.FLAGS` | the popup's flags, added together |
-| `MENU.BARFLAGS` | the bar's flags |
-| `MENU.GAP` | cells between bar items. 0 is none |
-| `MENU.HINTX` `MENU.HINTY` `MENU.HINTW` `MENU.HINTATTR` | the hint field. `MENU.HINTW` 0 turns hints off |
+| `MENU.FLAGS%` | the popup's flags, added together |
+| `MENU.BARFLAGS%` | the bar's flags |
+| `MENU.GAP%` | cells between bar items. 0 is none |
+| `MENU.HINTX%` `MENU.HINTY%` `MENU.HINTW%` `MENU.HINTATTR%` | the hint field. `MENU.HINTW%` 0 turns hints off |
 
 A hint is shown only when the highlight moves, never on opening. The field is cleared to
-`MENU.HINTATTR` first, and a hint longer than `MENU.HINTW` is cut.
+`MENU.HINTATTR%` first, and a hint longer than `MENU.HINTW%` is cut.
 
 #### The frame
 
 Both runners draw a `GP.BOX` with its corner at `row`, `col`, one cell bigger all round than the
-rows, in `MENU.SEPATTR`. `style` is `MENU.SOLID` 0, `MENU.THIN` 1, `MENU.ROUND` 2, `MENU.THICK` 3,
+rows, in `MENU.SEPATTR%`. `style` is `MENU.SOLID` 0, `MENU.THIN` 1, `MENU.ROUND` 2, `MENU.THICK` 3,
 or 256 and up for the address of an eight-character glyph table:
 
 ```basic
@@ -1761,7 +1765,7 @@ N = GP.FN(MENUTO.VERT, 4, 10, GP.STRPTR(T.GLYPH$) + 1)
 `MENU.NOBOX`, 255, draws no frame and puts the first row at `row`, `col`.
 
 A popup row, and its highlight, is as wide as the widest row. A bar item is as wide as its own text,
-with `MENU.GAP` cells between items, so spaces inside the text are how a bar item gets padding.
+with `MENU.GAP%` cells between items, so spaces inside the text are how a bar item gets padding.
 
 #### Keys and flags
 
@@ -1776,7 +1780,7 @@ with `MENU.GAP` cells between items, so spaces inside the text are how a bar ite
 | flag | value | |
 |---|---:|---|
 | `MENU.MUSTSEL` | 1 | ESC and STOP do not cancel |
-| `MENU.KEEPMARK` | 2 | the chosen row stays lit. On the bar, `MENUTO.BAR` sets `MENU.MARKED` to it |
+| `MENU.KEEPMARK` | 2 | the chosen row stays lit. On the bar, `MENUTO.BAR` sets `MENU.MARKED%` to it |
 | `MENU.NOWRAP` | 4 | stop at the ends instead of wrapping |
 | `MENU.GAMEPAD` | 8 | the SNES pad in port 1 as well: directions move, B or START chooses |
 | `MENU.DOWNEXIT` | 16 | bar only: DOWN chooses the item |
@@ -1789,11 +1793,11 @@ On the bar, UP and DOWN do nothing unless `MENU.UPEXIT` or `MENU.DOWNEXIT` is se
 The pad acts on new presses only, one step a press. Cancel is keyboard only. With no pad connected
 the flag changes nothing; in the emulator a pad needs `-joy1`.
 
-`MENU.EXITKEY` is the key that ended the run: 13 for RETURN, 27 for ESC, 3 for STOP, the hot key,
+`MENU.EXITKEY%` is the key that ended the run: 13 for RETURN, 27 for ESC, 3 for STOP, the hot key,
 or the key `MENU.KEYEXIT` handed back. A pad press is reported as the key it stands for.
 
-`MENU.BARNUM` is the bar's row count. `MENU.SELX` and `MENU.SELW` are the chosen bar item's column
-and width, for placing a panel under it. `MENU.MARKED` is the bar item left lit by `MENU.KEEPMARK`
+`MENU.BARNUM%` is the bar's row count. `MENU.SELX%` and `MENU.SELW%` are the chosen bar item's column
+and width, for placing a panel under it. `MENU.MARKED%` is the bar item left lit by `MENU.KEEPMARK`
 or by `MENUTO.PULLDOWN` (§4.9). `MENU.DRAWBAR` redraws the bar with it lit, to repaint a bar that a
 panel has covered.
 
@@ -1909,45 +1913,54 @@ with the trims, to [`STRTST.EXP.BL`](STRTST.EXP.BL).
 
 | Routine | in | out |
 |---|---|---|
-| `N = GP.FN(MENUTO.PULLDOWN, barnum, style)` | the popup slot, the bar `MENUTO.BAR` or `MENU.DRAWBAR` last drew, `MENU.STASHBANK` | `N` `MENU.EXITKEY` `MENU.NEXTBAR` `MENU.BARNUM` `MENU.SELX` `MENU.SELW` |
+| `N = GP.FN(MENUTO.PULLDOWN, barnum, style)` | the popup slot, the bar `MENUTO.BAR` or `MENU.DRAWBAR` last drew | `N` `MENU.EXITKEY%` `MENU.NEXTBAR%` `MENU.BARNUM%` `MENU.SELX%` `MENU.SELW%` |
+| `GP.SUB MENU.SAVESCREEN, mode` | `MENU.SAVE.VRAM`, the default, or `MENU.SAVE.BANK` | where the screen under a dropdown is kept |
 
 ```basic
-MENU.BARFLAGS = MENU.DOWNEXIT
+MENU.BARFLAGS% = MENU.DOWNEXIT
 B = GP.FN(MENUTO.BAR, 0, 0, MENU.NOBOX)
 GP.DO
     IF B = 0 THEN GP.EXITDO
     GOSUB MY.FILL
     N = GP.FN(MENUTO.PULLDOWN, B, MENU.ROUND)
-    B = MENU.NEXTBAR
+    B = MENU.NEXTBAR%
 GP.LOOP
 ```
 
 `MY.FILL` is the caller's: `MENU.BEGIN MENU.POPUP` and the rows for bar item `B`.
 
-Requires `MENU.INC.BL` (§4.6) and `STASH.INC.BL` (§3.6), included by the caller, and a `#SYMFILE`
-for `STASH`. A program with no dropdown leaves this file out and does not carry `STASH`.
+Requires `MENU.INC.BL` (§4.6), `STASH.INC.BL` (§3.6) and `STASHVRAM.INC.BL` (§4.18), included by
+the caller, `BANKMGR.INC.BL` above this file, and a `#SYMFILE` for `STASH`. A program with no
+dropdown leaves this file out and does not carry `STASH`.
 
 `MENUTO.PULLDOWN` marks bar item `barnum`, opens the popup slot under it and runs it. A `barnum`
 out of range or disabled returns 0 and draws nothing. The bar is the one last drawn, where it was
-drawn, read with `MENU.GAP` and `MENU.BARFLAGS` as they are now. The item the last call marked is
-unmarked and `barnum` is marked. It stays marked on the way out, in `MENU.MARKED`.
+drawn, read with `MENU.GAP%` and `MENU.BARFLAGS%` as they are now. The item the last call marked is
+unmarked and `barnum` is marked. It stays marked on the way out, in `MENU.MARKED%`.
 
 The dropdown's corner is the item's column on the row under the bar, moved left if the box would
 run off the screen. The screen width comes from the KERNAL's `screen_mode`. The style and colours
-are `MENUTO.VERT`'s (§4.6), and the run adds `MENU.KEYEXIT` to `MENU.FLAGS`.
+are `MENUTO.VERT`'s (§4.6), and the run adds `MENU.KEYEXIT` to `MENU.FLAGS%`.
 
 | out | |
 |---|---|
 | `N` | the row, for RETURN or a hot key. Any other exit is 0 |
-| `MENU.EXITKEY` | the key that ended it |
-| `MENU.NEXTBAR` | the bar item LEFT or RIGHT walks to, stepping over disabled items as the bar does. With no live neighbour it is `barnum`. 0 for any other exit |
-| `MENU.BARNUM` | the bar's row count |
-| `MENU.SELX` `MENU.SELW` | the item's column and width |
+| `MENU.EXITKEY%` | the key that ended it |
+| `MENU.NEXTBAR%` | the bar item LEFT or RIGHT walks to, stepping over disabled items as the bar does. With no live neighbour it is `barnum`. 0 for any other exit |
+| `MENU.BARNUM%` | the bar's row count |
+| `MENU.SELX%` `MENU.SELW%` | the item's column and width |
 
-The screen under the dropdown is saved first and put back after, in `STASH` slot 0 of bank
-`MENU.STASHBANK`. Set it before the first call to choose the bank. Left at 0, the first call takes
-one from `BANKMGR.GET.FREE.BANK`. If none is free, the dropdown still runs and the screen is not put
-back.
+The screen under the dropdown is saved first and put back after. `MENU.SAVESCREEN` sets where.
+
+`MENU.SAVE.VRAM` keeps it in VRAM with `STASHVRAM`, and runs `SV.START` (§4.18) if nothing has. A
+program that uses `STASHVRAM` itself sets `SV.MAX%` with a handle to spare for the menu.
+
+`MENU.SAVE.BANK` keeps it with `STASH` in `MENU.STASHSIZE%` bytes at `MENU.STASHADDR` in bank
+`MENU.STASHBANK%`. A dropdown takes `4 + 2 * w * h` bytes, frame and shadow included. Set all three
+before the first call. Bank 0 at the first call takes `MENUPULL.SAVEBYTES`, 4,096 bytes, from
+`BANKMGR.SPACE` (§4.13).
+
+If there is no room either way, the dropdown still runs and the screen is not put back.
 
 WARNING: `MENUTO.PULLDOWN` sets `STASH.BANK`, `STASH.SLOT`, `STASH.MOVE`, `STASH.X`, `STASH.Y`,
 `STASH.W` and `STASH.H`. Set them again before the caller's own next `STASH` call.
@@ -2036,7 +2049,7 @@ the result is a field, so a right answer in the wrong number of columns still br
 
 | Routine | in | out |
 |---|---|---|
-| `GUI.OPEN` | `GUI.BODY.ROWS` `GUI.BODY.WIDTH` | `GUI.INNER.LEFT` `.TOP` `.WIDTH` — the box on its own |
+| `GUI.OPEN` | `GUI.BODY.ROWS%` `GUI.BODY.WIDTH%` | `GUI.INNER.LEFT%` `.TOP` `.WIDTH` — the box on its own |
 | `GUI.CLOSE` | — | the screen as it was |
 
 **The dialogs are not here.** They are one-line verbs in `GUI-DIALOGS.INC.BL`, §4.12, and a program
@@ -2045,24 +2058,34 @@ the loop that runs a mix of controls under one focus.
 
 ```basic
 GP.SUB PANELOPEN, " READY ", "", 4, 30
-GP.PRINTAT GUI.INNER.LEFT, GUI.INNER.TOP, "MY OWN ROWS", THEME.CLR(THEME.TEXT)
+GP.PRINTAT GUI.INNER.LEFT%, GUI.INNER.TOP%, "MY OWN ROWS", THEME.CLR%(THEME.TEXT)
 GP.SUB PANELCLOSE
 ```
 
-Requires `GPB.INC.BL`, `STASH.INC.BL`, `THEME.INC.BL`, `BANKMGR.INC.BL`, `MENU.INC.BL`,
-`LINEINPUT.INC.BL`, `COMBO.INC.BL` and `CHECK.INC.BL`, and `#INCLUDE`s none of them. All of them
-are needed whichever dialog you call: BASLOAD resolves every label in the file, so leaving one out
-is `LABEL NOT FOUND`. `MENU.INC.BL` goes in before `GUI.INC.BL`, for its `#DEFINE`s.
-`COMBO.INC.BL` and `CHECK.INC.BL` go in after it. It wants a `#SYMFILE`, because `STASH` does.
+Requires `GPB.INC.BL`, `STASH.INC.BL`, `STASHVRAM.INC.BL` (§4.18), `THEME.INC.BL`,
+`BANKMGR.INC.BL`, `MENU.INC.BL`, `LINEINPUT.INC.BL`, `COMBO.INC.BL` and `CHECK.INC.BL`, and
+`#INCLUDE`s none of them. All of them are needed whichever dialog you call: BASLOAD resolves every
+label in the file, so leaving one out is `LABEL NOT FOUND`. `STASH.INC.BL`, `STASHVRAM.INC.BL` and
+`MENU.INC.BL` go in before `GUI.INC.BL`. `COMBO.INC.BL` and `CHECK.INC.BL` go in after it. It wants
+a `#SYMFILE`, because `STASH` does.
 
 `PICKMENU` runs the popup slot inside its box. Build the rows with `MENU.BEGIN MENU.POPUP` and
-`MENU.ITEM` first. `&` hot keys are tinted in `GUI.BORDER`, and the highlight is as wide as the
+`MENU.ITEM` first. `&` hot keys are tinted in `GUI.BORDER%`, and the highlight is as wide as the
 widest row.
 
-Everything the box takes — three message lines, a title, the style, the placement, the shadow, the
-frame glyphs, the bank the covered cells go to — is listed in full in
-[GP-BASIC.GLOBALS.md](GP-BASIC.GLOBALS.md) §3. `GUI.BANK = 0` does not save the cells, and then the
-box is still on screen when the call returns.
+Everything the box takes is listed in full in [GP-BASIC.GLOBALS.md](GP-BASIC.GLOBALS.md) §3: three
+message lines, a title, the style, the placement, the shadow, the frame glyphs, and where the
+covered cells are saved.
+
+`GUI.SAVEMODE%` sets where a box keeps the cells it covers. `GUI.SAVE.VRAM` (1), or 0, the default,
+keeps them in `STASHVRAM` and runs `SV.START` if nothing has. `GUI.SAVE.BANK` (2) keeps them with
+`STASH` in `GUI.STASHSIZE%` bytes at `GUI.STASHADDR` in bank `GUI.BANK%`. A box that is not saved
+is still on screen when the call returns. In VRAM mode that is a box with no free handle or no room
+in the window. In bank mode it is a box with `GUI.BANK% = 0`, or one that needs more than
+`GUI.STASHSIZE%` bytes.
+
+`GUI.FORM.RUN` drops the keys queued before a box opens and the keys left when it closes.
+`GUI.TYPEAHEAD%` non-zero keeps them. Set it in a program that queues a box's keys ahead of it.
 
 **Every control has a focus, and TAB moves it.** A dialog states its controls and `GUI.FORM` runs
 them. A control is a button, a field, a list, a combo (§4.17) or a check box (§4.21); it hands back
@@ -2072,7 +2095,7 @@ whatever the mix.
 **The default button and the focused control are different things.** The default is what RETURN
 presses from anywhere and is drawn `<<LIKE THIS>>`; the focus is where TAB has got to and is drawn
 in `THEME.FOCUS`. `INPUTBOX` opens with the default on OK and the focus in the field — which is
-the point of keeping the two apart, and `GUI.DEFAULT` sets only the first.
+the point of keeping the two apart, and `GUI.DEFAULT%` sets only the first.
 
 **The answers are buttons.** `GUI.BTN.ONE$` and `GUI.BTN.TWO$` carry them, and `&` marks the
 accelerator: `"&CANCEL"` lights the C. **An accelerator is live only while the focused control does
@@ -2086,13 +2109,13 @@ label and a variable of one name, and the `$` does not separate them.
 
 | Routine | in | out |
 |---|---|---|
-| `GUI.FORM.ADD.FIELD` | `LINEINPUT.X` `.Y` `.LEN` `.TEXT$` and the rest of `LINEINPUT`'s inputs | `GUI.CTRL.N` — the field's control number |
+| `GUI.FORM.ADD.FIELD` | `LINEINPUT.X` `.Y` `.LEN` `.TEXT$` and the rest of `LINEINPUT`'s inputs | `GUI.CTRL.N%` — the field's control number |
 
 ```basic
-LINEINPUT.X = GUI.INNER.LEFT : LINEINPUT.Y = GUI.INNER.TOP
+LINEINPUT.X = GUI.INNER.LEFT% : LINEINPUT.Y = GUI.INNER.TOP%
 LINEINPUT.LEN = 20 : LINEINPUT.TEXT$ = "UNTITLED"
 GOSUB GUI.FORM.ADD.FIELD
-NAME.CTRL = GUI.CTRL.N
+NAME.CTRL = GUI.CTRL.N%
 REM ... run the form ...
 PRINT GUI.CTRL.TEXT$(NAME.CTRL)
 ```
@@ -2106,7 +2129,7 @@ The field is painted as soon as it is added, so a field that never takes the foc
 **Upper case, on the default charset.** `GP.PRINTAT` converts PETSCII and BASLOAD passes literals
 through as source bytes, so charset 2 lands lower case on the graphics half of the font. ISO mode
 fixes the text and breaks the frame, `GP.BOX`'s `$40`–`$7D` being letters. Upper case with a frame,
-mixed case without one, or re-order the font and set `GUI.GLYPH`.
+mixed case without one, or re-order the font and set `GUI.GLYPH%`.
 
 Example: [`GUI.EXP.BL`](GUI.EXP.BL).
 
@@ -2114,53 +2137,88 @@ Example: [`GUI.EXP.BL`](GUI.EXP.BL).
 
 ### 4.12 `GUI-DIALOGS.INC.BL` — every dialog as a verb
 
-A dialog is a call with its arguments in it. Nothing is set up in globals first, and nothing a
-previous dialog set carries into the next one.
+A dialog is a call with its arguments in it. Nothing is set up in globals first. Every dialog runs
+`GUI.DEFAULTS` before it sets anything, so no title, placement or button from one dialog carries
+into the next. The setup verbs' settings are kept: the `DLGSAVESCREEN` mode, the `DLGRESET` space,
+the `DLGLABELS` labels, and the `DLGSHADOW`, `DLGSHADOWCLR`, `DLGSTYLE` and `DLGGLYPH` settings.
 
 | Routine | in | out |
 |---|---|---|
-| `DLGRESET bank` | the RAM bank the covered cells go to | every other input back to its default |
+| `DLGSAVESCREEN mode` | `GUI.SAVE.VRAM`, the default, or `GUI.SAVE.BANK` | where every box after it keeps the cells it covers |
+| `DLGRESET bank, addr, size` | the `GUI.SAVE.BANK` space: `size` bytes at `addr` in `bank` | every other input back to its default |
 | `DLGSHADOW on` · `DLGGLYPH on` | non-zero | the shadow and the frame glyphs, for every box after it |
 | `DLGSHADOWCLR attr` | a packed colour | the shadow's own colour; 0, the default, is black on black |
-| `DLGSTYLE style` | a `GP.BOX` style (§3.7); 0, the default, is a solid block | the frame every box after it draws; `DLGGLYPH` overrides it |
+| `DLGSTYLE style` | a `GP.BOX` style (§3.7); 0, the default, draws style 2, single line with rounded corners | the frame every box after it draws; `DLGGLYPH` overrides it |
+| `DLGLABELS ok$, cancel$, yes$, no$` | a label for each; `""` keeps the library's own | the buttons every dialog after it names itself |
 | `KBCLEAR` | — | the keyboard buffer emptied |
-| `MSGBOX msg$` | | `GUI.KEY` — something to say, and one way out |
+| `MSGBOX msg$` | | one button; `GUI.KEY%` is the key that closed it |
 | `ASKYN msg$` · `ASKOK msg$` | | -1 for yes, or OK |
 | `ASK3 t$, m$, b1$, b2$, b3$, dflt, esc` | | the button pressed, 1..3; `esc` is the one ESC means, and `b3$` `""` leaves two |
 | `ASKTEXT msg$, len` | | the typed line, `""` when cancelled |
-| `INPUTBOX msg$, start$, len` | | the text either way; `GUI.OK` says which |
+| `INPUTBOX msg$, start$, len` | | the text either way; `GUI.OK%` says which |
 | `PICKMENU msg$, sel` | the popup slot of `MENU.INC.BL` (§4.6) | the row, 1..N, or 0 cancelled |
 | `LISTBOX msg$, count, rows` | `GUI.LIST.ITEM$()` | the row, or 0 cancelled |
 | `LISTBOXM msg$, count, rows` | the same | how many are marked; `GUI.LISTBOX.MARKS$` which |
 | `ASKLINE x, y, label$, len` | | a line typed in place, no box; `LINEINPUT.KEY` 27 cancelled |
-| `PANELOPEN t$, m$, rows, width` · `PANELCLOSE` | | an empty box at `GUI.INNER.LEFT` and `.TOP`, and the screen back |
+| `PANELOPEN t$, m$, rows, width` · `PANELCLOSE` | | an empty box at `GUI.INNER.LEFT%` and `.TOP`, and the screen back |
 
 ```basic
-GP.SUB DLGRESET, 8
 GP.SUB MSGBOX, "DISK FULL"
 IF GP.FN(ASKYN, "DELETE THE FILE?") THEN GOSUB DELETEIT
 F$ = GP.FN(ASKTEXT, "FILE NAME?", 16)
 ```
 
-**Every verb has an `EX` form** that takes a title and three message lines first, always in that
+`DLGSAVESCREEN` sets where every dialog keeps the cells it covers. `GUI.SAVE.VRAM` keeps them in
+`STASHVRAM` (§4.18), and a box runs `SV.START` if nothing has. A program that uses `STASHVRAM`
+itself sets `SV.MAX%` with a handle to spare for each box open at once.
+
+`GUI.SAVE.BANK` keeps them with `STASH` in the space `DLGRESET` sets. A program calls
+`GP.SUB DLGSAVESCREEN, GUI.SAVE.BANK` and `GP.SUB DLGRESET, bank, addr, size` once, at startup. A
+box takes `4 + 2 * w * h` bytes, and a combo's dropdown is saved above it in the same space. A box
+that does not fit is drawn and not saved. Bank 0 saves none.
+
+`GUI.DEFAULTS` copies the mode into `GUI.SAVEMODE%`, and the space into `GUI.BANK%`,
+`GUI.STASHADDR` and `GUI.STASHSIZE%`.
+
+`DLGLABELS` sets the labels of the buttons the library names itself:
+
+- OK of `MSGBOX`, and of `MSGBOXEX` when `btn$` is `""`;
+- YES and NO of `ASKYN` and `ASKYNEX`;
+- OK and CANCEL of `ASKOK`, `ASKYNEX` with `okc` non-zero, `ASKTEXT`, `INPUTBOX`, `INPUTBOXEX` and
+  the listbox verbs.
+
+`ASK3` and `FORM.BEGIN` take their own labels and are not affected. The labels are kept in
+`DLG.LABELS.OK$`, `.CANCEL$`, `.YES$` and `.NO$`. `GUI.DEFAULTS` fills a `""` one with the
+library's own: `"&OK"`, `"&CANCEL"`, `"&YES"` or `"&NO"`. `DLGLABELS` runs `GUI.DEFAULTS` itself.
+The `&` in a label marks the accelerator letter, and that letter is the key that presses the
+button. The answer comes from which button was pressed, so a relabelled yes button still answers
+-1.
+
+Under charset 5 the library's upper-case PETSCII literals show as lower case. A program that runs
+under charset 5 passes its own labels, already converted.
+
+Five verbs have an `EX` form that takes a title and three message lines first, always in that
 order, then its own arguments: `MSGBOXEX t$, m$, m2$, m3$, btn$`, `ASKYNEX t$, m$, m2$, m3$, dflt,
 okc`, `INPUTBOXEX ... start$, len, mask`, `PICKMENUEX ... sel, flags`, `LISTBOXEX ... count, rows,
-multi`. `dflt` 2 makes the second button the default; `okc` non-zero says OK and CANCEL rather than
-YES and NO; `flags` are `MENU.MUSTSEL`, `.NOWRAP` and `.GAMEPAD`.
+multi`. `dflt` 2 makes the second button the default; `okc` non-zero gives OK and CANCEL buttons
+in place of YES and NO; `flags` are `MENU.MUSTSEL`, `.NOWRAP` and `.GAMEPAD`.
 
-`#INCLUDE` it after `GUI.INC.BL`, `COMBO.INC.BL` and `CHECK.INC.BL`: a verb is compiled before any
-call to it, and this one calls all of them. **The rows are filled first**, because an array cannot
-be an argument — `MENU.BEGIN`/`MENU.ITEM` for `PICKMENU`, `GUI.LIST.ITEM$(1..count)` for the
-listbox, and the caller owns that `DIM`.
+`#INCLUDE` it after `GPB.INC.BL`, `THEME.INC.BL`, `MENU.INC.BL`, `LINEINPUT.INC.BL`,
+`STASH.INC.BL`, `STASHVRAM.INC.BL`, `GUI.INC.BL`, `COMBO.INC.BL` and `CHECK.INC.BL`, and above the
+program's code: a verb is compiled before any call to it.
 
-Up and down move, PgUp and PgDn page, HOME and END jump, SPACE toggles a mark in multi. TAB moves
-to the buttons and back, RETURN takes `<<OK>>` from anywhere, ESC and STOP cancel — and O and C
-press their buttons while the eye is still in the list, which a list can offer and a typing field
-cannot.
+The rows are filled first, because an array cannot be an argument. `PICKMENU` reads the rows built
+with `MENU.BEGIN` and `MENU.ITEM`. The listbox verbs read `GUI.LIST.ITEM$(1..count)`, which the
+caller `DIM`s.
 
-**In multi, `GUI.LISTBOX.SEL` is not the answer** — it is where the cursor was left. The marks are:
-`GUI.LISTBOX.MARKS$` is `count` characters with `"1"` for marked. They are cleared on every call,
-so one run never reports the run before it.
+Up and down move, PgUp and PgDn page, HOME and END jump, and SPACE toggles a mark in multi. TAB
+moves to the buttons and back. RETURN in the list presses OK, and on a button presses that button.
+ESC and STOP cancel. The marked letter of OK or CANCEL presses that button while the focus is in
+the list.
+
+**In multi, `GUI.LISTBOX.SEL%` is not the answer.** It is the row the cursor was left on.
+`GUI.LISTBOX.MARKS$` holds the marks: `count` characters, `"1"` for a marked row. The marks are
+cleared on every call.
 
 The bottom frame edge reads `2 SELECTED OF 20` in multi, `20 ITEMS` for a single list too long to
 see at once, and is blank for one that fits.
@@ -2171,24 +2229,25 @@ see at once, and is blank for one that fits.
 |---|---|---|
 | `LIST.BEGIN title$, rows` | | a list box declared, not yet drawn |
 | `LIST.ARRAY count` | `GUI.LIST.ITEM$()` | its rows come from the array |
-| `LIST.BANK bank, first, last` | a RAM bank in the `GP.BSTR` image layout | its rows come from the bank |
+| `LIST.BANK bank, addr, first, last` | a `GP.BSTR` image at `addr` in `bank` | its rows come from the bank |
 | `LISTTO.RUN` | | the row, or 0 cancelled |
 | `LIST.ITEM n` | | row `n` as text |
-| `LIST.SORT bank, first, last` | | that bank's rows in order, in place |
+| `LIST.SORT bank, addr, first, last` | | that image's rows in order, in place |
 
 ```basic
 GP.SUB LIST.BEGIN, " OPEN FILE ", 12
-GP.SUB LIST.BANK, MY.BANK%, 0, N - 1
+GP.SUB LIST.BANK, MY.BANK%, MY.ADDR, 0, N - 1
 SEL = GP.FN(LISTTO.RUN)
 IF SEL > 0 THEN F$ = GP.FN(LIST.ITEM, SEL)
 ```
 
-**A bank list never comes into low memory.** The bank holds the `GP.BSTR` image layout — a 16-bit
-count at `$A000`, an offset a row at `$A002`, then the records — and `GUI.LIST.FETCH` reads one row
-at a time, as it is drawn. That is how `FILEPICK` (§4.20) shows a directory of any length in a
-program with no room for it. `LIST.SORT` moves the two-byte offsets and not the records, so a
-pointer into one stays good afterwards; it reaches the bank through `STASH.SELECT`, which is what
-lets the whole module sit inside a `GP.BANKED` region.
+**A bank list never comes into low memory.** `addr` is where the `GP.BSTR` image starts. The
+offset table is at `addr + 2`, one 16-bit offset a string, and each offset counts from `addr`. A
+`GP.BANKEDSTR` group's image is at `$A000` when it is the first group declared in its bank.
+`GUI.LIST.FETCH` reads one row at a time, as it is drawn. `FILEPICK.INC.BL` shows a directory this
+way. `LIST.SORT` moves the two-byte offsets and not the records, so a pointer into a record stays
+good and a string number does not. It reaches the bank through `STASH.SELECT`, so the whole module
+can sit inside a `GP.BANKED` region.
 
 Example: [`GUI.EXP.BL`](GUI.EXP.BL).
 
@@ -2198,25 +2257,33 @@ Example: [`GUI.EXP.BL`](GUI.EXP.BL).
 
 | Routine | in | out |
 |---|---|---|
-| `BANKMGR.INIT` | — | `BANKMGR.BANKS` |
-| `BANKMGR.CLAIM` | `BANKMGR.SET.BANK` | `BANKMGR.OK` |
-| `BANKMGR.GET.FREE.BANK` | — | `BANKMGR.BANK` |
-| `BANKMGR.RELEASE` | `BANKMGR.SET.BANK` | — |
-| `BANKMGR.COUNT` | — | `BANKMGR.BANKS` `BANKMGR.SPARE` |
+| `BANKMGR.INIT` | — | `BANKMGR.BANKS%` |
+| `BANKMGR.CLAIM` | `BANKMGR.SET.BANK%` | `BANKMGR.OK%` |
+| `BANKMGR.GET.FREE.BANK` | — | `BANKMGR.BANK%` |
+| `BANKMGR.RELEASE` | `BANKMGR.SET.BANK%` | — |
+| `BANKMGR.COUNT` | — | `BANKMGR.BANKS%` `BANKMGR.SPARE%` |
+| `GP.SUB BANKMGR.SPACE, size` | `BANKMGR.SIZE%`, 1 to 8192 | `BANKMGR.BANK%` `BANKMGR.ADDR` |
 
 ```basic
 #INCLUDE "BANKMGR.INC.BL"
 
 GOSUB BANKMGR.INIT
-BANKMGR.SET.BANK = MY.GUICODE : GOSUB BANKMGR.CLAIM
-IF BANKMGR.OK = 0 THEN <bank was already taken>
+BANKMGR.SET.BANK% = MY.GUICODE : GOSUB BANKMGR.CLAIM
+IF BANKMGR.OK% = 0 THEN <bank was already taken>
 GOSUB BANKMGR.GET.FREE.BANK
-IF BANKMGR.BANK = 0 THEN <none left>
+IF BANKMGR.BANK% = 0 THEN <none left>
+GP.SUB BANKMGR.SPACE, 1200
+MYBANK% = BANKMGR.BANK% : MYADDR = BANKMGR.ADDR
 ```
 
 For a program with several owners of banked RAM, none of which can see the others' numbers. The
-order matters: `BANKMGR.INIT` first, and every `CLAIM` before the first `GET.FREE.BANK`, or the
-allocator hands out a bank a compile-time region is already sitting in.
+order matters: `BANKMGR.INIT` first, and every `CLAIM` before the first `GET.FREE.BANK` or `SPACE`,
+or the allocator hands out a bank a compile-time region is already sitting in.
+
+`SPACE` hands out a piece smaller than a bank. The pieces come from the bottom of a bank it takes
+from `GET.FREE.BANK`, one after another. None is ever given back. A piece that does not fit in what
+is left takes a fresh bank. `BANKMGR.BANK%` is 0 when no bank is left. `BANKMGR.ADDR` is the piece's
+first byte, `$A000` to `$BFFF`, and stays a float because `$A000` is past 32,767.
 
 **It tracks, it does not select.** Nothing in this module executes `BANK`. A claim is a promise
 between the program's own modules, and an accessor still sets its own bank on every access.
@@ -2225,8 +2292,8 @@ between the program's own modules, and an accessor still sets its own bank on ev
 for *none left*. `INIT` reserves bank 1 as well, for the runtime (§3.12), so `GET.FREE.BANK`
 hands out bank 2 or higher.
 
-`BANKMGR.OK` is `-1` if `CLAIM` took the bank, `0` if it was already taken or out of range.
-`BANKMGR.BANKS` is how many the machine has, 64 or 256. `BANKMGR.SPARE` is what `COUNT` found free.
+`BANKMGR.OK%` is `-1` if `CLAIM` took the bank, `0` if it was already taken or out of range.
+`BANKMGR.BANKS%` is how many the machine has, 64 or 256. `BANKMGR.SPARE%` is what `COUNT` found free.
 
 **`MEMTOP` returns `$00` on a 2 MB machine.** The count is one byte and 256 does not fit, so 512 K
 reads `$40` = 64 and 2 MB reads `$00`, meaning 256. `INIT` reads 0 as 256. A manager that took `$00`
@@ -2264,24 +2331,24 @@ could not call another bank. Fix one and fix the other. There are only the two, 
 
 | Routine | in | out |
 |---|---|---|
-| `FILE.STATUS` | — | `FILE.ERR` `FILE.MSG$` `FILE.TRK` `FILE.SEC` |
-| `FILE.EXISTS` | `FILE.NAME$` | `FILE.OK` |
-| `FILE.SIZE` | a name — **a verb, not a `GOSUB`** | `FILE.OK` `FILE.BLOCKS` |
-| `FILE.DELETE` | `FILE.NAME$`, pattern allowed | `FILE.ERR` `FILE.TRK` |
-| `FILE.RENAME` | `FILE.NAME$` `FILE.NEW$` | `FILE.ERR` |
-| `FILE.COPY` | `FILE.NAME$` `FILE.NEW$` | `FILE.ERR` |
-| `FILE.MKDIR` `FILE.RMDIR` `FILE.CHDIR` | `FILE.NAME$` | `FILE.ERR` |
-| `FILE.UP` | — | `FILE.ERR` |
+| `FILE.STATUS` | — | `FILE.ERR%` `FILE.MSG$` `FILE.TRK%` `FILE.SEC%` |
+| `FILE.EXISTS` | `FILE.NAME$` | `FILE.OK%` |
+| `FILE.SIZE` | a name — **a verb, not a `GOSUB`** | `FILE.OK%` `FILE.BLOCKS` |
+| `FILE.DELETE` | `FILE.NAME$`, pattern allowed | `FILE.ERR%` `FILE.TRK%` |
+| `FILE.RENAME` | `FILE.NAME$` `FILE.NEW$` | `FILE.ERR%` |
+| `FILE.COPY` | `FILE.NAME$` `FILE.NEW$` | `FILE.ERR%` |
+| `FILE.MKDIR` `FILE.RMDIR` `FILE.CHDIR` | `FILE.NAME$` | `FILE.ERR%` |
+| `FILE.UP` | — | `FILE.ERR%` |
 | `FILE.CURDIR` | — | `FILE.PATH$` |
-| `FILE.SAVEARRAY` | `FILE.NAME$` `FILE.ROWS` `FILE.LINE$()` | `FILE.ERR` |
-| `FILE.LOADARRAY` | `FILE.NAME$` `FILE.MAX.ROWS` | `FILE.ROWS` `FILE.LINE$()` |
+| `FILE.SAVEARRAY` | `FILE.NAME$` `FILE.ROWS%` `FILE.LINE$()` | `FILE.ERR%` |
+| `FILE.LOADARRAY` | `FILE.NAME$` `FILE.MAX.ROWS%` | `FILE.ROWS%` `FILE.LINE$()` |
 
 ```basic
 #SYMFILE "@:MYPROG.SYM"
 #INCLUDE "FILEIO.INC.BL"
 
 FILE.NAME$ = "SCORES.DAT" : GOSUB FILE.EXISTS
-IF FILE.OK THEN N = GP.FN(FILE.SIZE, "SCORES.DAT")
+IF FILE.OK% THEN N = GP.FN(FILE.SIZE, "SCORES.DAT")
 ```
 
 **The `#SYMFILE` is required, before the `#INCLUDE`s.** `FILE.TOPET` is `GP.ASM` and reaches
@@ -2291,12 +2358,12 @@ IF FILE.OK THEN N = GP.FN(FILE.SIZE, "SCORES.DAT")
 `GP.SUB FILE.SIZE, "MYFILE.DAT"` or `N = GP.FN(FILE.SIZE, "MYFILE.DAT")` — and not with a `GOSUB`.
 Everything else in the table is a plain `GOSUB`.
 
-`FILE.DEVICE` is the drive and 0 means 8. `FILE.ISO` non-zero folds names to PETSCII on the way out.
+`FILE.DEVICE%` is the drive and 0 means 8. `FILE.ISO%` non-zero folds names to PETSCII on the way out.
 `FILE.LINE$()` is the caller's `DIM`, as `GUI.LIST.ITEM$` is; left alone the implicit `DIM` gives
-0 to 10. `FILE.ROWS` is an input to `SAVEARRAY` and an output from `LOADARRAY`.
+0 to 10. `FILE.ROWS%` is an input to `SAVEARRAY` and an output from `LOADARRAY`.
 
-**`FILE.ERR` under 20 is success.** 0 is OK. 1 is *files scratched* and carries the count in
-`FILE.TRK`. 62 is FILE NOT FOUND, 63 FILE EXISTS, 26 WRITE PROTECT. `FILE.ERR` is `DS` and
+**`FILE.ERR%` under 20 is success.** 0 is OK. 1 is *files scratched* and carries the count in
+`FILE.TRK%`. 62 is FILE NOT FOUND, 63 FILE EXISTS, 26 WRITE PROTECT. `FILE.ERR%` is `DS` and
 `FILE.MSG$` is `DS$` — the X16 has neither.
 
 This module takes logical file 14 and secondary address 14. Not 2 or 3: those belong to the editor,
@@ -2337,8 +2404,8 @@ first non-numeric character, so parse the eight hex digits by hand.
 | Routine | in | out |
 |---|---|---|
 | `FILE.DIR.INIT` | — | — |
-| `FILE.DIR.OPEN` | `FILE.DIR.BANK` `FILE.DIR.PTR` `FILE.DIR.CAP` `FILE.DIR.PATTERN$` `FILE.DIR.ONLY` | `FILE.DIR.GOT` `FILE.DIR.FULL` `FILE.DIR.SLOW` |
-| `FILE.DIR.NEXT` | — | `FILE.DIR.MORE` `FILE.NAME$` `FILE.BLOCKS` `FILE.TYPE$` |
+| `FILE.DIR.OPEN` | `FILE.DIR.BANK%` `FILE.DIR.PTR` `FILE.DIR.CAP%` `FILE.DIR.PATTERN$` `FILE.DIR.ONLY%` | `FILE.DIR.GOT%` `FILE.DIR.FULL%` `FILE.DIR.SLOW%` |
+| `FILE.DIR.NEXT` | — | `FILE.DIR.MORE%` `FILE.NAME$` `FILE.BLOCKS` `FILE.TYPE$` |
 
 ```basic
 #SYMFILE "@:MYPROG.SYM"
@@ -2346,12 +2413,13 @@ first non-numeric character, so parse the eight hex digits by hand.
 #INCLUDE "FILEDIR.INC.BL"
 
 GOSUB BANKMGR.GET.FREE.BANK
-FILE.DIR.BANK = BANKMGR.BANK
-FILE.DIR.PATTERN$ = "*.BASL" : FILE.DIR.ONLY = FILE.DIR.FILES
+FILE.DIR.BANK% = BANKMGR.BANK%
+FILE.DIR.PTR = $A000 : FILE.DIR.CAP% = 8192
+FILE.DIR.PATTERN$ = "*.BASL" : FILE.DIR.ONLY% = FILE.DIR.FILES
 GOSUB FILE.DIR.OPEN
 GP.DO
     GOSUB FILE.DIR.NEXT
-    IF FILE.DIR.MORE = 0 THEN GP.EXITDO
+    IF FILE.DIR.MORE% = 0 THEN GP.EXITDO
     PRINT FILE.NAME$, FILE.BLOCKS, FILE.TYPE$
 GP.LOOP
 ```
@@ -2359,35 +2427,38 @@ GP.LOOP
 Requires `GPB.INC.BL` and `FILEIO.INC.BL`, and `#INCLUDE`s neither. The `#SYMFILE` is required, for
 the same reason `FILEIO` needs one.
 
-`FILE.DIR.ONLY` takes `FILE.DIR.ALL`, `FILE.DIR.FILES` or `FILE.DIR.DIRS`. `FILE.DIR.MORE` is `-1`
-while `NEXT` produced an entry and 0 at the end. `FILE.DIR.GOT` is bytes read, 0 for an empty or
-failed listing. `FILE.DIR.FULL` says the buffer filled before the listing ended, and
-`FILE.DIR.SLOW` is 1 if the device had no `MACPTR` and the read fell back to `CHRIN` a byte at a
+`FILE.DIR.ONLY%` takes `FILE.DIR.ALL`, `FILE.DIR.FILES` or `FILE.DIR.DIRS`. `FILE.DIR.MORE%` is `-1`
+while `NEXT` produced an entry and 0 at the end. `FILE.DIR.GOT%` is bytes read, 0 for an empty or
+failed listing. `FILE.DIR.FULL%` says the buffer filled before the listing ended, and
+`FILE.DIR.SLOW%` is 1 if the device had no `MACPTR` and the read fell back to `CHRIN` a byte at a
 time.
 
-**Two destinations, one code path**: the reader takes an address and a size.
+**Two destinations, one code path**: the reader takes a bank, an address and a size.
+`FILE.DIR.BANK%` is the bank the buffer is in, 0 for low RAM. `FILE.DIR.PTR` is the buffer's first
+byte and `FILE.DIR.CAP%` the bytes it holds.
 
 ```basic
-REM a bank -- 8,192 bytes at $A000, about 250 entries
-FILE.DIR.BANK = BANKMGR.BANK
+REM a whole bank -- 8,192 bytes hold about 250 entries
+FILE.DIR.BANK% = BANKMGR.BANK%
+FILE.DIR.PTR = $A000
+FILE.DIR.CAP% = 8192
 
 REM low RAM
-FILE.DIR.BANK = 0
+FILE.DIR.BANK% = 0
 DIM FD.BUF%(1022)
 FILE.DIR.PTR = GP.ARRPTR(FD.BUF%())
-FILE.DIR.CAP = 1023 * 2
+FILE.DIR.CAP% = 1023 * 2
 ```
 
-**A `%` array is TWO bytes an element, not six.** The recipe above said six until it was measured,
-and sized a 682-byte buffer as 2,046: a caller following it handed the assembly three times the room
-it had, and the reader would have run 1,364 bytes off the end of the array and into whatever the
-workspace put after it. An untyped array is the six.
+**In a bank, `FILE.DIR.PTR + FILE.DIR.CAP%` stays at or below `$C000`.** Past `$BFFF`, `MACPTR`
+wraps into the next bank. A piece from `BANKMGR.SPACE` (§4.13) keeps to this.
 
-`FILE.DIR.BANKBASE` and `FILE.DIR.BANKROOM` are the hardware window, not an allocation — every bank
-appears at `$A000` and every bank is 8,192 bytes. **The bank number is the resource.** Take it from
-`BANKMGR.GET.FREE.BANK` and put it in `FILE.DIR.BANK`. This module claims no bank and executes no
-`BANK` statement. Its two `GP.ASM` blocks write `$00`, so both are `GP.ASM LOW` (§3.9) and stay in
-low memory when the module is in a region.
+**A `%` array is two bytes an element.** A buffer sized at six bytes an element runs the reader off
+the end of the array, into whatever the workspace put after it. An untyped array is six bytes an
+element.
+
+This module claims no bank and executes no `BANK` statement. Its two `GP.ASM` blocks write `$00`, so
+both are `GP.ASM LOW` (§3.9) and stay in low memory when the module is in a region.
 
 ---
 
@@ -2395,36 +2466,45 @@ low memory when the module is in a region.
 
 | Routine | in | out |
 |---|---|---|
-| `COMBO.ADD` | `COMBO.X` `COMBO.Y` `COMBO.W` `COMBO.COUNT` `COMBO.SEL` `COMBO.BANK`, over `COMBO.ITEM$()` | `COMBO.SEL` |
+| `COMBO.ADD` | `COMBO.X%` `COMBO.Y%` `COMBO.W%` `COMBO.SEL%` | `COMBO.CTRL%` |
 
 ```basic
-COMBO.ITEM$(1) = " TEXAS"
-COMBO.ITEM$(2) = " UTAH"
-COMBO.X = GUI.INNER.LEFT : COMBO.Y = GUI.INNER.TOP
-COMBO.W = 16 : COMBO.COUNT = 2 : COMBO.SEL = 1
-GOSUB COMBO.ADD
-REM ... run the form ... the answer is in COMBO.SEL
+GP.SUB FORM.BEGIN, "TITLE", "MSG", "", 6, 40, "&OK", "&CANCEL"
+GP.SUB FORM.ITEMS, MY.BANK%, MY.ADDR
+STATE = GP.FN(FORM.COMBO, 1, "STATE", 6, 12, 1)
+GP.SUB FORM.ITEM, "TEXAS"
+GP.SUB FORM.ITEM, "OHIO"
+IF GP.FN(FORMTO.RUN) THEN <OK>
+SEL = GP.FN(FORM.SEL, STATE)
+GP.SUB FORM.END
 ```
 
-**Only `COMBO.ADD` is called by an application.** `COMBO.DRAW`, `COMBO.KEY` and `COMBO.OPEN` are
-reached by `GUI.FORM`, which dispatches a `GUI.CT.COMBO` control to them by name. The call goes
-between `GUI.OPEN` and `GUI.FORM.RUN`.
+A program reaches a combo through the `FORM.` verbs of `GUI-DIALOGS.INC.BL` (§4.12). `GUI.FORM`
+dispatches a `GUI.CT.COMBO` control to `COMBO.DRAW`, `COMBO.KEY` and `COMBO.OPEN` by name.
 
-`COMBO.W` is the width in cells, brackets included; 5 is the floor and anything less is raised to
-it. `COMBO.BANK` is where the dropdown saves the cells it covers, and 0 takes `GUI.BANK` — which is
-what the dialog around it is already using. The caller owns the `DIM` of `COMBO.ITEM$()`.
+`COMBO.X%` and `COMBO.Y%` are the closed control's top left, in cells. `COMBO.W%` is the width,
+brackets included. 5 is the floor and anything less is raised to it. `COMBO.SEL%` is the item
+showing, 1 up. `COMBO.CTRL%` is the control's number, 0 if the form was full.
 
-One combo to a dialog, since there is one `COMBO.ITEM$()`. The dropdown is the popup slot of
-`MENU.INC.BL` (§4.6), loaded from `COMBO.ITEM$()` each time it opens, so whatever the caller last
-built in that slot is gone after. An item is a menu row: `&` marks a hot key and `"-"` is a
-separator. The `MENU.*` colours and flags it sets are put back.
+The items are the form's item store: `GUI.ITEM.CLAIM` after `COMBO.ADD`, then a `GUI.ITEM.ADD` each.
+`GUI.ITEM.SEAL` draws the combo once they are in. The choice is `GUI.CTRL.SEL%(COMBO.CTRL%)`.
 
-A long list belongs in `GUI.LISTBOX` (§4.12). The dropdown shows every item at once, 32 at most,
-and does not scroll.
+The dropdown saves the cells it covers where the dialog does, by `GUI.SAVEMODE%` (§4.11). In VRAM
+mode it takes a `STASHVRAM` handle of its own and needs no bank. In bank mode it goes in the
+dialog's save space, bank `GUI.BANK%` from `GUI.STASHADDR`, above the dialog's own save. Every
+combo on the form opens into that one slot, one at a time. If there is no room either way, the
+dropdown does not open.
 
-**The dropdown is framed like the dialog behind it.** With `GUI.GLYPH` non-zero it draws from
-`GUI.EDGE.H`, `GUI.EDGE.V`, `GUI.CORNER.TL`, `.TR`, `.BL` and `.BR`, the same six a dialog frames
-with, so a re-ordered charset gets its own frame here too. With `GUI.GLYPH = 0` the frame is
+The dropdown is the popup slot of `MENU.INC.BL` (§4.6), loaded from the item store each time it
+opens, so whatever the caller last built in that slot is gone after. An item is a menu row: `&`
+marks a hot key and `"-"` is a separator. The `MENU.*` colours and flags it sets are put back.
+
+A long list belongs in a list control. The dropdown shows every item at once, 32 at most, and does
+not scroll.
+
+**The dropdown is framed like the dialog behind it.** With `GUI.GLYPH%` non-zero it draws from
+`GUI.EDGE.H%`, `GUI.EDGE.V%`, `GUI.CORNER.TL%`, `.TR`, `.BL` and `.BR`, the same six a dialog frames
+with, so a re-ordered charset gets its own frame here too. With `GUI.GLYPH% = 0` the frame is
 `GP.BOX` style 1.
 
 **It is required by `GUI.INC.BL`**, which names `COMBO.DRAW` and `COMBO.KEY`. BASLOAD resolves every
@@ -2438,44 +2518,49 @@ requires.
 
 | Routine | in | out |
 |---|---|---|
-| `SV.INIT` | `SV.BASE` `SV.TOP` `SV.MAX` | `SV.OK` |
-| `SV.SAVE` | `SV.X` `SV.Y` `SV.W` `SV.H` | `SV.HND` `SV.OK` |
-| `SV.RESTORE` | `SV.HND` `SV.MOVE` `SV.X` `SV.Y` | `SV.OK` |
-| `SV.PUT` | `SV.ADDR` `SV.LEN` | `SV.HND` `SV.OK` |
-| `SV.GET` | `SV.HND` `SV.ADDR` | `SV.OK` |
-| `SV.FREE` | `SV.HND` | `SV.OK` |
-| `SV.RESET` | — | `SV.OK` |
+| `SV.START` | `SV.MAX%`; 0 gives `SV.START.HANDLES`, 4 | `SV.OK%`, on the first call only |
+| `SV.INIT` | `SV.BASE` `SV.TOP` `SV.MAX%` | `SV.OK%` |
+| `SV.SAVE` | `SV.X%` `SV.Y%` `SV.W%` `SV.H%` | `SV.HND%` `SV.OK%` |
+| `SV.RESTORE` | `SV.HND%` `SV.MOVE%` `SV.X%` `SV.Y%` | `SV.OK%` |
+| `SV.PUT` | `SV.ADDR` `SV.LEN` | `SV.HND%` `SV.OK%` |
+| `SV.GET` | `SV.HND%` `SV.ADDR` | `SV.OK%` |
+| `SV.FREE` | `SV.HND%` | `SV.OK%` |
+| `SV.RESET` | — | `SV.OK%` |
 
 ```basic
 #INCLUDE "STASHVRAM.INC.BL"
 
-SV.MAX = 16 : DIM SV.PAGE%(16), SV.PAGES%(16)
-GOSUB SV.INIT
-SV.X = 10 : SV.Y = 5 : SV.W = 40 : SV.H = 12 : GOSUB SV.SAVE
-IF SV.HND = 0 THEN <it did not fit>
+SV.MAX% = 16 : GOSUB SV.START
+SV.X% = 10 : SV.Y% = 5 : SV.W% = 40 : SV.H% = 12 : GOSUB SV.SAVE
+IF SV.HND% = 0 THEN <it did not fit>
 REM ... draw over it ...
 GOSUB SV.RESTORE
 ```
 
 **No `GP.ASM`, and so no `#SYMFILE`.** The cells never leave VRAM: one data port reads, the other
 writes, and the KERNAL's `memory_copy` moves between them without stepping either. That is what
-`STASH.INC.BL` cannot do, and the reason to reach for this one. It also executes no `BANK`, so
-unlike `STASH` it may live inside a `GP.BANKED` region.
+`STASH.INC.BL` cannot do. It executes no `BANK`, so it may live inside a `GP.BANKED` region.
+
+`SV.START` `DIM`s `SV.PAGE%` and `SV.PAGES%` to `SV.MAX%` and runs `SV.INIT`. Only the first call
+does anything. `SV.MAX%` 0 gives `SV.START.HANDLES`, 4: a menu dropdown, a dialog, a combo's
+dropdown and a message box over the dialog. `GUI.INC.BL`, `COMBO.INC.BL` and `MENUPULL.INC.BL` call
+`SV.START` themselves, so set `SV.MAX%` before the first box or dropdown opens. `SV.INIT` alone
+sets a new window with every handle given back.
+
+WARNING: The compiler takes one `DIM` of an array, and it is in `SV.START`. A program never `DIM`s
+`SV.PAGE%` or `SV.PAGES%` itself. It sets `SV.MAX%` and calls `GOSUB SV.START`.
 
 `SV.BASE` and `SV.TOP` are the VRAM window in bytes, rounded in to whole 256-byte pages, and default
-to `$04000` and `$1AFFF`. **The caller `DIM`s the two arrays** to `SV.MAX`. `SV.MOVE` works as
-`STASH.MOVE` does: `SV.RESTORE` puts the rectangle back where it came from when 0, at `SV.X` `SV.Y`
-when not. `SV.HND` is 1 to `SV.MAX`, or 0 if it did not fit. `SV.ERROR$` says why when something is
-refused, and is `""` otherwise.
+to `$04000` and `$1AFFF`. `SV.MOVE%` works as `STASH.MOVE` does: `SV.RESTORE` puts the rectangle
+back where it came from when 0, at `SV.X%` `SV.Y%` when not. `SV.HND%` is 1 to `SV.MAX%`, or 0 if
+it did not fit. `SV.ERROR$` says why when something is refused, and is `""` otherwise.
 
-**Allocation is a bump pointer on 256-byte pages, released LIFO.** Panels nest and close in reverse
-and a log is append-only, so a hole only appears if a caller frees out of order — and then
-`STASHVRAMGC.INC.BL` (§4.19) closes it. Pages rather than bytes are what let a handle's address live
-in an ordinary `%`: a page number reaches 511 where a 17-bit VRAM address would not.
+Allocation is a bump pointer on 256-byte pages, released last in, first out. A hole appears only
+when a caller frees out of order, and `STASHVRAMGC.INC.BL` (§4.19) closes it. A page number fits in
+a `%` and reaches 511. A 17-bit VRAM address does not fit.
 
-**There is one allocator and it is this one.** `SV.BASE` and `SV.TOP` are the caller's contract,
-checked only against the layer 1 map and the charset. `BMX.STASH` defaults to `$13000`, *inside* the
-default window — a program using both must move one of them.
+`SV.BASE` and `SV.TOP` are checked only against the layer 1 map and the charset. `BMX.STASH`
+defaults to `$13000`, inside the default window. A program that uses both moves one of them.
 
 A screen-mode change re-uploads the charset and can re-lay the map. Held handles do not survive it;
 call `SV.RESET` after one.
@@ -2486,7 +2571,7 @@ call `SV.RESET` after one.
 
 | Routine | in | out |
 |---|---|---|
-| `SV.COMPACT` | — | `SV.MOVED` `SV.OK` |
+| `SV.COMPACT` | — | `SV.MOVED` `SV.OK%` |
 
 ```basic
 #INCLUDE "STASHVRAM.INC.BL"
@@ -2595,13 +2680,13 @@ it after `BANKMGR.INIT` and before the first `GET.FREE.BANK`, then call `KV.INIT
 
 ```basic
 KV.BANK = 40
-BANKMGR.SET.BANK = KV.BANK
+BANKMGR.SET.BANK% = KV.BANK
 GOSUB BANKMGR.CLAIM
 GOSUB KV.INIT
 ```
 
-A bank from `GET.FREE.BANK` is already marked taken and needs no claim: `KV.BANK = BANKMGR.BANK`, then
-`KV.INIT`. `BANKMGR.BANK` is 0 when no bank is left, and `KV.INIT` then uses bank 40.
+A bank from `GET.FREE.BANK` is already marked taken and needs no claim: `KV.BANK = BANKMGR.BANK%`, then
+`KV.INIT`. `BANKMGR.BANK%` is 0 when no bank is left, and `KV.INIT` then uses bank 40.
 
 **`KV.SAVE` writes the whole bank**, all 8,192 bytes, to `KV.FNAME$` on device 8, and replaces a file
 of that name. A disk error stops the program.
@@ -2629,13 +2714,13 @@ slot 0    "*KVSTORE", 2, the version (1), the slot count (64)
 
 | Routine | in | out |
 |---|---|---|
-| `CHECK.ADD` | `CHECK.X` `CHECK.Y` `CHECK.TEXT$` `CHECK.ON` | `CHECK.CTRL` |
+| `CHECK.ADD` | `CHECK.X%` `CHECK.Y%` `CHECK.TEXT$` `CHECK.ON%` | `CHECK.CTRL%` |
 
 ```basic
-CHECK.X = GUI.INNER.LEFT : CHECK.Y = GUI.INNER.TOP
-CHECK.TEXT$ = "SHOW HIDDEN FILES" : CHECK.ON = -1
+CHECK.X% = GUI.INNER.LEFT% : CHECK.Y% = GUI.INNER.TOP%
+CHECK.TEXT$ = "SHOW HIDDEN FILES" : CHECK.ON% = -1
 GOSUB CHECK.ADD
-HIDDEN = CHECK.CTRL
+HIDDEN = CHECK.CTRL%
 REM ... run the form ...
 IF (GUI.CTRL.FLAGS%(HIDDEN) AND GUI.CF.CHECKED) <> 0 THEN PRINT "TICKED"
 ```
@@ -2644,11 +2729,11 @@ IF (GUI.CTRL.FLAGS%(HIDDEN) AND GUI.CF.CHECKED) <> 0 THEN PRINT "TICKED"
 `GUI.FORM`, which dispatches a `GUI.CT.CHECK` control to them by name. The call goes between
 `GUI.FORM.BEGIN` and `GUI.FORM.RUN`.
 
-`CHECK.X` and `CHECK.Y` are the cell the `[` goes in, and the caption starts four cells to the
-right. `CHECK.TEXT$ = ""` draws a bare box. A non-zero `CHECK.ON` starts the box ticked.
-`CHECK.CTRL` is the control's number, and 0 when the form is already full.
+`CHECK.X%` and `CHECK.Y%` are the cell the `[` goes in, and the caption starts four cells to the
+right. `CHECK.TEXT$ = ""` draws a bare box. A non-zero `CHECK.ON%` starts the box ticked.
+`CHECK.CTRL%` is the control's number, and 0 when the form is already full.
 
-**The state is a flag on the control**, `GUI.CF.CHECKED` in `GUI.CTRL.FLAGS%()`. Keep `CHECK.CTRL`
+**The state is a flag on the control**, `GUI.CF.CHECKED` in `GUI.CTRL.FLAGS%()`. Keep `CHECK.CTRL%`
 and test the flag after `GUI.FORM.RUN`. One form carries as many boxes as it has controls.
 
 | key | does |
@@ -2701,8 +2786,8 @@ Floats and integers both, and no range check. Equal arguments answer `MATH.FIRST
 
 | Routine | in | out |
 |---|---|---|
-| `MEM.COPY` | `MEM.SOURCE` `MEM.TARGET` `MEM.COUNT` | `MEM.OK` |
-| `MEM.FILL` | `MEM.TARGET` `MEM.COUNT` `MEM.VALUE` | `MEM.OK` |
+| `MEM.COPY` | `MEM.SOURCE` `MEM.TARGET` `MEM.COUNT` | — |
+| `MEM.FILL` | `MEM.TARGET` `MEM.COUNT` `MEM.VALUE` | — |
 
 ```basic
 #INCLUDE "GPB.INC.BL"
@@ -2710,15 +2795,14 @@ Floats and integers both, and no range check. Equal arguments answer `MATH.FIRST
 
 MEM.TARGET = 4096 : MEM.COUNT = 1000 : MEM.VALUE = 32
 GOSUB MEM.FILL
-IF MEM.OK = 0 THEN PRINT "REFUSED"
 ```
 
 The KERNAL's `memory_copy` and `memory_fill`. The verbs are `MEM.BLOCKCOPY` and `MEM.BLOCKFILL`, and
-the two routines share `MEM.TARGET`, `MEM.COUNT` and `MEM.OK`.
+the two routines share `MEM.TARGET` and `MEM.COUNT`.
 
-`MEM.COUNT` is 1 to 65535. Anything outside that is refused and `MEM.OK` comes back 0, never
-truncated. A longer block goes a chunk at a time; a chunk size above `$4000` cannot be a `#DEFINE`,
-which is signed. `STASHVRAMGC.INC.BL` (§4.19) is the worked example.
+`MEM.COUNT` is 1 to 65535. It is not checked. A longer block goes a chunk at a time; a chunk size
+above `$4000` cannot be a `#DEFINE`, which is signed. `STASHVRAMGC.INC.BL` (§4.19) is the worked
+example.
 
 Regions may overlap with the target below the source.
 
@@ -2917,29 +3001,29 @@ leave it out (§3.11).
 
 | Routine | in | out |
 |---|---|---|
-| `KVBIN.CREATE` | `KVBIN.NEWSLOTS` | `KVBIN.SLOTS` `KVBIN.OK` |
-| `KVBIN.INFO` | — | `KVBIN.SLOTS` `KVBIN.OK` |
-| `KVBIN.GET` | `KVBIN.KEY$` | `KVBIN.VALUE$` `KVBIN.SLOT` `KVBIN.OK` |
-| `KVBIN.PUT` | `KVBIN.KEY$` `KVBIN.VALUE$` | `KVBIN.SLOT` `KVBIN.OK` |
-| `KVBIN.DEL` | `KVBIN.KEY$` | `KVBIN.SLOT` `KVBIN.OK` |
-| `KVBIN.AT` | `KVBIN.SLOT` | `KVBIN.KEY$` `KVBIN.VALUE$` `KVBIN.OK` |
-| `KVBIN.FIRST` | — | `KVBIN.SLOT` `KVBIN.KEY$` `KVBIN.VALUE$` `KVBIN.OK` |
-| `KVBIN.NEXT` | — | `KVBIN.SLOT` `KVBIN.KEY$` `KVBIN.VALUE$` `KVBIN.OK` |
+| `KVBIN.CREATE` | `KVBIN.NEWSLOTS%` | `KVBIN.SLOTS` `KVBIN.OK%` |
+| `KVBIN.INFO` | — | `KVBIN.SLOTS` `KVBIN.OK%` |
+| `KVBIN.GET` | `KVBIN.KEY$` | `KVBIN.VALUE$` `KVBIN.SLOT%` `KVBIN.OK%` |
+| `KVBIN.PUT` | `KVBIN.KEY$` `KVBIN.VALUE$` | `KVBIN.SLOT%` `KVBIN.OK%` |
+| `KVBIN.DEL` | `KVBIN.KEY$` | `KVBIN.SLOT%` `KVBIN.OK%` |
+| `KVBIN.AT` | `KVBIN.SLOT%` | `KVBIN.KEY$` `KVBIN.VALUE$` `KVBIN.OK%` |
+| `KVBIN.FIRST` | — | `KVBIN.SLOT%` `KVBIN.KEY$` `KVBIN.VALUE$` `KVBIN.OK%` |
+| `KVBIN.NEXT` | — | `KVBIN.SLOT%` `KVBIN.KEY$` `KVBIN.VALUE$` `KVBIN.OK%` |
 | `KVBIN.STOP` | — | — |
-| `KVBIN.EXPAND` | `KVBIN.GROWBY` | `KVBIN.SLOTS` `KVBIN.OK` |
+| `KVBIN.EXPAND` | `KVBIN.GROWBY%` | `KVBIN.SLOTS` `KVBIN.OK%` |
 
 ```basic
 #INCLUDE "KVBIN.INC.BL"
 
 KVBIN.FNAME$ = "/SETTINGS.KVB"
 GOSUB KVBIN.INFO
-IF KVBIN.DOSERR = 62 THEN GOSUB KVBIN.CREATE
+IF KVBIN.DOSERR% = 62 THEN GOSUB KVBIN.CREATE
 KVBIN.KEY$ = "USER.NAME"
 KVBIN.VALUE$ = "STEVE"
 GOSUB KVBIN.PUT
 KVBIN.KEY$ = "USER.NAME"
 GOSUB KVBIN.GET
-IF KVBIN.OK THEN PRINT KVBIN.VALUE$
+IF KVBIN.OK% THEN PRINT KVBIN.VALUE$
 ```
 
 Strings stored by key in one file on the drive, for a few dozen settings that every program on the
@@ -2954,13 +3038,13 @@ every program that opens it reads and writes the same keys.
 needs runtime build 131 or later.
 
 **The file** is `KVBIN.FNAME$`, with its path if it has one, so the store can sit anywhere on the
-drive, such as the root. `KVBIN.DEVICE` is the drive, and 0 is 8. Every routine but `KVBIN.NEXT` and
+drive, such as the root. `KVBIN.DEVICE%` is the drive, and 0 is 8. Every routine but `KVBIN.NEXT` and
 `KVBIN.STOP` reads both.
 
-**`KVBIN.OK` is -1 when the call is done and 0 when it is not.** `KVBIN.WHY` is 0 when it is done.
-When it is not, `KVBIN.WHY` gives the reason:
+**`KVBIN.OK%` is -1 when the call is done and 0 when it is not.** `KVBIN.WHY%` is 0 when it is done.
+When it is not, `KVBIN.WHY%` gives the reason:
 
-| `KVBIN.WHY` | When |
+| `KVBIN.WHY%` | When |
 |---|---|
 | `KVBIN.WHY.NOFILE`, 1 | The drive refused the open. |
 | `KVBIN.WHY.NOTSTORE`, 2 | The file opened, and it does not start with a `*KVBIN` header of version 1, key length 12 and record length 128. |
@@ -2968,25 +3052,25 @@ When it is not, `KVBIN.WHY` gives the reason:
 | `KVBIN.WHY.FULL`, 4 | `KVBIN.PUT` of a new key found no free slot. |
 | `KVBIN.WHY.BADKEY`, 5 | `KVBIN.KEY$` is `""` for `KVBIN.GET`, `KVBIN.PUT` or `KVBIN.DEL`. The file is not opened. |
 
-`KVBIN.DOSERR` and `KVBIN.DOSMSG$` hold the drive's answer to the open. A number under 20 is
+`KVBIN.DOSERR%` and `KVBIN.DOSMSG$` hold the drive's answer to the open. A number under 20 is
 success, and a missing file is 62.
 
 **Keys** are cut to 12 characters and hold any byte but `$00`. A key compares byte for byte.
 
 **Values** are cut to 115 characters and hold any byte but `$00`. An empty value is stored and reads
-back as `""`. A missing key gives `KVBIN.OK = 0`, `KVBIN.SLOT = 0` and `KVBIN.VALUE$ = ""`.
+back as `""`. A missing key gives `KVBIN.OK% = 0`, `KVBIN.SLOT% = 0` and `KVBIN.VALUE$ = ""`.
 
-**`KVBIN.PUT` keeps a key's slot.** A new key takes the first free slot. With none free, `KVBIN.WHY`
+**`KVBIN.PUT` keeps a key's slot.** A new key takes the first free slot. With none free, `KVBIN.WHY%`
 is `KVBIN.WHY.FULL` and nothing is written. Call `KVBIN.EXPAND`, then `KVBIN.PUT` again.
 `KVBIN.DEL` frees the slot in place, and the other slots do not move.
 
-**`KVBIN.CREATE` makes a store of `KVBIN.NEWSLOTS` free slots**, 40 when it is 0, and replaces a
-file of the same name. `KVBIN.EXPAND` adds `KVBIN.GROWBY` free slots to the end of the file, 20
+**`KVBIN.CREATE` makes a store of `KVBIN.NEWSLOTS%` free slots**, 40 when it is 0, and replaces a
+file of the same name. `KVBIN.EXPAND` adds `KVBIN.GROWBY%` free slots to the end of the file, 20
 when it is 0. Both leave the new count in `KVBIN.SLOTS`. `KVBIN.INFO` reads the count from the
 header.
 
-**`KVBIN.AT` reads slot `KVBIN.SLOT` and does not scan.** The slot is 1 to `KVBIN.SLOTS`, and the
-module does not check it. A free slot gives `KVBIN.OK = 0` and `""` for both strings.
+**`KVBIN.AT` reads slot `KVBIN.SLOT%` and does not scan.** The slot is 1 to `KVBIN.SLOTS`, and the
+module does not check it. A free slot gives `KVBIN.OK% = 0` and `""` for both strings.
 
 **A lookup scans from slot 1.** `KVBIN.GET`, `KVBIN.PUT` and `KVBIN.DEL` read one key a slot and
 stop at the key. A missing key and a new key read every slot. Measured in ROM BASIC on an SD image,
@@ -2995,21 +3079,21 @@ takes 9 jiffies for a key in slot 3, and 39 to 44 for a key in slot 40 or a miss
 of a new key takes 41. The walk below costs about 5 jiffies a slot.
 
 **`KVBIN.FIRST` and `KVBIN.NEXT` walk every slot in order**, free ones too. A free slot has
-`KVBIN.KEY$ = ""`. After the last slot `KVBIN.OK` is 0, `KVBIN.WHY` is 0 and the file is closed.
-When `KVBIN.FIRST` cannot open the store, `KVBIN.OK` is 0 and `KVBIN.WHY` holds the reason.
+`KVBIN.KEY$ = ""`. After the last slot `KVBIN.OK%` is 0, `KVBIN.WHY%` is 0 and the file is closed.
+When `KVBIN.FIRST` cannot open the store, `KVBIN.OK%` is 0 and `KVBIN.WHY%` holds the reason.
 
 ```basic
 GOSUB KVBIN.FIRST
 SHOW.SLOT:
-    IF KVBIN.OK = 0 THEN GOTO SHOW.DONE
+    IF KVBIN.OK% = 0 THEN GOTO SHOW.DONE
     IF KVBIN.KEY$ <> "" THEN PRINT KVBIN.KEY$; " = "; KVBIN.VALUE$
     GOSUB KVBIN.NEXT
     GOTO SHOW.SLOT
 SHOW.DONE:
 ```
 
-The file stays open between the calls. `KVBIN.SLOT` is the walk's place and `KVBIN.SLOTS` its end,
-so change neither. Call no other routine in the module until `KVBIN.NEXT` gives `KVBIN.OK = 0` or
+The file stays open between the calls. `KVBIN.SLOT%` is the walk's place and `KVBIN.SLOTS` its end,
+so change neither. Call no other routine in the module until `KVBIN.NEXT` gives `KVBIN.OK% = 0` or
 `KVBIN.STOP` has run. `KVBIN.STOP` ends a walk early.
 
 **WARNING: the module uses logical files 12 and 15.** Neither may be open when a routine is called.
@@ -3083,13 +3167,14 @@ in and have entry points — `KB.CLEARKB`, `SV.COMPACT` — that no panel calls.
 **WARNING: FILES writes to the drive.** Four of its rows do. Everything they make is named
 `GPBFILE.*` or `GPBDIR`, and the row that makes each one removes it.
 
-#### Thirteen banks
+#### Seventeen banks
 
-Ten are named at compile time. Nine are claimed from `BANKMGR` (§4.13) at startup, because the
-compiler picks them while the object is written and the manager is told rather than asked. The
-tenth, 62, is claimed by the first `MENU.BEGIN` when the bar is built, before any bank is allocated.
-Three more are allocated at run time: the cells a dropdown covers, preset into `MENU.STASHBANK`, the
-cells a dialog covers, and `FILEDIR`'s directory buffer.
+Thirteen are named at compile time. Twelve are claimed from `BANKMGR` (§4.13) at startup, because
+the compiler picks them while the object is written and the manager is told rather than asked. The
+thirteenth, 62, is claimed by the first `MENU.BEGIN` when the bar is built, before any bank is
+allocated. Four more come from `BANKMGR.GET.FREE.BANK` at startup: the STASH panel's bank, the
+cells a dialog covers, `FILEDIR`'s directory buffer, and `FILEPICK`'s list with the form item
+store. A dropdown saves the cells it covers in VRAM.
 
 | | |
 |---|---|

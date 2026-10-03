@@ -19,12 +19,15 @@
 ## THE LIBRARY IN LOW MEMORY. To run a module below from a RAM bank instead,
 ## put its #INCLUDE inside a GP.BANKED region -- BANKED-OR-NOT.md has the rules.
 #INCLUDE "THEME.INC.BL"
-## STASH is not optional even though nothing here names it: GUI.OPEN calls
-## STASH.SAVE, and BASLOAD resolves every label in the build, not the ones a
-## path can reach. Without it the tokenise stops at LABEL NOT FOUND.
+## STASH and STASHVRAM are not optional even though nothing here names them:
+## GUI.OPEN calls STASH.SAVE and SV.SAVE, and BASLOAD resolves every label in
+## the build, not the ones a path can reach. Without them the tokenise stops
+## at LABEL NOT FOUND.
 #INCLUDE "STASH.INC.BL"
+#INCLUDE "STASHVRAM.INC.BL"
 #INCLUDE "APPSYS.INC.BL"
 #INCLUDE "BANKMGR.INC.BL"
+#DEFINE MENU.TEXTBANK 62
 #INCLUDE "MENU.INC.BANKED.BL"
 #INCLUDE "MENU.INC.BL"
 #INCLUDE "LINEINPUT.INC.BL"
@@ -35,16 +38,9 @@
 ## and this one calls every module above.
 #INCLUDE "GUI-DIALOGS.INC.BL"
 
-## A spare RAM bank for the saved cells. Bank 0 belongs to the KERNAL --
-## the keyboard layout lives there -- so a program picks anything above it.
-#DEFINE DEMO.BANK 8
-
 GOSUB APPSYS.STARTUP
 GOSUB BANKMGR.INIT
 THEME.ID% = 0 : GOSUB THEME.SELECT
-## Every dialog verb starts from a clean slate, and this is where it is told
-## which bank that slate saves the screen into.
-GP.SUB DLGRESET, DEMO.BANK
 
 DIM DEMO.MENU$(4)
 DIM GUI.LIST.ITEM$(20)
@@ -65,11 +61,11 @@ DEMO.OKC = GP.FN(ASKYNEX, "REBUILD", "THE INDEX WILL BE REBUILT.", "", "", 1, 1)
 
 ## ---- 2. INPUTBOXEX -- a question and a line of typing ----------------
 ##
-## The answer is the line as it was left. GUI.OK says whether it was typed
+## The answer is the line as it was left. GUI.OK% says whether it was typed
 ## or the dialog was cancelled, which an empty line on its own cannot.
 
 DEMO.NAME$ = GP.FN(INPUTBOXEX, "OPEN", "NAME OF THE FILE TO OPEN:", "", "", "TEST.MD", 24, 0)
-DEMO.OK = GUI.OK
+DEMO.OK = GUI.OK%
 
 ## ---- 3. PICKMENUEX -- a question and a list --------------------------
 ##
@@ -102,7 +98,7 @@ FOR DEMO.R = 1 TO 20
     GUI.LIST.ITEM$(DEMO.R) = " REPORT " + MID$(STR$(DEMO.R), 2) + ".TXT"
 NEXT DEMO.R
 DEMO.LSEL = GP.FN(LISTBOXEX, "BACKUP", "SPACE MARKS THE ONES TO BACK UP.", "", "", 20, 6, 1)
-DEMO.MARKED = GUI.LISTBOX.MARKED
+DEMO.MARKED = GUI.LISTBOX.MARKED%
 
 ## ---- what came back, on the page that survived ----------------------
 ##
@@ -111,25 +107,25 @@ DEMO.MARKED = GUI.LISTBOX.MARKED
 
 DEMO.LINE$ = "YN ANSWERED NO "
 IF DEMO.YN THEN DEMO.LINE$ = "YN ANSWERED YES"
-GP.PRINTAT 4, 20, DEMO.LINE$, THEME.CLR(THEME.WARN)
+GP.PRINTAT 4, 20, DEMO.LINE$, THEME.CLR%(THEME.WARN)
 
 DEMO.LINE$ = "TEXT CANCELLED                    "
 IF DEMO.OK THEN DEMO.LINE$ = "TEXT GAVE " + DEMO.NAME$ + "            "
-GP.PRINTAT 4, 21, DEMO.LINE$, THEME.CLR(THEME.WARN)
+GP.PRINTAT 4, 21, DEMO.LINE$, THEME.CLR%(THEME.WARN)
 
 DEMO.LINE$ = "MENU CANCELLED                    "
 IF DEMO.SEL > 0 THEN DEMO.LINE$ = "MENU CHOSE" + DEMO.MENU$(DEMO.SEL) + "          "
-GP.PRINTAT 4, 22, DEMO.LINE$, THEME.CLR(THEME.WARN)
+GP.PRINTAT 4, 22, DEMO.LINE$, THEME.CLR%(THEME.WARN)
 
 DEMO.LINE$ = "OK/CANCEL ANSWERED CANCEL"
 IF DEMO.OKC THEN DEMO.LINE$ = "OK/CANCEL ANSWERED OK    "
-GP.PRINTAT 4, 23, DEMO.LINE$, THEME.CLR(THEME.WARN)
+GP.PRINTAT 4, 23, DEMO.LINE$, THEME.CLR%(THEME.WARN)
 
 DEMO.LINE$ = "LISTBOX CANCELLED             "
 IF DEMO.LSEL > 0 THEN DEMO.LINE$ = "LISTBOX MARKED " + MID$(STR$(DEMO.MARKED), 2) + " OF 20     "
-GP.PRINTAT 4, 24, DEMO.LINE$, THEME.CLR(THEME.WARN)
+GP.PRINTAT 4, 24, DEMO.LINE$, THEME.CLR%(THEME.WARN)
 
-GP.PRINTAT 4, 25, "ANY KEY TO FINISH.", THEME.CLR(THEME.DIMMED)
+GP.PRINTAT 4, 25, "ANY KEY TO FINISH.", THEME.CLR%(THEME.DIMMED)
 DEMO.WAIT:
 GET DEMO.K$
 IF DEMO.K$ = "" THEN GOTO DEMO.WAIT
@@ -148,16 +144,16 @@ END
 ## ***********************************************************************
 
 DEMO.PAGE:
-    GP.FILL 0, 0, 80, 30, ASC(" "), THEME.CLR(THEME.PAGE)
-    GP.FILL 0, 0, 80, 1, ASC(" "), THEME.CLR(THEME.TITLE)
-    GP.PRINTAT 2, 0, "ASKYNEX, INPUTBOXEX, PICKMENUEX, LISTBOXEX", THEME.CLR(THEME.TITLE)
+    GP.FILL 0, 0, 80, 30, ASC(" "), THEME.CLR%(THEME.PAGE)
+    GP.FILL 0, 0, 80, 1, ASC(" "), THEME.CLR%(THEME.TITLE)
+    GP.PRINTAT 2, 0, "ASKYNEX, INPUTBOXEX, PICKMENUEX, LISTBOXEX", THEME.CLR%(THEME.TITLE)
     FOR DEMO.R = 2 TO 18
         DEMO.LINE$ = ""
         FOR DEMO.C = 0 TO 8
             DEMO.LINE$ = DEMO.LINE$ + MID$(STR$(DEMO.R), 2) + "........"
         NEXT DEMO.C
-        GP.PRINTAT 0, DEMO.R, LEFT$(DEMO.LINE$, 78), THEME.CLR(THEME.DIMMED)
+        GP.PRINTAT 0, DEMO.R, LEFT$(DEMO.LINE$, 78), THEME.CLR%(THEME.DIMMED)
     NEXT DEMO.R
-    GP.PRINTAT 2, 26, "EACH DIALOG SAVES WHAT IT COVERS.", THEME.CLR(THEME.TEXT)
-    GP.PRINTAT 2, 27, "THE NUMBERED ROWS MUST SURVIVE ALL FOUR.", THEME.CLR(THEME.TEXT)
+    GP.PRINTAT 2, 26, "EACH DIALOG SAVES WHAT IT COVERS.", THEME.CLR%(THEME.TEXT)
+    GP.PRINTAT 2, 27, "THE NUMBERED ROWS MUST SURVIVE ALL FOUR.", THEME.CLR%(THEME.TEXT)
     RETURN

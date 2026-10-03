@@ -111,12 +111,12 @@
 .before the first GET.FREE.BANK, then call KV.INIT:
 .
 :KV.BANK = 40
-:BANKMGR.SET.BANK = KV.BANK
+:BANKMGR.SET.BANK% = KV.BANK
 :GOSUB BANKMGR.CLAIM
 :GOSUB KV.INIT
 .
 .A bank from GET.FREE.BANK is already marked taken and needs no claim:
-.KV.BANK = BANKMGR.BANK, then KV.INIT. BANKMGR.BANK is 0 when no bank is
+.KV.BANK = BANKMGR.BANK%, then KV.INIT. BANKMGR.BANK% is 0 when no bank is
 .left, and KV.INIT then uses bank 40.
 .
 .KV.SAVE writes the whole bank, all 8,192 bytes, to KV.FNAME$ on device 8,

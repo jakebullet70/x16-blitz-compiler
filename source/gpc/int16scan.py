@@ -43,20 +43,21 @@ import os, re, sys, collections
 ROOT = os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", ".."))
 
 PROGRAMS = [
-    dict(name="GPBMODS",  sym="source/drive/GPBMODS.SRC.SYM",  prg="source/drive/GPBMODS.PRG",
+    dict(name="GPBMODS",  sym="GPC-BASIC-TOOLS-SRC/GPB-MODS-TESTING/GPBMODS.SRC.SYM",  prg="GPC-BASIC-TOOLS-SRC/GPB-MODS-TESTING/GPBMODS.PRG",
          src=["GPC-BASIC-TOOLS-SRC/GPB-MODS-TESTING", "GPC-BASIC-TOOLS-SRC/GPB-MODS-TESTING/GPC-BASIC"]),
     dict(name="XBASE",    sym="source/drive/XBASE.SRC.SYM",    prg="source/drive/XBASE.PRG",
          src=["GPC-BASIC-TOOLS-SRC/XBASE", "GPC-BASIC-TOOLS-SRC/XBASE/GPC-BASIC"]),
-    dict(name="GPB.HELP", sym="source/drive/GPB.HELP.SRC.SYM", prg="source/drive/GPB.HELP.PRG",
+    dict(name="GPC.HELP", sym="GPC-BASIC-TOOLS-SRC/GPC-HELP/GPC.HELP.SRC.SYM", prg="GPC-BASIC-TOOLS-SRC/GPC-HELP/GPC.HELP.PRG",
          src=["GPC-BASIC-TOOLS-SRC/GPC-HELP", "GPC-BASIC-TOOLS-SRC/GPC-HELP/GPC-BASIC"]),
-#   EDIT builds in place, so its SYM and object stay in the sample folder rather than source/drive/.
+#   Samples build in place, so each SYM and object stays in its sample folder.
     dict(name="EDIT",     sym="GPC-BASIC-TOOLS-SRC/edit/EDIT.SRC.SYM",  prg="GPC-BASIC-TOOLS-SRC/edit/EDIT.PRG",
          src=["GPC-BASIC-TOOLS-SRC/edit", "GPC-BASIC-TOOLS-SRC/edit/GPC-BASIC"]),
+    dict(name="TURBO",    sym="GPC-BASIC-TOOLS-SRC/TURBO-GPC/TURBO.SRC.SYM",  prg="GPC-BASIC-TOOLS-SRC/TURBO-GPC/TURBO.PRG",
+         src=["GPC-BASIC-TOOLS-SRC/TURBO-GPC", "GPC-BASIC-TOOLS-SRC/TURBO-GPC/GPC-BASIC"]),
 ]
 
-#   Plain and % on one name before any conversion. FILEDIR's blob writes FILE.DIR.SLOW% and
-#   BASIC keeps a float copy of it.
-KNOWN_PAIRS = {"FILE.DIR.SLOW"}
+#   A name used plain and with % on purpose.
+KNOWN_PAIRS = set()
 
 #   --spread reads these. Generated files are left out: they follow their masters.
 EDIT_ROOTS = ["GPC-BASIC", "GPC-BASIC-TOOLS-SRC/GPB-MODS-TESTING", "GPC-BASIC-TOOLS-SRC/GPC-HELP", "GPC-BASIC-TOOLS-SRC/XBASE",

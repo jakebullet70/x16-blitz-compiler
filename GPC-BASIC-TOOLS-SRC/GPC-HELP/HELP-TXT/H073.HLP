@@ -7,7 +7,7 @@
 .129536) is an ordinary variable and not a #DEFINE. Every VRAM address past
 .$FFFF has the same problem.
 .
-.A dotted name whose tail is a reserved word is fine. MENU.COUNT, THEME.CLR,
+.A dotted name whose tail is a reserved word is fine. MENU.COUNT%, THEME.CLR,
 .LINEINPUT.LEN and LINEINPUT.RETURN all contain keywords and all work,
 .because BASLOAD matches the whole identifier. An undotted one does not: POS,
 .MB, ST, LEN and CHAR cannot be variables at all. This is the main reason the

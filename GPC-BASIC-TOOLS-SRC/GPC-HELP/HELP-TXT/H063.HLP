@@ -5,56 +5,56 @@
 =DESCRIPTION
 .
 .  KVBIN.CREATE
-.      IN: KVBIN.NEWSLOTS
-.      OUT: KVBIN.SLOTS KVBIN.OK
+.      IN: KVBIN.NEWSLOTS%
+.      OUT: KVBIN.SLOTS KVBIN.OK%
 .
 .  KVBIN.INFO
 .      IN: --
-.      OUT: KVBIN.SLOTS KVBIN.OK
+.      OUT: KVBIN.SLOTS KVBIN.OK%
 .
 .  KVBIN.GET
 .      IN: KVBIN.KEY$
-.      OUT: KVBIN.VALUE$ KVBIN.SLOT KVBIN.OK
+.      OUT: KVBIN.VALUE$ KVBIN.SLOT% KVBIN.OK%
 .
 .  KVBIN.PUT
 .      IN: KVBIN.KEY$ KVBIN.VALUE$
-.      OUT: KVBIN.SLOT KVBIN.OK
+.      OUT: KVBIN.SLOT% KVBIN.OK%
 .
 .  KVBIN.DEL
 .      IN: KVBIN.KEY$
-.      OUT: KVBIN.SLOT KVBIN.OK
+.      OUT: KVBIN.SLOT% KVBIN.OK%
 .
 .  KVBIN.AT
-.      IN: KVBIN.SLOT
-.      OUT: KVBIN.KEY$ KVBIN.VALUE$ KVBIN.OK
+.      IN: KVBIN.SLOT%
+.      OUT: KVBIN.KEY$ KVBIN.VALUE$ KVBIN.OK%
 .
 .  KVBIN.FIRST
 .      IN: --
-.      OUT: KVBIN.SLOT KVBIN.KEY$ KVBIN.VALUE$ KVBIN.OK
+.      OUT: KVBIN.SLOT% KVBIN.KEY$ KVBIN.VALUE$ KVBIN.OK%
 .
 .  KVBIN.NEXT
 .      IN: --
-.      OUT: KVBIN.SLOT KVBIN.KEY$ KVBIN.VALUE$ KVBIN.OK
+.      OUT: KVBIN.SLOT% KVBIN.KEY$ KVBIN.VALUE$ KVBIN.OK%
 .
 .  KVBIN.STOP
 .      IN: --
 .      OUT: --
 .
 .  KVBIN.EXPAND
-.      IN: KVBIN.GROWBY
-.      OUT: KVBIN.SLOTS KVBIN.OK
+.      IN: KVBIN.GROWBY%
+.      OUT: KVBIN.SLOTS KVBIN.OK%
 .
 :#INCLUDE "KVBIN.INC.BL"
 :
 :KVBIN.FNAME$ = "/SETTINGS.KVB"
 :GOSUB KVBIN.INFO
-:IF KVBIN.DOSERR = 62 THEN GOSUB KVBIN.CREATE
+:IF KVBIN.DOSERR% = 62 THEN GOSUB KVBIN.CREATE
 :KVBIN.KEY$ = "USER.NAME"
 :KVBIN.VALUE$ = "STEVE"
 :GOSUB KVBIN.PUT
 :KVBIN.KEY$ = "USER.NAME"
 :GOSUB KVBIN.GET
-:IF KVBIN.OK THEN PRINT KVBIN.VALUE$
+:IF KVBIN.OK% THEN PRINT KVBIN.VALUE$
 .
 .Strings stored by key in one file on the drive, for a few dozen settings
 .that every program on the drive shares. Every routine is a plain GOSUB.
@@ -70,11 +70,11 @@
 .GPC unchanged. Under GPC it needs runtime build 131 or later.
 .
 .The file is KVBIN.FNAME$, with its path if it has one, so the store can sit
-.anywhere on the drive, such as the root. KVBIN.DEVICE is the drive, and 0 is
-.8. Every routine but KVBIN.NEXT and KVBIN.STOP reads both.
+.anywhere on the drive, such as the root. KVBIN.DEVICE% is the drive, and 0
+.is 8. Every routine but KVBIN.NEXT and KVBIN.STOP reads both.
 .
-.KVBIN.OK is -1 when the call is done and 0 when it is not. KVBIN.WHY is 0
-.when it is done. When it is not, KVBIN.WHY gives the reason:
+.KVBIN.OK% is -1 when the call is done and 0 when it is not. KVBIN.WHY% is 0
+.when it is done. When it is not, KVBIN.WHY% gives the reason:
 .
 .  KVBIN.WHY.NOFILE, 1
 .      WHEN: The drive refused the open.
@@ -94,28 +94,28 @@
 .      WHEN: KVBIN.KEY$ is "" for KVBIN.GET, KVBIN.PUT or KVBIN.DEL. The file
 .        is not opened.
 .
-.KVBIN.DOSERR and KVBIN.DOSMSG$ hold the drive's answer to the open. A number
-.under 20 is success, and a missing file is 62.
+.KVBIN.DOSERR% and KVBIN.DOSMSG$ hold the drive's answer to the open. A
+.number under 20 is success, and a missing file is 62.
 .
 .Keys are cut to 12 characters and hold any byte but $00. A key compares byte
 .for byte.
 .
 .Values are cut to 115 characters and hold any byte but $00. An empty value
-.is stored and reads back as "". A missing key gives KVBIN.OK = 0, KVBIN.SLOT
-.= 0 and KVBIN.VALUE$ = "".
+.is stored and reads back as "". A missing key gives KVBIN.OK% = 0,
+.KVBIN.SLOT% = 0 and KVBIN.VALUE$ = "".
 .
 .KVBIN.PUT keeps a key's slot. A new key takes the first free slot. With none
-.free, KVBIN.WHY is KVBIN.WHY.FULL and nothing is written. Call KVBIN.EXPAND,
-.then KVBIN.PUT again. KVBIN.DEL frees the slot in place, and the other slots
-.do not move.
+.free, KVBIN.WHY% is KVBIN.WHY.FULL and nothing is written. Call
+.KVBIN.EXPAND, then KVBIN.PUT again. KVBIN.DEL frees the slot in place, and
+.the other slots do not move.
 .
-.KVBIN.CREATE makes a store of KVBIN.NEWSLOTS free slots, 40 when it is 0,
-.and replaces a file of the same name. KVBIN.EXPAND adds KVBIN.GROWBY free
+.KVBIN.CREATE makes a store of KVBIN.NEWSLOTS% free slots, 40 when it is 0,
+.and replaces a file of the same name. KVBIN.EXPAND adds KVBIN.GROWBY% free
 .slots to the end of the file, 20 when it is 0. Both leave the new count in
 .KVBIN.SLOTS. KVBIN.INFO reads the count from the header.
 .
-.KVBIN.AT reads slot KVBIN.SLOT and does not scan. The slot is 1 to
-.KVBIN.SLOTS, and the module does not check it. A free slot gives KVBIN.OK =
+.KVBIN.AT reads slot KVBIN.SLOT% and does not scan. The slot is 1 to
+.KVBIN.SLOTS, and the module does not check it. A free slot gives KVBIN.OK% =
 .0 and "" for both strings.
 .
 .A lookup scans from slot 1. KVBIN.GET, KVBIN.PUT and KVBIN.DEL read one key
@@ -127,22 +127,22 @@
 .slot.
 .
 .KVBIN.FIRST and KVBIN.NEXT walk every slot in order, free ones too. A free
-.slot has KVBIN.KEY$ = "". After the last slot KVBIN.OK is 0, KVBIN.WHY is 0
-.and the file is closed. When KVBIN.FIRST cannot open the store, KVBIN.OK is
-.0 and KVBIN.WHY holds the reason.
+.slot has KVBIN.KEY$ = "". After the last slot KVBIN.OK% is 0, KVBIN.WHY% is
+.0 and the file is closed. When KVBIN.FIRST cannot open the store, KVBIN.OK%
+.is 0 and KVBIN.WHY% holds the reason.
 .
 :GOSUB KVBIN.FIRST
 :SHOW.SLOT:
-:    IF KVBIN.OK = 0 THEN GOTO SHOW.DONE
+:    IF KVBIN.OK% = 0 THEN GOTO SHOW.DONE
 :    IF KVBIN.KEY$ <> "" THEN PRINT KVBIN.KEY$; " = "; KVBIN.VALUE$
 :    GOSUB KVBIN.NEXT
 :    GOTO SHOW.SLOT
 :SHOW.DONE:
 .
-.The file stays open between the calls. KVBIN.SLOT is the walk's place and
+.The file stays open between the calls. KVBIN.SLOT% is the walk's place and
 .KVBIN.SLOTS its end, so change neither. Call no other routine in the module
-.until KVBIN.NEXT gives KVBIN.OK = 0 or KVBIN.STOP has run. KVBIN.STOP ends a
-.walk early.
+.until KVBIN.NEXT gives KVBIN.OK% = 0 or KVBIN.STOP has run. KVBIN.STOP ends
+.a walk early.
 .
 .WARNING: the module uses logical files 12 and 15. Neither may be open when a
 .routine is called. A routine opens both and closes both before it returns,

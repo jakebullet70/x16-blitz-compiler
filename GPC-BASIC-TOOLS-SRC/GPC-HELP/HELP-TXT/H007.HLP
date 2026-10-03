@@ -64,8 +64,9 @@
 .        never both
 .
 .  FILEPICK.INC.BL
-.      a popup file picker, PICKBANKS / PICKFILE / PICKSCAN: reads the drive
-.        into a RAM bank, filters by suffix, answers with a name. Needs
+.      a popup file picker, PICKSPACE / PICKDIRSPACE / PICKFILE / PICKSCAN:
+.        reads the drive into space in a RAM bank, filters by suffix, answers
+.        with a name. 8,192 bytes of PICKSPACE hold 255 files. Needs
 .        GUI.INC.BL, GUI-DIALOGS.INC.BL, FILEIO.INC.BL and FILEDIR.INC.BL
 .
 .  STRINGS.INC.BL

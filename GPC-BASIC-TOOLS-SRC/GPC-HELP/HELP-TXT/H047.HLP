@@ -11,53 +11,53 @@
 .
 .  FILE.STATUS
 .      IN: --
-.      OUT: FILE.ERR FILE.MSG$ FILE.TRK FILE.SEC
+.      OUT: FILE.ERR% FILE.MSG$ FILE.TRK% FILE.SEC%
 .
 .  FILE.EXISTS
 .      IN: FILE.NAME$
-.      OUT: FILE.OK
+.      OUT: FILE.OK%
 .
 .  FILE.SIZE
 .      IN: a name -- a verb, not a GOSUB
-.      OUT: FILE.OK FILE.BLOCKS
+.      OUT: FILE.OK% FILE.BLOCKS
 .
 .  FILE.DELETE
 .      IN: FILE.NAME$, pattern allowed
-.      OUT: FILE.ERR FILE.TRK
+.      OUT: FILE.ERR% FILE.TRK%
 .
 .  FILE.RENAME
 .      IN: FILE.NAME$ FILE.NEW$
-.      OUT: FILE.ERR
+.      OUT: FILE.ERR%
 .
 .  FILE.COPY
 .      IN: FILE.NAME$ FILE.NEW$
-.      OUT: FILE.ERR
+.      OUT: FILE.ERR%
 .
 .  FILE.MKDIR FILE.RMDIR FILE.CHDIR
 .      IN: FILE.NAME$
-.      OUT: FILE.ERR
+.      OUT: FILE.ERR%
 .
 .  FILE.UP
 .      IN: --
-.      OUT: FILE.ERR
+.      OUT: FILE.ERR%
 .
 .  FILE.CURDIR
 .      IN: --
 .      OUT: FILE.PATH$
 .
 .  FILE.SAVEARRAY
-.      IN: FILE.NAME$ FILE.ROWS FILE.LINE$()
-.      OUT: FILE.ERR
+.      IN: FILE.NAME$ FILE.ROWS% FILE.LINE$()
+.      OUT: FILE.ERR%
 .
 .  FILE.LOADARRAY
-.      IN: FILE.NAME$ FILE.MAX.ROWS
-.      OUT: FILE.ROWS FILE.LINE$()
+.      IN: FILE.NAME$ FILE.MAX.ROWS%
+.      OUT: FILE.ROWS% FILE.LINE$()
 .
 :#SYMFILE "@:MYPROG.SYM"
 :#INCLUDE "FILEIO.INC.BL"
 :
 :FILE.NAME$ = "SCORES.DAT" : GOSUB FILE.EXISTS
-:IF FILE.OK THEN N = GP.FN(FILE.SIZE, "SCORES.DAT")
+:IF FILE.OK% THEN N = GP.FN(FILE.SIZE, "SCORES.DAT")
 .
 .The #SYMFILE is required, before the #INCLUDEs. FILE.TOPET is GP.ASM and
 .reaches FILE.PETP% through {VAR}; without a symbol file the compile stops at
@@ -67,14 +67,14 @@
 .FILE.SIZE, "MYFILE.DAT" or N = GP.FN(FILE.SIZE, "MYFILE.DAT") -- and not
 .with a GOSUB. Everything else in the table is a plain GOSUB.
 .
-.FILE.DEVICE is the drive and 0 means 8. FILE.ISO non-zero folds names to
+.FILE.DEVICE% is the drive and 0 means 8. FILE.ISO% non-zero folds names to
 .PETSCII on the way out. FILE.LINE$() is the caller's DIM, as GUI.LIST.ITEM$
-.is; left alone the implicit DIM gives 0 to 10. FILE.ROWS is an input to
+.is; left alone the implicit DIM gives 0 to 10. FILE.ROWS% is an input to
 .SAVEARRAY and an output from LOADARRAY.
 .
-.FILE.ERR under 20 is success. 0 is OK. 1 is files scratched and carries the
-.count in FILE.TRK. 62 is FILE NOT FOUND, 63 FILE EXISTS, 26 WRITE PROTECT.
-.FILE.ERR is DS and FILE.MSG$ is DS$ -- the X16 has neither.
+.FILE.ERR% under 20 is success. 0 is OK. 1 is files scratched and carries the
+.count in FILE.TRK%. 62 is FILE NOT FOUND, 63 FILE EXISTS, 26 WRITE PROTECT.
+.FILE.ERR% is DS and FILE.MSG$ is DS$ -- the X16 has neither.
 .
 .This module takes logical file 14 and secondary address 14. Not 2 or 3:
 .those belong to the editor, GPC-HELP and the cruncher. The two are equal so

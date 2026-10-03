@@ -14,8 +14,8 @@
 =DESCRIPTION
 .
 .  GUI.OPEN
-.      IN: GUI.BODY.ROWS GUI.BODY.WIDTH
-.      OUT: GUI.INNER.LEFT .TOP .WIDTH -- the box on its own
+.      IN: GUI.BODY.ROWS% GUI.BODY.WIDTH%
+.      OUT: GUI.INNER.LEFT% .TOP .WIDTH -- the box on its own
 .
 .  GUI.CLOSE
 .      IN: --
@@ -27,24 +27,36 @@
 .controls under one focus.
 .
 :GP.SUB PANELOPEN, " READY ", "", 4, 30
-:GP.PRINTAT GUI.INNER.LEFT, GUI.INNER.TOP, "MY OWN ROWS", THEME.CLR(THEME.TEX
+:GP.PRINTAT GUI.INNER.LEFT%, GUI.INNER.TOP%, "MY OWN ROWS", THEME.CLR%(THEME.
 :GP.SUB PANELCLOSE
 .
-.Requires GPB.INC.BL, STASH.INC.BL, THEME.INC.BL, BANKMGR.INC.BL,
-.MENU.INC.BL, LINEINPUT.INC.BL, COMBO.INC.BL and CHECK.INC.BL, and #INCLUDEs
-.none of them. All of them are needed whichever dialog you call: BASLOAD
-.resolves every label in the file, so leaving one out is LABEL NOT FOUND.
-.MENU.INC.BL goes in before GUI.INC.BL, for its #DEFINEs. COMBO.INC.BL and
-.CHECK.INC.BL go in after it. It wants a #SYMFILE, because STASH does.
+.Requires GPB.INC.BL, STASH.INC.BL, STASHVRAM.INC.BL (SEC 4.18),
+.THEME.INC.BL, BANKMGR.INC.BL, MENU.INC.BL, LINEINPUT.INC.BL, COMBO.INC.BL
+.and CHECK.INC.BL, and #INCLUDEs none of them. All of them are needed
+.whichever dialog you call: BASLOAD resolves every label in the file, so
+.leaving one out is LABEL NOT FOUND. STASH.INC.BL, STASHVRAM.INC.BL and
+.MENU.INC.BL go in before GUI.INC.BL. COMBO.INC.BL and CHECK.INC.BL go in
+.after it. It wants a #SYMFILE, because STASH does.
 .
 .PICKMENU runs the popup slot inside its box. Build the rows with MENU.BEGIN
-.MENU.POPUP and MENU.ITEM first. & hot keys are tinted in GUI.BORDER, and the
-.highlight is as wide as the widest row.
+.MENU.POPUP and MENU.ITEM first. & hot keys are tinted in GUI.BORDER%, and
+.the highlight is as wide as the widest row.
 .
-.Everything the box takes -- three message lines, a title, the style, the
-.placement, the shadow, the frame glyphs, the bank the covered cells go to --
-.is listed in full in GP-BASIC.GLOBALS.md SEC 3. GUI.BANK = 0 does not save
-.the cells, and then the box is still on screen when the call returns.
+.Everything the box takes is listed in full in GP-BASIC.GLOBALS.md SEC 3:
+.three message lines, a title, the style, the placement, the shadow, the
+.frame glyphs, and where the covered cells are saved.
+.
+.GUI.SAVEMODE% sets where a box keeps the cells it covers. GUI.SAVE.VRAM (1),
+.or 0, the default, keeps them in STASHVRAM and runs SV.START if nothing has.
+.GUI.SAVE.BANK (2) keeps them with STASH in GUI.STASHSIZE% bytes at
+.GUI.STASHADDR in bank GUI.BANK%. A box that is not saved is still on screen
+.when the call returns. In VRAM mode that is a box with no free handle or no
+.room in the window. In bank mode it is a box with GUI.BANK% = 0, or one that
+.needs more than GUI.STASHSIZE% bytes.
+.
+.GUI.FORM.RUN drops the keys queued before a box opens and the keys left when
+.it closes. GUI.TYPEAHEAD% non-zero keeps them. Set it in a program that
+.queues a box's keys ahead of it.
 .
 .Every control has a focus, and TAB moves it. A dialog states its controls
 .and GUI.FORM runs them. A control is a button, a field, a list, a combo (SEC
@@ -56,7 +68,7 @@
 .is what RETURN presses from anywhere and is drawn <<LIKE THIS>>; the focus
 .is where TAB has got to and is drawn in THEME.FOCUS. INPUTBOX opens with the
 .default on OK and the focus in the field -- which is the point of keeping
-.the two apart, and GUI.DEFAULT sets only the first.
+.the two apart, and GUI.DEFAULT% sets only the first.
 .
 .The answers are buttons. GUI.BTN.ONE$ and GUI.BTN.TWO$ carry them, and &
 .marks the accelerator: "&CANCEL" lights the C. An accelerator is live only
@@ -71,12 +83,12 @@
 .
 .  GUI.FORM.ADD.FIELD
 .      IN: LINEINPUT.X .Y .LEN .TEXT$ and the rest of LINEINPUT's inputs
-.      OUT: GUI.CTRL.N -- the field's control number
+.      OUT: GUI.CTRL.N% -- the field's control number
 .
-:LINEINPUT.X = GUI.INNER.LEFT : LINEINPUT.Y = GUI.INNER.TOP
+:LINEINPUT.X = GUI.INNER.LEFT% : LINEINPUT.Y = GUI.INNER.TOP%
 :LINEINPUT.LEN = 20 : LINEINPUT.TEXT$ = "UNTITLED"
 :GOSUB GUI.FORM.ADD.FIELD
-:NAME.CTRL = GUI.CTRL.N
+:NAME.CTRL = GUI.CTRL.N%
 :REM ... run the form ...
 :PRINT GUI.CTRL.TEXT$(NAME.CTRL)
 .
@@ -92,7 +104,7 @@
 .passes literals through as source bytes, so charset 2 lands lower case on
 .the graphics half of the font. ISO mode fixes the text and breaks the frame,
 .GP.BOX's $40-$7D being letters. Upper case with a frame, mixed case without
-.one, or re-order the font and set GUI.GLYPH.
+.one, or re-order the font and set GUI.GLYPH%.
 .
 .Example: GUI.EXP.BL.
 .
@@ -103,6 +115,7 @@
 =SEE ALSO
 .
 >88|4.12 GUI-DIALOGS.INC.BL -- every dialog as a verb
+>95|4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM
 >28|3. Command reference
 >94|4.17 COMBO.INC.BL -- a drop-down list that folds into one row
 >98|4.21 CHECK.INC.BL -- a check box, [X] or [ ]

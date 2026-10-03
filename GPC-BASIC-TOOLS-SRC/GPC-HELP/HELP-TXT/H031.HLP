@@ -54,7 +54,7 @@
 .
 .Claim the bank, or something else hands it out:
 .
-:BANKMGR.SET.BANK = MY.GUICODE : GOSUB BANKMGR.CLAIM
+:BANKMGR.SET.BANK% = MY.GUICODE : GOSUB BANKMGR.CLAIM
 .
 =What fits
 .

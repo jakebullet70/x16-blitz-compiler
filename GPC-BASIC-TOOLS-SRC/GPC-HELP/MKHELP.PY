@@ -190,8 +190,12 @@ def inline(s):
     s = re.sub(r"!\[[^\]]*\]\([^)]*\)", "", s)
     s = re.sub(r"\[([^\]]*)\]\([^)]*\)", r"\1", s)
     s = s.replace("**", "").replace("``", "`")
-    s = s.replace("`", "")
-    s = re.sub(r"(?<![A-Za-z0-9_*])\*([^*\n]+)\*(?![A-Za-z0-9_*])", r"\1", s)
+    # Emphasis is stripped outside code spans only: `DLG.*` and `GUI.*` on one line
+    # would otherwise read as one emphasised run.
+    parts = re.split(r"(`[^`]*`)", s)
+    for at in range(0, len(parts), 2):
+        parts[at] = re.sub(r"(?<![A-Za-z0-9_*])\*([^*\n]+)\*(?![A-Za-z0-9_*])", r"\1", parts[at])
+    s = "".join(parts).replace("`", "")
     s = s.replace("\\|", "|").replace("\\<", "<").replace("\\>", ">")
     s = s.replace("\\$", "$").replace("\\_", "_")
     for a, b in TRANSLIT:

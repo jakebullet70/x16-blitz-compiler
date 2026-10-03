@@ -8,17 +8,13 @@
 ## **
 ## **      MEM.SOURCE = A : MEM.TARGET = B : MEM.COUNT = 200 : GOSUB MEM.COPY
 ## **      GP.SUB MEM.BLOCKCOPY, A, B, 200
-## **      IF GP.FN(MEM.BLOCKCOPY, A, B, 200) = 0 THEN <it was refused>
 ## **
 ## **   in   MEM.SOURCE     where MEM.COPY reads, 0 to 65535
 ## **        MEM.TARGET     where either one writes, 0 to 65535
-## **        MEM.COUNT      how many bytes, 1 to 65535. Anything else is
-## **                       refused, not truncated.
+## **        MEM.COUNT      how many bytes, 1 to 65535. It is not checked.
 ## **        MEM.VALUE      the byte MEM.FILL writes, 0 to 255
 ## **
-## **   out  MEM.OK         -1 done, 0 refused, and what GP.FN reads back
-## **
-## **  The two routines share MEM.TARGET, MEM.COUNT and MEM.OK.
+## **  The two routines share MEM.TARGET and MEM.COUNT.
 ## **
 ## **  The two regions of a copy may overlap with the target below the
 ## **  source.
@@ -56,25 +52,19 @@ GOTO MEM.SKIP
 
 ## ---- MEM.COPY ----
 MEM.COPY:
-    GP.DEFPROC MEM.BLOCKCOPY, MEM.SOURCE, MEM.TARGET, MEM.COUNT RETURNS MEM.OK
-    MEM.OK = 0
-    IF MEM.COUNT < 1 THEN RETURN
-    IF MEM.COUNT > 65535 THEN RETURN
+    GP.DEFPROC MEM.BLOCKCOPY, MEM.SOURCE, MEM.TARGET, MEM.COUNT
     POKE 2, GP.LOBYTE(MEM.SOURCE) : POKE 3, GP.HIBYTE(MEM.SOURCE)
     POKE 4, GP.LOBYTE(MEM.TARGET) : POKE 5, GP.HIBYTE(MEM.TARGET)
     POKE 6, GP.LOBYTE(MEM.COUNT) : POKE 7, GP.HIBYTE(MEM.COUNT)
-    GP.CALL MEM.MEMORYCOPY : MEM.OK = -1
+    GP.CALL MEM.MEMORYCOPY
     RETURN
 
 ## ---- MEM.FILL ----
 MEM.FILL:
-    GP.DEFPROC MEM.BLOCKFILL, MEM.TARGET, MEM.COUNT, MEM.VALUE RETURNS MEM.OK
-    MEM.OK = 0
-    IF MEM.COUNT < 1 THEN RETURN
-    IF MEM.COUNT > 65535 THEN RETURN
+    GP.DEFPROC MEM.BLOCKFILL, MEM.TARGET, MEM.COUNT, MEM.VALUE
     POKE 2, GP.LOBYTE(MEM.TARGET) : POKE 3, GP.HIBYTE(MEM.TARGET)
     POKE 4, GP.LOBYTE(MEM.COUNT) : POKE 5, GP.HIBYTE(MEM.COUNT)
-    GP.CALL MEM.MEMORYFILL, GP.LOBYTE(MEM.VALUE) : MEM.OK = -1
+    GP.CALL MEM.MEMORYFILL, GP.LOBYTE(MEM.VALUE)
     RETURN
 
 MEM.SKIP:

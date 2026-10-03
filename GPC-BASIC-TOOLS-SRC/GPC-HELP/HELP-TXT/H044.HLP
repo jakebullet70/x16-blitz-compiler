@@ -10,10 +10,17 @@
 =DESCRIPTION
 .
 .A dialog is a call with its arguments in it. Nothing is set up in globals
-.first, and nothing a previous dialog set carries into the next one.
+.first. Every dialog runs GUI.DEFAULTS before it sets anything, so no title,
+.placement or button from one dialog carries into the next. The setup verbs'
+.settings are kept: the DLGSAVESCREEN mode, the DLGRESET space, the DLGLABELS
+.labels, and the DLGSHADOW, DLGSHADOWCLR, DLGSTYLE and DLGGLYPH settings.
 .
-.  DLGRESET bank
-.      IN: the RAM bank the covered cells go to
+.  DLGSAVESCREEN mode
+.      IN: GUI.SAVE.VRAM, the default, or GUI.SAVE.BANK
+.      OUT: where every box after it keeps the cells it covers
+.
+.  DLGRESET bank, addr, size
+.      IN: the GUI.SAVE.BANK space: size bytes at addr in bank
 .      OUT: every other input back to its default
 .
 .  DLGSHADOW on - DLGGLYPH on
@@ -25,15 +32,20 @@
 .      OUT: the shadow's own colour; 0, the default, is black on black
 .
 .  DLGSTYLE style
-.      IN: a GP.BOX style (SEC 3.7); 0, the default, is a solid block
+.      IN: a GP.BOX style (SEC 3.7); 0, the default, draws style 2, single
+.        line with rounded corners
 .      OUT: the frame every box after it draws; DLGGLYPH overrides it
+.
+.  DLGLABELS ok$, cancel$, yes$, no$
+.      IN: a label for each; "" keeps the library's own
+.      OUT: the buttons every dialog after it names itself
 .
 .  KBCLEAR
 .      IN: --
 .      OUT: the keyboard buffer emptied
 .
 .  MSGBOX msg$
-.      OUT: GUI.KEY -- something to say, and one way out
+.      OUT: one button; GUI.KEY% is the key that closed it
 .
 .  ASKYN msg$ - ASKOK msg$
 .      OUT: -1 for yes, or OK
@@ -46,7 +58,7 @@
 .      OUT: the typed line, "" when cancelled
 .
 .  INPUTBOX msg$, start$, len
-.      OUT: the text either way; GUI.OK says which
+.      OUT: the text either way; GUI.OK% says which
 .
 .  PICKMENU msg$, sel
 .      IN: the popup slot of MENU.INC.BL (SEC 4.6)
@@ -64,35 +76,67 @@
 .      OUT: a line typed in place, no box; LINEINPUT.KEY 27 cancelled
 .
 .  PANELOPEN t$, m$, rows, width - PANELCLOSE
-.      OUT: an empty box at GUI.INNER.LEFT and .TOP, and the screen back
+.      OUT: an empty box at GUI.INNER.LEFT% and .TOP, and the screen back
 .
-:GP.SUB DLGRESET, 8
 :GP.SUB MSGBOX, "DISK FULL"
 :IF GP.FN(ASKYN, "DELETE THE FILE?") THEN GOSUB DELETEIT
 :F$ = GP.FN(ASKTEXT, "FILE NAME?", 16)
 .
-.Every verb has an EX form that takes a title and three message lines first,
+.DLGSAVESCREEN sets where every dialog keeps the cells it covers.
+.GUI.SAVE.VRAM keeps them in STASHVRAM (SEC 4.18), and a box runs SV.START if
+.nothing has. A program that uses STASHVRAM itself sets SV.MAX% with a handle
+.to spare for each box open at once.
+.
+.GUI.SAVE.BANK keeps them with STASH in the space DLGRESET sets. A program
+.calls GP.SUB DLGSAVESCREEN, GUI.SAVE.BANK and GP.SUB DLGRESET, bank, addr,
+.size once, at startup. A box takes 4 + 2 * w * h bytes, and a combo's
+.dropdown is saved above it in the same space. A box that does not fit is
+.drawn and not saved. Bank 0 saves none.
+.
+.GUI.DEFAULTS copies the mode into GUI.SAVEMODE%, and the space into
+.GUI.BANK%, GUI.STASHADDR and GUI.STASHSIZE%.
+.
+.DLGLABELS sets the labels of the buttons the library names itself:
+.
+.  - OK of MSGBOX, and of MSGBOXEX when btn$ is "";
+.  - YES and NO of ASKYN and ASKYNEX;
+.  - OK and CANCEL of ASKOK, ASKYNEX with okc non-zero, ASKTEXT, INPUTBOX,
+.    INPUTBOXEX and the listbox verbs.
+.
+.ASK3 and FORM.BEGIN take their own labels and are not affected. The labels
+.are kept in DLG.LABELS.OK$, .CANCEL$, .YES$ and .NO$. GUI.DEFAULTS fills a
+."" one with the library's own: "&OK", "&CANCEL", "&YES" or "&NO". DLGLABELS
+.runs GUI.DEFAULTS itself. The & in a label marks the accelerator letter, and
+.that letter is the key that presses the button. The answer comes from which
+.button was pressed, so a relabelled yes button still answers -1.
+.
+.Under charset 5 the library's upper-case PETSCII literals show as lower
+.case. A program that runs under charset 5 passes its own labels, already
+.converted.
+.
+.Five verbs have an EX form that takes a title and three message lines first,
 .always in that order, then its own arguments: MSGBOXEX t$, m$, m2$, m3$,
 .btn$, ASKYNEX t$, m$, m2$, m3$, dflt, okc, INPUTBOXEX ... start$, len, mask,
 .PICKMENUEX ... sel, flags, LISTBOXEX ... count, rows, multi. dflt 2 makes
-.the second button the default; okc non-zero says OK and CANCEL rather than
-.YES and NO; flags are MENU.MUSTSEL, .NOWRAP and .GAMEPAD.
+.the second button the default; okc non-zero gives OK and CANCEL buttons in
+.place of YES and NO; flags are MENU.MUSTSEL, .NOWRAP and .GAMEPAD.
 .
-.#INCLUDE it after GUI.INC.BL, COMBO.INC.BL and CHECK.INC.BL: a verb is
-.compiled before any call to it, and this one calls all of them. The rows are
-.filled first, because an array cannot be an argument -- MENU.BEGIN/MENU.ITEM
-.for PICKMENU, GUI.LIST.ITEM$(1..count) for the listbox, and the caller owns
-.that DIM.
+.#INCLUDE it after GPB.INC.BL, THEME.INC.BL, MENU.INC.BL, LINEINPUT.INC.BL,
+.STASH.INC.BL, STASHVRAM.INC.BL, GUI.INC.BL, COMBO.INC.BL and CHECK.INC.BL,
+.and above the program's code: a verb is compiled before any call to it.
 .
-.Up and down move, PgUp and PgDn page, HOME and END jump, SPACE toggles a
-.mark in multi. TAB moves to the buttons and back, RETURN takes <<OK>> from
-.anywhere, ESC and STOP cancel -- and O and C press their buttons while the
-.eye is still in the list, which a list can offer and a typing field cannot.
+.The rows are filled first, because an array cannot be an argument. PICKMENU
+.reads the rows built with MENU.BEGIN and MENU.ITEM. The listbox verbs read
+.GUI.LIST.ITEM$(1..count), which the caller DIMs.
 .
-.In multi, GUI.LISTBOX.SEL is not the answer -- it is where the cursor was
-.left. The marks are: GUI.LISTBOX.MARKS$ is count characters with "1" for
-.marked. They are cleared on every call, so one run never reports the run
-.before it.
+.Up and down move, PgUp and PgDn page, HOME and END jump, and SPACE toggles a
+.mark in multi. TAB moves to the buttons and back. RETURN in the list presses
+.OK, and on a button presses that button. ESC and STOP cancel. The marked
+.letter of OK or CANCEL presses that button while the focus is in the list.
+.
+.In multi, GUI.LISTBOX.SEL% is not the answer. It is the row the cursor was
+.left on. GUI.LISTBOX.MARKS$ holds the marks: count characters, "1" for a
+.marked row. The marks are cleared on every call.
 .
 .The bottom frame edge reads 2 SELECTED OF 20 in multi, 20 ITEMS for a single
 .list too long to see at once, and is blank for one that fits.
@@ -106,8 +150,8 @@
 .      IN: GUI.LIST.ITEM$()
 .      OUT: its rows come from the array
 .
-.  LIST.BANK bank, first, last
-.      IN: a RAM bank in the GP.BSTR image layout
+.  LIST.BANK bank, addr, first, last
+.      IN: a GP.BSTR image at addr in bank
 .      OUT: its rows come from the bank
 .
 .  LISTTO.RUN
@@ -116,22 +160,22 @@
 .  LIST.ITEM n
 .      OUT: row n as text
 .
-.  LIST.SORT bank, first, last
-.      OUT: that bank's rows in order, in place
+.  LIST.SORT bank, addr, first, last
+.      OUT: that image's rows in order, in place
 .
 :GP.SUB LIST.BEGIN, " OPEN FILE ", 12
-:GP.SUB LIST.BANK, MY.BANK%, 0, N - 1
+:GP.SUB LIST.BANK, MY.BANK%, MY.ADDR, 0, N - 1
 :SEL = GP.FN(LISTTO.RUN)
 :IF SEL > 0 THEN F$ = GP.FN(LIST.ITEM, SEL)
 .
-.A bank list never comes into low memory. The bank holds the GP.BSTR image
-.layout -- a 16-bit count at $A000, an offset a row at $A002, then the
-.records -- and GUI.LIST.FETCH reads one row at a time, as it is drawn. That
-.is how FILEPICK (SEC 4.20) shows a directory of any length in a program with
-.no room for it. LIST.SORT moves the two-byte offsets and not the records, so
-.a pointer into one stays good afterwards; it reaches the bank through
-.STASH.SELECT, which is what lets the whole module sit inside a GP.BANKED
-.region.
+.A bank list never comes into low memory. addr is where the GP.BSTR image
+.starts. The offset table is at addr + 2, one 16-bit offset a string, and
+.each offset counts from addr. A GP.BANKEDSTR group's image is at $A000 when
+.it is the first group declared in its bank. GUI.LIST.FETCH reads one row at
+.a time, as it is drawn. FILEPICK.INC.BL shows a directory this way.
+.LIST.SORT moves the two-byte offsets and not the records, so a pointer into
+.a record stays good and a string number does not. It reaches the bank
+.through STASH.SELECT, so the whole module can sit inside a GP.BANKED region.
 .
 .Example: GUI.EXP.BL.
 .
@@ -143,8 +187,11 @@
 .
 >42|3.7 Screen -- drawing
 >77|4.6 MENU.INC.BL -- menus built a row at a time
->97|4.20 KV.INC.BL -- keys and values in one RAM bank
+>95|4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM
 >88|4.12 GUI-DIALOGS.INC.BL -- every dialog as a verb
+>65|4.1 THEME.INC.BL -- named colour roles
+>75|4.4 LINEINPUT.INC.BL -- a positioned entry field
+>113|STASH.INC.BL -- save a text rectangle, and put it back.
 >86|4.11 GUI.INC.BL -- the box that puts the screen back, and the form in 
 >94|4.17 COMBO.INC.BL -- a drop-down list that folds into one row
 >98|4.21 CHECK.INC.BL -- a check box, [X] or [ ]

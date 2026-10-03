@@ -199,7 +199,7 @@ removes dead code, including a module costs its whole size whether or not it is 
 | `COMBO.INC.BL` | a drop-down list that folds into one row, a `GUI.FORM` control |
 | `CHECK.INC.BL` | a check box, a `GUI.FORM` control |
 | `GUI-LITE.INC.BL` | `MSGBOX`, `PICKMENU` and `CLOSEBOX` in low memory, nothing banked, the screen under the box saved to VRAM. An alternative to `GUI-DIALOGS`, never both |
-| `FILEPICK.INC.BL` | a popup file picker, `PICKBANKS` / `PICKFILE` / `PICKSCAN`: reads the drive into a RAM bank, filters by suffix, answers with a name. Needs `GUI.INC.BL`, `GUI-DIALOGS.INC.BL`, `FILEIO.INC.BL` and `FILEDIR.INC.BL` |
+| `FILEPICK.INC.BL` | a popup file picker, `PICKSPACE` / `PICKDIRSPACE` / `PICKFILE` / `PICKSCAN`: reads the drive into space in a RAM bank, filters by suffix, answers with a name. 8,192 bytes of `PICKSPACE` hold 255 files. Needs `GUI.INC.BL`, `GUI-DIALOGS.INC.BL`, `FILEIO.INC.BL` and `FILEDIR.INC.BL` |
 | `STRINGS.INC.BL` | the string helpers: BASIC where BASIC is enough, assembly where it is not |
 | `STRCASE.INC.BL` | case, rewriting a string in place, in assembly |
 | `STRUSING.INC.BL` | a number to a template: PRINT USING's mask, in BASIC |

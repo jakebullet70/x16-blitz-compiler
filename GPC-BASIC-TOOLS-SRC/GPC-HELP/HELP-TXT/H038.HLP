@@ -32,25 +32,27 @@
 .
 .  N = GP.FN(MENUTO.VERT, row, col, style)
 .      IN: the popup slot, and the inputs below
-.      OUT: N, 1 to the row count, or 0 for ESC. MENU.EXITKEY
+.      OUT: N, 1 to the row count, or 0 for ESC. MENU.EXITKEY%
 .
 .  N = GP.FN(MENUTO.BAR, row, col, style)
-.      IN: the bar slot, MENU.GAP MENU.BARFLAGS
-.      OUT: N MENU.EXITKEY MENU.BARNUM MENU.SELX MENU.SELW MENU.MARKED
+.      IN: the bar slot, MENU.GAP% MENU.BARFLAGS%
+.      OUT: N MENU.EXITKEY% MENU.BARNUM% MENU.SELX% MENU.SELW% MENU.MARKED%
 .
 .  GP.SUB MENU.DRAWBAR, row, col, style
-.      IN: the bar slot, MENU.MARKED
-.      OUT: the bar on screen, not run, with MENU.MARKED lit
+.      IN: the bar slot, MENU.MARKED%
+.      OUT: the bar on screen, not run, with MENU.MARKED% lit
 .
 :#INCLUDE "GPB.INC.BL"
 :#INCLUDE "BANKMGR.INC.BL"
+:#INCLUDE "THEME.INC.BL"
+:#DEFINE MENU.TEXTBANK 62
 :#INCLUDE "MENU.INC.BANKED.BL"
 :#INCLUDE "MENU.INC.BL"
 :
 :GOSUB BANKMGR.INIT
-:MENU.ATTR = 6 * 16 + 1
-:MENU.HOTATTR = 6 * 16 + 7
-:MENU.DISATTR = 6 * 16 + 12
+:MENU.ATTR% = 6 * 16 + 1
+:MENU.HOTATTR% = 6 * 16 + 7
+:MENU.DISATTR% = 6 * 16 + 12
 :GP.SUB MENU.BEGIN, MENU.POPUP
 :GP.SUB MENU.ITEMX, "&ADD RECORD", "APPEND A BLANK RECORD", MENU.ON
 :GP.SUB MENU.ITEMX, "&DEL RECORD", "", MENU.OFF
@@ -59,10 +61,10 @@
 :N = GP.FN(MENUTO.VERT, 4, 10, MENU.ROUND)
 :IF N = 0 THEN <cancelled>
 .
-.Requires GPB.INC.BL and BANKMGR.INC.BL, with BANKMGR.INIT run before the
-.first MENU.BEGIN, and a SHARED compile. #INCLUDE "MENU.INC.BANKED.BL"
-.straight before MENU.INC.BL. Its groups are banked, so the program gets a
-.NAME.OVL beside its .PRG. Ship both.
+.Requires GPB.INC.BL, BANKMGR.INC.BL and THEME.INC.BL, with BANKMGR.INIT run
+.before the first MENU.BEGIN, and a SHARED compile. #DEFINE MENU.TEXTBANK,
+.then #INCLUDE "MENU.INC.BANKED.BL" straight before MENU.INC.BL. Its groups
+.are banked, so the program gets a NAME.OVL beside its .PRG. Ship both.
 .
 .A menu is built into a slot, then run from it. There are two slots, so the
 .bar survives while its dropdown is built:
@@ -81,12 +83,12 @@
 .rows off the end of a menu. MENU.POOLBASE is MENU.BAR.MAX + MENU.POPUP.MAX.
 .
 .The text and hints are kept in bank MENU.TEXTBANK, which the first
-.MENU.BEGIN claims from BANKMGR (SEC 4.13). It is 62 unless the program
-.writes #DEFINE MENU.TEXTBANK n before the #INCLUDE. If another owner has
-.claimed that bank, MENU.OK is 0 and every row is dropped. Text is cut to 30
-.characters and a hint to 50. MENU.FLAG$(), MENU.HOTKEY$() and MENU.HOTCOL$()
-.are the module's own arrays, DIMmed on the first MENU.BEGIN. Do not DIM
-.them.
+.MENU.BEGIN claims from BANKMGR (SEC 4.13). It has no default: the program
+.writes #DEFINE MENU.TEXTBANK n before #INCLUDE "MENU.INC.BANKED.BL". Nothing
+.else may use that bank. If another owner has claimed it, MENU.OK% is 0 and
+.every row is dropped. Text is cut to 30 characters and a hint to 50.
+.MENU.FLAG$(), MENU.HOTKEY$() and MENU.HOTCOL$() are the module's own arrays,
+.DIMmed on the first MENU.BEGIN. Do not DIM them.
 .
 .MENU.SELECTED sets the row the next run opens on. The next MENU.BEGIN or run
 .clears it, and without it a run opens on row 1.
@@ -100,13 +102,14 @@
 .& marks the hot key: "SAVE &AS" is stored as SAVE AS with hot key A at
 .column 6. Only the first & counts, && is a literal &, and a trailing & stays
 .in the text. A hot key is matched without case, the first live row with it
-.wins, and it chooses the row at once.
+.wins, and it chooses the row at once. A shifted PETSCII letter, 193 to 218,
+.pairs with 65 to 90 as well.
 .
 .A row whose text is one hyphen, "-", is a separator. It draws as a line of
 .MENU.SEPCHR, still counts as a row, and the cursor steps over it.
 .
 .MENU.ITEMX with on 0 adds a disabled row. The cursor steps over it, its hot
-.key and RETURN are refused, and it draws in MENU.DISATTR.
+.key and RETURN are refused, and it draws in MENU.DISATTR%.
 .
 .A caller keeping its rows in GP.BANKEDSTR groups (SEC 3.10) can put the
 .enable mask at index 0 of the hint group, "1" for on and "0" for off a row,
@@ -116,45 +119,46 @@
 .
 .Set once by the caller, and read by every run:
 .
-.  MENU.ATTR
+.  MENU.ATTR%
 .      the rows, background * 16 + foreground
 .
-.  MENU.HIATTR
-.      the highlighted row. 0 inverts MENU.ATTR
+.  MENU.HIATTR%
+.      the highlighted row. 0 inverts MENU.ATTR%
 .
-.  MENU.HOTATTR
-.      the hot key letter. 0 leaves it untinted. Only rows drawn in MENU.ATTR
-.        are tinted
+.  MENU.HOTATTR%
+.      the hot key letter. 0 leaves it untinted. Only rows drawn in
+.        MENU.ATTR% are tinted
 .
-.  MENU.DISATTR
-.      a disabled row. 0 is MENU.ATTR
+.  MENU.DISATTR%
+.      a disabled row. 0 is MENU.ATTR%
 .
-.  MENU.SEPATTR
-.      separator lines and the frame. 0 is MENU.ATTR
+.  MENU.SEPATTR%
+.      separator lines and the frame. 0 is MENU.ATTR%
 .
 .  MENU.SEPCHR
 .      the separator glyph. 0 is MENU.LINE, 192, the stroke GP.BOX style 1
 .        draws with
 .
-.  MENU.FLAGS
+.  MENU.FLAGS%
 .      the popup's flags, added together
 .
-.  MENU.BARFLAGS
+.  MENU.BARFLAGS%
 .      the bar's flags
 .
-.  MENU.GAP
+.  MENU.GAP%
 .      cells between bar items. 0 is none
 .
-.  MENU.HINTX MENU.HINTY MENU.HINTW MENU.HINTATTR
-.      the hint field. MENU.HINTW 0 turns hints off
+.  MENU.HINTX% MENU.HINTY% MENU.HINTW% MENU.HINTATTR%
+.      the hint field. MENU.HINTW% 0 turns hints off
 .
 .A hint is shown only when the highlight moves, never on opening. The field
-.is cleared to MENU.HINTATTR first, and a hint longer than MENU.HINTW is cut.
+.is cleared to MENU.HINTATTR% first, and a hint longer than MENU.HINTW% is
+.cut.
 .
 =The frame
 .
 .Both runners draw a GP.BOX with its corner at row, col, one cell bigger all
-.round than the rows, in MENU.SEPATTR. style is MENU.SOLID 0, MENU.THIN 1,
+.round than the rows, in MENU.SEPATTR%. style is MENU.SOLID 0, MENU.THIN 1,
 .MENU.ROUND 2, MENU.THICK 3, or 256 and up for the address of an
 .eight-character glyph table:
 .
@@ -164,8 +168,8 @@
 .MENU.NOBOX, 255, draws no frame and puts the first row at row, col.
 .
 .A popup row, and its highlight, is as wide as the widest row. A bar item is
-.as wide as its own text, with MENU.GAP cells between items, so spaces inside
-.the text are how a bar item gets padding.
+.as wide as its own text, with MENU.GAP% cells between items, so spaces
+.inside the text are how a bar item gets padding.
 .
 =Keys and flags
 .
@@ -190,7 +194,7 @@
 .
 .  MENU.KEEPMARK
 .      VALUE: 2
-.      the chosen row stays lit. On the bar, MENUTO.BAR sets MENU.MARKED to
+.      the chosen row stays lit. On the bar, MENUTO.BAR sets MENU.MARKED% to
 .        it
 .
 .  MENU.NOWRAP
@@ -225,15 +229,15 @@
 .With no pad connected the flag changes nothing; in the emulator a pad needs
 .-joy1.
 .
-.MENU.EXITKEY is the key that ended the run: 13 for RETURN, 27 for ESC, 3 for
-.STOP, the hot key, or the key MENU.KEYEXIT handed back. A pad press is
+.MENU.EXITKEY% is the key that ended the run: 13 for RETURN, 27 for ESC, 3
+.for STOP, the hot key, or the key MENU.KEYEXIT handed back. A pad press is
 .reported as the key it stands for.
 .
-.MENU.BARNUM is the bar's row count. MENU.SELX and MENU.SELW are the chosen
-.bar item's column and width, for placing a panel under it. MENU.MARKED is
-.the bar item left lit by MENU.KEEPMARK or by MENUTO.PULLDOWN (SEC 4.9).
-.MENU.DRAWBAR redraws the bar with it lit, to repaint a bar that a panel has
-.covered.
+.MENU.BARNUM% is the bar's row count. MENU.SELX% and MENU.SELW% are the
+.chosen bar item's column and width, for placing a panel under it.
+.MENU.MARKED% is the bar item left lit by MENU.KEEPMARK or by MENUTO.PULLDOWN
+.(SEC 4.9). MENU.DRAWBAR redraws the bar with it lit, to repaint a bar that a
+.panel has covered.
 .
 .Examples: MENUTO.EXP.BL runs a popup, a bar and a dropdown by hand, and
 .MENUBUILD.EXP.BL builds both slots and reads them back.
@@ -249,3 +253,4 @@
 >51|3.10 Text in a bank
 >84|4.9 MENUPULL.INC.BL -- a dropdown under a bar item
 >77|4.6 MENU.INC.BL -- menus built a row at a time
+>65|4.1 THEME.INC.BL -- named colour roles

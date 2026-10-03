@@ -21,9 +21,9 @@
 .MKDIR, CHDIR, UP, GETPATH, SAVEARRAY and LOADARRAY, plus FILE.DIR.INIT,
 ..OPEN and .NEXT. FILE.CMD, .DONE, .PETNAME, .PETNEW, .TOPET, .PATHWALK,
 ..WRITEROWS, .READROWS, .ROWREAL, .ROWDROP, .KEEPROW, FILE.DIR.WHERE,
-..LOWRAM, .ASKFOR, .SUCK, .SKIPDISK, .FILL and .STEP are not. FILE.DIR.FILL
-.and FILE.DIR.STEP are the two assembly blobs and enter with no arguments set
-.up at all.
+..ASKFOR, .SUCK, .SKIPDISK, .FILL and .STEP are not. FILE.DIR.FILL and
+.FILE.DIR.STEP are the two assembly blobs and enter with no arguments set up
+.at all.
 .
 .STRINGS has three of its own. STR.SPLIT.NEXT and STR.REPLACE.NEXT are loop
 .continuations rather than entry points: enter either directly and you resume
@@ -36,8 +36,8 @@
 .because GUI.FORM is a dispatcher and every arm of it is one. The callable
 .names are GUI.OPEN and GUI.CLOSE -- the dialogs themselves are verbs, in
 .GUI-DIALOGS.INC.BL. GUI.FORM is usable and undocumented, the module's own.
-.Everything else, the whole of GUI.FORM., GUI.BUTTON, GUI.BTN., GUI.LIST.,
-.GUI.FIELD.DRAW, GUI.FRAME, GUI.GLYPHS, GUI.SHADOW.*, GUI.SIZE,
+.Everything else, the whole of GUI.FORM.*, GUI.BUTTON*, GUI.BTN.*,
+.GUI.LIST.*, GUI.FIELD.DRAW, GUI.FRAME, GUI.GLYPHS, GUI.SHADOW.*, GUI.SIZE,
 .GUI.PLACE.BOX, GUI.PLACE.SCROLL and GUI.SCREEN, is not.
 .
 =A module in a bank keeps its names

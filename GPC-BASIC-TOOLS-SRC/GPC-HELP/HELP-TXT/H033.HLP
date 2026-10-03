@@ -11,7 +11,7 @@
 .
 .  THEME.SELECT
 .      IN: THEME.ID%
-.      OUT: fills THEME.CLR()
+.      OUT: fills THEME.CLR%()
 .
 .  THEME.NEXT
 .      IN: THEME.ID%
@@ -49,24 +49,24 @@
 .
 .  4
 .      CUSTOM
-.      whatever THEME.CLR() already holds
+.      whatever THEME.CLR%() already holds
 .
 .THEME.NEXT moves to the following one and wraps, which is what a program
 .binds to a key. A cached attribute does not follow it: work out anything
-.derived from THEME.CLR(), a reversed bar included, after every load.
+.derived from THEME.CLR%(), a reversed bar included, after every load.
 .
-.CUSTOM loads nothing. Selecting it leaves THEME.CLR() as it stands, so a
+.CUSTOM loads nothing. Selecting it leaves THEME.CLR%() as it stands, so a
 .program that lets the user change colours carries those changes into CUSTOM
 .rather than discarding them. The one exception is a cold start -- CUSTOM
 .selected before any other theme has been loaded -- where there is nothing to
 .keep and it takes X16's values. THEME.RESET goes back to those.
 .
 .GPC-BASIC-TOOLS-SRC/color-test edits the roles against a mock of the GUI and
-.prints the THEME.CLR() lines to paste back in here. It carries its own
+.prints the THEME.CLR%() lines to paste back in here. It carries its own
 .GPC-BASIC folder and is still at nine roles, so it offers THEME.FOCUS and
 .THEME.BAR but not THEME.SHADOW.
 .
-.Roles, for indexing THEME.CLR(): THEME.PAGE THEME.TEXT THEME.TITLE
+.Roles, for indexing THEME.CLR%(): THEME.PAGE THEME.TEXT THEME.TITLE
 .THEME.BORDER THEME.HILITE THEME.DIMMED THEME.WARN THEME.FOCUS THEME.BAR
 .THEME.SHADOW, and THEME.SLOTS = 10.
 .
@@ -78,22 +78,22 @@
 .drop shadow is filled with.
 .
 .The module's own scalars are int16: THEME.ID%, THEME.ATTR% and THEME.INV%.
-.THEME.CLR() is not -- it stays an untyped array, and it is DIMmed to
+.THEME.CLR%() is not -- it stays an untyped array, and it is DIMmed to
 .THEME.SLOTS - 1, which is the last role and no element beyond it.
 .
-.Usage is THEME.ID%, one GOSUB THEME.SELECT, then THEME.CLR(role) wherever an
-.attribute is wanted:
+.Usage is THEME.ID%, one GOSUB THEME.SELECT, then THEME.CLR%(role) wherever
+.an attribute is wanted:
 .
 :THEME.ID% = 1 : GOSUB THEME.SELECT
-:GP.BOX 4,2,30,8, 2, THEME.CLR(THEME.BORDER)
-:GP.PRINTAT 6,3, "TITLE", THEME.CLR(THEME.TITLE)
+:GP.BOX 4,2,30,8, 2, THEME.CLR%(THEME.BORDER)
+:GP.PRINTAT 6,3, "TITLE", THEME.CLR%(THEME.TITLE)
 .
 .The values are packed attributes, background * 16 + foreground, which is
 .what GP.BOX, GP.FILL and GP.PRINTAT take. For COLOR, which takes the halves
 .separately, use THEME.SET.
 .
-.#DEFINE substitutes at translation time, so THEME.CLR(THEME.TITLE) compiles
-.to THEME.CLR(2). The readable name costs no variable and no lookup.
+.#DEFINE substitutes at translation time, so THEME.CLR%(THEME.TITLE) compiles
+.to THEME.CLR%(2). The readable name costs no variable and no lookup.
 .
 .THEME.CLR is DIMmed by the module. Do not DIM it in your own program.
 .
