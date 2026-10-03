@@ -39,7 +39,7 @@ ACT_HOME, ACT_END, ACT_PAGE_DOWN, ACT_PAGE_UP = 6, 7, 8, 9
 ACT_RETURN, ACT_BACKSPACE, ACT_DELETE, ACT_TAB, ACT_DELETE_LINE = 10, 11, 12, 13, 14
 ACT_UNDO, ACT_REDO = 15, 16
 ACT_CUT, ACT_COPY, ACT_PASTE, ACT_SELECT_ALL, ACT_INSERT = 17, 18, 19, 20, 21
-ACT_FIND, ACT_SAVE = 65, 67
+ACT_FIND, ACT_SAVE, ACT_REPLACE = 65, 67, 80
 ACTIONS = {DOWN: ACT_DOWN, UP: ACT_UP, RIGHT: ACT_RIGHT, LEFT: ACT_LEFT, HOME: ACT_HOME,
            END: ACT_END, PAGE_DOWN: ACT_PAGE_DOWN, PAGE_UP: ACT_PAGE_UP, RETURN: ACT_RETURN,
            BACKSPACE: ACT_BACKSPACE, DELETE: ACT_DELETE, TAB: ACT_TAB,
@@ -156,7 +156,7 @@ def play(lines, keys, line=0, col=0):
                     line, col = ends[0], ends[1]
                     if action in (ACT_BACKSPACE, ACT_DELETE):
                         action = 0
-            elif not (ACT_CUT <= action <= ACT_INSERT or action == ACT_FIND):
+            elif not (ACT_CUT <= action <= ACT_INSERT or action in (ACT_FIND, ACT_REPLACE)):
                 anchor = None
         if action == ACT_INSERT:
             action = 0

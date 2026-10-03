@@ -9,7 +9,10 @@ W.DOC is a copy of the fixture, and the last file of the bench folder, so End pi
 the file picker. The script types on the empty document, opens W.DOC over it and edits. It
 finds a term, finds it again and looks for a term that is nowhere. It finds the first term
 twice more, picked from the find history with Up and Down. The history starts with one
-term, from the settings store the run starts with. It picks File, Exit and
+term, from the settings store the run starts with. It plants four places of a new term,
+finds it, and replaces it three times: answering Y, N, Y and Esc, then A with an empty
+replacement, which it undoes, then A with the replacement picked from the replace history.
+It picks File, Exit and
 answers no to the quit question, saves, starts a new document, saves it as N.DOC, opens
 W.DOC again, moves and saves. It goes to document B, types two lines and saves them as
 B.DOC. It goes to document C and types a line it does not save. It goes past A to B,
@@ -34,6 +37,7 @@ SCRIPT_LIMIT = 1024
 
 FIND, FIND_NEXT, SAVE, OPEN, NEW, ESCAPE, HELP = 6, 134, 137, 15, 14, 27, 133
 NEXT_DOCUMENT = 136
+REPLACE = 8
 UNDO = 26
 # The attributes of A, B and C on the title bar at the end: A is on screen, B is saved and
 # C has an edit. They are the X16 theme's text, its bar, and yellow on the bar.
@@ -48,6 +52,10 @@ DISCARD = 68
 EXIT, MENU_UNDO, MENU_REDO = 88, 85, 82
 MENU_CUT, MENU_COPY, MENU_PASTE, MENU_SELECT_ALL = 84, 67, 80, 65
 TERM = b"gosub"
+# The replace term, which no line of the fixture holds, and its replacement.
+PLANTED = b"zq"
+REPLACEMENT = b"r"
+LINE_LIMIT = 250
 # The settings store the run starts with: a key of another program, and a find history of
 # one term.
 OLD_TERM = b"OLDTERM"
@@ -76,6 +84,44 @@ def find(lines, line, col, term):
         if at >= 0:
             return number, at
     return None
+
+
+def replace_walk(lines, term, replacement, answers):
+    """Return the lines, the cursor and the count of places replaced after a replace run, as
+    TURBO.REPLACE.WALK makes them. answers are "y", "n", "a" and "esc", one for each place
+    asked about. The cursor is None when no place was asked about."""
+    lines = list(lines)
+    answers = list(answers)
+    cursor = None
+    count = 0
+    every = False
+    number, start = 0, 0
+    while True:
+        place = None
+        for candidate in range(number, len(lines)):
+            at = lines[candidate].lower().find(term, start if candidate == number else 0)
+            if at >= 0:
+                place = (candidate, at)
+                break
+        if place is None:
+            break
+        number, at = place
+        answer = "a" if every else answers.pop(0)
+        if not every:
+            cursor = (number, at + len(term))
+        if answer == "esc":
+            break
+        start = at + len(term)
+        if answer != "n" and len(lines[number]) - len(term) + len(replacement) <= LINE_LIMIT:
+            lines[number] = lines[number][:at] + replacement + lines[number][at + len(term):]
+            count += 1
+            start = at + len(replacement)
+        if answer == "a":
+            every = True
+    assert not answers
+    if cursor is not None:
+        cursor = (cursor[0], min(cursor[1], len(lines[cursor[0]])))
+    return lines, cursor, count
 
 
 def plan():
@@ -125,6 +171,36 @@ def plan():
     groups.append([FIND, keymodel.UP, keymodel.DOWN, keymodel.RETURN])
     jump(find(lines, line, col, TERM))
     edit(typed("w"))
+
+    # ---- replace. Three "zq" on the cursor line and one on the next are the places. A find
+    # makes "zq" the term: five Backspaces clear "gosub" from its box. A run's keys stay in one
+    # group, because the run reads the key buffer.
+    edit(typed(PLANTED.decode() * 3) + [keymodel.DOWN] + typed(PLANTED.decode()))
+    groups.append([FIND] + [keymodel.BACKSPACE] * 5 + typed(PLANTED.decode()) + [keymodel.RETURN])
+    jump(find(lines, line, col, PLANTED))
+    planted_lines = [number for number, text in enumerate(lines) if PLANTED in text.lower()]
+    assert len(planted_lines) == 2
+    # Y, N, Y on the cursor line, and Esc on the next.
+    groups.append([REPLACE, keymodel.RETURN] + typed(REPLACEMENT.decode()) + [keymodel.RETURN]
+                  + typed("yny") + [ESCAPE])
+    lines, cursor, count = replace_walk(lines, PLANTED, REPLACEMENT, ["y", "n", "y", "esc"])
+    assert count == 2
+    line, col = cursor
+    # The replace box starts with "r". Backspace empties it, so the run takes "zq" out, and A
+    # answers both places. The undo puts them back, with the cursor at column 0 of the first
+    # line the run changed.
+    before = list(lines)
+    groups.append([REPLACE, keymodel.RETURN, keymodel.BACKSPACE, keymodel.RETURN] + typed("a"))
+    lines, cursor, count = replace_walk(lines, PLANTED, b"", ["a"])
+    assert count == 2
+    groups.append([UNDO])
+    lines = before
+    line, col = planted_lines[0], 0
+    # The replace box starts empty, and Up shows "r", the newest entry of the replace history.
+    groups.append([REPLACE, keymodel.RETURN, keymodel.UP, keymodel.RETURN] + typed("a"))
+    lines, cursor, count = replace_walk(lines, PLANTED, REPLACEMENT, ["a"])
+    assert count == 2
+    line, col = cursor
 
     # ---- File, Exit and no to the quit question, a key with no command behind it, then save
     groups.append([ESCAPE, EXIT, NO])
@@ -194,11 +270,14 @@ def plan():
 def settings_after():
     """Return the keys of the settings store after the run. A key the store must not hold
     is None. A find term is the bytes of the keys typed."""
-    history = [bytes(typed(term)) for term in ("bee", TERM.decode(), TERM.decode() + "zqx")]
+    terms = ("bee", PLANTED.decode(), TERM.decode(), TERM.decode() + "zqx")
+    history = [bytes(typed(term)) for term in terms]
     history.append(OLD_TERM)
+    replacements = [bytes(typed(REPLACEMENT.decode()))]
     settings = {b"OTHER.KEY": SETTINGS_BEFORE[b"OTHER.KEY"]}
     for place in range(1, 7):
         settings[b"TG.FIND.%d" % place] = history[place - 1] if place <= len(history) else None
+        settings[b"TG.REPLACE.%d" % place] = replacements[place - 1] if place <= len(replacements) else None
     return settings
 
 

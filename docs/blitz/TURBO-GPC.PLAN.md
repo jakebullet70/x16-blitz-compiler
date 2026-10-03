@@ -319,7 +319,7 @@ The editor is in `GPC-BASIC-TOOLS-SRC/TURBO-GPC/`.
 
 | file | holds |
 |---|---|
-| `TURBO.BASL` | the program: the key loop, the title bar, the status bar, the prompt, the yes or no question, and the commands find, find next, save, open, new and quit |
+| `TURBO.BASL` | the program: the key loop, the title bar, the status bar, the prompt, the yes or no question, and the commands find, find next, replace, save, open, new and quit |
 | `TG-STORE.BASL` | the line table, the arena, the edit buffer, character insert and remove, the word scans, line split, the copies a join makes, line remove, new document, load, save, find |
 | `TG-UNDO.BASL` | the undo ring, the redo ring, and the routines that note an edit, take it back and put it in again. `UNDO.PUSH`, which writes a record, is a `GP.ASM` kernel. The rest is BASIC. |
 | `TG-VIEW.BASL` | row paint, the syntax classifier, pane slide, status numbers, and the keys: cursor, word left, word right, page, Home, End, first and last line, type, Tab, RETURN, Backspace, Delete, delete line, undo, redo, find next |
@@ -464,6 +464,7 @@ function keys.
 | Ctrl+L | delete line |
 | Ctrl+F or F6 | find |
 | F3 | find next |
+| Ctrl+H | replace |
 | Ctrl+G | go to line |
 | Ctrl+N | new |
 | Ctrl+O | open |
@@ -486,7 +487,7 @@ rows after `VIEW.PAINT`. A line inside the selection is marked to the pane's rig
 Shift+Home and Shift+End arrive as 147 and 132, and Shift+Delete as 148 with Shift held.
 
 A typed character and RETURN replace the selection. Backspace and Delete take it out. Tab
-and every command end it. Copy keeps it.
+and every command but find and replace end it. Copy keeps it.
 
 The clipboard is document 3 of the store, in bank 40. It holds 512 lines and 6,400 bytes.
 A copy that does not fit keeps the lines before the one refused and shows
@@ -526,6 +527,7 @@ and `ed_word_left`.
 |---|---|
 | find | asks for a term in an input box and moves the cursor to the next place it starts. The box starts with the selected text when the selection is on one line, and with the last term when not. Up and Down in the box walk the last six terms. The selection ends when the find runs, and stays when the box is left with Esc. |
 | find next | finds the last term again |
+| replace | asks for a term in the find box, then for its replacement in a second box. The replace box starts with the last replacement, and Up and Down in it walk the last six. The run starts at the first line. Each place the term starts is selected, and the status bar asks `Replace?  Yes  No  All  Esc`. Y, RETURN and Space replace it, N passes it, A replaces it and every place after it, Esc and Stop end the run. An empty replacement takes the term out. A replacement that would make a line over 250 characters is passed over. The run is one edit for undo, and the cursor ends at the last place asked about. The status bar then shows `Replaced` and the count, or `Not found`. |
 | save | writes the document. It prompts for a name when the document has none. |
 | open | picks a file in the file picker and loads it. The pick can change the current directory. |
 | new | starts an empty document with no name. `DOC.NEW` makes it one empty line. |
@@ -549,7 +551,7 @@ all three documents.
 |---|---|
 | File | New Ctrl+N, Open... Ctrl+O, Save Ctrl+S/F2, Save As..., a separator, Exit |
 | Edit | Undo Ctrl+Z, Redo Ctrl+Y, a separator, Cut Ctrl+X, Copy Ctrl+C, Paste Ctrl+V, a separator, Select All Ctrl+A, Delete Line Ctrl+L |
-| Search | Find... Ctrl+F/F6, Find Next F3, a separator, Go to Line... Ctrl+G |
+| Search | Find... Ctrl+F/F6, Find Next F3, Replace... Ctrl+H, a separator, Go to Line... Ctrl+G |
 | Window | Next Document F7, a separator, Document A, Document B, Document C |
 | Help | Help... F1, About |
 
@@ -601,7 +603,7 @@ the limit or past it. A full arena stops it the same way. Either shows
 | 14 | pieces from `BANKMGR.SPACE`: the file picker's list, 6,144 bytes, and the TURBOTEST key script, 1,024 bytes, in TURBOTEST only. The clipboard is not placed. |
 | 15 | keyword table, inks and the classify buffers |
 | 16 to 38 | arena of A |
-| 39 | the code of `TG-CLIP`, `KVBIN` and the find history |
+| 39 | the code of `TG-CLIP`, `KVBIN`, the histories and the replace run |
 | 40 | the clipboard, document 3 of the store: its line table to $A5FF, its arena from $A600 |
 | 41 | the code of `LINEINPUT` and the TG modules other than `TG-CLIP` |
 | 42 to 52 | arena of B |
@@ -622,9 +624,10 @@ Dialogs keep the screen under them in VRAM through `STASHVRAM`, the library's de
 take no bank. The clipboard takes bank 40, and its code bank 39. The editor's settings are keys in the shared
 store `/SETTINGS.KVB`, read and written by `KVBIN.INC.BL`, and take no bank.
 
-The find history is the keys `TG.FIND.1` to `TG.FIND.6`, newest first. The first find of a
-run reads them, and stops at the first key the store does not hold. A find writes the keys
-whose entry changed. The first write of a run makes the store when it is not on the drive
+The find history is the keys `TG.FIND.1` to `TG.FIND.6`, newest first, and the replace
+history `TG.REPLACE.1` to `TG.REPLACE.6`. The first find or replace of a run reads a history,
+and stops at the first key the store does not hold. A find or a replace writes the keys
+whose entry changed. An empty replacement is not kept. The first write of a run makes the store when it is not on the drive
 or is an empty file. `KVBIN.PUT` cannot: its read and write open makes an empty file on
 hostfs, and `KVBIN` then takes the file for one that is not a store. TURBOTEST's store is
 `SETTINGS.KVB` in `bench/`.
@@ -717,7 +720,7 @@ Decided 2026-10-03. The work runs in this order.
      back on every exit.
    - The status-bar prompts are removed: `TURBO.PROMPT`, `TURBO.CONFIRM`, and the
      `LINEINPUT` lines of `TURBO.SETUP`.
-   - Find and Save as call `INPUTBOX`. Open calls `PICKFILE`, step 5.
+   - Find, Replace and Save as call `INPUTBOX`. Open calls `PICKFILE`, step 5.
    - Before a document's changes are lost, the editor asks with `ASK3`: Save, Discard
      and Cancel, as MSEDIT does. Quit asks with `ASKYNEX`, and the focus starts on No.
    - "Saved", "Loaded" and "Not found" stay on the status bar. "Save failed" and "File

@@ -14,7 +14,7 @@
 ##
 ##                       1 find    2 find next    3 save     4 open
 ##                       5 new     6 quit         7 build    8 help
-##                       9 next document    15 go to line
+##                       9 next document    15 go to line    16 replace
 ##
 ##                     Commands 6 and 10 to 14 have no key. A menu row runs them.
 ##
@@ -32,6 +32,7 @@
 ##   Ctrl+V                                paste
 ##   Ctrl+A                                select all
 ##   Ctrl+F or F6, F3                      find, find next
+##   Ctrl+H                                replace
 ##   Ctrl+G                                go to a line
 ##   Ctrl+S or F2, Ctrl+O, Ctrl+N          save, open, new
 ##   F5, F1                                build, help
@@ -48,8 +49,8 @@
 ## Insert, with Shift held.
 ##
 ## A typed character and RETURN replace the selection. Backspace and Delete take it out. Cut,
-## copy and paste work on it. Find keeps it for the program, which ends it. Any other action
-## ends it.
+## copy and paste work on it. Find and replace keep it for the program, which ends it. Any
+## other action ends it.
 ##
 ## WARNING: Ctrl+C and Stop send code 3, and the KERNAL raises its stop flag for code 3. The
 ## runtime then ends the program with BREAK. The program points the KERNAL's stop vector at a
@@ -102,6 +103,7 @@ KEYS.SETUP:
   POKE KEYS.ACTION.ADDR + 139, 65
   POKE KEYS.ACTION.ADDR + 134, 66
   POKE KEYS.ACTION.ADDR + 7, 79
+  POKE KEYS.ACTION.ADDR + 8, 80
   POKE KEYS.ACTION.ADDR + 137, 67
   POKE KEYS.ACTION.ADDR + 15, 68
   POKE KEYS.ACTION.ADDR + 14, 69
@@ -166,8 +168,8 @@ KEYS.SELECT.MOVE:
   RETURN
 
 ## Settle the selection before action KEYS.ACTION% runs. Cursor moves keep it, empty or not.
-## Before any other action an empty selection ends. Cut, copy, paste, select all, Insert and
-## find keep it. A typed character and RETURN take the selected text out first, and Backspace
+## Before any other action an empty selection ends. Cut, copy, paste, select all, Insert, find
+## and replace keep it. A typed character and RETURN take the selected text out first, and Backspace
 ## and Delete take it out and do nothing more. Every other action ends it.
 ##
 ## WARNING: KEYS.SELECT.MOVE starts a selection empty, before its move runs. The moves must
@@ -178,7 +180,7 @@ KEYS.SELECTION.FIRST:
   IF VIEW.SELECT.ANCHOR.LINE% = VIEW.CURSOR.LINE% AND VIEW.SELECT.ANCHOR.COL% = VIEW.CURSOR.COL% THEN VIEW.SELECT.ON% = 0
   IF VIEW.SELECT.ON% = 0 THEN RETURN
   GP.SELECT KEYS.SETTLE.ACTION%
-    GP.CASE 17, 18, 19, 20, 21, 65
+    GP.CASE 17, 18, 19, 20, 21, 65, 80
     GP.CASE 1, 10
       GOSUB VIEW.SELECTION.DELETE
       IF VIEW.SELECTION.DELETED% = 0 THEN KEYS.ACTION% = 0
