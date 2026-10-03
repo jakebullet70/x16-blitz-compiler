@@ -1,0 +1,776 @@
+#SAVEAS "@:TURBO.SRC.PRG"
+#REM 0
+#SYMFILE "@:TURBO.SRC.SYM"
+#INCLUDE "GPC-BASIC/GPB.INC.BL"
+#INCLUDE "GPC-BASIC/APPSYS.INC.BL"
+#INCLUDE "GPC-BASIC/STASH.INC.BL"
+
+## ============================================================================
+## TURBO -- TURBO GPC, the editor. It holds three documents, A, B and C, and shows one.
+## F7 shows the next.
+##
+## Row 0 is the menu bar: File, Edit, Search, Window and Help, the name, and the letters A, B
+## and C at columns 76 to 78. The letter of the document on screen is in TURBO.ATTR.CHOSEN%.
+## The letter of another document with an edit since its last load or save is in
+## TURBO.ATTR.CHANGED%. Esc opens the File menu, and Alt with a menu's letter opens that
+## menu. Alt pressed and let go alone lights the bar. File, Exit quits.
+##
+## Rows 1 to 28 are the pane. Row 29 is the status bar:
+##
+##   column 1    Line and the cursor's line
+##   column 12   Col and the cursor's column
+##   column 22   * when an edit was made since the last load or save
+##   column 24   the file name
+##   column 46   a message. The next key clears it.
+##
+## Open picks the file in the file picker. Find, Save as and Go to line ask in a dialog box.
+## So do the question before a document's changes are lost and the question before quitting.
+## An error opens a message box. A hot letter is yellow.
+##
+## The find box starts with the selected text when the selection is on one line. Up and Down
+## in it walk the last TURBO.HISTORY.DEPTH terms. The settings store /SETTINGS.KVB keeps them,
+## under the keys TG.FIND.1 to TG.FIND.6, newest first.
+##
+## The GUI library and the editor's setup run from banks 10 to 12. LINEINPUT and the TG
+## modules run from bank 41.
+## TURBO.GUI.SETUP claims the editor's banks: 2 to 12, and 15 to 63. The menu builder claims bank 13. The dialogs keep the
+## screen under them in VRAM. Dialogs and dropdowns have a drop shadow. The file picker's list
+## takes TURBO.PICK.BYTES of space from BANKMGR.SPACE.
+##
+## TG-KEYS.BASL holds the key map. A menu row runs an action of the map or a command.
+## TG-CLIP.BASL holds the clipboard, in bank 40, and runs from bank 39. TURBO.STOP.OFF takes Ctrl+C away from the
+## runtime, so it reaches the key map as Copy. KVBIN and the find history run from bank 39 too.
+##
+## WARNING: a string literal here is ASCII and the screen is PETSCII. A literal drawn as it
+## is shows each letter in the other case. TURBO.ASCII.TO.PETSCII makes the text to draw.
+##
+## build.py builds it. In bench/, python spike.py TURBOTEST drives it with a key script and
+## checks it.
+##
+## Checklist: turbo_test_source() in bench/spike.py replaces six strings of this file.
+## They are the #SAVEAS name, the #SYMFILE name, the empty-key line of TURBO.KEY.WAIT, the
+## pair of lines GOSUB APPSYS.RESTORE and END, the settings store's name in TURBO.SETUP,
+## and the #INCLUDE of TG-LOW.BASL. Each occurs once. Change the function when one of them
+## changes.
+## ============================================================================
+
+#DEFINE TURBO.KBDMOD $FEC0
+#DEFINE TURBO.STOP.VECTOR $0328
+#DEFINE TURBO.STOP.PAGE 7
+#DEFINE TURBO.CHARSET.THIN 5
+#DEFINE TURBO.MARK.COLUMN 22
+#DEFINE TURBO.NAME.COLUMN 24
+#DEFINE TURBO.MESSAGE.COLUMN 46
+#DEFINE TURBO.MESSAGE.WIDTH 34
+#DEFINE TURBO.TITLE.COLUMN 66
+#DEFINE TURBO.DOCUMENTS.COLUMN 76
+#DEFINE TURBO.FIELD.LENGTH 40
+#DEFINE TURBO.MENU.COUNT 5
+#DEFINE TURBO.HOT.COLOUR 7
+#DEFINE TURBO.PICK.BYTES 6144
+#DEFINE TURBO.LINE.DIGITS 4
+#DEFINE TURBO.HISTORY.DEPTH 6
+#DEFINE TURBO.DOS.NOT.FOUND 62
+
+## A menu row's action. 1 to 21 are actions of the key map. 65 and on are 64 and a command
+## number of TURBO.COMMAND.
+## Checklist: KEYS.SETUP and KEYS.RUN in TG-KEYS.BASL number the actions, and the ON list
+## of TURBO.COMMAND the commands. Change them together.
+#DEFINE TURBO.ACT.NONE 0
+#DEFINE TURBO.ACT.DELETE.LINE 14
+#DEFINE TURBO.ACT.UNDO 15
+#DEFINE TURBO.ACT.REDO 16
+#DEFINE TURBO.ACT.CUT 17
+#DEFINE TURBO.ACT.COPY 18
+#DEFINE TURBO.ACT.PASTE 19
+#DEFINE TURBO.ACT.SELECT.ALL 20
+#DEFINE TURBO.ACT.FIND 65
+#DEFINE TURBO.ACT.FIND.NEXT 66
+#DEFINE TURBO.ACT.SAVE 67
+#DEFINE TURBO.ACT.OPEN 68
+#DEFINE TURBO.ACT.NEW 69
+#DEFINE TURBO.ACT.QUIT 70
+#DEFINE TURBO.ACT.HELP 72
+#DEFINE TURBO.ACT.NEXT.DOCUMENT 73
+#DEFINE TURBO.ACT.SAVE.AS 74
+#DEFINE TURBO.ACT.DOCUMENT.A 75
+#DEFINE TURBO.ACT.DOCUMENT.B 76
+#DEFINE TURBO.ACT.DOCUMENT.C 77
+#DEFINE TURBO.ACT.ABOUT 78
+#DEFINE TURBO.ACT.GOTO.LINE 79
+
+## The code banks of the editor and the GUI library, and the menu builder's text bank.
+#DEFINE TURBO.EDIT.CODE.BANK 41
+#DEFINE TURBO.CLIP.CODE.BANK 39
+#DEFINE TURBO.MENU.CODE.BANK 10
+#DEFINE TURBO.GUI.CODE.BANK 11
+#DEFINE TURBO.DIALOG.CODE.BANK 12
+#DEFINE MENU.TEXTBANK 13
+
+## ---- the GUI library and the editor's setup ----
+## It sits above every caller: a GP.SUB or GP.FN compiles only below its GP.DEFPROC.
+## TURBO.PETSCII and the routines that run once at the start are in the regions with the
+## library, so their bytes stay out of low memory and the workspace keeps them. MENUKEY holds
+## a BANK statement, so it follows the last region and stays out of them, and no region calls
+## it.
+GOTO TURBO.GUI.END
+
+## WARNING: LINEINPUT stays above the GUI region. GUI.INC.BL reads its #DEFINEs.
+GP.BANKED TURBO.EDIT.CODE.BANK
+#INCLUDE "GPC-BASIC/LINEINPUT.INC.BL"
+#INCLUDE "TG-STORE.BASL"
+#INCLUDE "TG-UNDO.BASL"
+#INCLUDE "TG-VIEW.BASL"
+#INCLUDE "TG-KEYS.BASL"
+GP.ENDBANKED
+
+GP.BANKED TURBO.CLIP.CODE.BANK
+#INCLUDE "TG-CLIP.BASL"
+#INCLUDE "GPC-BASIC/KVBIN.INC.BL"
+
+## ---- the find history ----
+## TURBO.FIND.PREPARE -- set TURBO.FIND.START$, the text the find box starts with. It is the
+## selected text when the selection is on one line, cut to TURBO.FIELD.LENGTH characters, and
+## the last term when not. The first call reads the find history from the settings store.
+##
+## A selection on one line is on the cursor line, and the edit buffer holds that line.
+TURBO.FIND.PREPARE:
+  IF TURBO.FIND.LOADED% = 0 THEN GOSUB TURBO.FIND.LOAD
+  TURBO.FIND.START$ = DOC.FIND.TERM$
+  IF VIEW.SELECT.ON% = 0 THEN RETURN
+  IF VIEW.SELECT.ANCHOR.LINE% <> VIEW.CURSOR.LINE% THEN RETURN
+  GOSUB VIEW.SELECT.ORDER
+  IF VIEW.SELECT.LAST.COL% - VIEW.SELECT.FIRST.COL% > TURBO.FIELD.LENGTH THEN VIEW.SELECT.LAST.COL% = VIEW.SELECT.FIRST.COL% + TURBO.FIELD.LENGTH
+  TURBO.FIND.START$ = ""
+  FOR TURBO.FIND.COLUMN = VIEW.SELECT.FIRST.COL% TO VIEW.SELECT.LAST.COL% - 1
+    TURBO.FIND.START$ = TURBO.FIND.START$ + CHR$(PEEK(DOC.EDIT.ADDR + 1 + TURBO.FIND.COLUMN))
+  NEXT TURBO.FIND.COLUMN
+  RETURN
+
+TURBO.FIND.LOAD:
+  TURBO.HISTORY.KEY$ = "TG.FIND." : GOSUB TURBO.HISTORY.LOAD
+  TURBO.FIND.HISTORY$ = TURBO.HISTORY.LIST$ : TURBO.FIND.LOADED% = -1
+  RETURN
+
+## TURBO.FIND.REMEMBER -- put DOC.FIND.TERM$ at the front of the find history.
+TURBO.FIND.REMEMBER:
+  TURBO.HISTORY.KEY$ = "TG.FIND."
+  TURBO.HISTORY.LIST$ = TURBO.FIND.HISTORY$ : TURBO.HISTORY.TERM$ = DOC.FIND.TERM$
+  GOSUB TURBO.HISTORY.ADD : TURBO.FIND.HISTORY$ = TURBO.HISTORY.LIST$
+  RETURN
+
+## ---- histories in the settings store ----
+## A history is the values of keys 1 to TURBO.HISTORY.DEPTH under one stem in the settings
+## store, newest first. Stem "TG.FIND." gives keys TG.FIND.1 to TG.FIND.6. In memory a
+## history is TURBO.HISTORY.LIST$: the entries, newest first, each followed by CHR$(13), the
+## form DLGHISTORY takes.
+
+## TURBO.HISTORY.LOAD -- read the history of stem TURBO.HISTORY.KEY$ into
+## TURBO.HISTORY.LIST$. The read stops at the first key the store does not hold. A store that
+## is not on the drive gives "".
+TURBO.HISTORY.LOAD:
+  TURBO.HISTORY.LIST$ = "" : TURBO.HISTORY.PLACE% = 0
+  GP.DO TURBO.HISTORY.DEPTH
+    TURBO.HISTORY.PLACE% = TURBO.HISTORY.PLACE% + 1
+    KVBIN.KEY$ = TURBO.HISTORY.KEY$ + CHR$(48 + TURBO.HISTORY.PLACE%)
+    GOSUB KVBIN.GET : IF LEN(KVBIN.VALUE$) = 0 THEN GP.EXITDO
+    TURBO.HISTORY.LIST$ = TURBO.HISTORY.LIST$ + KVBIN.VALUE$ + CHR$(13)
+  GP.LOOP
+  RETURN
+
+## TURBO.HISTORY.ADD -- put TURBO.HISTORY.TERM$ at the front of TURBO.HISTORY.LIST$, the
+## history of stem TURBO.HISTORY.KEY$, and write the entries that changed to the settings
+## store. The term leaves its old place. An entry past TURBO.HISTORY.DEPTH is dropped. The
+## term must not be empty.
+TURBO.HISTORY.ADD:
+  TURBO.HISTORY.OLD$  = TURBO.HISTORY.LIST$ : TURBO.HISTORY.LIST$ = TURBO.HISTORY.TERM$ + CHR$(13)
+  TURBO.HISTORY.KEPT% = 1 : TURBO.HISTORY.WALK$ = TURBO.HISTORY.OLD$ : TURBO.HISTORY.PLACE% = 0
+  GP.DO TURBO.HISTORY.DEPTH
+    TURBO.HISTORY.PLACE% = TURBO.HISTORY.PLACE% + 1 : GOSUB TURBO.HISTORY.PICK
+    IF LEN(TURBO.HISTORY.ENTRY$) = 0 THEN GP.EXITDO
+    IF TURBO.HISTORY.KEPT% = TURBO.HISTORY.DEPTH THEN GP.EXITDO
+    IF TURBO.HISTORY.ENTRY$ <> TURBO.HISTORY.TERM$ THEN TURBO.HISTORY.LIST$ = TURBO.HISTORY.LIST$ + TURBO.HISTORY.ENTRY$ + CHR$(13)
+    IF TURBO.HISTORY.ENTRY$ <> TURBO.HISTORY.TERM$ THEN TURBO.HISTORY.KEPT% = TURBO.HISTORY.KEPT% + 1
+  GP.LOOP
+  TURBO.HISTORY.PLACE% = 0
+  GP.DO TURBO.HISTORY.KEPT%
+    TURBO.HISTORY.PLACE% = TURBO.HISTORY.PLACE% + 1 : TURBO.HISTORY.WALK$ = TURBO.HISTORY.OLD$
+    GOSUB TURBO.HISTORY.PICK
+    TURBO.HISTORY.WAS$ = TURBO.HISTORY.ENTRY$ : TURBO.HISTORY.WALK$ = TURBO.HISTORY.LIST$
+    GOSUB TURBO.HISTORY.PICK
+    IF TURBO.HISTORY.ENTRY$ <> TURBO.HISTORY.WAS$ THEN GOSUB TURBO.HISTORY.WRITE
+  GP.LOOP
+  RETURN
+
+## Set TURBO.HISTORY.ENTRY$ to entry TURBO.HISTORY.PLACE% of TURBO.HISTORY.WALK$, counted from
+## 1. It is "" when the history holds fewer entries.
+##
+## WARNING: GP.DO 0 loops forever. TURBO.HISTORY.PLACE% must be 1 or more.
+TURBO.HISTORY.PICK:
+  TURBO.HISTORY.ENTRY$ = "" : TURBO.HISTORY.FROM% = 1
+  GP.DO TURBO.HISTORY.PLACE%
+    IF TURBO.HISTORY.FROM% > LEN(TURBO.HISTORY.WALK$) THEN TURBO.HISTORY.ENTRY$ = ""
+    IF TURBO.HISTORY.FROM% > LEN(TURBO.HISTORY.WALK$) THEN GP.EXITDO
+    TURBO.HISTORY.CUT% = GP.INSTR(TURBO.HISTORY.WALK$, CHR$(13), TURBO.HISTORY.FROM%)
+    TURBO.HISTORY.ENTRY$ = MID$(TURBO.HISTORY.WALK$, TURBO.HISTORY.FROM%, TURBO.HISTORY.CUT% - TURBO.HISTORY.FROM%)
+    TURBO.HISTORY.FROM% = TURBO.HISTORY.CUT% + 1
+  GP.LOOP
+  RETURN
+
+TURBO.HISTORY.WRITE:
+  KVBIN.KEY$ = TURBO.HISTORY.KEY$ + CHR$(48 + TURBO.HISTORY.PLACE%)
+  KVBIN.VALUE$ = TURBO.HISTORY.ENTRY$
+
+## TURBO.SETTING.PUT -- write KVBIN.KEY$ and KVBIN.VALUE$ to the settings store. A full store
+## grows.
+TURBO.SETTING.PUT:
+  IF TURBO.SETTINGS.CHECKED% = 0 THEN GOSUB TURBO.SETTINGS.CHECK
+  GOSUB KVBIN.PUT    : IF KVBIN.WHY% <> KVBIN.WHY.FULL THEN RETURN
+  GOSUB KVBIN.EXPAND : IF KVBIN.OK% <> 0 THEN GOSUB KVBIN.PUT
+  RETURN
+
+## Make the settings store when it is not on the drive, or is an empty file. Once a run.
+##
+## WARNING: KVBIN.PUT opens the store to read and write. On a store not on the drive that open
+## makes an empty file, and KVBIN takes an empty file for one that is not a store.
+TURBO.SETTINGS.CHECK:
+  TURBO.SETTINGS.CHECKED% = -1 : GOSUB KVBIN.INFO
+  IF KVBIN.WHY% = KVBIN.WHY.NOFILE   THEN IF KVBIN.DOSERR% = TURBO.DOS.NOT.FOUND THEN GOSUB KVBIN.CREATE
+  IF KVBIN.WHY% = KVBIN.WHY.NOTSTORE THEN IF KVBIN.HEADER$ = "" THEN GOSUB KVBIN.CREATE
+  RETURN
+GP.ENDBANKED
+
+GP.BANKED TURBO.MENU.CODE.BANK
+#INCLUDE "GPC-BASIC/BANKMGR.INC.BL"
+#INCLUDE "GPC-BASIC/STASHVRAM.INC.BL"
+#INCLUDE "GPC-BASIC/THEME.INC.BL"
+#INCLUDE "GPC-BASIC/MENU.INC.BANKED.BL"
+#INCLUDE "GPC-BASIC/MENU.INC.BL"
+#INCLUDE "GPC-BASIC/MENUPULL.INC.BL"
+
+## TURBO.ASCII.TO.PETSCII -- make TURBO.PETSCII.TEXT$, the PETSCII form of the ASCII text
+## TURBO.ASCII.TEXT$.
+## A to Z becomes $C1 to $DA and a to z becomes $41 to $5A.
+##
+##   GOSUB TURBO.ASCII.TO.PETSCII with TURBO.ASCII.TEXT$ set, or F$ = GP.FN(TURBO.PETSCII, "Save as:")
+TURBO.ASCII.TO.PETSCII:
+  GP.DEFPROC TURBO.PETSCII, TURBO.ASCII.TEXT$ RETURNS TURBO.PETSCII.TEXT$
+  TURBO.PETSCII.TEXT$ = "" : IF LEN(TURBO.ASCII.TEXT$) = 0 THEN RETURN
+  FOR TURBO.PETSCII.PLACE = 1 TO LEN(TURBO.ASCII.TEXT$)
+    TURBO.PETSCII.CODE% = ASC(MID$(TURBO.ASCII.TEXT$, TURBO.PETSCII.PLACE, 1))
+    IF TURBO.PETSCII.CODE% >= 65 AND TURBO.PETSCII.CODE% <= 90 THEN TURBO.PETSCII.CODE% = TURBO.PETSCII.CODE% + 128
+    IF TURBO.PETSCII.CODE% >= 97 AND TURBO.PETSCII.CODE% <= 122 THEN TURBO.PETSCII.CODE% = TURBO.PETSCII.CODE% - 32
+    TURBO.PETSCII.TEXT$ = TURBO.PETSCII.TEXT$ + CHR$(TURBO.PETSCII.CODE%)
+  NEXT TURBO.PETSCII.PLACE
+  RETURN
+
+## TURBO.MENU.ROW.ADD -- add a row to dropdown TURBO.MENU.BUILDING%. The text is ASCII and is
+## made PETSCII here. The action is a TURBO.ACT number. A separator, "-", takes TURBO.ACT.NONE.
+##
+##   GP.SUB TURBO.ADDROW, "&Open...       Ctrl+O", TURBO.ACT.OPEN
+TURBO.MENU.ROW.ADD:
+  GP.DEFPROC TURBO.ADDROW, TURBO.ROW.TEXT$, TURBO.ROW.ACTION%
+  GP.SUB MENU.ITEM, GP.FN(TURBO.PETSCII, TURBO.ROW.TEXT$)
+  TURBO.MENU.ACTIONS$(TURBO.MENU.BUILDING%) = TURBO.MENU.ACTIONS$(TURBO.MENU.BUILDING%) + CHR$(TURBO.ROW.ACTION%)
+  RETURN
+
+## TURBO.MENU.SETUP -- build the menu bar and its five dropdowns. TURBO.MENU.ACTIONS$(n) holds
+## the action of each row of dropdown n, a byte a row.
+TURBO.MENU.SETUP:
+  DIM TURBO.MENU.ACTIONS$(TURBO.MENU.COUNT)
+  GP.SUB MENU.BEGIN, MENU.BAR
+  GP.SUB MENU.ITEM, GP.FN(TURBO.PETSCII, " &File ")
+  GP.SUB MENU.ITEM, GP.FN(TURBO.PETSCII, " &Edit ")
+  GP.SUB MENU.ITEM, GP.FN(TURBO.PETSCII, " &Search ")
+  GP.SUB MENU.ITEM, GP.FN(TURBO.PETSCII, " &Window ")
+  GP.SUB MENU.ITEM, GP.FN(TURBO.PETSCII, " &Help ")
+  TURBO.MENU.BUILDING% = 1
+  GP.SUB MENU.BEGIN, MENU.DROP + TURBO.MENU.BUILDING%
+  GP.SUB TURBO.ADDROW, "&New           Ctrl+N", TURBO.ACT.NEW
+  GP.SUB TURBO.ADDROW, "&Open...       Ctrl+O", TURBO.ACT.OPEN
+  GP.SUB TURBO.ADDROW, "&Save          Ctrl+S/F2", TURBO.ACT.SAVE
+  GP.SUB TURBO.ADDROW, "Save &As...", TURBO.ACT.SAVE.AS
+  GP.SUB TURBO.ADDROW, "-", TURBO.ACT.NONE
+  GP.SUB TURBO.ADDROW, "E&xit", TURBO.ACT.QUIT
+  TURBO.MENU.BUILDING% = 2
+  GP.SUB MENU.BEGIN, MENU.DROP + TURBO.MENU.BUILDING%
+  GP.SUB TURBO.ADDROW, "&Undo          Ctrl+Z", TURBO.ACT.UNDO
+  GP.SUB TURBO.ADDROW, "&Redo          Ctrl+Y", TURBO.ACT.REDO
+  GP.SUB TURBO.ADDROW, "-", TURBO.ACT.NONE
+  GP.SUB TURBO.ADDROW, "Cu&t           Ctrl+X", TURBO.ACT.CUT
+  GP.SUB TURBO.ADDROW, "&Copy          Ctrl+C", TURBO.ACT.COPY
+  GP.SUB TURBO.ADDROW, "&Paste         Ctrl+V", TURBO.ACT.PASTE
+  GP.SUB TURBO.ADDROW, "-", TURBO.ACT.NONE
+  GP.SUB TURBO.ADDROW, "Select &All    Ctrl+A", TURBO.ACT.SELECT.ALL
+  GP.SUB TURBO.ADDROW, "&Delete Line   Ctrl+L", TURBO.ACT.DELETE.LINE
+  TURBO.MENU.BUILDING% = 3
+  GP.SUB MENU.BEGIN, MENU.DROP + TURBO.MENU.BUILDING%
+  GP.SUB TURBO.ADDROW, "&Find...       Ctrl+F/F6", TURBO.ACT.FIND
+  GP.SUB TURBO.ADDROW, "Find &Next     F3", TURBO.ACT.FIND.NEXT
+  GP.SUB TURBO.ADDROW, "-", TURBO.ACT.NONE
+  GP.SUB TURBO.ADDROW, "&Go to Line... Ctrl+G", TURBO.ACT.GOTO.LINE
+  TURBO.MENU.BUILDING% = 4
+  GP.SUB MENU.BEGIN, MENU.DROP + TURBO.MENU.BUILDING%
+  GP.SUB TURBO.ADDROW, "&Next Document  F7", TURBO.ACT.NEXT.DOCUMENT
+  GP.SUB TURBO.ADDROW, "-", TURBO.ACT.NONE
+  GP.SUB TURBO.ADDROW, "Document &A", TURBO.ACT.DOCUMENT.A
+  GP.SUB TURBO.ADDROW, "Document &B", TURBO.ACT.DOCUMENT.B
+  GP.SUB TURBO.ADDROW, "Document &C", TURBO.ACT.DOCUMENT.C
+  TURBO.MENU.BUILDING% = 5
+  GP.SUB MENU.BEGIN, MENU.DROP + TURBO.MENU.BUILDING%
+  GP.SUB TURBO.ADDROW, "&Help...       F1", TURBO.ACT.HELP
+  GP.SUB TURBO.ADDROW, "&About", TURBO.ACT.ABOUT
+  RETURN
+
+GP.ENDBANKED
+
+GP.BANKED TURBO.GUI.CODE.BANK
+#INCLUDE "GPC-BASIC/GUI.INC.BL"
+#INCLUDE "GPC-BASIC/COMBO.INC.BL"
+#INCLUDE "GPC-BASIC/CHECK.INC.BL"
+GP.ENDBANKED
+
+GP.BANKED TURBO.DIALOG.CODE.BANK
+#INCLUDE "GPC-BASIC/GUI-DIALOGS.INC.BL"
+#INCLUDE "GPC-BASIC/FILEIO.INC.BL"
+#INCLUDE "GPC-BASIC/FILEDIR.INC.BL"
+#INCLUDE "GPC-BASIC/FILEPICK.INC.BL"
+
+## TURBO.GUI.SETUP -- claim the editor's banks, then set up the menus and the dialogs. Call
+## it once, before DOC.SETUP.
+##
+## TURBO.MENU.SETUP comes before any BANKMGR.SPACE. Its first MENU.BEGIN claims
+## MENU.TEXTBANK, and a piece of space handed out first would take that bank.
+##
+## Hot letters are TURBO.HOT.COLOUR. MENU.THEME takes the theme's colours, and the two menu
+## attributes set after it make the menus' hot letters yellow. DLGHOTKEY does the same for the
+## dialogs' buttons and the picker's footer. WARNING: a THEME.SELECT after this gives the
+## menus the theme's hot letter colour back.
+##
+## The dialogs and the dropdowns frame their boxes from six screen codes. GP.BOX's own styles
+## show letters under charset 5. These six are lines there. The dropdowns take them as a
+## glyph table in TURBO.FRAME.GLYPHS%, which stays where it is: an array does not move and a
+## string can. DLGLABELS gives the library's own buttons their labels through TURBO.PETSCII,
+## like every other text the editor draws.
+##
+## Checklist: DOC.PLACE in TG-STORE.BASL, VIEW.SETUP in TG-VIEW.BASL and the bank map of
+## docs/blitz/TURBO-GPC.PLAN.md give the banks claimed here. Change them together.
+TURBO.GUI.SETUP:
+  GOSUB BANKMGR.INIT
+  FOR TURBO.CLAIM.BANK = 2 TO 12
+    GP.SUB BANKMGR.CLAIM.BANK, TURBO.CLAIM.BANK
+  NEXT TURBO.CLAIM.BANK
+  FOR TURBO.CLAIM.BANK = 15 TO 63
+    GP.SUB BANKMGR.CLAIM.BANK, TURBO.CLAIM.BANK
+  NEXT TURBO.CLAIM.BANK
+  GOSUB TURBO.MENU.SETUP : THEME.ID% = 0 : GOSUB THEME.SELECT : GOSUB MENU.THEME
+  MENU.BARHOT% = (MENU.BARATTR% AND 240) + TURBO.HOT.COLOUR
+  MENU.HOTATTR% = (MENU.ATTR% AND 240) + TURBO.HOT.COLOUR
+  GP.SUB DLGHOTKEY, TURBO.HOT.COLOUR : GP.SUB BANKMGR.SPACE, TURBO.PICK.BYTES
+  GP.SUB PICKSPACE, BANKMGR.BANK%, BANKMGR.ADDR, TURBO.PICK.BYTES
+  GP.SUB PICKLABELS, GP.FN(TURBO.PETSCII, "&Del  &Folders:On   Esc"), GP.FN(TURBO.PETSCII, "&Del  &Folders:Off  Esc"), GP.FN(TURBO.PETSCII, "Delete *? Y/N")
+  GUI.CORNER.TL% = $70 : GUI.CORNER.TR% = $6E : GUI.CORNER.BL% = $6D
+  GUI.CORNER.BR% = $7D : GUI.EDGE.H% = $40 : GUI.EDGE.V% = $5D
+  GP.SUB DLGGLYPH, 1 : GP.SUB DLGSHADOW, 1
+  GP.SUB DLGLABELS, GP.FN(TURBO.PETSCII, "&OK"), GP.FN(TURBO.PETSCII, "&Cancel"), GP.FN(TURBO.PETSCII, "&Yes"), GP.FN(TURBO.PETSCII, "&No")
+  DIM TURBO.FRAME.GLYPHS%(3) : TURBO.FRAME.ADDR = GP.ARRPTR(TURBO.FRAME.GLYPHS%())
+  POKE TURBO.FRAME.ADDR, GUI.CORNER.TR% : POKE TURBO.FRAME.ADDR + 1, GUI.CORNER.TL%
+  POKE TURBO.FRAME.ADDR + 2, GUI.CORNER.BR% : POKE TURBO.FRAME.ADDR + 3, GUI.CORNER.BL%
+  POKE TURBO.FRAME.ADDR + 4, GUI.EDGE.H% : POKE TURBO.FRAME.ADDR + 5, GUI.EDGE.H%
+  POKE TURBO.FRAME.ADDR + 6, GUI.EDGE.V% : POKE TURBO.FRAME.ADDR + 7, GUI.EDGE.V%
+  MENU.DROPSTYLE = TURBO.FRAME.ADDR : MENU.SHADOW% = 1
+  RETURN
+
+## TURBO.SETUP -- set the bar attributes and the labels of the bars. Call it once, after
+## VIEW.SETUP. The bars take the theme's colours, as the menu bar does. A changed document's
+## letter is yellow on the bar.
+TURBO.SETUP:
+  TURBO.ATTR.BAR% = THEME.CLR%(THEME.BAR)
+  TURBO.ATTR.CHOSEN% = THEME.CLR%(THEME.TEXT)
+  TURBO.ATTR.CHANGED% = (TURBO.ATTR.BAR% AND 240) + 7
+  DIM TURBO.KEPT.NAME$(2)       : DIM TURBO.KEPT.SAVED.GROUP%(2)
+  DIM TURBO.KEPT.CHANGED%(2)    : DIM TURBO.KEPT.CURSOR.LINE%(2)
+  DIM TURBO.KEPT.CURSOR.COL%(2) : DIM TURBO.KEPT.TOP.LINE%(2)
+  DIM TURBO.KEPT.LEFT.COL%(2)
+  TURBO.SWITCH.TO% = 0 : TURBO.FILE.NAME$ = "" : TURBO.QUITTING% = 0
+  TURBO.MESSAGE.VISIBLE% = 0 : TURBO.SAVED.GROUP% = 0 : TURBO.MARK.GROUP% = 0
+  VIEW.COLOUR.ON% = 1
+  KVBIN.FNAME$ = "/SETTINGS.KVB"
+  TURBO.FIND.HISTORY$ = ""
+  TURBO.FIND.LOADED% = 0
+  TURBO.SETTINGS.CHECKED% = 0
+  TURBO.ASCII.TEXT$ = "Line"
+  GOSUB TURBO.ASCII.TO.PETSCII : TURBO.LABEL.LINE$     = TURBO.PETSCII.TEXT$ : TURBO.ASCII.TEXT$ = "Col"
+  GOSUB TURBO.ASCII.TO.PETSCII : TURBO.LABEL.COLUMN$   = TURBO.PETSCII.TEXT$ : TURBO.ASCII.TEXT$ = "Untitled"
+  GOSUB TURBO.ASCII.TO.PETSCII : TURBO.LABEL.UNTITLED$ = TURBO.PETSCII.TEXT$
+  TURBO.LABEL.TITLE$ = GP.FN(TURBO.PETSCII, "TURBO GPC")
+  GOSUB TURBO.STOP.OFF
+  RETURN
+
+## TURBO.STOP.OFF -- point the KERNAL's stop vector at a stub that answers no, so Ctrl+C
+## reaches the key map as Copy. TURBO.STOP.ON puts the vector back.
+##
+## The stub is LDA #$FF : RTS. It sits in page TURBO.STOP.PAGE at the vector's own low byte,
+## so one POKE of the high byte switches the vector. A vector whose low byte leaves no room
+## below the runtime's GP.BSTR bank table at $07F0 is left alone.
+##
+## WARNING: the runtime calls the vector every 16 p-code words. A vector changed by two POKEs
+## is half written between them, and a call there jumps into the ROM.
+##
+## WARNING: while the stub answers, nothing breaks out of the program, and the KERNAL's own
+## stop checks in LOAD and SAVE answer no too.
+TURBO.STOP.OFF:
+  TURBO.STOP.KEPT.HIGH% = PEEK(TURBO.STOP.VECTOR + 1)
+  TURBO.STOP.ADDR = TURBO.STOP.PAGE * 256 + PEEK(TURBO.STOP.VECTOR)
+  IF TURBO.STOP.ADDR > TURBO.STOP.PAGE * 256 + 237 THEN RETURN
+  POKE TURBO.STOP.ADDR, 169
+  POKE TURBO.STOP.ADDR + 1, 255
+  POKE TURBO.STOP.ADDR + 2, 96
+  POKE TURBO.STOP.VECTOR + 1, TURBO.STOP.PAGE
+  RETURN
+
+## TURBO.STOP.ON -- give the KERNAL its stop vector back. Call it before the program ends.
+TURBO.STOP.ON:
+  POKE TURBO.STOP.VECTOR + 1, TURBO.STOP.KEPT.HIGH%
+  RETURN
+
+## TURBO.CLIP.MESSAGE -- show the message CLIP.MESSAGE% names on the status bar, and clear it.
+TURBO.CLIP.MESSAGE:
+  TURBO.CLIP.SHOWN% = CLIP.MESSAGE%
+  CLIP.MESSAGE% = 0
+  GP.SELECT TURBO.CLIP.SHOWN%
+    GP.CASE 1 : TURBO.MESSAGE$ = "Copied"
+    GP.CASE 2 : TURBO.MESSAGE$ = "Line copied"
+    GP.CASE 3 : TURBO.MESSAGE$ = "Clipboard empty"
+    GP.CASE 4 : TURBO.MESSAGE$ = "Clipboard full, copied in part"
+    GP.CASE 5 : TURBO.MESSAGE$ = "Line too long"
+    GP.OTHER  : TURBO.MESSAGE$ = "Document full"
+  GP.ENDSEL
+  GOSUB TURBO.MESSAGE.SHOW
+  RETURN
+
+GP.ENDBANKED
+
+#INCLUDE "GPC-BASIC/MENUKEY.INC.BL"
+
+TURBO.GUI.END:
+
+GOSUB APPSYS.STARTUP : SCREEN 1
+GP.CALL APPSYS.SETCHR, TURBO.CHARSET.THIN, 0, 0, 0
+GOSUB TURBO.GUI.SETUP : GOSUB MENU.KEYS.ON
+GOSUB DOC.SETUP   : GOSUB UNDO.SETUP
+GOSUB VIEW.SETUP  : GOSUB KEYS.SETUP
+GOSUB CLIP.SETUP
+GOSUB TURBO.SETUP : GOSUB TURBO.TITLE.PAINT
+GOSUB DOC.NEW     : GOSUB TURBO.DOCUMENT.SHOW
+
+## ---- the key loop: one key or one menu row a pass, until File, Exit is answered yes ----
+GP.DO
+  GOSUB TURBO.KEY.WAIT
+  IF TURBO.MESSAGE.VISIBLE% <> 0 THEN GOSUB TURBO.MESSAGE.CLEAR
+  KEYS.COMMAND% = 0
+  IF TURBO.MENU.PICKED% < 0 THEN GOSUB KEYS.DISPATCH
+  IF TURBO.MENU.PICKED% > 0 THEN GOSUB TURBO.MENU.RUN
+  IF KEYS.COMMAND% <> 0 THEN GOSUB TURBO.COMMAND
+  IF CLIP.MESSAGE% <> 0 THEN GOSUB TURBO.CLIP.MESSAGE
+  IF UNDO.GROUP% <> TURBO.MARK.GROUP% THEN GOSUB TURBO.MARK.PAINT
+  IF TURBO.QUITTING% <> 0 THEN GP.EXITDO
+GP.LOOP
+
+## --- we done! Bye!
+GOSUB MENU.KEYS.OFF : GOSUB TURBO.STOP.ON : GOSUB APPSYS.RESTORE
+END
+
+## TURBO.KEY.WAIT -- wait for a key. Esc and a key with Alt held go to the menu first.
+##
+##   out  KEYS.CODE%          the key's code. 0 when the menu took Alt alone.
+##        KEYS.MODIFIERS%     the modifier keys held with it
+##        TURBO.MENU.PICKED%  -1 for a key of the key map. 0 when the menu took the key and
+##                            nothing was chosen. A row number when a menu row was chosen, and
+##                            MENU.PICKBAR is then its bar item.
+TURBO.KEY.WAIT:
+  GET TURBO.KEY$ : IF TURBO.KEY$ = "" THEN GOTO TURBO.KEY.IDLE
+  KEYS.CODE% = ASC(TURBO.KEY$) : GOSUB TURBO.MODIFIERS.READ : TURBO.MENU.PICKED% = -1
+  IF KEYS.CODE% = 27 OR (KEYS.MODIFIERS% AND 2) <> 0 THEN TURBO.MENU.PICKED% = GP.FN(MENU.KEY, KEYS.CODE%)
+  RETURN
+
+## No key. MENU.KEY lights the bar when Alt was pressed and let go alone.
+TURBO.KEY.IDLE:
+  TURBO.MENU.PICKED% = GP.FN(MENU.KEY, 0)
+  IF TURBO.MENU.PICKED% < 0 THEN GOTO TURBO.KEY.WAIT
+  KEYS.CODE% = 0 : KEYS.MODIFIERS% = 0
+  RETURN
+
+## Read the modifier keys into KEYS.MODIFIERS%. The call is in ROM bank 0.
+TURBO.MODIFIERS.READ:
+  TURBO.ROM.BANK% = PEEK(1) : POKE 1, 0 : GP.CALL TURBO.KBDMOD : KEYS.MODIFIERS% = GP.A : POKE 1, TURBO.ROM.BANK%
+  RETURN
+
+## TURBO.COMMAND -- run command KEYS.COMMAND%, 1 to 15. Commands 7 and 8 show "Not in this
+## version". Commands 6 and 10 to 14 have no key, and a menu row runs them.
+##
+## Checklist: the two ON lists follow the command numbers of TG-KEYS.BASL and the TURBO.ACT
+## defines. Change them together.
+TURBO.COMMAND:
+  IF KEYS.COMMAND% > 8 THEN GOTO TURBO.COMMAND.HIGH
+  ON KEYS.COMMAND% GOSUB TURBO.FIND, TURBO.FIND.NEXT, TURBO.SAVE, TURBO.OPEN, TURBO.NEW, TURBO.QUIT.ASK, TURBO.NOT.BUILT, TURBO.NOT.BUILT
+  RETURN
+TURBO.COMMAND.HIGH:
+  ON KEYS.COMMAND% - 8 GOSUB TURBO.DOCUMENT.NEXT, TURBO.SAVE.AS, TURBO.DOCUMENT.A, TURBO.DOCUMENT.B, TURBO.DOCUMENT.C, TURBO.ABOUT, TURBO.GOTO.LINE
+  RETURN
+
+## TURBO.MENU.RUN -- run the action of row TURBO.MENU.PICKED% of the dropdown under bar item
+## MENU.PICKBAR.
+TURBO.MENU.RUN:
+  KEYS.ACTION% = ASC(MID$(TURBO.MENU.ACTIONS$(MENU.PICKBAR), TURBO.MENU.PICKED%, 1))
+  KEYS.MODIFIERS% = 0 : GOSUB KEYS.RUN
+  RETURN
+
+TURBO.ABOUT:
+  GP.SUB MSGBOX, GP.FN(TURBO.PETSCII, "TURBO GPC, the GP.BASIC editor")
+  RETURN
+
+
+## ---- find ----
+## TURBO.FIND -- ask for a term and move the cursor to the next place it starts. The term
+## goes to the front of the find history. The selection ends when the find runs, and stays
+## when the box is left with Esc.
+TURBO.FIND:
+  GOSUB TURBO.FIND.PREPARE
+  GP.SUB DLGHISTORY, TURBO.FIND.HISTORY$
+  GP.SUB INPUTBOX, GP.FN(TURBO.PETSCII, "Find:"), TURBO.FIND.START$, TURBO.FIELD.LENGTH
+  IF GUI.OK% = 0 THEN RETURN
+  IF LEN(GUI.TEXT$) = 0 THEN RETURN
+  DOC.FIND.TERM$ = GUI.TEXT$
+  GOSUB VIEW.SELECT.DROP
+  GOSUB TURBO.FIND.AGAIN
+  GOSUB TURBO.FIND.REMEMBER
+  RETURN
+
+## Move the cursor to the next place DOC.FIND.TERM$ starts.
+TURBO.FIND.AGAIN:
+  GOSUB VIEW.FIND.NEXT
+  IF DOC.FIND.FOUND% <> 0 THEN RETURN
+  TURBO.MESSAGE$ = "Not found"
+  GOTO TURBO.MESSAGE.SHOW
+
+## TURBO.FIND.NEXT -- find the last term again. With no term yet it asks for one.
+TURBO.FIND.NEXT:
+  IF LEN(DOC.FIND.TERM$) = 0 THEN GOTO TURBO.FIND
+  GOTO TURBO.FIND.AGAIN
+
+## TURBO.GOTO.LINE -- ask for a line number and move the cursor to column 0 of that line. A
+## number past the last line goes to the last.
+TURBO.GOTO.LINE:
+  GP.SUB INPUTBOX, GP.FN(TURBO.PETSCII, "Go to line:"), "", TURBO.LINE.DIGITS
+  IF GUI.OK% = 0 THEN RETURN
+  TURBO.GOTO.NUMBER% = VAL(GUI.TEXT$)
+  IF TURBO.GOTO.NUMBER% < 1 THEN RETURN
+  IF TURBO.GOTO.NUMBER% > LINE.COUNT% THEN TURBO.GOTO.NUMBER% = LINE.COUNT%
+  VIEW.GOTO.LINE% = TURBO.GOTO.NUMBER% - 1
+  GOSUB VIEW.CURSOR.TO.LINE
+  RETURN
+
+
+
+## ---- files ----
+## TURBO.SAVE -- write the document to its file. A document with no name asks for one.
+TURBO.SAVE:
+  IF LEN(TURBO.FILE.NAME$) = 0 THEN GOSUB TURBO.SAVE.NAME
+  IF LEN(TURBO.FILE.NAME$) = 0 THEN RETURN
+  DOC.FILE.NAME$ = TURBO.FILE.NAME$
+  GOSUB DOC.SAVEFILE : IF DOC.SAVE.ERROR% <> 0 THEN GOTO TURBO.SAVE.FAILED
+  TURBO.SAVED.GROUP% = UNDO.GROUP%
+  GOSUB TURBO.MARK.PAINT : TURBO.MESSAGE$ = "Saved"  
+  GOTO TURBO.MESSAGE.SHOW
+TURBO.SAVE.FAILED:
+  GP.SUB MSGBOX, GP.FN(TURBO.PETSCII, "Save failed")
+  RETURN
+
+## TURBO.SAVE.AS -- ask for a name, then save the document under it.
+TURBO.SAVE.AS:
+  GOSUB TURBO.SAVE.NAME
+  IF GUI.OK% = 0 THEN RETURN
+  IF LEN(GUI.TEXT$) = 0 THEN RETURN
+  GOTO TURBO.SAVE
+
+## Ask for the name to save under. The box starts with the document's name. TURBO.FILE.NAME$
+## stays as it was when the box is left with Esc or with no text.
+TURBO.SAVE.NAME:
+  GP.SUB INPUTBOX, GP.FN(TURBO.PETSCII, "Save as:"), TURBO.FILE.NAME$, TURBO.FIELD.LENGTH
+  IF GUI.OK% = 0 THEN RETURN
+  IF LEN(GUI.TEXT$) = 0 THEN RETURN
+  TURBO.FILE.NAME$ = GUI.TEXT$
+  GOSUB TURBO.STATUS.PAINT
+  RETURN
+
+## TURBO.OPEN -- pick a file in the file picker and load it. The picker may change the
+## current directory. A file gone from the disk by the time it loads gives an empty document
+## with its name.
+TURBO.OPEN:
+  GOSUB TURBO.DISCARD.ASK
+  IF TURBO.PROCEED% = 0 THEN RETURN
+  TURBO.PICKED$ = GP.FN(PICKFILE, GP.FN(TURBO.PETSCII, "Open File"), "")
+  IF LEN(TURBO.PICKED$) = 0 THEN RETURN
+  TURBO.FILE.NAME$ = TURBO.PICKED$ : DOC.FILE.NAME$ = TURBO.FILE.NAME$
+  GOSUB DOC.LOADFILE : GOSUB TURBO.DOCUMENT.SHOW
+  IF DOC.FULL% <> 0 THEN GOTO TURBO.OPEN.TOO.BIG
+  TURBO.MESSAGE$ = "Loaded"
+  IF (DOC.LOAD.STATUS% AND 2) <> 0 THEN TURBO.MESSAGE$ = "New file"
+  GOTO TURBO.MESSAGE.SHOW
+TURBO.OPEN.TOO.BIG:
+  GP.SUB MSGBOX, GP.FN(TURBO.PETSCII, "File too big, loaded in part")
+  RETURN
+
+## TURBO.NEW -- start an empty document with no name.
+TURBO.NEW:
+  GOSUB TURBO.DISCARD.ASK
+  IF TURBO.PROCEED% = 0 THEN RETURN
+  TURBO.FILE.NAME$ = ""
+  GOSUB DOC.NEW : GOTO TURBO.DOCUMENT.SHOW
+
+## TURBO.DOCUMENT.SHOW -- show the document the store now holds: empty the undo rings, put
+## the cursor on line 0, and paint the status bar and the pane.
+TURBO.DOCUMENT.SHOW:
+  GOSUB UNDO.CLEAR : TURBO.SAVED.GROUP% = UNDO.GROUP%
+  VIEW.CURSOR.LINE% = 0 : VIEW.CURSOR.COL% = 0
+  VIEW.TOP.LINE% = 0 : VIEW.LEFT.COL% = 0 : DOC.LINE% = 0
+  GOSUB DOC.EDIT.OPEN : GOSUB TURBO.STATUS.PAINT : GOSUB VIEW.PAINT.ALL
+  RETURN
+
+## TURBO.DISCARD.ASK -- ask before the document's changes are lost: Save, Discard or
+## Cancel. Esc is Cancel.
+##
+##   out  TURBO.PROCEED%   -1 when the document has no change, was saved, or the answer was
+##                         Discard. 0 for Cancel, and for a save that did not happen.
+TURBO.DISCARD.ASK:
+  TURBO.PROCEED% = -1 : IF UNDO.GROUP% = TURBO.SAVED.GROUP% THEN RETURN
+  TURBO.PROCEED% = 0
+  GP.SUB ASK3, "", GP.FN(TURBO.PETSCII, "Save the changes first?"), GP.FN(TURBO.PETSCII, "&Save"), GP.FN(TURBO.PETSCII, "&Discard"), GP.FN(TURBO.PETSCII, "&Cancel"), 1, 3
+  IF GUI.PICK% = 2 THEN TURBO.PROCEED% = -1
+  IF GUI.PICK% <> 1 THEN RETURN
+  GOSUB TURBO.SAVE
+  IF UNDO.GROUP% = TURBO.SAVED.GROUP% THEN TURBO.PROCEED% = -1
+  RETURN
+
+## TURBO.QUIT.ASK -- ask to quit. The focus starts on No. A yes sets TURBO.QUITTING%.
+TURBO.QUIT.ASK:
+  TURBO.ASCII.TEXT$ = "Quit TURBO GPC?"
+  GOSUB TURBO.CHANGED.KEEP
+  IF TURBO.KEPT.CHANGED%(0) OR TURBO.KEPT.CHANGED%(1) OR TURBO.KEPT.CHANGED%(2) THEN TURBO.ASCII.TEXT$ = "Quit without saving?"
+  GOSUB TURBO.ASCII.TO.PETSCII
+  GP.SUB ASKYNEX, "", TURBO.PETSCII.TEXT$, "", "", 2, 0
+  TURBO.QUITTING% = GUI.ANSWER%
+  RETURN
+
+TURBO.NOT.BUILT:
+  TURBO.MESSAGE$ = "Not in this version"
+  GOTO TURBO.MESSAGE.SHOW
+
+## ---- documents ----
+
+## TURBO.DOCUMENT.NEXT -- show the next of the three documents. A comes after C.
+TURBO.DOCUMENT.NEXT:
+  TURBO.SWITCH.TO% = DOC.NUMBER% + 1
+  IF TURBO.SWITCH.TO% > 2 THEN TURBO.SWITCH.TO% = 0
+  GOTO TURBO.DOCUMENT.SWITCH
+
+## TURBO.DOCUMENT.A, B and C -- show that document. Picking the one on screen does nothing.
+TURBO.DOCUMENT.A:
+  TURBO.SWITCH.TO% = 0
+  GOTO TURBO.DOCUMENT.PICK
+TURBO.DOCUMENT.B:
+  TURBO.SWITCH.TO% = 1
+  GOTO TURBO.DOCUMENT.PICK
+TURBO.DOCUMENT.C:
+  TURBO.SWITCH.TO% = 2
+TURBO.DOCUMENT.PICK:
+  IF TURBO.SWITCH.TO% = DOC.NUMBER% THEN RETURN
+
+## TURBO.DOCUMENT.SWITCH -- show document TURBO.SWITCH.TO%, 0 to 2. The document it leaves
+## keeps its lines, its undo and redo records, its file name, its cursor and its scroll.
+TURBO.DOCUMENT.SWITCH:
+  IF DOC.EDIT.DIRTY% <> 0 THEN GOSUB DOC.EDIT.CLOSE
+  GOSUB TURBO.CHANGED.KEEP
+  TURBO.KEPT.NAME$(DOC.NUMBER%) = TURBO.FILE.NAME$
+  TURBO.KEPT.SAVED.GROUP%(DOC.NUMBER%) = TURBO.SAVED.GROUP%
+  TURBO.KEPT.CURSOR.LINE%(DOC.NUMBER%) = VIEW.CURSOR.LINE%
+  TURBO.KEPT.CURSOR.COL%(DOC.NUMBER%) = VIEW.CURSOR.COL%
+  TURBO.KEPT.TOP.LINE%(DOC.NUMBER%) = VIEW.TOP.LINE%
+  TURBO.KEPT.LEFT.COL%(DOC.NUMBER%) = VIEW.LEFT.COL%
+  DOC.NEXT.NUMBER% = TURBO.SWITCH.TO%
+  GOSUB DOC.SELECT : GOSUB UNDO.SELECT
+  TURBO.FILE.NAME$ = TURBO.KEPT.NAME$(DOC.NUMBER%)
+  TURBO.SAVED.GROUP% = TURBO.KEPT.SAVED.GROUP%(DOC.NUMBER%)
+  VIEW.CURSOR.LINE% = TURBO.KEPT.CURSOR.LINE%(DOC.NUMBER%)
+  VIEW.CURSOR.COL% = TURBO.KEPT.CURSOR.COL%(DOC.NUMBER%)
+  VIEW.TOP.LINE% = TURBO.KEPT.TOP.LINE%(DOC.NUMBER%)
+  VIEW.LEFT.COL% = TURBO.KEPT.LEFT.COL%(DOC.NUMBER%)
+  DOC.LINE% = VIEW.CURSOR.LINE%
+  GOSUB DOC.EDIT.OPEN : GOSUB TURBO.DOCUMENTS.PAINT : GOSUB TURBO.STATUS.PAINT : GOSUB VIEW.PAINT.ALL
+  RETURN
+
+## Set TURBO.KEPT.CHANGED%(DOC.NUMBER%) to -1 when the document on screen has an edit since
+## its last load or save, and to 0 when not.
+TURBO.CHANGED.KEEP:
+  TURBO.KEPT.CHANGED%(DOC.NUMBER%) = 0
+  IF UNDO.GROUP% <> TURBO.SAVED.GROUP% THEN TURBO.KEPT.CHANGED%(DOC.NUMBER%) = -1
+  RETURN
+
+## ---- the bars ----
+
+## TURBO.TITLE.PAINT -- paint the title bar: the menu bar, the name and the letters A, B and C.
+TURBO.TITLE.PAINT:
+  GP.FILL 0, 0, 80, 1, 32, TURBO.ATTR.BAR%
+  GP.SUB MENU.DRAWBAR, 0, 0, MENU.NOBOX
+  GP.PRINTAT TURBO.TITLE.COLUMN, 0, TURBO.LABEL.TITLE$, TURBO.ATTR.BAR%
+  GOTO TURBO.DOCUMENTS.PAINT
+
+## TURBO.DOCUMENTS.PAINT -- paint the letters A, B and C on the title bar.
+TURBO.DOCUMENTS.PAINT:
+  FOR TURBO.PAINT.NUMBER = 0 TO 2
+    TURBO.PAINT.ATTR% = TURBO.ATTR.BAR%
+    IF TURBO.KEPT.CHANGED%(TURBO.PAINT.NUMBER) <> 0 THEN TURBO.PAINT.ATTR% = TURBO.ATTR.CHANGED%
+    IF TURBO.PAINT.NUMBER = DOC.NUMBER% THEN TURBO.PAINT.ATTR% = TURBO.ATTR.CHOSEN%
+    GP.PRINTAT TURBO.DOCUMENTS.COLUMN + TURBO.PAINT.NUMBER, 0, CHR$(193 + TURBO.PAINT.NUMBER), TURBO.PAINT.ATTR%
+  NEXT TURBO.PAINT.NUMBER
+  RETURN
+
+## TURBO.STATUS.PAINT -- paint the whole status bar: the labels, the cursor's line and
+## column, the change mark and the file name. A message on it is gone afterwards.
+TURBO.STATUS.PAINT:
+  GP.FILL 0, VIEW.STATUS.ROW%, 80, 1, 32, TURBO.ATTR.BAR%
+  GP.PRINTAT 1, VIEW.STATUS.ROW%, TURBO.LABEL.LINE$, TURBO.ATTR.BAR%
+  GP.PRINTAT 12, VIEW.STATUS.ROW%, TURBO.LABEL.COLUMN$, TURBO.ATTR.BAR%
+  TURBO.NAME.SHOWN$ = TURBO.LABEL.UNTITLED$
+  IF LEN(TURBO.FILE.NAME$) > 0 THEN TURBO.NAME.SHOWN$ = LEFT$(TURBO.FILE.NAME$, 20)
+  GP.PRINTAT TURBO.NAME.COLUMN, VIEW.STATUS.ROW%, TURBO.NAME.SHOWN$, TURBO.ATTR.BAR%
+  TURBO.MESSAGE.VISIBLE% = 0
+  GOSUB TURBO.MARK.PAINT : GOSUB VIEW.STATUS
+  RETURN
+
+## TURBO.MARK.PAINT -- paint the change mark. It is * when an edit was made since the
+## document was loaded or saved, and a blank when not. An undo or a redo counts as an edit,
+## so an undo back to the saved text still shows *.
+TURBO.MARK.PAINT:
+  TURBO.MARK.GROUP% = UNDO.GROUP% : TURBO.MARK.CHAR% = 32
+  IF UNDO.GROUP% <> TURBO.SAVED.GROUP% THEN TURBO.MARK.CHAR% = 42
+  GP.FILL TURBO.MARK.COLUMN, VIEW.STATUS.ROW%, 1, 1, TURBO.MARK.CHAR%, TURBO.ATTR.BAR%
+  RETURN
+
+## TURBO.MESSAGE.SHOW -- show a message on the status bar. The next key clears it.
+##
+##   in   TURBO.MESSAGE$   an ASCII literal of TURBO.MESSAGE.WIDTH characters or less
+TURBO.MESSAGE.SHOW:
+  TURBO.ASCII.TEXT$ = TURBO.MESSAGE$ : GOSUB TURBO.ASCII.TO.PETSCII
+  GP.FILL TURBO.MESSAGE.COLUMN, VIEW.STATUS.ROW%, TURBO.MESSAGE.WIDTH, 1, 32, TURBO.ATTR.BAR%
+  GP.PRINTAT TURBO.MESSAGE.COLUMN, VIEW.STATUS.ROW%, TURBO.PETSCII.TEXT$, TURBO.ATTR.BAR%
+  TURBO.MESSAGE.VISIBLE% = -1
+  RETURN
+
+TURBO.MESSAGE.CLEAR:
+  GP.FILL TURBO.MESSAGE.COLUMN, VIEW.STATUS.ROW%, TURBO.MESSAGE.WIDTH, 1, 32, TURBO.ATTR.BAR%
+  TURBO.MESSAGE.VISIBLE% = 0
+  RETURN
+
+#INCLUDE "TG-LOW.BASL"

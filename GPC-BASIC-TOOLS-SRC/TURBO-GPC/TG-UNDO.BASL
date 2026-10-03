@@ -1,0 +1,397 @@
+## ============================================================================
+## TG-UNDO.BASL -- the undo ring and the redo ring. An edit adds records to the undo ring
+## before it changes the store. UNDO.REVERT takes the newest edit back. UNDO.REPEAT puts
+## it in again.
+##
+## UNDO.PUSH is a GP.ASM kernel. The rest is BASIC.
+##
+## #INCLUDE it after TG-STORE.BASL, and TG-LOW.BASL outside every GP.BANKED region. Call
+## UNDO.SETUP once. Call UNDO.CLEAR after DOC.INIT,
+## DOC.NEW and DOC.LOADFILE.
+##
+## A record is 8 bytes in bank UNDO.RING.BANK%:
+##
+##   [op][line low][line high][group low][group high][bank][address low][address high]
+##
+## The last three bytes are a line table slot. The arena never frees a record, so a record
+## keeps the slot and not the text.
+##
+##   op 1   the line changed. The slot points at its old arena record.
+##   op 2   the line was added. The slot is not used.
+##   op 3   the line was removed. The slot points at its arena record.
+##
+## The records of one edit share a group number. Bit 7 of the op byte is set in the first
+## record of an edit.
+##
+## Each document has its own two rings in its first line table bank: the undo ring at
+## $B800 and the redo ring at $B900. A table bank's slots end at $B7FF.
+##
+## Interface:
+##
+##   UNDO.LINE%          in for the UNDO.NOTE routines: the line the record is about
+##   UNDO.RING.DEPTH%    records a ring keeps. It must be at least the number of records
+##                       one edit writes. A full ring loses every record of its oldest
+##                       edit. UNDO.SETUP sets 32, which keeps 16 edits or more. The two
+##                       rings take UNDO.RING.DEPTH% * 16 bytes.
+##   UNDO.RING.BANK%     the rings' bank. UNDO.SETUP and UNDO.SELECT set it to the
+##                       document's first line table bank.
+##   UNDO.RING.PAGE%     the high byte of the undo ring's first address. The redo ring
+##                       follows the undo ring.
+##
+## A caller that moves the rings sets these three after UNDO.SETUP, then calls UNDO.CLEAR.
+##
+##   UNDO.DONE%          out of UNDO.REVERT and UNDO.REPEAT: -1 when an edit was applied
+##   UNDO.FOCUS.LINE%    out of the same: the line of the last record applied
+##
+## Routines: UNDO.SETUP, UNDO.CLEAR, UNDO.SELECT, UNDO.GROUP.BEGIN, UNDO.NOTE.REPLACE,
+## UNDO.NOTE.ADD, UNDO.NOTE.REMOVE, UNDO.REVERT, UNDO.REPEAT.
+##
+## WARNING: the undo routines read and write line table slots, not the edit buffer. Store
+## a dirty edit buffer before UNDO.NOTE.REMOVE, UNDO.REVERT and UNDO.REPEAT. Store it
+## before UNDO.NOTE.REPLACE when the undo must keep the buffer's changes.
+##
+## WARNING: the rings must not overlap a line table's slots, an arena or the data in
+## VIEW.KEY.BANK%.
+##
+## WARNING: UNDO.REVERT and UNDO.REPEAT leave BANK on the rings' bank or on a line table
+## bank. UNDO.PUSH uses zero page $2C to $31.
+##
+## Checklist: a routine that moves the arena's records must call UNDO.CLEAR.
+##
+## Checklist: a variable UNDO.PUSH's kernel names as {NAME} must be assigned above the
+## kernel. UNDO.SETUP assigns the UNDO ones.
+## ============================================================================
+
+## UNDO.SETUP -- set the rings' bank and depth and empty both rings. Call it once.
+UNDO.SETUP:
+  DIM UNDO.RING.FIRST%(1) :  DIM UNDO.RING.COUNT%(1) : DIM UNDO.KEPT.UNDO.FIRST%(2) :  DIM UNDO.KEPT.UNDO.COUNT%(2)
+  DIM UNDO.KEPT.REDO.FIRST%(2) :  DIM UNDO.KEPT.REDO.COUNT%(2) : DIM UNDO.KEPT.GROUP%(2)
+  UNDO.DOCUMENT% = 0 : UNDO.RING.BANK% = DOC.TABLE.BANK%
+  UNDO.RING.PAGE% = 184 : UNDO.RING.DEPTH% = 32 : UNDO.GROUP% = 0 : UNDO.GROUP.FIRST% = 0
+  UNDO.LINE% = 0 : UNDO.OP% = 0 : UNDO.RING% = 0 : UNDO.PUSH.FIRST% = 0 : UNDO.PUSH.COUNT% = 0 : UNDO.PUSH.BASE% = 0
+  UNDO.DONE% = 0 : UNDO.FOCUS.LINE% = 0 : GOSUB UNDO.CLEAR
+  RETURN
+
+## UNDO.CLEAR -- empty both rings.
+UNDO.CLEAR:
+  UNDO.RING.FIRST%(0) = 0  : UNDO.RING.COUNT%(0) = 0 : UNDO.RING.FIRST%(1) = 0 : UNDO.RING.COUNT%(1) = 0
+  RETURN
+
+## UNDO.SELECT -- switch the rings and UNDO.GROUP% to document DOC.NUMBER%. The document
+## left keeps its undo records, its redo records and its group number. Call it straight
+## after DOC.SELECT.
+UNDO.SELECT:
+  UNDO.KEPT.UNDO.FIRST%(UNDO.DOCUMENT%) = UNDO.RING.FIRST%(0)
+  UNDO.KEPT.UNDO.COUNT%(UNDO.DOCUMENT%) = UNDO.RING.COUNT%(0)
+  UNDO.KEPT.REDO.FIRST%(UNDO.DOCUMENT%) = UNDO.RING.FIRST%(1)
+  UNDO.KEPT.REDO.COUNT%(UNDO.DOCUMENT%) = UNDO.RING.COUNT%(1)
+  UNDO.KEPT.GROUP%(UNDO.DOCUMENT%) = UNDO.GROUP% : UNDO.DOCUMENT% = DOC.NUMBER% : UNDO.RING.BANK% = DOC.TABLE.BANK%
+  UNDO.RING.FIRST%(0) = UNDO.KEPT.UNDO.FIRST%(UNDO.DOCUMENT%)
+  UNDO.RING.COUNT%(0) = UNDO.KEPT.UNDO.COUNT%(UNDO.DOCUMENT%)
+  UNDO.RING.FIRST%(1) = UNDO.KEPT.REDO.FIRST%(UNDO.DOCUMENT%)
+  UNDO.RING.COUNT%(1) = UNDO.KEPT.REDO.COUNT%(UNDO.DOCUMENT%)
+  UNDO.GROUP% = UNDO.KEPT.GROUP%(UNDO.DOCUMENT%)
+  RETURN
+
+## UNDO.GROUP.BEGIN -- start a new edit. The records noted after it belong to that edit.
+## The redo ring is emptied.
+UNDO.GROUP.BEGIN:
+  GOSUB UNDO.GROUP.NEXT : UNDO.RING.COUNT%(1) = 0
+  RETURN
+
+UNDO.GROUP.NEXT:
+  IF UNDO.GROUP% = 32767 THEN UNDO.GROUP% = 0
+  UNDO.GROUP% = UNDO.GROUP% + 1 : UNDO.GROUP.FIRST% = 128
+  RETURN
+
+## UNDO.NOTE.REPLACE -- record that line UNDO.LINE% is about to change. Call it before the
+## line's slot is written.
+UNDO.NOTE.REPLACE:
+  UNDO.OP% = 1 : UNDO.RING% = 0
+  GOTO UNDO.PUSH
+
+## UNDO.NOTE.ADD -- record that a line is about to be added as line UNDO.LINE%.
+UNDO.NOTE.ADD:
+  UNDO.OP% = 2 : UNDO.RING% = 0
+  GOTO UNDO.PUSH
+
+## UNDO.NOTE.REMOVE -- record that line UNDO.LINE% is about to be removed. Call it before
+## the line's slot is closed.
+UNDO.NOTE.REMOVE:
+  UNDO.OP% = 3 : UNDO.RING% = 0
+  GOTO UNDO.PUSH
+
+## UNDO.REVERT -- take back the newest edit in the undo ring. Its inverse goes on the redo
+## ring.
+##
+##   out  UNDO.DONE%         -1 when an edit was taken back, 0 when the ring was empty
+##        UNDO.FOCUS.LINE%   the line of the last record applied. It can be LINE.COUNT%,
+##                           one past the last line.
+##
+## The edit buffer is stale afterwards. Open a line next.
+UNDO.REVERT:
+  UNDO.SOURCE.RING% = 0
+  GOTO UNDO.APPLY.EDIT
+
+## UNDO.REPEAT -- put the newest edit in the redo ring back in. Its inverse goes on the
+## undo ring. The outputs are those of UNDO.REVERT.
+UNDO.REPEAT:
+  UNDO.SOURCE.RING% = 1
+
+## Apply the newest group of ring UNDO.SOURCE.RING%, newest record first.
+UNDO.APPLY.EDIT:
+  UNDO.DONE% = 0 : IF UNDO.RING.COUNT%(UNDO.SOURCE.RING%) = 0 THEN RETURN
+  UNDO.DONE% = -1 : GOSUB UNDO.GROUP.NEXT
+  UNDO.RING% = UNDO.SOURCE.RING% : GOSUB UNDO.TOP.READ
+  UNDO.SOURCE.GROUP% = UNDO.RECORD.GROUP%
+UNDO.APPLY.NEXT:
+  UNDO.RING.COUNT%(UNDO.SOURCE.RING%) = UNDO.RING.COUNT%(UNDO.SOURCE.RING%) - 1
+  UNDO.FOCUS.LINE% = UNDO.LINE% : GOSUB UNDO.APPLY.RECORD
+  IF UNDO.RING.COUNT%(UNDO.SOURCE.RING%) = 0 THEN RETURN
+  UNDO.RING% = UNDO.SOURCE.RING% : GOSUB UNDO.TOP.READ
+  IF UNDO.RECORD.GROUP% = UNDO.SOURCE.GROUP% THEN GOTO UNDO.APPLY.NEXT
+  RETURN
+
+## Apply the record in UNDO.OP%, UNDO.LINE% and the UNDO.SLOT variables. Its inverse goes
+## on the other ring, in group UNDO.GROUP%. UNDO.PUSH reads the inverse's slot itself.
+UNDO.APPLY.RECORD:
+  UNDO.RING% = 1 - UNDO.SOURCE.RING%
+  IF UNDO.OP% = 2 THEN GOTO UNDO.APPLY.ADD
+  IF UNDO.OP% = 3 THEN GOTO UNDO.APPLY.REMOVE
+  ## ---- a changed line: its slot and the record's slot change places ----
+  GOSUB UNDO.PUSH : GOSUB UNDO.SLOT.WRITE
+  RETURN
+## ---- an added line: take it out ----
+UNDO.APPLY.ADD:
+  UNDO.OP% = 3 : GOSUB UNDO.PUSH
+  DOC.SLOT.LINE% = UNDO.LINE% : GOSUB DOC.SLOT.CLOSE
+  RETURN
+## ---- a removed line: put it back ----
+UNDO.APPLY.REMOVE:
+  DOC.SLOT.LINE% = UNDO.LINE%
+  GOSUB DOC.SLOT.OPEN : GOSUB UNDO.SLOT.WRITE
+  UNDO.OP% = 2 : GOSUB UNDO.PUSH
+  RETURN
+
+## UNDO.PUSH -- add a record to a ring.
+##
+##   in   UNDO.RING%          0 for the undo ring, 1 for the redo ring
+##        UNDO.OP%            1, 2 or 3
+##        UNDO.LINE%          the line the record is about
+##        UNDO.GROUP%         the edit's number
+##        UNDO.GROUP.FIRST%   128 for the first record of an edit. UNDO.PUSH sets it to 0.
+##
+## The record's slot is read from the line table, as line UNDO.LINE% holds it now. A full
+## ring drops its first record and each record after it up to the next one that starts an
+## edit.
+##
+## The UNDO.SLOT variables are not read and not changed. The kernel works on
+## UNDO.PUSH.FIRST% and UNDO.PUSH.COUNT%, copies of the ring's UNDO.RING.FIRST% and
+## UNDO.RING.COUNT% entries. UNDO.PUSH.BASE% is the number of records stored ahead of the
+## ring.
+UNDO.PUSH:
+  UNDO.PUSH.FIRST% = UNDO.RING.FIRST%(UNDO.RING%) : UNDO.PUSH.COUNT% = UNDO.RING.COUNT%(UNDO.RING%) : UNDO.PUSH.BASE% = UNDO.RING% * UNDO.RING.DEPTH%
+  #REM 1
+  GP.ASM LOW
+  REM CLD
+  REM LDA $00
+  REM PHA
+  REM ; ---- the line's slot: table bank, then $A000 + (line mod 2048) * 3 in $2E
+  REM LDY #1
+  REM LDA {UNDO.LINE%},Y
+  REM LSR
+  REM LSR
+  REM LSR
+  REM CLC
+  REM ADC {DOC.TABLE.BANK%}
+  REM STA $00
+  REM LDA {UNDO.LINE%},Y
+  REM AND #$07
+  REM STA $2F
+  REM LDA {UNDO.LINE%}
+  REM STA $2E
+  REM ASL
+  REM TAX
+  REM LDA $2F
+  REM ROL
+  REM PHA
+  REM TXA
+  REM CLC
+  REM ADC $2E
+  REM STA $2E
+  REM PLA
+  REM ADC $2F
+  REM CLC
+  REM ADC #$A0
+  REM STA $2F
+  REM ; ---- the slot's three bytes go on the stack
+  REM LDA ($2E)
+  REM PHA
+  REM LDA ($2E),Y
+  REM PHA
+  REM INY
+  REM LDA ($2E),Y
+  REM PHA
+  REM ; ---- the ring: its first record in $2E, its count in $30
+  REM LDX #1
+  REM LDA {UNDO.PUSH.FIRST%}
+  REM STA $2E
+  REM LDA {UNDO.PUSH.FIRST%},X
+  REM STA $2F
+  REM LDA {UNDO.PUSH.COUNT%}
+  REM STA $30
+  REM LDA {UNDO.PUSH.COUNT%},X
+  REM STA $31
+  REM LDA {UNDO.RING.BANK%}
+  REM STA $00
+  REM ; ---- the new record's place in $2C: first + count, less the depth from the depth up
+  REM CLC
+  REM LDA $2E
+  REM ADC $30
+  REM STA $2C
+  REM LDA $2F
+  REM ADC $31
+  REM STA $2D
+  REM LDA $2C
+  REM CMP {UNDO.RING.DEPTH%}
+  REM LDA $2D
+  REM SBC {UNDO.RING.DEPTH%},X
+  REM BCC UPLACE
+  REM LDA $2C
+  REM SBC {UNDO.RING.DEPTH%}
+  REM STA $2C
+  REM LDA $2D
+  REM SBC {UNDO.RING.DEPTH%},X
+  REM STA $2D
+  REM ; ---- a full ring drops its oldest edit. The place waits on the stack.
+  REM UPLACE: LDA $30
+  REM CMP {UNDO.RING.DEPTH%}
+  REM BNE UROOM
+  REM LDA $31
+  REM CMP {UNDO.RING.DEPTH%},X
+  REM BNE UROOM
+  REM LDA $2D
+  REM PHA
+  REM LDA $2C
+  REM PHA
+  REM UDROP: INC $2E
+  REM BNE UWRAP
+  REM INC $2F
+  REM UWRAP: LDA $2E
+  REM CMP {UNDO.RING.DEPTH%}
+  REM BNE ULESS
+  REM LDA $2F
+  REM CMP {UNDO.RING.DEPTH%},X
+  REM BNE ULESS
+  REM STZ $2E
+  REM STZ $2F
+  REM ULESS: LDA $30
+  REM BNE UDEC
+  REM DEC $31
+  REM UDEC: DEC $30
+  REM LDA $30
+  REM ORA $31
+  REM BEQ UKEPT
+  REM LDA $2E
+  REM STA $2C
+  REM LDA $2F
+  REM STA $2D
+  REM JSR UADDR
+  REM LDA ($2C)
+  REM BPL UDROP
+  REM UKEPT: PLA
+  REM STA $2C
+  REM PLA
+  REM STA $2D
+  REM ; ---- one more record in the ring
+  REM UROOM: INC $30
+  REM BNE UCOUNT
+  REM INC $31
+  REM UCOUNT: LDA $2E
+  REM STA {UNDO.PUSH.FIRST%}
+  REM LDA $2F
+  REM STA {UNDO.PUSH.FIRST%},X
+  REM LDA $30
+  REM STA {UNDO.PUSH.COUNT%}
+  REM LDA $31
+  REM STA {UNDO.PUSH.COUNT%},X
+  REM ; ---- the record, last byte first
+  REM JSR UADDR
+  REM LDY #7
+  REM PLA
+  REM STA ($2C),Y
+  REM DEY
+  REM PLA
+  REM STA ($2C),Y
+  REM DEY
+  REM PLA
+  REM STA ($2C),Y
+  REM DEY
+  REM LDA {UNDO.GROUP%},X
+  REM STA ($2C),Y
+  REM DEY
+  REM LDA {UNDO.GROUP%}
+  REM STA ($2C),Y
+  REM DEY
+  REM LDA {UNDO.LINE%},X
+  REM STA ($2C),Y
+  REM DEY
+  REM LDA {UNDO.LINE%}
+  REM STA ($2C),Y
+  REM LDA {UNDO.OP%}
+  REM ORA {UNDO.GROUP.FIRST%}
+  REM STA ($2C)
+  REM STZ {UNDO.GROUP.FIRST%}
+  REM PLA
+  REM STA $00
+  REM RTS
+  REM ; ---- UADDR turns the place in $2C into the record's address. X must be 1.
+  REM UADDR: CLC
+  REM LDA $2C
+  REM ADC {UNDO.PUSH.BASE%}
+  REM STA $2C
+  REM LDA $2D
+  REM ADC {UNDO.PUSH.BASE%},X
+  REM STA $2D
+  REM ASL $2C
+  REM ROL $2D
+  REM ASL $2C
+  REM ROL $2D
+  REM ASL $2C
+  REM ROL $2D
+  REM LDA {UNDO.RING.PAGE%}
+  REM CLC
+  REM ADC $2D
+  REM STA $2D
+  REM RTS
+  GP.ENDASM
+  #REM 0
+  UNDO.RING.FIRST%(UNDO.RING%) = UNDO.PUSH.FIRST% : UNDO.RING.COUNT%(UNDO.RING%) = UNDO.PUSH.COUNT%
+  RETURN
+
+## UNDO.TOP.READ -- read the newest record of ring UNDO.RING% into UNDO.OP%, UNDO.LINE%,
+## UNDO.RECORD.GROUP% and the UNDO.SLOT variables. The record stays in the ring. The ring
+## must not be empty.
+UNDO.TOP.READ:
+  UNDO.RECORD.INDEX% = UNDO.RING.FIRST%(UNDO.RING%) + UNDO.RING.COUNT%(UNDO.RING%) - 1
+  IF UNDO.RECORD.INDEX% >= UNDO.RING.DEPTH% THEN UNDO.RECORD.INDEX% = UNDO.RECORD.INDEX% - UNDO.RING.DEPTH%
+  UNDO.RECORD.ADDR = UNDO.RING.PAGE%
+  UNDO.RECORD.ADDR = UNDO.RECORD.ADDR * 256 + (UNDO.RING% * UNDO.RING.DEPTH% + UNDO.RECORD.INDEX%) * 8
+  DOC.PEEK.BANK% = UNDO.RING.BANK%
+  GOSUB DOC.PEEK.BANK.SET
+  UNDO.OP% = PEEK(UNDO.RECORD.ADDR) AND 127
+  UNDO.LINE% = PEEK(UNDO.RECORD.ADDR + 1) + PEEK(UNDO.RECORD.ADDR + 2) * 256
+  UNDO.RECORD.GROUP% = PEEK(UNDO.RECORD.ADDR + 3) + PEEK(UNDO.RECORD.ADDR + 4) * 256
+  UNDO.SLOT.BANK% = PEEK(UNDO.RECORD.ADDR + 5) : UNDO.SLOT.LOW% = PEEK(UNDO.RECORD.ADDR + 6) : UNDO.SLOT.HIGH% = PEEK(UNDO.RECORD.ADDR + 7)
+  RETURN
+
+## UNDO.SLOT.WRITE -- write the UNDO.SLOT variables to the slot of line UNDO.LINE%.
+UNDO.SLOT.WRITE:
+  GOSUB UNDO.SLOT.LOCATE : POKE UNDO.SLOT.ADDR, UNDO.SLOT.BANK% : POKE UNDO.SLOT.ADDR + 1, UNDO.SLOT.LOW% : POKE UNDO.SLOT.ADDR + 2, UNDO.SLOT.HIGH%
+  RETURN
+
+## UNDO.SLOT.LOCATE -- select the table bank of line UNDO.LINE% and set UNDO.SLOT.ADDR to
+## the line's slot.
+UNDO.SLOT.LOCATE:
+  UNDO.SLOT.SEGMENT% = INT(UNDO.LINE% / 2048) : DOC.PEEK.BANK% = DOC.TABLE.BANK% + UNDO.SLOT.SEGMENT% : GOSUB DOC.PEEK.BANK.SET :UNDO.SLOT.ADDR = 40960 + (UNDO.LINE% - UNDO.SLOT.SEGMENT% * 2048) * 3
+  RETURN

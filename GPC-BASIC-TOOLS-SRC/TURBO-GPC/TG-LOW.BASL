@@ -1,0 +1,16 @@
+## ============================================================================
+## TG-LOW.BASL -- the routines of the TG modules that run from low memory. A BLOAD and a
+## BANK statement write the RAM bank register, and code in a GP.BANKED region cannot.
+##
+## #INCLUDE it outside every GP.BANKED region. A RETURN to a caller in a region selects
+## the caller's bank again. BANK stays on the bank these routines chose.
+## ============================================================================
+
+## VIEW.KEYS.LOAD -- load TGKEYS.BIN at $A000 of bank VIEW.KEY.BANK%, and select that bank
+## for the PEEKs and POKEs that follow.
+VIEW.KEYS.LOAD:
+  BLOAD "TGKEYS.BIN", 8, VIEW.KEY.BANK%, 40960 : BANK VIEW.KEY.BANK% : RETURN
+
+## DOC.PEEK.BANK.SET -- select bank DOC.PEEK.BANK% for the PEEKs and POKEs that follow.
+DOC.PEEK.BANK.SET:
+  BANK DOC.PEEK.BANK% : RETURN

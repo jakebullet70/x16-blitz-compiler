@@ -1,0 +1,77 @@
+#SAVEAS "@:PAGEBEN.SRC.PRG"
+#REM 0
+#SYMFILE "@:PAGEBEN.SRC.SYM"
+#INCLUDE "GPC-BASIC/GPB.INC.BL"
+#INCLUDE "GPC-BASIC/MEM.INC.BL"
+
+## ============================================================================
+## PAGEBEN -- the page keys on a 2,000 line document. It times the page-down key BEN.PAGES
+## times, then the page-up key back to the top.
+##
+## A page is the whole path: decide, open the line in the edit buffer, paint 28 rows,
+## status. Times are jiffies off TI, with the empty loop taken off.
+##
+## WARNING: run it at real speed. Under -warp TI is not tied to the CPU.
+##
+## The results go to PAGEBEN.RES. MISMATCHES.DOWN and MISMATCHES.UP count the cells of
+## the pane that differ from the store read in BASIC. Each is counted after the last page
+## that way. Both are 0. The pane after the last page goes to PAGEBEN.PANE.
+## ============================================================================
+
+BEN.PAGES = 60
+
+SCREEN 1
+GOSUB DOC.SETUP
+GOSUB VIEW.SETUP
+GOSUB BEN.CONFIG
+
+DOC.FILE.NAME$ = "FIX2000.TXT"
+GOSUB DOC.LOADFILE
+
+DOC.LINE% = 0
+GOSUB DOC.EDIT.OPEN
+GOSUB VIEW.PAINT.ALL
+
+BEN.START = TI
+FOR BEN.COUNT = 1 TO BEN.PAGES
+NEXT BEN.COUNT
+BEN.FLOOR.JIFFIES = TI - BEN.START
+
+BEN.START = TI
+FOR BEN.COUNT = 1 TO BEN.PAGES
+  GOSUB VIEW.PAGE.DOWN
+NEXT BEN.COUNT
+BEN.DOWN.JIFFIES = TI - BEN.START - BEN.FLOOR.JIFFIES
+BEN.DOWN.LINE = VIEW.CURSOR.LINE%
+GOSUB BEN.REFERENCE.CHECK
+BEN.DOWN.MISMATCHES = BEN.MISMATCHES
+
+BEN.START = TI
+FOR BEN.COUNT = 1 TO BEN.PAGES
+  GOSUB VIEW.PAGE.UP
+NEXT BEN.COUNT
+BEN.UP.JIFFIES = TI - BEN.START - BEN.FLOOR.JIFFIES
+GOSUB BEN.REFERENCE.CHECK
+BEN.PANE.NAME$ = "PAGEBEN.PANE"
+GOSUB BEN.PANE.DUMP
+
+OPEN 3, 8, 3, "@:PAGEBEN.RES,S,W"
+PRINT# 3, "LINES"; LINE.COUNT%
+PRINT# 3, "PAGES"; BEN.PAGES
+PRINT# 3, "FLOOR.JIFFIES"; BEN.FLOOR.JIFFIES
+PRINT# 3, "DOWN.JIFFIES"; BEN.DOWN.JIFFIES
+PRINT# 3, "DOWN.LINE"; BEN.DOWN.LINE
+PRINT# 3, "MISMATCHES.DOWN"; BEN.DOWN.MISMATCHES
+PRINT# 3, "UP.JIFFIES"; BEN.UP.JIFFIES
+PRINT# 3, "UP.LINE"; VIEW.CURSOR.LINE%
+PRINT# 3, "MISMATCHES.UP"; BEN.MISMATCHES
+GOSUB BEN.PANE.REPORT
+PRINT# 3, "DONE"
+CLOSE 3
+END
+
+#INCLUDE "TG-BENCH-CHECK.BASL"
+#INCLUDE "TG-STORE.BASL"
+#INCLUDE "TG-UNDO.BASL"
+#INCLUDE "TG-VIEW.BASL"
+#INCLUDE "TG-LOW.BASL"

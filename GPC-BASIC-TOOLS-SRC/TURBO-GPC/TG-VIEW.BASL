@@ -1,0 +1,1487 @@
+## ============================================================================
+## TG-VIEW.BASL -- the pane. It holds the row paint, the slide, the status numbers and the
+## cursor moves that decide between them.
+##
+## #INCLUDE it after TG-STORE.BASL and TG-UNDO.BASL, and TG-LOW.BASL outside every GP.BANKED
+## region. Call VIEW.SETUP once.
+##
+## The screen is 80 by 30. Row 0 is the title bar. Rows VIEW.TEXT.TOP% to
+## VIEW.TEXT.TOP% + VIEW.TEXT.ROWS% - 1 are the text rows. They are the pane. Row
+## VIEW.STATUS.ROW% is the status bar. A text row is a six cell gutter, then
+## VIEW.TEXT.WIDTH% cells of text. The gutter is four digits and two blanks.
+##
+## Interface:
+##
+##   VIEW.CURSOR.LINE%   the document line under the cursor
+##   VIEW.CURSOR.COL%    the cursor's column in that line
+##   VIEW.TOP.LINE%      the document line on the first text row
+##   VIEW.LEFT.COL%      the line column in the first text cell
+##   VIEW.MOVED.FROM%    the line the cursor left, in for VIEW.AFTER.MOVE
+##   VIEW.KEY.CHAR%      the character to type, in for VIEW.TYPE.CHAR
+##   VIEW.GOTO.LINE%     the line to go to, in for VIEW.CURSOR.TO.LINE
+##   VIEW.CHANGE.LINE%   the first line an edit changed, in for VIEW.AFTER.CHANGE
+##
+##   VIEW.TAB.WIDTH%     the columns between two tab stops
+##
+## The selection runs from the anchor to the cursor. The character at its far end is not in
+## it. A selected cell takes the paper VIEW.SELECT.PAPER% and keeps its ink.
+##
+##   VIEW.SELECT.ON%            -1 while there is a selection
+##   VIEW.SELECT.ANCHOR.LINE%   the line and the column where it started
+##   VIEW.SELECT.ANCHOR.COL%
+##   VIEW.SELECT.FIRST.LINE%    out of VIEW.SELECT.ORDER: the end nearer the top of the
+##   VIEW.SELECT.FIRST.COL%     document, then the other end
+##   VIEW.SELECT.LAST.LINE%
+##   VIEW.SELECT.LAST.COL%
+##   VIEW.SELECTION.DELETED%    out of VIEW.SELECTION.DELETE: -1 when the text was taken out
+##
+## Keys: VIEW.CURSOR.DOWN, VIEW.CURSOR.UP, VIEW.CURSOR.RIGHT, VIEW.CURSOR.LEFT,
+## VIEW.WORD.RIGHT, VIEW.WORD.LEFT, VIEW.PAGE.DOWN, VIEW.PAGE.UP, VIEW.CURSOR.HOME,
+## VIEW.CURSOR.END, VIEW.CURSOR.TOP, VIEW.CURSOR.BOTTOM, VIEW.CURSOR.TO.LINE,
+## VIEW.TYPE.CHAR, VIEW.KEY.TAB,
+## VIEW.KEY.RETURN, VIEW.BACKSPACE, VIEW.DELETE.CHAR, VIEW.DELETE.LINE, VIEW.UNDO,
+## VIEW.REDO, VIEW.FIND.NEXT, VIEW.SELECT.ALL, VIEW.SELECTION.DELETE. Each one repaints what
+## it changed.
+##
+## Selection: VIEW.SELECT.START, VIEW.SELECT.DROP, VIEW.SELECT.ORDER. A cursor move made after
+## VIEW.SELECT.START makes the selection bigger or smaller.
+##
+## A key that changes the document notes its edit in the undo ring. The characters typed
+## into a line and taken out of it between two stores of the edit buffer are one edit.
+##
+## The cursor line is painted from the edit buffer in VIEW.ATTR.BAND%. The cursor cell is
+## in VIEW.ATTR.CURSOR%. Every other line is painted from the store.
+##
+## When VIEW.COLOUR.ON% is not 0 the text is painted in syntax colour. A cell's attribute
+## is then the ink of its class over the background of its row. The colouring keeps four
+## things in bank VIEW.KEY.BANK%:
+##
+##   $A000   the keyword table, loaded from TGKEYS.BIN. tgkeys.py writes the file and
+##           documents its layout.
+##   $BDF0   seven inks, one for each class
+##   $BE00   the text of the line being painted
+##   $BF00   the class of each of its columns
+##
+## WARNING: VIEW.KEY.BANK% must not be a line table bank or an arena bank.
+##
+## WARNING: the kernels use zero page $2C to $31. They leave VERA's ADDRSEL at 0.
+##
+## Checklist: VIEW.PAINT, VIEW.CLASS.SCAN and VIEW.CLASS.WORDS are GP.ASM LOW. VIEW.PAINT
+## pushes $00 on entry and puts it back on every exit. VIEW.SELECT.PAINT writes no $00 and is
+## not LOW.
+## ============================================================================
+
+## VIEW.SETUP -- build the PETSCII to screen code table, set the pane's geometry and its
+## attributes, load the keyword table and the inks into VIEW.KEY.BANK%, and store the entry
+## addresses of VIEW.CLASS.SCAN and VIEW.CLASS.WORDS. It sets VIEW.COLOUR.ON% to 0. Call it
+## once.
+VIEW.SETUP:
+  DIM VIEW.XLAT.TABLE%(127)
+  VIEW.XLAT.ADDR = GP.ARRPTR(VIEW.XLAT.TABLE%())
+  VIEW.XLAT.PTR% = VIEW.XLAT.ADDR
+  FOR VIEW.CODE = 0 TO 255
+    VIEW.SCREEN.CODE = VIEW.CODE
+    IF VIEW.CODE < 32 THEN VIEW.SCREEN.CODE = VIEW.CODE + 128
+    IF VIEW.CODE >= 64 AND VIEW.CODE < 96 THEN VIEW.SCREEN.CODE = VIEW.CODE - 64
+    IF VIEW.CODE >= 96 AND VIEW.CODE < 128 THEN VIEW.SCREEN.CODE = VIEW.CODE - 32
+    IF VIEW.CODE >= 128 AND VIEW.CODE < 160 THEN VIEW.SCREEN.CODE = VIEW.CODE + 64
+    IF VIEW.CODE >= 160 AND VIEW.CODE < 192 THEN VIEW.SCREEN.CODE = VIEW.CODE - 64
+    IF VIEW.CODE >= 192 THEN VIEW.SCREEN.CODE = VIEW.CODE - 128
+    POKE VIEW.XLAT.ADDR + VIEW.CODE, VIEW.SCREEN.CODE
+  NEXT VIEW.CODE
+  POKE VIEW.XLAT.ADDR + 255, 94
+  VIEW.TEXT.TOP% = 1 : VIEW.TEXT.ROWS% = 28
+  VIEW.TEXT.WIDTH% = 74 : VIEW.STATUS.ROW% = 29 : VIEW.ATTR.TEXT% = 97 : VIEW.ATTR.BAND% = 225 : VIEW.ATTR.GUTTER% = 111
+  VIEW.ATTR.CURSOR% = 22 : VIEW.CURSOR.LINE% = 0 : VIEW.CURSOR.COL% = 0 : VIEW.TOP.LINE% = 0
+  VIEW.LEFT.COL% = 0 : VIEW.MOVED.FROM% = 0 : VIEW.KEY.CHAR% = 0 : VIEW.TAB.WIDTH% = 4
+  VIEW.PAINT.ROW% = 0 : VIEW.PAINT.COUNT% = 0 : VIEW.PAINT.LINE% = 0 : VIEW.SCROLL.TOP% = 0
+  VIEW.SCROLL.ROWS% = 0 : VIEW.SCROLL.DIR% = 0 : VIEW.WORK.LINE% = 0
+  VIEW.WORK.ROW% = 0 : VIEW.WORK.LEFT% = 0 : VIEW.WORK.NUMBER% = 0  
+  VIEW.WORK.PAPER% = 0 : VIEW.COLOUR.ON% = 0 : VIEW.KEY.BANK% = 15
+  VIEW.SCAN.ENTRY% = 0 : VIEW.WORDS.ENTRY% = 0 :  VIEW.CLASS.LENGTH% = 0
+  VIEW.CLASS.TEXTBANK% = 0 : VIEW.CLASS.FIRST% = 0 : VIEW.WORD.START% = 0
+  VIEW.WORD.END% = 0 : VIEW.WORD.LENGTH% = 0 : VIEW.WORD.DOTTED% = 0
+  VIEW.CHANGE.LINE% = 0
+  VIEW.SELECT.ON% = 0
+  VIEW.SELECT.ANCHOR.LINE% = 0
+  VIEW.SELECT.ANCHOR.COL% = 0
+  VIEW.SELECT.FIRST.LINE% = 0
+  VIEW.SELECT.FIRST.COL% = 0
+  VIEW.SELECT.LAST.LINE% = 0
+  VIEW.SELECT.LAST.COL% = 0
+  VIEW.SELECTION.DELETED% = 0
+  ## Dark grey paper, under every ink of the colouring.
+  VIEW.SELECT.PAPER% = 176
+  GOSUB VIEW.KEYS.LOAD
+  ## The seven inks at $BDF0, in class order: plain, statement, function, string, number,
+  ## comment, and a word that is not a keyword.
+  POKE 48624, 1 : POKE 48625, 7: POKE 48626, 13
+  POKE 48627, 3 : POKE 48628, 8 : POKE 48629, 15 : POKE 48630, 1
+  GOSUB VIEW.CLASS.SCAN : GOSUB VIEW.CLASS.WORDS
+  RETURN
+
+## VIEW.CURSOR.DOWN -- move the cursor down a line.
+VIEW.CURSOR.DOWN:
+  IF VIEW.CURSOR.LINE% + 1 >= LINE.COUNT% THEN RETURN
+  VIEW.MOVED.FROM% = VIEW.CURSOR.LINE% : VIEW.CURSOR.LINE% = VIEW.CURSOR.LINE% + 1
+  GOTO VIEW.ENTER.LINE
+
+## VIEW.CURSOR.UP -- move the cursor up a line.
+VIEW.CURSOR.UP:
+  IF VIEW.CURSOR.LINE% = 0 THEN RETURN
+  VIEW.MOVED.FROM% = VIEW.CURSOR.LINE% : VIEW.CURSOR.LINE% = VIEW.CURSOR.LINE% - 1
+  GOTO VIEW.ENTER.LINE
+
+## VIEW.PAGE.DOWN -- move the cursor down VIEW.TEXT.ROWS% lines, or to the last line.
+VIEW.PAGE.DOWN:
+  VIEW.MOVED.FROM% = VIEW.CURSOR.LINE% : VIEW.CURSOR.LINE% = VIEW.CURSOR.LINE% + VIEW.TEXT.ROWS%
+  IF VIEW.CURSOR.LINE% >= LINE.COUNT% THEN VIEW.CURSOR.LINE% = LINE.COUNT% - 1
+  GOTO VIEW.ENTER.LINE
+
+## VIEW.PAGE.UP -- move the cursor up VIEW.TEXT.ROWS% lines, or to the first line.
+VIEW.PAGE.UP:
+  VIEW.MOVED.FROM% = VIEW.CURSOR.LINE% : VIEW.CURSOR.LINE% = VIEW.CURSOR.LINE% - VIEW.TEXT.ROWS%
+  IF VIEW.CURSOR.LINE% < 0 THEN VIEW.CURSOR.LINE% = 0
+  GOTO VIEW.ENTER.LINE
+
+## VIEW.CURSOR.HOME -- move the cursor to column 0 of its line.
+VIEW.CURSOR.HOME:
+  VIEW.CURSOR.COL% = 0 : VIEW.MOVED.FROM% = VIEW.CURSOR.LINE%
+  GOTO VIEW.AFTER.MOVE
+
+## VIEW.CURSOR.END -- move the cursor past the last character of its line.
+VIEW.CURSOR.END:
+  VIEW.CURSOR.COL% = PEEK(DOC.EDIT.ADDR) : VIEW.MOVED.FROM% = VIEW.CURSOR.LINE%
+  GOTO VIEW.AFTER.MOVE
+
+## VIEW.CURSOR.TOP -- move the cursor to column 0 of the first line.
+VIEW.CURSOR.TOP:
+  VIEW.MOVED.FROM% = VIEW.CURSOR.LINE% : VIEW.CURSOR.LINE% = 0 : VIEW.CURSOR.COL% = 0
+  GOTO VIEW.ENTER.LINE
+
+## VIEW.CURSOR.BOTTOM -- move the cursor past the last character of the last line.
+VIEW.CURSOR.BOTTOM:
+  VIEW.MOVED.FROM% = VIEW.CURSOR.LINE% : VIEW.CURSOR.LINE% = LINE.COUNT% - 1 : VIEW.CURSOR.COL% = 255
+  GOTO VIEW.ENTER.LINE
+
+## VIEW.CURSOR.TO.LINE -- move the cursor to column 0 of line VIEW.GOTO.LINE%, 0 to
+## LINE.COUNT% - 1.
+VIEW.CURSOR.TO.LINE:
+  VIEW.MOVED.FROM% = VIEW.CURSOR.LINE%
+  VIEW.CURSOR.LINE% = VIEW.GOTO.LINE%
+  VIEW.CURSOR.COL% = 0
+  GOTO VIEW.ENTER.LINE
+
+## VIEW.CURSOR.RIGHT -- move the cursor right a column. From the end of a line it goes to
+## column 0 of the line below.
+VIEW.CURSOR.RIGHT:
+  IF VIEW.CURSOR.COL% >= PEEK(DOC.EDIT.ADDR) THEN GOTO VIEW.CURSOR.RIGHT.WRAP
+  VIEW.CURSOR.COL% = VIEW.CURSOR.COL% + 1 : VIEW.MOVED.FROM% = VIEW.CURSOR.LINE%
+  GOTO VIEW.AFTER.MOVE
+VIEW.CURSOR.RIGHT.WRAP:
+  IF VIEW.CURSOR.LINE% + 1 >= LINE.COUNT% THEN RETURN
+  VIEW.MOVED.FROM% = VIEW.CURSOR.LINE% : VIEW.CURSOR.LINE% = VIEW.CURSOR.LINE% + 1
+  VIEW.CURSOR.COL% = 0
+  GOTO VIEW.ENTER.LINE
+
+## VIEW.CURSOR.LEFT -- move the cursor left a column. From column 0 it goes past the last
+## character of the line above.
+VIEW.CURSOR.LEFT:
+  IF VIEW.CURSOR.COL% = 0 THEN GOTO VIEW.CURSOR.LEFT.WRAP
+  VIEW.CURSOR.COL% = VIEW.CURSOR.COL% - 1 : VIEW.MOVED.FROM% = VIEW.CURSOR.LINE%
+  GOTO VIEW.AFTER.MOVE
+VIEW.CURSOR.LEFT.WRAP:
+  IF VIEW.CURSOR.LINE% = 0 THEN RETURN
+  VIEW.MOVED.FROM% = VIEW.CURSOR.LINE% : VIEW.CURSOR.LINE% = VIEW.CURSOR.LINE% - 1 : VIEW.CURSOR.COL% = 255
+  GOTO VIEW.ENTER.LINE
+
+## VIEW.WORD.RIGHT -- move the cursor past the rest of the word under it, then past the
+## spaces after that. The move stops at the end of the line. From the end of a line it
+## goes to column 0 of the line below.
+VIEW.WORD.RIGHT:
+  IF VIEW.CURSOR.COL% >= PEEK(DOC.EDIT.ADDR) THEN GOTO VIEW.CURSOR.RIGHT.WRAP
+  DOC.EDIT.COLUMN% = VIEW.CURSOR.COL% : GOSUB DOC.EDIT.WORD.RIGHT
+  VIEW.CURSOR.COL% = DOC.EDIT.COLUMN% : VIEW.MOVED.FROM% = VIEW.CURSOR.LINE%
+  GOTO VIEW.AFTER.MOVE
+
+## VIEW.WORD.LEFT -- move the cursor back past the spaces in front of it, then back to the
+## start of the word in front of them. The move stops at column 0. From column 0 it goes
+## past the last character of the line above.
+VIEW.WORD.LEFT:
+  IF VIEW.CURSOR.COL% = 0 THEN GOTO VIEW.CURSOR.LEFT.WRAP
+  DOC.EDIT.COLUMN% = VIEW.CURSOR.COL% : GOSUB DOC.EDIT.WORD.LEFT
+  VIEW.CURSOR.COL% = DOC.EDIT.COLUMN% : VIEW.MOVED.FROM% = VIEW.CURSOR.LINE%
+  GOTO VIEW.AFTER.MOVE
+
+## VIEW.ENTER.LINE -- open the cursor line in the edit buffer and keep VIEW.CURSOR.COL%
+## inside it. It falls into VIEW.AFTER.MOVE, which repaints.
+VIEW.ENTER.LINE:
+  DOC.LINE% = VIEW.CURSOR.LINE% : GOSUB DOC.EDIT.OPEN
+  IF VIEW.CURSOR.COL% > PEEK(DOC.EDIT.ADDR) THEN VIEW.CURSOR.COL% = PEEK(DOC.EDIT.ADDR)
+
+## VIEW.AFTER.MOVE -- bring the cursor into the pane and repaint as little as the move
+## allows.
+##
+##   no scroll           the rows from the line the cursor left to the cursor line
+##   scrolled one line   the slide in VRAM, then the rows the slide leaves stale
+##   anything else       every row
+VIEW.AFTER.MOVE:
+  VIEW.OLD.TOP% = VIEW.TOP.LINE% : VIEW.OLD.LEFT% = VIEW.LEFT.COL%
+  IF VIEW.CURSOR.LINE% < VIEW.TOP.LINE% THEN VIEW.TOP.LINE% = VIEW.CURSOR.LINE%
+  IF VIEW.CURSOR.LINE% >= VIEW.TOP.LINE% + VIEW.TEXT.ROWS% THEN VIEW.TOP.LINE% = VIEW.CURSOR.LINE% - VIEW.TEXT.ROWS% + 1
+  IF VIEW.CURSOR.COL% < VIEW.LEFT.COL% THEN VIEW.LEFT.COL% = VIEW.CURSOR.COL%
+  IF VIEW.CURSOR.COL% >= VIEW.LEFT.COL% + VIEW.TEXT.WIDTH% THEN VIEW.LEFT.COL% = VIEW.CURSOR.COL% - VIEW.TEXT.WIDTH% + 1
+  IF VIEW.LEFT.COL% <> VIEW.OLD.LEFT% THEN GOTO VIEW.PAINT.ALL
+  VIEW.TOP.DELTA% = VIEW.TOP.LINE% - VIEW.OLD.TOP%
+  IF VIEW.TOP.DELTA% = 0 THEN GOTO VIEW.REPAINT.MOVE
+  IF VIEW.TOP.DELTA% = 1 THEN GOTO VIEW.REPAINT.SLIDE.UP
+  IF VIEW.TOP.DELTA% = -1 THEN GOTO VIEW.REPAINT.SLIDE.DOWN
+  GOTO VIEW.PAINT.ALL
+
+## No scroll. Paint from the higher of the two lines to the lower.
+VIEW.REPAINT.MOVE:
+  VIEW.PAINT.LINE% = VIEW.MOVED.FROM%
+  IF VIEW.CURSOR.LINE% < VIEW.MOVED.FROM% THEN VIEW.PAINT.LINE% = VIEW.CURSOR.LINE%
+  VIEW.PAINT.COUNT% = ABS(VIEW.CURSOR.LINE% - VIEW.MOVED.FROM%) + 1
+  VIEW.PAINT.ROW% = VIEW.TEXT.TOP% + VIEW.PAINT.LINE% - VIEW.TOP.LINE%
+  GOSUB VIEW.PAINT : GOSUB VIEW.STATUS
+  RETURN
+
+## The slide moves the text up a row. Paint from the line the cursor left to the last row.
+VIEW.REPAINT.SLIDE.UP:
+  IF VIEW.MOVED.FROM% < VIEW.TOP.LINE% THEN GOTO VIEW.PAINT.ALL
+  VIEW.SCROLL.TOP% = VIEW.TEXT.TOP% : VIEW.SCROLL.ROWS% = VIEW.TEXT.ROWS%
+  VIEW.SCROLL.DIR% = 0 : GOSUB VIEW.SCROLL : VIEW.PAINT.LINE% = VIEW.MOVED.FROM%
+  VIEW.PAINT.COUNT% = VIEW.TOP.LINE% + VIEW.TEXT.ROWS% - VIEW.MOVED.FROM%
+  VIEW.PAINT.ROW% = VIEW.TEXT.TOP% + VIEW.PAINT.LINE% - VIEW.TOP.LINE%
+  GOSUB VIEW.PAINT : GOSUB VIEW.STATUS
+  RETURN
+
+## The slide moves the text down a row. Paint from the first row to the line the cursor
+## left.
+VIEW.REPAINT.SLIDE.DOWN:
+  IF VIEW.MOVED.FROM% >= VIEW.TOP.LINE% + VIEW.TEXT.ROWS% THEN GOTO VIEW.PAINT.ALL
+  VIEW.SCROLL.TOP% = VIEW.TEXT.TOP% : VIEW.SCROLL.ROWS% = VIEW.TEXT.ROWS%
+  VIEW.SCROLL.DIR% = 1 : GOSUB VIEW.SCROLL
+  VIEW.PAINT.LINE% = VIEW.TOP.LINE% : VIEW.PAINT.COUNT% = VIEW.MOVED.FROM% - VIEW.TOP.LINE% + 1
+  VIEW.PAINT.ROW% = VIEW.TEXT.TOP%
+  GOSUB VIEW.PAINT : GOSUB VIEW.STATUS
+  RETURN
+
+## VIEW.PAINT.ALL -- paint every text row and the status numbers.
+VIEW.PAINT.ALL:
+  VIEW.PAINT.ROW% = VIEW.TEXT.TOP% : VIEW.PAINT.COUNT% = VIEW.TEXT.ROWS% : VIEW.PAINT.LINE% = VIEW.TOP.LINE%
+  GOSUB VIEW.PAINT : GOSUB VIEW.STATUS
+  RETURN
+
+## VIEW.PAINT.BELOW -- paint the text rows from document line VIEW.PAINT.LINE% to the last
+## row, and the status numbers. The line is inside the pane.
+VIEW.PAINT.BELOW:
+  VIEW.PAINT.ROW% = VIEW.TEXT.TOP% + VIEW.PAINT.LINE% - VIEW.TOP.LINE%
+  VIEW.PAINT.COUNT% = VIEW.TOP.LINE% + VIEW.TEXT.ROWS% - VIEW.PAINT.LINE%
+  GOSUB VIEW.PAINT : GOSUB VIEW.STATUS
+  RETURN
+
+## VIEW.TYPE.CHAR -- put character VIEW.KEY.CHAR% in the cursor line at the cursor, and
+## move the cursor right. A line of 250 characters is left as it is.
+VIEW.TYPE.CHAR:
+  IF PEEK(DOC.EDIT.ADDR) >= 250 THEN RETURN
+  IF DOC.EDIT.DIRTY% = 0 THEN GOSUB VIEW.NOTE.CHANGE
+  DOC.EDIT.COLUMN% = VIEW.CURSOR.COL% : DOC.EDIT.CHAR% = VIEW.KEY.CHAR%
+  GOSUB DOC.EDIT.INSERT : DOC.EDIT.DIRTY% = -1 : VIEW.CURSOR.COL% = VIEW.CURSOR.COL% + 1 : VIEW.MOVED.FROM% = VIEW.CURSOR.LINE%
+  GOTO VIEW.AFTER.MOVE
+
+## VIEW.KEY.TAB -- put spaces in the cursor line at the cursor, up to the next tab stop,
+## and move the cursor past them. The spaces stop when the line holds 250 characters.
+VIEW.KEY.TAB:
+  VIEW.TAB.SPACES% = VIEW.TAB.WIDTH% - (VIEW.CURSOR.COL% - INT(VIEW.CURSOR.COL% / VIEW.TAB.WIDTH%) * VIEW.TAB.WIDTH%)
+  IF PEEK(DOC.EDIT.ADDR) + VIEW.TAB.SPACES% > 250 THEN VIEW.TAB.SPACES% = 250 - PEEK(DOC.EDIT.ADDR)
+  IF VIEW.TAB.SPACES% <= 0 THEN RETURN
+  IF DOC.EDIT.DIRTY% = 0 THEN GOSUB VIEW.NOTE.CHANGE
+  DOC.EDIT.CHAR% = 32
+  DOC.EDIT.COLUMN% = VIEW.CURSOR.COL%
+  FOR VIEW.TAB.COUNT = 1 TO VIEW.TAB.SPACES%
+    GOSUB DOC.EDIT.INSERT
+  NEXT VIEW.TAB.COUNT
+  DOC.EDIT.DIRTY% = -1 : VIEW.CURSOR.COL% = VIEW.CURSOR.COL% + VIEW.TAB.SPACES%
+  VIEW.MOVED.FROM% = VIEW.CURSOR.LINE%
+  GOTO VIEW.AFTER.MOVE
+
+## VIEW.KEY.RETURN -- split the cursor line at the cursor. The new line starts with the
+## cursor line's leading spaces, counted up to the cursor. The cursor goes past them in
+## the new line. At DOC.LINE.LIMIT% lines or more it does nothing.
+VIEW.KEY.RETURN:
+  IF LINE.COUNT% >= DOC.LINE.LIMIT% THEN RETURN
+  IF DOC.EDIT.DIRTY% <> 0 THEN GOSUB DOC.EDIT.CLOSE
+  GOSUB VIEW.NOTE.CHANGE
+  UNDO.LINE% = VIEW.CURSOR.LINE% + 1
+  GOSUB UNDO.NOTE.ADD
+  GOSUB VIEW.INDENT.COUNT
+  DOC.EDIT.COLUMN% = VIEW.CURSOR.COL%
+  GOSUB DOC.LINE.SPLIT
+  VIEW.MOVED.FROM% = VIEW.CURSOR.LINE% : VIEW.CURSOR.LINE% = VIEW.CURSOR.LINE% + 1
+  VIEW.CURSOR.COL% = DOC.SPLIT.INDENT% : VIEW.OLD.LEFT% = VIEW.LEFT.COL%
+  VIEW.LEFT.COL% = 0
+  IF VIEW.CURSOR.COL% >= VIEW.TEXT.WIDTH% THEN VIEW.LEFT.COL% = VIEW.CURSOR.COL% - VIEW.TEXT.WIDTH% + 1
+  IF VIEW.CURSOR.LINE% >= VIEW.TOP.LINE% + VIEW.TEXT.ROWS% THEN GOTO VIEW.KEY.RETURN.SCROLLED
+  IF VIEW.OLD.LEFT% <> VIEW.LEFT.COL% THEN GOTO VIEW.PAINT.ALL
+  VIEW.PAINT.LINE% = VIEW.MOVED.FROM%
+  GOTO VIEW.PAINT.BELOW
+VIEW.KEY.RETURN.SCROLLED:
+  VIEW.TOP.LINE% = VIEW.CURSOR.LINE% - VIEW.TEXT.ROWS% + 1
+  GOTO VIEW.PAINT.ALL
+
+## Count the edit buffer's leading spaces, up to the cursor.
+##
+##   out  DOC.SPLIT.INDENT%   the count
+VIEW.INDENT.COUNT:
+  DOC.SPLIT.INDENT% = 0
+VIEW.INDENT.NEXT:
+  IF DOC.SPLIT.INDENT% >= VIEW.CURSOR.COL% THEN RETURN
+  IF PEEK(DOC.EDIT.ADDR + 1 + DOC.SPLIT.INDENT%) <> 32 THEN RETURN
+  DOC.SPLIT.INDENT% = DOC.SPLIT.INDENT% + 1
+  GOTO VIEW.INDENT.NEXT
+
+## VIEW.BACKSPACE -- take out the character in front of the cursor and move the cursor
+## left. At column 0 VIEW.JOIN.PAIR joins the cursor line to the end of the line above.
+VIEW.BACKSPACE:
+  IF VIEW.CURSOR.COL% = 0 THEN GOTO VIEW.BACKSPACE.JOIN
+  VIEW.CURSOR.COL% = VIEW.CURSOR.COL% - 1
+  GOTO VIEW.DELETE.CHAR
+VIEW.BACKSPACE.JOIN:
+  IF VIEW.CURSOR.LINE% = 0 THEN RETURN
+  VIEW.JOIN.LINE% = VIEW.CURSOR.LINE% - 1
+  GOTO VIEW.JOIN.PAIR
+
+## VIEW.DELETE.CHAR -- take out the character under the cursor. At the end of the line
+## VIEW.JOIN.PAIR joins the line below to the cursor line.
+VIEW.DELETE.CHAR:
+  IF VIEW.CURSOR.COL% >= PEEK(DOC.EDIT.ADDR) THEN GOTO VIEW.DELETE.JOIN
+  IF DOC.EDIT.DIRTY% = 0 THEN GOSUB VIEW.NOTE.CHANGE
+  DOC.EDIT.COLUMN% = VIEW.CURSOR.COL% : GOSUB DOC.EDIT.REMOVE
+  DOC.EDIT.DIRTY% = -1 : VIEW.MOVED.FROM% = VIEW.CURSOR.LINE%
+  GOTO VIEW.AFTER.MOVE
+
+VIEW.DELETE.JOIN:
+  IF VIEW.CURSOR.LINE% + 1 >= LINE.COUNT% THEN RETURN
+  VIEW.JOIN.LINE% = VIEW.CURSOR.LINE%
+
+## Join line VIEW.JOIN.LINE% + 1 to the end of line VIEW.JOIN.LINE%. The cursor goes to
+## the place the two meet. Two lines that hold over 250 characters together are left as
+## they are, and so is the cursor.
+##
+## VIEW.JOIN.LINE% is the cursor line or the line above it. The join uses the block
+## buffer. VIEW.DELETE.JOIN falls into this routine.
+VIEW.JOIN.PAIR:
+  IF DOC.EDIT.DIRTY% <> 0 THEN GOSUB DOC.EDIT.CLOSE
+  ## ---- the lower line's record image into the block buffer ----
+  DOC.LINE% = VIEW.JOIN.LINE% + 1
+  GOSUB DOC.FETCH : GOSUB DOC.EDIT.TO.BLOCK
+  ## ---- the upper line into the edit buffer, with the lower line added to it ----
+  DOC.LINE% = VIEW.JOIN.LINE%
+  GOSUB DOC.FETCH
+  VIEW.JOIN.LENGTH% = PEEK(DOC.EDIT.ADDR)
+  IF VIEW.JOIN.LENGTH% + PEEK(DOC.BLOCK.ADDR) > 250 THEN GOTO VIEW.JOIN.REFUSED
+  GOSUB DOC.EDIT.APPEND
+  ## ---- note the edit, store the joined line and close the slot of the lower line ----
+  GOSUB UNDO.GROUP.BEGIN : UNDO.LINE% = VIEW.JOIN.LINE%
+  GOSUB UNDO.NOTE.REPLACE : UNDO.LINE% = VIEW.JOIN.LINE% + 1
+  GOSUB UNDO.NOTE.REMOVE : DOC.EDIT.LINE% = VIEW.JOIN.LINE% : DOC.LINE% = VIEW.JOIN.LINE%
+  GOSUB DOC.COMMIT : DOC.SLOT.LINE% = VIEW.JOIN.LINE% + 1
+  GOSUB DOC.SLOT.CLOSE : VIEW.CURSOR.LINE% = VIEW.JOIN.LINE% : VIEW.CURSOR.COL% = VIEW.JOIN.LENGTH%
+  GOTO VIEW.AFTER.JOIN
+
+## Put the cursor line back in the edit buffer.
+VIEW.JOIN.REFUSED:
+  DOC.LINE% = VIEW.CURSOR.LINE% : GOSUB DOC.FETCH
+  RETURN
+
+## Bring the cursor into the pane after a join. Paint every row when the pane moved, and
+## the rows from the cursor line down when it did not.
+VIEW.AFTER.JOIN:
+  VIEW.OLD.TOP% = VIEW.TOP.LINE% : VIEW.OLD.LEFT% = VIEW.LEFT.COL%
+  IF VIEW.CURSOR.LINE% < VIEW.TOP.LINE% THEN VIEW.TOP.LINE% = VIEW.CURSOR.LINE%
+  IF VIEW.CURSOR.COL% < VIEW.LEFT.COL% THEN VIEW.LEFT.COL% = VIEW.CURSOR.COL%
+  IF VIEW.CURSOR.COL% >= VIEW.LEFT.COL% + VIEW.TEXT.WIDTH% THEN VIEW.LEFT.COL% = VIEW.CURSOR.COL% - VIEW.TEXT.WIDTH% + 1
+  IF VIEW.TOP.LINE% <> VIEW.OLD.TOP% THEN GOTO VIEW.PAINT.ALL
+  IF VIEW.LEFT.COL% <> VIEW.OLD.LEFT% THEN GOTO VIEW.PAINT.ALL
+  VIEW.PAINT.LINE% = VIEW.CURSOR.LINE%
+  GOTO VIEW.PAINT.BELOW
+
+## VIEW.DELETE.LINE -- take the cursor line out of the document. The cursor goes to column
+## 0 of the line that takes its place, or of the new last line.
+VIEW.DELETE.LINE:
+  IF DOC.EDIT.DIRTY% <> 0 THEN GOSUB DOC.EDIT.CLOSE
+  GOSUB UNDO.GROUP.BEGIN : UNDO.LINE% = VIEW.CURSOR.LINE%
+  IF LINE.COUNT% <= 1 THEN GOSUB UNDO.NOTE.REPLACE
+  IF LINE.COUNT% > 1 THEN GOSUB UNDO.NOTE.REMOVE
+  DOC.LINE% = VIEW.CURSOR.LINE% : GOSUB DOC.LINE.REMOVE
+  IF VIEW.CURSOR.LINE% >= LINE.COUNT% THEN VIEW.CURSOR.LINE% = LINE.COUNT% - 1
+  VIEW.CURSOR.COL% = 0 : DOC.LINE% = VIEW.CURSOR.LINE%
+  GOSUB DOC.EDIT.OPEN : VIEW.OLD.LEFT% = VIEW.LEFT.COL%
+  VIEW.LEFT.COL% = 0
+  IF VIEW.CURSOR.LINE% < VIEW.TOP.LINE% THEN GOTO VIEW.DELETE.LINE.SCROLLED
+  IF VIEW.OLD.LEFT% <> 0 THEN GOTO VIEW.PAINT.ALL
+  VIEW.PAINT.LINE% = VIEW.CURSOR.LINE%
+  GOTO VIEW.PAINT.BELOW
+VIEW.DELETE.LINE.SCROLLED:
+  VIEW.TOP.LINE% = VIEW.CURSOR.LINE%
+  GOTO VIEW.PAINT.ALL
+
+## Start a new edit in the undo ring and note that the cursor line is about to change. The
+## edit buffer must match its stored line.
+VIEW.NOTE.CHANGE:
+  GOSUB UNDO.GROUP.BEGIN : UNDO.LINE% = VIEW.CURSOR.LINE% : GOSUB UNDO.NOTE.REPLACE
+  RETURN
+
+## VIEW.UNDO -- take back the newest edit. The cursor goes to column 0 of the last line the
+## undo changed.
+##
+##   out  UNDO.DONE%   0 when there was no edit to take back. The pane is then left alone.
+VIEW.UNDO:
+  IF DOC.EDIT.DIRTY% <> 0 THEN GOSUB DOC.EDIT.CLOSE
+  GOSUB UNDO.REVERT 
+  GOTO VIEW.AFTER.UNDO
+
+## VIEW.REDO -- put in again the edit that VIEW.UNDO last took back. The cursor and
+## UNDO.DONE% are as in VIEW.UNDO.
+VIEW.REDO:
+  IF DOC.EDIT.DIRTY% <> 0 THEN GOSUB DOC.EDIT.CLOSE
+  GOSUB UNDO.REPEAT
+
+VIEW.AFTER.UNDO:
+  IF UNDO.DONE% = 0 THEN RETURN
+  VIEW.CURSOR.LINE% = UNDO.FOCUS.LINE%
+  IF VIEW.CURSOR.LINE% >= LINE.COUNT% THEN VIEW.CURSOR.LINE% = LINE.COUNT% - 1
+  VIEW.CURSOR.COL% = 0 : VIEW.LEFT.COL% = 0 : DOC.LINE% = VIEW.CURSOR.LINE%
+  GOSUB DOC.EDIT.OPEN
+  IF VIEW.CURSOR.LINE% < VIEW.TOP.LINE% THEN VIEW.TOP.LINE% = VIEW.CURSOR.LINE%
+  IF VIEW.CURSOR.LINE% >= VIEW.TOP.LINE% + VIEW.TEXT.ROWS% THEN VIEW.TOP.LINE% = VIEW.CURSOR.LINE% - VIEW.TEXT.ROWS% + 1
+  GOTO VIEW.PAINT.ALL
+
+## VIEW.FIND.NEXT -- move the cursor to the next place DOC.FIND.TERM$ starts, after the
+## cursor. The search wraps to the first line once.
+##
+##   out  DOC.FIND.FOUND%   -1 when the term was found. The cursor stays when it is 0.
+VIEW.FIND.NEXT:
+  IF DOC.EDIT.DIRTY% <> 0 THEN GOSUB DOC.EDIT.CLOSE
+  DOC.FIND.LINE% = VIEW.CURSOR.LINE% : DOC.FIND.COLUMN% = VIEW.CURSOR.COL% + 1
+  GOSUB DOC.FIND
+  IF DOC.FIND.FOUND% <> 0 THEN GOTO VIEW.FIND.SHOW
+  DOC.FIND.LINE% = 0 : DOC.FIND.COLUMN% = 0 : GOSUB DOC.FIND
+  IF DOC.FIND.FOUND% = 0 THEN RETURN
+VIEW.FIND.SHOW:
+  VIEW.MOVED.FROM% = VIEW.CURSOR.LINE% : VIEW.CURSOR.LINE% = DOC.FIND.LINE% : VIEW.CURSOR.COL% = DOC.FIND.COLUMN%
+  GOTO VIEW.ENTER.LINE
+
+## VIEW.AFTER.CHANGE -- bring the cursor into the pane after an edit that changed the lines
+## from VIEW.CHANGE.LINE% down, and paint them. Every row is painted when the pane moved.
+VIEW.AFTER.CHANGE:
+  VIEW.OLD.TOP% = VIEW.TOP.LINE%
+  VIEW.OLD.LEFT% = VIEW.LEFT.COL%
+  IF VIEW.CURSOR.LINE% < VIEW.TOP.LINE% THEN VIEW.TOP.LINE% = VIEW.CURSOR.LINE%
+  IF VIEW.CURSOR.LINE% >= VIEW.TOP.LINE% + VIEW.TEXT.ROWS% THEN VIEW.TOP.LINE% = VIEW.CURSOR.LINE% - VIEW.TEXT.ROWS% + 1
+  IF VIEW.CURSOR.COL% < VIEW.LEFT.COL% THEN VIEW.LEFT.COL% = VIEW.CURSOR.COL%
+  IF VIEW.CURSOR.COL% >= VIEW.LEFT.COL% + VIEW.TEXT.WIDTH% THEN VIEW.LEFT.COL% = VIEW.CURSOR.COL% - VIEW.TEXT.WIDTH% + 1
+  IF VIEW.TOP.LINE% <> VIEW.OLD.TOP% THEN GOTO VIEW.PAINT.ALL
+  IF VIEW.LEFT.COL% <> VIEW.OLD.LEFT% THEN GOTO VIEW.PAINT.ALL
+  VIEW.PAINT.LINE% = VIEW.CHANGE.LINE%
+  IF VIEW.PAINT.LINE% < VIEW.TOP.LINE% THEN VIEW.PAINT.LINE% = VIEW.TOP.LINE%
+  GOTO VIEW.PAINT.BELOW
+
+## ---- the selection ----
+
+## VIEW.SELECT.START -- start a selection at the cursor.
+VIEW.SELECT.START:
+  VIEW.SELECT.ANCHOR.LINE% = VIEW.CURSOR.LINE%
+  VIEW.SELECT.ANCHOR.COL% = VIEW.CURSOR.COL%
+  VIEW.SELECT.ON% = -1
+  RETURN
+
+## VIEW.SELECT.DROP -- end the selection and paint its rows plain. The text stays.
+VIEW.SELECT.DROP:
+  IF VIEW.SELECT.ON% = 0 THEN RETURN
+  VIEW.SELECT.ON% = 0
+  GOSUB VIEW.SELECT.ORDER
+  IF VIEW.SELECT.FIRST.LINE% < VIEW.TOP.LINE% THEN VIEW.SELECT.FIRST.LINE% = VIEW.TOP.LINE%
+  IF VIEW.SELECT.LAST.LINE% >= VIEW.TOP.LINE% + VIEW.TEXT.ROWS% THEN VIEW.SELECT.LAST.LINE% = VIEW.TOP.LINE% + VIEW.TEXT.ROWS% - 1
+  IF VIEW.SELECT.LAST.LINE% < VIEW.SELECT.FIRST.LINE% THEN RETURN
+  VIEW.PAINT.LINE% = VIEW.SELECT.FIRST.LINE%
+  VIEW.PAINT.ROW% = VIEW.TEXT.TOP% + VIEW.PAINT.LINE% - VIEW.TOP.LINE%
+  VIEW.PAINT.COUNT% = VIEW.SELECT.LAST.LINE% - VIEW.SELECT.FIRST.LINE% + 1
+  GOTO VIEW.PAINT
+
+## VIEW.SELECT.ORDER -- set the FIRST and LAST ends of the selection from the anchor and the
+## cursor.
+VIEW.SELECT.ORDER:
+  VIEW.SELECT.FIRST.LINE% = VIEW.SELECT.ANCHOR.LINE%
+  VIEW.SELECT.FIRST.COL% = VIEW.SELECT.ANCHOR.COL%
+  VIEW.SELECT.LAST.LINE% = VIEW.CURSOR.LINE%
+  VIEW.SELECT.LAST.COL% = VIEW.CURSOR.COL%
+  IF VIEW.CURSOR.LINE% > VIEW.SELECT.ANCHOR.LINE% THEN RETURN
+  IF VIEW.CURSOR.LINE% = VIEW.SELECT.ANCHOR.LINE% AND VIEW.CURSOR.COL% >= VIEW.SELECT.ANCHOR.COL% THEN RETURN
+  VIEW.SELECT.FIRST.LINE% = VIEW.CURSOR.LINE%
+  VIEW.SELECT.FIRST.COL% = VIEW.CURSOR.COL%
+  VIEW.SELECT.LAST.LINE% = VIEW.SELECT.ANCHOR.LINE%
+  VIEW.SELECT.LAST.COL% = VIEW.SELECT.ANCHOR.COL%
+  RETURN
+
+## VIEW.SELECT.ALL -- select the whole document. The cursor goes past the last character of
+## the last line.
+VIEW.SELECT.ALL:
+  VIEW.SELECT.ANCHOR.LINE% = 0
+  VIEW.SELECT.ANCHOR.COL% = 0
+  VIEW.SELECT.ON% = -1
+  GOSUB VIEW.CURSOR.BOTTOM
+  GOTO VIEW.PAINT.ALL
+
+## Mark the selection on the rows VIEW.PAINT has just painted.
+VIEW.SELECT.SHOW:
+  GOSUB VIEW.SELECT.ORDER
+  GOTO VIEW.SELECT.PAINT
+
+## VIEW.SELECTION.DELETE -- take the selected text out and end the selection. The cursor goes
+## to the selection's first end. A selection whose two ends would join into a line of over 250
+## characters stays in the document.
+VIEW.SELECTION.DELETE:
+  IF DOC.EDIT.DIRTY% <> 0 THEN GOSUB DOC.EDIT.CLOSE
+  GOSUB VIEW.SELECT.ORDER
+  VIEW.SELECTION.DELETED% = 0
+  ## ---- the last line's characters from the last column on, into the block buffer ----
+  DOC.LINE% = VIEW.SELECT.LAST.LINE%
+  GOSUB DOC.FETCH
+  IF VIEW.SELECT.FIRST.COL% + PEEK(DOC.EDIT.ADDR) - VIEW.SELECT.LAST.COL% > 250 THEN GOTO VIEW.SELECTION.KEPT
+  DOC.EDIT.COLUMN% = VIEW.SELECT.LAST.COL%
+  GOSUB DOC.EDIT.SPLIT
+  GOSUB VIEW.SELECTION.NOTE
+  ## ---- the first line up to the first column, with those characters after it ----
+  DOC.LINE% = VIEW.SELECT.FIRST.LINE%
+  GOSUB DOC.FETCH
+  POKE DOC.EDIT.ADDR, VIEW.SELECT.FIRST.COL%
+  GOSUB DOC.EDIT.APPEND
+  GOSUB DOC.COMMIT
+  IF VIEW.SELECT.LAST.LINE% > VIEW.SELECT.FIRST.LINE% THEN GOSUB VIEW.SELECTION.CLOSE
+  VIEW.SELECT.ON% = 0
+  VIEW.SELECTION.DELETED% = -1
+  VIEW.MOVED.FROM% = VIEW.CURSOR.LINE%
+  VIEW.CURSOR.LINE% = VIEW.SELECT.FIRST.LINE%
+  VIEW.CURSOR.COL% = VIEW.SELECT.FIRST.COL%
+  DOC.LINE% = VIEW.CURSOR.LINE%
+  GOSUB DOC.EDIT.OPEN
+  IF VIEW.SELECT.LAST.LINE% = VIEW.SELECT.FIRST.LINE% THEN GOTO VIEW.AFTER.MOVE
+  VIEW.CHANGE.LINE% = VIEW.CURSOR.LINE%
+  GOTO VIEW.AFTER.CHANGE
+
+## Put the cursor line back in the edit buffer and end the selection.
+VIEW.SELECTION.KEPT:
+  DOC.LINE% = VIEW.CURSOR.LINE%
+  GOSUB DOC.FETCH
+  GOTO VIEW.SELECT.DROP
+
+## Close the slots of the lines after the selection's first line, up to its last, the last
+## first.
+VIEW.SELECTION.CLOSE:
+  FOR VIEW.SELECTION.SLOT = VIEW.SELECT.LAST.LINE% TO VIEW.SELECT.FIRST.LINE% + 1 STEP -1
+    DOC.SLOT.LINE% = VIEW.SELECTION.SLOT
+    GOSUB DOC.SLOT.CLOSE
+  NEXT VIEW.SELECTION.SLOT
+  RETURN
+
+## Note the deletion in the undo ring: the first line changes, and each line after it up to
+## the last goes, the last first. An edit with more records than the ring keeps is not noted,
+## and the rings are emptied.
+VIEW.SELECTION.NOTE:
+  GOSUB UNDO.GROUP.BEGIN
+  IF VIEW.SELECT.LAST.LINE% - VIEW.SELECT.FIRST.LINE% >= UNDO.RING.DEPTH% THEN GOTO UNDO.CLEAR
+  UNDO.LINE% = VIEW.SELECT.FIRST.LINE%
+  GOSUB UNDO.NOTE.REPLACE
+  IF VIEW.SELECT.LAST.LINE% = VIEW.SELECT.FIRST.LINE% THEN RETURN
+  FOR VIEW.SELECTION.SLOT = VIEW.SELECT.LAST.LINE% TO VIEW.SELECT.FIRST.LINE% + 1 STEP -1
+    UNDO.LINE% = VIEW.SELECTION.SLOT
+    GOSUB UNDO.NOTE.REMOVE
+  NEXT VIEW.SELECTION.SLOT
+  RETURN
+
+## VIEW.PAINT -- paint VIEW.PAINT.COUNT% rows, from screen row VIEW.PAINT.ROW% and
+## document line VIEW.PAINT.LINE%.
+##
+## A row past the end of the document is blank. VIEW.PAINT.COUNT% is 1 or more.
+VIEW.PAINT:
+  #REM 1
+  GP.ASM LOW
+  REM CLD
+  REM LDA $00
+  REM PHA
+  REM ; ---- patch the operands. PXLAT and PCXLAT take the screen code table's address.
+  REM ; ---- PSCAN and PWORDS take the entry addresses of the two classify kernels.
+  REM LDX #1
+  REM LDY #2
+  REM LDA {VIEW.XLAT.PTR%}
+  REM STA PXLAT,X
+  REM STA PCXLAT,X
+  REM LDA {VIEW.XLAT.PTR%},X
+  REM STA PXLAT,Y
+  REM STA PCXLAT,Y
+  REM LDA {VIEW.SCAN.ENTRY%}
+  REM STA PSCAN,X
+  REM LDA {VIEW.SCAN.ENTRY%},X
+  REM STA PSCAN,Y
+  REM LDA {VIEW.WORDS.ENTRY%}
+  REM STA PWORDS,X
+  REM LDA {VIEW.WORDS.ENTRY%},X
+  REM STA PWORDS,Y
+  REM LDY #1
+  REM LDA {VIEW.PAINT.LINE%}
+  REM STA {VIEW.WORK.LINE%}
+  REM LDA {VIEW.PAINT.LINE%},Y
+  REM STA {VIEW.WORK.LINE%},Y
+  REM LDA {VIEW.PAINT.ROW%}
+  REM STA {VIEW.WORK.ROW%}
+  REM LDA {VIEW.PAINT.COUNT%}
+  REM STA {VIEW.WORK.LEFT%}
+  REM STZ $9F25
+  REM ; ---- one row: the VERA address of its first cell, increment 1
+  REM PROW: STZ $9F20
+  REM LDA $9F35
+  REM ASL
+  REM PHP
+  REM CLC
+  REM ADC {VIEW.WORK.ROW%}
+  REM STA $9F21
+  REM PLP
+  REM LDA #$08
+  REM ROL
+  REM STA $9F22
+  REM ; ---- Y is 1 through the gutter: the index of a high byte
+  REM LDY #1
+  REM LDA {VIEW.WORK.LINE%}
+  REM CMP {LINE.COUNT%}
+  REM LDA {VIEW.WORK.LINE%},Y
+  REM SBC {LINE.COUNT%},Y
+  REM BCC PNUM
+  REM ; ---- past the end of the document: a blank row
+  REM LDX #6
+  REM JSR PBLANK
+  REM LDA {VIEW.ATTR.TEXT%}
+  REM STA $30
+  REM LDY #0
+  REM JMP PPAD
+  REM ; ---- the gutter: line + 1 in four digits, leading zeros blank, then two blanks
+  REM PNUM: LDA {VIEW.WORK.LINE%}
+  REM CLC
+  REM ADC #1
+  REM STA {VIEW.WORK.NUMBER%}
+  REM LDA {VIEW.WORK.LINE%},Y
+  REM ADC #0
+  REM STA {VIEW.WORK.NUMBER%},Y
+  REM STZ $31
+  REM LDA #$E8
+  REM STA $2E
+  REM LDA #$03
+  REM STA $2F
+  REM JSR PDIGIT
+  REM LDA #$64
+  REM STA $2E
+  REM STZ $2F
+  REM JSR PDIGIT
+  REM LDA #$0A
+  REM STA $2E
+  REM JSR PDIGIT
+  REM LDA {VIEW.WORK.NUMBER%}
+  REM ORA #$30
+  REM STA $9F23
+  REM LDA {VIEW.ATTR.GUTTER%}
+  REM STA $9F23
+  REM LDX #2
+  REM JSR PBLANK
+  REM ; ---- the source record in $2C: the edit buffer on the cursor line, the store otherwise
+  REM LDA {VIEW.WORK.LINE%}
+  REM CMP {VIEW.CURSOR.LINE%}
+  REM BNE PSTORE
+  REM LDA {VIEW.WORK.LINE%},Y
+  REM CMP {VIEW.CURSOR.LINE%},Y
+  REM BNE PSTORE
+  REM LDA {DOC.EDIT.PTR%}
+  REM STA $2C
+  REM LDA {DOC.EDIT.PTR%},Y
+  REM STA $2D
+  REM LDA {VIEW.ATTR.BAND%}
+  REM STA $30
+  REM BRA PCLIP
+  REM ; ---- the slot: table bank, then $A000 + (line mod 2048) * 3 in $2E
+  REM PSTORE: LDA {VIEW.WORK.LINE%},Y
+  REM LSR
+  REM LSR
+  REM LSR
+  REM CLC
+  REM ADC {DOC.TABLE.BANK%}
+  REM STA $00
+  REM LDA {VIEW.WORK.LINE%},Y
+  REM AND #$07
+  REM STA $2F
+  REM LDA {VIEW.WORK.LINE%}
+  REM STA $2E
+  REM ASL
+  REM TAX
+  REM LDA $2F
+  REM ROL
+  REM PHA
+  REM TXA
+  REM CLC
+  REM ADC $2E
+  REM STA $2E
+  REM PLA
+  REM ADC $2F
+  REM CLC
+  REM ADC #$A0
+  REM STA $2F
+  REM LDA ($2E)
+  REM PHA
+  REM LDA ($2E),Y
+  REM STA $2C
+  REM INY
+  REM LDA ($2E),Y
+  REM STA $2D
+  REM PLA
+  REM STA $00
+  REM LDA {VIEW.ATTR.TEXT%}
+  REM STA $30
+  REM PCLIP: LDA {VIEW.COLOUR.ON%}
+  REM BEQ PPLAIN
+  REM ; ---- in colour: classify the line, then paint from the text and class buffers.
+  REM ; ---- X is the line column. $31 is the column to stop at.
+  REM LDA $30
+  REM AND #$F0
+  REM STA {VIEW.WORK.PAPER%}
+  REM PSCAN: JSR $FFFF
+  REM PWORDS: JSR $FFFF
+  REM LDA {VIEW.LEFT.COL%}
+  REM TAX
+  REM CLC
+  REM ADC {VIEW.TEXT.WIDTH%}
+  REM CMP {VIEW.CLASS.LENGTH%}
+  REM BCC PCEND
+  REM LDA {VIEW.CLASS.LENGTH%}
+  REM PCEND: STA $31
+  REM BRA PCTEST
+  REM PCCELL: LDY $BE00,X
+  REM PCXLAT: LDA $FFFF,Y
+  REM STA $9F23
+  REM LDY $BF00,X
+  REM LDA $BDF0,Y
+  REM ORA {VIEW.WORK.PAPER%}
+  REM STA $9F23
+  REM INX
+  REM PCTEST: CPX $31
+  REM BCC PCCELL
+  REM ; ---- Y = cells written, for the padding
+  REM TXA
+  REM SEC
+  REM SBC {VIEW.LEFT.COL%}
+  REM TAY
+  REM JMP PPAD
+  REM ; ---- no colour. $31 = cells holding a character: length - left column, at most the width
+  REM PPLAIN: LDA ($2C)
+  REM SEC
+  REM SBC {VIEW.LEFT.COL%}
+  REM BCS PWIDE
+  REM LDA #0
+  REM PWIDE: CMP {VIEW.TEXT.WIDTH%}
+  REM BCC PKEEP
+  REM LDA {VIEW.TEXT.WIDTH%}
+  REM PKEEP: STA $31
+  REM ; ---- $2C moves past the length byte and the columns left of the pane
+  REM LDA {VIEW.LEFT.COL%}
+  REM SEC
+  REM ADC $2C
+  REM STA $2C
+  REM BCC PCELLS
+  REM INC $2D
+  REM PCELLS: LDY #0
+  REM LDA $31
+  REM BEQ PPAD
+  REM PCHAR: LDA ($2C),Y
+  REM TAX
+  REM PXLAT: LDA $FFFF,X
+  REM STA $9F23
+  REM LDA $30
+  REM STA $9F23
+  REM INY
+  REM CPY $31
+  REM BCC PCHAR
+  REM PPAD: CPY {VIEW.TEXT.WIDTH%}
+  REM BCS PCURS
+  REM LDA #$20
+  REM STA $9F23
+  REM LDA $30
+  REM STA $9F23
+  REM INY
+  REM BRA PPAD
+  REM ; ---- the cursor cell, on the cursor line when the column is inside the pane
+  REM PCURS: LDY #1
+  REM LDA {VIEW.WORK.LINE%}
+  REM CMP {VIEW.CURSOR.LINE%}
+  REM BNE PSTEP
+  REM LDA {VIEW.WORK.LINE%},Y
+  REM CMP {VIEW.CURSOR.LINE%},Y
+  REM BNE PSTEP
+  REM LDA {VIEW.CURSOR.COL%}
+  REM SEC
+  REM SBC {VIEW.LEFT.COL%}
+  REM BCC PSTEP
+  REM CMP {VIEW.TEXT.WIDTH%}
+  REM BCS PSTEP
+  REM CLC
+  REM ADC #6
+  REM ASL
+  REM ORA #1
+  REM STA $9F20
+  REM LDA {VIEW.ATTR.CURSOR%}
+  REM STA $9F23
+  REM PSTEP: INC {VIEW.WORK.LINE%}
+  REM BNE PNEXT
+  REM LDX #1
+  REM INC {VIEW.WORK.LINE%},X
+  REM PNEXT: INC {VIEW.WORK.ROW%}
+  REM DEC {VIEW.WORK.LEFT%}
+  REM BEQ PEXIT
+  REM JMP PROW
+  REM PEXIT: PLA
+  REM STA $00
+  REM RTS
+  REM ; ---- write X blank gutter cells
+  REM PBLANK: LDA #$20
+  REM STA $9F23
+  REM LDA {VIEW.ATTR.GUTTER%}
+  REM STA $9F23
+  REM DEX
+  REM BNE PBLANK
+  REM RTS
+  REM ; ---- write one digit of VIEW.WORK.NUMBER%: how many times $2E/$2F comes off it.
+  REM ; ---- $31 is 0 until a digit other than 0 has been written.
+  REM PDIGIT: LDX #$30
+  REM PDLOOP: LDA {VIEW.WORK.NUMBER%}
+  REM CMP $2E
+  REM LDA {VIEW.WORK.NUMBER%},Y
+  REM SBC $2F
+  REM BCC PDPUT
+  REM STA {VIEW.WORK.NUMBER%},Y
+  REM LDA {VIEW.WORK.NUMBER%}
+  REM SEC
+  REM SBC $2E
+  REM STA {VIEW.WORK.NUMBER%}
+  REM INX
+  REM BRA PDLOOP
+  REM PDPUT: CPX #$30
+  REM BNE PDSHOW
+  REM LDA $31
+  REM BNE PDSHOW
+  REM LDX #$20
+  REM BRA PDOUT
+  REM PDSHOW: INC $31
+  REM PDOUT: STX $9F23
+  REM LDA {VIEW.ATTR.GUTTER%}
+  REM STA $9F23
+  REM RTS
+  GP.ENDASM
+  #REM 0
+  IF VIEW.SELECT.ON% <> 0 THEN GOSUB VIEW.SELECT.SHOW
+  RETURN
+
+## VIEW.CLASS.SCAN -- copy a line into the text buffer and give every column a class.
+## VIEW.PAINT calls it. A GOSUB to it stores its entry address in VIEW.SCAN.ENTRY% and does
+## nothing else.
+##
+##   in   $2C                   the address of the line's record, with its bank selected
+##   out  VIEW.CLASS.LENGTH%    the line's length
+##        $BE00                 the text, with a 0 after it
+##        $BF00                 the class of each column
+##
+## It leaves VIEW.KEY.BANK% selected.
+##
+## The classes are 0 plain, 1 statement, 2 function, 3 string, 4 number, 5 comment and 6 a
+## word that VIEW.CLASS.WORDS has still to look up.
+##
+## A word is letters, digits and dots, with the $ or % that types it. The word REM starts a
+## comment that runs to the end of the line. So does "##" at any column. Neither counts
+## inside a string. A "#" in the first column that is not a space starts a directive. The
+## "#" and the letters after it are class 1. A letter is $41 to $5A or $C1 to $DA, as the
+## store holds it.
+##
+## WARNING: the entry is 17 bytes past the last byte of JSR QHERE. Count again when a line
+## between QHERE and the RTS changes.
+VIEW.CLASS.SCAN:
+  #REM 1
+  GP.ASM LOW
+  REM CLD
+  REM JSR QHERE
+  REM QHERE: PLA
+  REM CLC
+  REM ADC #17
+  REM STA {VIEW.SCAN.ENTRY%}
+  REM PLA
+  REM ADC #0
+  REM LDX #1
+  REM STA {VIEW.SCAN.ENTRY%},X
+  REM RTS
+  REM ; ---- the entry: copy the line out of its bank into the text buffer
+  REM LDA $00
+  REM STA {VIEW.CLASS.TEXTBANK%}
+  REM LDA ($2C)
+  REM STA {VIEW.CLASS.LENGTH%}
+  REM LDX {VIEW.KEY.BANK%}
+  REM LDY #0
+  REM QCOPY: CPY {VIEW.CLASS.LENGTH%}
+  REM BEQ QCOPYX
+  REM INY
+  REM LDA {VIEW.CLASS.TEXTBANK%}
+  REM STA $00
+  REM LDA ($2C),Y
+  REM STX $00
+  REM STA $BDFF,Y
+  REM BRA QCOPY
+  REM ; ---- a 0 after the text stops every loop below that reads a column ahead
+  REM QCOPYX: STX $00
+  REM LDA #0
+  REM STA $BE00,Y
+  REM ; ---- the first column that is not a space
+  REM LDY #0
+  REM QSPACE: LDA $BE00,Y
+  REM CMP #$20
+  REM BNE QFIRST
+  REM INY
+  REM BNE QSPACE
+  REM QFIRST: STY {VIEW.CLASS.FIRST%}
+  REM LDX #0
+  REM BRA QMAIN
+  REM ; ---- a number: digits, dots and letters
+  REM QNUM: LDA #4
+  REM STA $BF00,X
+  REM INX
+  REM LDA $BE00,X
+  REM CMP #$2E
+  REM BEQ QNUM
+  REM JSR QISDIG
+  REM BCC QNUM
+  REM JSR QISLET
+  REM BCC QNUM
+  REM BRA QMAIN
+  REM ; ---- a string, to its closing quote or the end of the line
+  REM QSTR: LDA #3
+  REM STA $BF00,X
+  REM INX
+  REM LDA $BE00,X
+  REM BEQ QMAIN
+  REM CMP #$22
+  REM BNE QSTR
+  REM LDA #3
+  REM BRA QPUT
+  REM QPLAIN: LDA #0
+  REM QPUT: STA $BF00,X
+  REM INX
+  REM ; ---- what the next column starts. X is the column.
+  REM QMAIN: CPX {VIEW.CLASS.LENGTH%}
+  REM BCS QDONE
+  REM LDA $BE00,X
+  REM CMP #$22
+  REM BEQ QSTR
+  REM CMP #$24
+  REM BEQ QNUM
+  REM CMP #$25
+  REM BEQ QNUM
+  REM CMP #$23
+  REM BEQ QHASH
+  REM JSR QISDIG
+  REM BCC QNUM
+  REM JSR QISLET
+  REM BCS QPLAIN
+  REM JMP QWORD
+  REM ; ---- a hash. Two start a comment. One leading the line starts a directive.
+  REM QHASH: LDA $BE01,X
+  REM CMP #$23
+  REM BEQ QREST
+  REM CPX {VIEW.CLASS.FIRST%}
+  REM BNE QPLAIN
+  REM QDIR: LDA #1
+  REM STA $BF00,X
+  REM INX
+  REM LDA $BE00,X
+  REM JSR QISLET
+  REM BCC QDIR
+  REM BRA QMAIN
+  REM ; ---- a comment, from X to the end of the line
+  REM QREST: LDA #5
+  REM QRESTL: STA $BF00,X
+  REM INX
+  REM CPX {VIEW.CLASS.LENGTH%}
+  REM BCC QRESTL
+  REM ; ---- class 0 after the last column, so a class 6 word ends with the line
+  REM QDONE: LDX {VIEW.CLASS.LENGTH%}
+  REM STZ $BF00,X
+  REM RTS
+  REM ; ---- carry clear when A is a digit. A is kept.
+  REM QISDIG: PHA
+  REM SEC
+  REM SBC #$30
+  REM CMP #10
+  REM PLA
+  REM RTS
+  REM ; ---- carry clear when A is a letter of either case. A is kept.
+  REM QISLET: PHA
+  REM AND #$7F
+  REM SEC
+  REM SBC #$41
+  REM CMP #26
+  REM PLA
+  REM RTS
+  REM ; ---- a word, marked class 6 from its first column to its last
+  REM QWORD: STX {VIEW.WORD.START%}
+  REM QWLOOP: LDA #6
+  REM STA $BF00,X
+  REM INX
+  REM LDA $BE00,X
+  REM JSR QISLET
+  REM BCC QWLOOP
+  REM JSR QISDIG
+  REM BCC QWLOOP
+  REM CMP #$2E
+  REM BEQ QWLOOP
+  REM CMP #$24
+  REM BEQ QWLOOP
+  REM CMP #$25
+  REM BEQ QWLOOP
+  REM ; ---- a word of three characters that fold to R, E, M starts a comment at the R
+  REM TXA
+  REM SEC
+  REM SBC {VIEW.WORD.START%}
+  REM CMP #3
+  REM BNE QWOUT
+  REM LDY {VIEW.WORD.START%}
+  REM LDA $BE00,Y
+  REM AND #$7F
+  REM CMP #$52
+  REM BNE QWOUT
+  REM LDA $BE01,Y
+  REM AND #$7F
+  REM CMP #$45
+  REM BNE QWOUT
+  REM LDA $BE02,Y
+  REM AND #$7F
+  REM CMP #$4D
+  REM BNE QWOUT
+  REM LDX {VIEW.WORD.START%}
+  REM JMP QREST
+  REM QWOUT: JMP QMAIN
+  GP.ENDASM
+  #REM 0
+  RETURN
+
+## VIEW.CLASS.WORDS -- look up every class 6 word of the line VIEW.CLASS.SCAN left in the
+## buffers. VIEW.PAINT calls it. A GOSUB to it stores its entry address in
+## VIEW.WORDS.ENTRY% and does nothing else.
+##
+## It expects VIEW.KEY.BANK% selected, as VIEW.CLASS.SCAN leaves it.
+##
+## A word becomes class 1 when GP. leads it or when the keyword table holds it as a
+## statement. It becomes class 2 when the table holds it as a function. Any other word stays
+## at class 6. A word with a dot in it, a word of one character and a word of over eight
+## characters are not looked up in the table.
+##
+## WARNING: the entry is 17 bytes past the last byte of JSR GHERE. Count again when a line
+## between GHERE and the RTS changes.
+VIEW.CLASS.WORDS:
+  #REM 1
+  GP.ASM LOW
+  REM CLD
+  REM JSR GHERE
+  REM GHERE: PLA
+  REM CLC
+  REM ADC #17
+  REM STA {VIEW.WORDS.ENTRY%}
+  REM PLA
+  REM ADC #0
+  REM LDX #1
+  REM STA {VIEW.WORDS.ENTRY%},X
+  REM RTS
+  REM ; ---- the entry: find the next class 6 word, from column X
+  REM LDX #0
+  REM GSCAN: CPX {VIEW.CLASS.LENGTH%}
+  REM BCS GEXIT
+  REM LDA $BF00,X
+  REM CMP #6
+  REM BEQ GFOUND
+  REM INX
+  REM BNE GSCAN
+  REM GEXIT: RTS
+  REM GFOUND: STX {VIEW.WORD.START%}
+  REM STZ {VIEW.WORD.DOTTED%}
+  REM GEND: LDA $BE00,X
+  REM CMP #$2E
+  REM BNE GNODOT
+  REM STA {VIEW.WORD.DOTTED%}
+  REM GNODOT: INX
+  REM LDA $BF00,X
+  REM CMP #6
+  REM BEQ GEND
+  REM STX {VIEW.WORD.END%}
+  REM LDA {VIEW.WORD.DOTTED%}
+  REM BEQ GTABLE
+  REM ; ---- a dotted word is a statement only when G, P and a dot lead it
+  REM LDY {VIEW.WORD.START%}
+  REM LDA $BE00,Y
+  REM AND #$7F
+  REM CMP #$47
+  REM BNE GSCAN
+  REM LDA $BE01,Y
+  REM AND #$7F
+  REM CMP #$50
+  REM BNE GSCAN
+  REM LDA $BE02,Y
+  REM CMP #$2E
+  REM BNE GSCAN
+  REM LDA #1
+  REM JMP GPAINT
+  REM GTABLE: TXA
+  REM SEC
+  REM SBC {VIEW.WORD.START%}
+  REM STA {VIEW.WORD.LENGTH%}
+  REM CMP #2
+  REM BCC GSCAN
+  REM CMP #9
+  REM BCS GSCAN
+  REM ; ---- $2E = the first record of the word's first letter
+  REM LDY {VIEW.WORD.START%}
+  REM LDA $BE00,Y
+  REM AND #$7F
+  REM SEC
+  REM SBC #$41
+  REM ASL
+  REM TAY
+  REM LDA $A000,Y
+  REM STA $2E
+  REM LDA $A001,Y
+  REM STA $2F
+  REM ; ---- a record: length, kind, the word. Length 0 ends the letter.
+  REM GREC: LDA ($2E)
+  REM BEQ GNONE
+  REM CMP {VIEW.WORD.LENGTH%}
+  REM BNE GNEXT
+  REM LDY #2
+  REM LDX {VIEW.WORD.START%}
+  REM GCMP: LDA $BE00,X
+  REM AND #$7F
+  REM CMP ($2E),Y
+  REM BNE GNEXT
+  REM INX
+  REM INY
+  REM CPX {VIEW.WORD.END%}
+  REM BNE GCMP
+  REM LDY #1
+  REM LDA ($2E),Y
+  REM BRA GPAINT
+  REM GNEXT: LDA ($2E)
+  REM CLC
+  REM ADC #2
+  REM ADC $2E
+  REM STA $2E
+  REM BCC GREC
+  REM INC $2F
+  REM BRA GREC
+  REM GNONE: LDX {VIEW.WORD.END%}
+  REM JMP GSCAN
+  REM ; ---- the class in A goes over the whole word
+  REM GPAINT: LDX {VIEW.WORD.START%}
+  REM GPLOOP: STA $BF00,X
+  REM INX
+  REM CPX {VIEW.WORD.END%}
+  REM BNE GPLOOP
+  REM JMP GSCAN
+  GP.ENDASM
+  #REM 0
+  RETURN
+
+## VIEW.SCROLL -- slide the VIEW.SCROLL.ROWS% screen rows from row VIEW.SCROLL.TOP% by one
+## row. VIEW.SCROLL.DIR% is 0 to move the text up and 1 to move it down.
+##
+## The row the slide exposes keeps its old cells. The caller paints it.
+VIEW.SCROLL:
+  #REM 1
+  GP.ASM
+  REM CLD
+  REM ; ---- $2E = high byte of the map's first row, $2F = ADDR_H: increment 1, the map's bank bit
+  REM LDA $9F35
+  REM ASL
+  REM STA $2E
+  REM LDA #$08
+  REM ROL
+  REM STA $2F
+  REM ; ---- $30 = row copies to make, $2C = destination row, $2D = step to its source
+  REM LDA {VIEW.SCROLL.ROWS%}
+  REM SEC
+  REM SBC #1
+  REM BEQ SDONE
+  REM STA $30
+  REM LDA {VIEW.SCROLL.TOP%}
+  REM CLC
+  REM ADC $2E
+  REM STA $2C
+  REM LDA #1
+  REM STA $2D
+  REM LDA {VIEW.SCROLL.DIR%}
+  REM BEQ SROW
+  REM ; ---- text moves down: start at the last row, the source is the row above
+  REM LDA $2C
+  REM CLC
+  REM ADC $30
+  REM STA $2C
+  REM LDA #$FF
+  REM STA $2D
+  REM ; ---- ADDR1 is the destination row, ADDR0 the source row
+  REM SROW: LDA #1
+  REM STA $9F25
+  REM STZ $9F20
+  REM LDA $2C
+  REM STA $9F21
+  REM LDA $2F
+  REM STA $9F22
+  REM STZ $9F25
+  REM STZ $9F20
+  REM LDA $2C
+  REM CLC
+  REM ADC $2D
+  REM STA $9F21
+  REM ; ---- this source row is the next destination
+  REM STA $2C
+  REM LDA $2F
+  REM STA $9F22
+  REM LDX #80
+  REM SCELL: LDA $9F23
+  REM STA $9F24
+  REM LDA $9F23
+  REM STA $9F24
+  REM DEX
+  REM BNE SCELL
+  REM DEC $30
+  REM BNE SROW
+  REM SDONE: STZ $9F25
+  GP.ENDASM
+  #REM 0
+  RETURN
+
+## VIEW.STATUS -- write the cursor's line and column on the status bar, both counted from 1.
+## The line is four characters at column 6. The column is four characters at column 16.
+## Attributes are left as they are.
+VIEW.STATUS:
+  #REM 1
+  GP.ASM
+  REM CLD
+  REM STZ $9F25
+  REM LDA $9F35
+  REM ASL
+  REM PHP
+  REM CLC
+  REM ADC {VIEW.STATUS.ROW%}
+  REM STA $9F21
+  REM PLP
+  REM ; ---- increment 2: characters only
+  REM LDA #$10
+  REM ROL
+  REM STA $9F22
+  REM LDY #1
+  REM LDA #12
+  REM STA $9F20
+  REM LDA {VIEW.CURSOR.LINE%}
+  REM CLC
+  REM ADC #1
+  REM STA {VIEW.WORK.NUMBER%}
+  REM LDA {VIEW.CURSOR.LINE%},Y
+  REM ADC #0
+  REM STA {VIEW.WORK.NUMBER%},Y
+  REM JSR SNUM
+  REM LDA #32
+  REM STA $9F20
+  REM LDA {VIEW.CURSOR.COL%}
+  REM CLC
+  REM ADC #1
+  REM STA {VIEW.WORK.NUMBER%}
+  REM LDA #0
+  REM ADC #0
+  REM STA {VIEW.WORK.NUMBER%},Y
+  REM JSR SNUM
+  REM RTS
+  REM ; ---- write VIEW.WORK.NUMBER% in four characters, leading zeros blank
+  REM SNUM: STZ $31
+  REM LDA #$E8
+  REM STA $2E
+  REM LDA #$03
+  REM STA $2F
+  REM JSR SDIGIT
+  REM LDA #$64
+  REM STA $2E
+  REM STZ $2F
+  REM JSR SDIGIT
+  REM LDA #$0A
+  REM STA $2E
+  REM JSR SDIGIT
+  REM LDA {VIEW.WORK.NUMBER%}
+  REM ORA #$30
+  REM STA $9F23
+  REM RTS
+  REM SDIGIT: LDX #$30
+  REM SDLOOP: LDA {VIEW.WORK.NUMBER%}
+  REM CMP $2E
+  REM LDA {VIEW.WORK.NUMBER%},Y
+  REM SBC $2F
+  REM BCC SDPUT
+  REM STA {VIEW.WORK.NUMBER%},Y
+  REM LDA {VIEW.WORK.NUMBER%}
+  REM SEC
+  REM SBC $2E
+  REM STA {VIEW.WORK.NUMBER%}
+  REM INX
+  REM BRA SDLOOP
+  REM SDPUT: CPX #$30
+  REM BNE SDSHOW
+  REM LDA $31
+  REM BNE SDSHOW
+  REM LDX #$20
+  REM BRA SDOUT
+  REM SDSHOW: INC $31
+  REM SDOUT: STX $9F23
+  REM RTS
+  GP.ENDASM
+  #REM 0
+  RETURN
+
+## VIEW.SELECT.PAINT -- give the selected cells of the rows VIEW.PAINT has just painted the
+## paper VIEW.SELECT.PAPER%. A cell keeps its ink, and the cursor cell is left as it is. A
+## line that runs on into the selection's next line is marked to the pane's right edge.
+##
+##   in   VIEW.SELECT.FIRST.LINE%, VIEW.SELECT.FIRST.COL%, VIEW.SELECT.LAST.LINE% and
+##        VIEW.SELECT.LAST.COL%, as VIEW.SELECT.ORDER sets them
+##        VIEW.PAINT.ROW%, VIEW.PAINT.COUNT% and VIEW.PAINT.LINE%, as VIEW.PAINT took them
+##
+## VERA's data port 0 reads each attribute and port 1 writes it back.
+VIEW.SELECT.PAINT:
+  #REM 1
+  GP.ASM
+  REM CLD
+  REM LDY #1
+  REM LDA {VIEW.PAINT.LINE%}
+  REM STA {VIEW.WORK.LINE%}
+  REM LDA {VIEW.PAINT.LINE%},Y
+  REM STA {VIEW.WORK.LINE%},Y
+  REM LDA {VIEW.PAINT.ROW%}
+  REM STA {VIEW.WORK.ROW%}
+  REM LDA {VIEW.PAINT.COUNT%}
+  REM STA {VIEW.WORK.LEFT%}
+  REM BRA HROW
+  REM ; ---- HNEXT is past a branch's reach from the tests above the cell loop
+  REM HSKIP: JMP HNEXT
+  REM ; ---- a row whose line is outside the selection keeps its cells
+  REM HROW: LDY #1
+  REM LDA {VIEW.WORK.LINE%}
+  REM CMP {VIEW.SELECT.FIRST.LINE%}
+  REM LDA {VIEW.WORK.LINE%},Y
+  REM SBC {VIEW.SELECT.FIRST.LINE%},Y
+  REM BCC HSKIP
+  REM LDA {VIEW.SELECT.LAST.LINE%}
+  REM CMP {VIEW.WORK.LINE%}
+  REM LDA {VIEW.SELECT.LAST.LINE%},Y
+  REM SBC {VIEW.WORK.LINE%},Y
+  REM BCC HSKIP
+  REM ; ---- $30 = the line's first selected column, $31 = the column after its last
+  REM STZ $30
+  REM LDA {VIEW.WORK.LINE%}
+  REM CMP {VIEW.SELECT.FIRST.LINE%}
+  REM BNE HLAST
+  REM LDA {VIEW.WORK.LINE%},Y
+  REM CMP {VIEW.SELECT.FIRST.LINE%},Y
+  REM BNE HLAST
+  REM LDA {VIEW.SELECT.FIRST.COL%}
+  REM STA $30
+  REM HLAST: LDA #$FF
+  REM STA $31
+  REM LDA {VIEW.WORK.LINE%}
+  REM CMP {VIEW.SELECT.LAST.LINE%}
+  REM BNE HCELLS
+  REM LDA {VIEW.WORK.LINE%},Y
+  REM CMP {VIEW.SELECT.LAST.LINE%},Y
+  REM BNE HCELLS
+  REM LDA {VIEW.SELECT.LAST.COL%}
+  REM STA $31
+  REM ; ---- the columns as cells of the pane, clipped to its width
+  REM HCELLS: LDA $30
+  REM SEC
+  REM SBC {VIEW.LEFT.COL%}
+  REM BCS HSTART
+  REM LDA #0
+  REM HSTART: STA $30
+  REM LDA $31
+  REM SEC
+  REM SBC {VIEW.LEFT.COL%}
+  REM BCC HSKIP
+  REM CMP {VIEW.TEXT.WIDTH%}
+  REM BCC HEND
+  REM LDA {VIEW.TEXT.WIDTH%}
+  REM HEND: STA $31
+  REM CMP $30
+  REM BCC HSKIP
+  REM BEQ HSKIP
+  REM ; ---- $2C = the cursor's cell on the cursor line, $FF on any other line
+  REM LDA #$FF
+  REM STA $2C
+  REM LDA {VIEW.WORK.LINE%}
+  REM CMP {VIEW.CURSOR.LINE%}
+  REM BNE HPORTS
+  REM LDA {VIEW.WORK.LINE%},Y
+  REM CMP {VIEW.CURSOR.LINE%},Y
+  REM BNE HPORTS
+  REM LDA {VIEW.CURSOR.COL%}
+  REM SEC
+  REM SBC {VIEW.LEFT.COL%}
+  REM STA $2C
+  REM ; ---- port 1, then port 0, at the first cell's attribute, increment 2
+  REM HPORTS: LDX #1
+  REM HPORT: STX $9F25
+  REM LDA $30
+  REM CLC
+  REM ADC #6
+  REM ASL
+  REM ORA #1
+  REM STA $9F20
+  REM LDA $9F35
+  REM ASL
+  REM PHP
+  REM CLC
+  REM ADC {VIEW.WORK.ROW%}
+  REM STA $9F21
+  REM PLP
+  REM LDA #$10
+  REM ROL
+  REM STA $9F22
+  REM DEX
+  REM BPL HPORT
+  REM LDX $30
+  REM HCELL: LDA $9F23
+  REM CPX $2C
+  REM BEQ HKEEP
+  REM AND #$0F
+  REM ORA {VIEW.SELECT.PAPER%}
+  REM HKEEP: STA $9F24
+  REM INX
+  REM CPX $31
+  REM BCC HCELL
+  REM ; ---- the next row
+  REM HNEXT: INC {VIEW.WORK.LINE%}
+  REM BNE HSTEP
+  REM LDX #1
+  REM INC {VIEW.WORK.LINE%},X
+  REM HSTEP: INC {VIEW.WORK.ROW%}
+  REM DEC {VIEW.WORK.LEFT%}
+  REM BEQ HDONE
+  REM JMP HROW
+  REM HDONE: RTS
+  GP.ENDASM
+  #REM 0
+  RETURN

@@ -1,0 +1,90 @@
+#SAVEAS "@:SCROLLBEN.SRC.PRG"
+#REM 0
+#SYMFILE "@:SCROLLBEN.SRC.SYM"
+#INCLUDE "GPC-BASIC/GPB.INC.BL"
+#INCLUDE "GPC-BASIC/MEM.INC.BL"
+
+## ============================================================================
+## SCROLLBEN -- the cursor-down key on a 2,000 line document. It times 27 moves inside the
+## pane, then BEN.SCROLLS moves that each scroll the pane one line.
+##
+## A move is the whole path: decide, open the line in the edit buffer, slide, paint,
+## status. Times are jiffies off TI. The scroll time has the empty loop taken off. The
+## move time and the load time do not.
+##
+## WARNING: run it at real speed. Under -warp TI is not tied to the CPU.
+##
+## The results go to SCROLLBEN.RES. SUM.SLID is the sums of the pane after the last scroll.
+## SUM.PAINTED is the sums of the pane after a full repaint. The two match. MISMATCHES
+## counts the cells of the repaint that differ from the store read in BASIC. It is 0.
+## The repainted pane goes to SCROLLBEN.PANE.
+## ============================================================================
+
+BEN.SCROLLS = 300
+BEN.MOVES = 27
+
+SCREEN 1
+GOSUB DOC.SETUP
+GOSUB VIEW.SETUP
+GOSUB BEN.CONFIG
+
+DOC.FILE.NAME$ = "FIX2000.TXT"
+BEN.START = TI
+GOSUB DOC.LOADFILE
+BEN.LOAD.JIFFIES = TI - BEN.START
+
+DOC.LINE% = 0
+GOSUB DOC.EDIT.OPEN
+GOSUB VIEW.PAINT.ALL
+
+BEN.START = TI
+FOR BEN.COUNT = 1 TO BEN.SCROLLS
+NEXT BEN.COUNT
+BEN.FLOOR.JIFFIES = TI - BEN.START
+
+BEN.START = TI
+FOR BEN.COUNT = 1 TO BEN.MOVES
+  GOSUB VIEW.CURSOR.DOWN
+NEXT BEN.COUNT
+BEN.MOVE.JIFFIES = TI - BEN.START
+
+BEN.START = TI
+FOR BEN.COUNT = 1 TO BEN.SCROLLS
+  GOSUB VIEW.CURSOR.DOWN
+NEXT BEN.COUNT
+BEN.SCROLL.JIFFIES = TI - BEN.START - BEN.FLOOR.JIFFIES
+
+GOSUB BEN.SCREEN.SUM
+BEN.SLID.CHARS = BEN.SUM.BY.COLUMN
+BEN.SLID.ROWS = BEN.SUM.BY.ROW
+GOSUB VIEW.PAINT.ALL
+GOSUB BEN.SCREEN.SUM
+GOSUB BEN.REFERENCE.CHECK
+BEN.PANE.NAME$ = "SCROLLBEN.PANE"
+GOSUB BEN.PANE.DUMP
+
+OPEN 3, 8, 3, "@:SCROLLBEN.RES,S,W"
+PRINT# 3, "LINES"; LINE.COUNT%
+PRINT# 3, "FULL"; DOC.FULL%
+PRINT# 3, "CURSOR.LINE"; VIEW.CURSOR.LINE%
+PRINT# 3, "TOP.LINE"; VIEW.TOP.LINE%
+PRINT# 3, "LOAD.JIFFIES"; BEN.LOAD.JIFFIES
+PRINT# 3, "FLOOR.JIFFIES"; BEN.FLOOR.JIFFIES
+PRINT# 3, "MOVES"; BEN.MOVES
+PRINT# 3, "MOVE.JIFFIES"; BEN.MOVE.JIFFIES
+PRINT# 3, "SCROLLS"; BEN.SCROLLS
+PRINT# 3, "SCROLL.JIFFIES"; BEN.SCROLL.JIFFIES
+PRINT# 3, "SUM.SLID"; BEN.SLID.CHARS; BEN.SLID.ROWS
+PRINT# 3, "SUM.PAINTED"; BEN.SUM.BY.COLUMN; BEN.SUM.BY.ROW
+PRINT# 3, "MISMATCHES"; BEN.MISMATCHES
+PRINT# 3, "FREE"; FRE(0)
+GOSUB BEN.PANE.REPORT
+PRINT# 3, "DONE"
+CLOSE 3
+END
+
+#INCLUDE "TG-BENCH-CHECK.BASL"
+#INCLUDE "TG-STORE.BASL"
+#INCLUDE "TG-UNDO.BASL"
+#INCLUDE "TG-VIEW.BASL"
+#INCLUDE "TG-LOW.BASL"

@@ -1,0 +1,94 @@
+#SAVEAS "@:CLASSBEN.SRC.PRG"
+#REM 0
+#SYMFILE "@:CLASSBEN.SRC.SYM"
+#INCLUDE "GPC-BASIC/GPB.INC.BL"
+#INCLUDE "GPC-BASIC/MEM.INC.BL"
+
+## ============================================================================
+## CLASSBEN -- the check of the syntax colouring. It times nothing.
+##
+## It paints every line of the 2,000 line document on one row, in colour, and writes the
+## classes of each line to CLASSBEN.CLS. Then it puts the cursor at column 90 of the
+## longest line. That scrolls the pane 17 columns sideways. It writes that pane to
+## CLASSBEN.PANE. spike.py compares both files with the rules in tgkeys.py.
+##
+## It writes the line count, the longest line and the pane's state to CLASSBEN.RES.
+## ============================================================================
+
+SCREEN 1
+GOSUB DOC.SETUP
+GOSUB VIEW.SETUP
+VIEW.COLOUR.ON% = 1
+
+DOC.FILE.NAME$ = "FIX2000.TXT"
+GOSUB DOC.LOADFILE
+DOC.LINE% = 0
+GOSUB DOC.EDIT.OPEN
+
+## ---- the classes of every line ----
+BEN.LONGEST.LINE = 0
+BEN.LONGEST.LENGTH = 0
+OPEN 4, 8, 4, "@:CLASSBEN.CLS,S,W"
+FOR BEN.LINE = 0 TO LINE.COUNT% - 1
+  VIEW.PAINT.LINE% = BEN.LINE
+  VIEW.PAINT.ROW% = VIEW.TEXT.TOP%
+  VIEW.PAINT.COUNT% = 1
+  GOSUB VIEW.PAINT
+  IF VIEW.CLASS.LENGTH% > BEN.LONGEST.LENGTH THEN GOSUB BEN.NOTE.LONGEST
+  IF VIEW.CLASS.LENGTH% > 0 THEN GOSUB BEN.CLASS.DUMP
+NEXT BEN.LINE
+CLOSE 4
+
+## ---- a pane scrolled sideways ----
+VIEW.MOVED.FROM% = VIEW.CURSOR.LINE%
+VIEW.CURSOR.LINE% = BEN.LONGEST.LINE
+VIEW.CURSOR.COL% = 0
+GOSUB VIEW.ENTER.LINE
+VIEW.MOVED.FROM% = VIEW.CURSOR.LINE%
+VIEW.CURSOR.COL% = 90
+GOSUB VIEW.AFTER.MOVE
+BEN.PANE.NAME$ = "CLASSBEN.PANE"
+GOSUB BEN.PANE.DUMP
+
+OPEN 3, 8, 3, "@:CLASSBEN.RES,S,W"
+PRINT# 3, "LINES"; LINE.COUNT%
+PRINT# 3, "LONGEST.LINE"; BEN.LONGEST.LINE
+PRINT# 3, "LONGEST.LENGTH"; BEN.LONGEST.LENGTH
+GOSUB BEN.PANE.REPORT
+PRINT# 3, "DONE"
+CLOSE 3
+END
+
+BEN.NOTE.LONGEST:
+  BEN.LONGEST.LENGTH = VIEW.CLASS.LENGTH%
+  BEN.LONGEST.LINE = BEN.LINE
+  RETURN
+
+#INCLUDE "TG-BENCH-CHECK.BASL"
+#INCLUDE "TG-STORE.BASL"
+#INCLUDE "TG-UNDO.BASL"
+#INCLUDE "TG-VIEW.BASL"
+#INCLUDE "TG-LOW.BASL"
+
+## BEN.CLASS.DUMP -- write the classes of the line VIEW.PAINT painted last to file 4.
+## VIEW.CLASS.LENGTH% is 1 or more.
+##
+## WARNING: the write and its CHKOUT stay in this one GP.ASM block. A PRINT between a CHKOUT
+## and an MCIOUT puts the output channel back on the screen.
+BEN.CLASS.DUMP:
+  #REM 1
+  GP.ASM
+  REM CLD
+  REM LDX #4
+  REM JSR $FFC9
+  REM LDA {VIEW.KEY.BANK%}
+  REM STA $00
+  REM LDA {VIEW.CLASS.LENGTH%}
+  REM LDX #$00
+  REM LDY #$BF
+  REM CLC
+  REM JSR $FEB1
+  REM JSR $FFCC
+  GP.ENDASM
+  #REM 0
+  RETURN

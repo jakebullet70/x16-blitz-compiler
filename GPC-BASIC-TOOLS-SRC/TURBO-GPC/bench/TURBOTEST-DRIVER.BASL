@@ -1,0 +1,87 @@
+## ============================================================================
+## TURBOTEST-DRIVER.BASL -- types the keys of TURBOTEST.KEY into TURBO.BASL.
+##
+## spike.py makes TURBOTEST.BASL from TURBO.BASL. The key wait there jumps to TEST.FEED
+## when no key is waiting, and the program's exit jumps to TEST.REPORT. TURBOTEST.BASL
+## includes TG-BENCH-CHECK.BASL, which holds BEN.PANE.DUMP and BEN.PANE.REPORT.
+##
+## TURBOTEST.KEY is groups of keys. A group is a count byte and that many key codes. A
+## count of 0 ends the file. A group goes into the KERNAL's key buffer whole, so it is 10
+## keys or less. The file loads into TEST.SCRIPT.BYTES of space from BANKMGR.SPACE.
+##
+## WARNING: a dialog reads the key buffer itself and never reaches TEST.FEED. Put the key
+## that opens a dialog and the dialog's keys in one group. GUI.TYPEAHEAD% keeps the dialog
+## from dropping them.
+##
+## After the last group the driver dumps the pane to TURBOTEST.PANE and rows 0 and 29 to
+## TURBOTEST.BAR. It then types Esc, X and Y: File, Exit, and yes to the question.
+## TURBOTEST.RES is written when the program quits.
+## ============================================================================
+
+#DEFINE TEST.KBDPUT $FEC3
+#DEFINE TEST.SCRIPT.BYTES 1024
+
+## TEST.FEED -- put the next group of keys in the key buffer and go back to the key wait.
+TEST.FEED:
+  IF TEST.SCRIPT.ADDR = 0 THEN GOSUB TEST.SCRIPT.LOAD
+  BANK TEST.SCRIPT.BANK%
+  TEST.GROUP.KEYS = PEEK(TEST.SCRIPT.ADDR)
+  IF TEST.GROUP.KEYS = 0 THEN GOTO TEST.SCRIPT.END
+  FOR TEST.KEY.PLACE = 1 TO TEST.GROUP.KEYS
+    BANK TEST.SCRIPT.BANK%
+    TEST.KEY.CODE% = PEEK(TEST.SCRIPT.ADDR + TEST.KEY.PLACE)
+    GOSUB TEST.KEY.PUT
+  NEXT TEST.KEY.PLACE
+  TEST.SCRIPT.ADDR = TEST.SCRIPT.ADDR + TEST.GROUP.KEYS + 1
+  GOTO TURBO.KEY.WAIT
+
+TEST.SCRIPT.LOAD:
+  GUI.TYPEAHEAD% = -1
+  GP.SUB BANKMGR.SPACE, TEST.SCRIPT.BYTES
+  TEST.SCRIPT.BANK% = BANKMGR.BANK%
+  TEST.SCRIPT.ADDR = BANKMGR.ADDR
+  BLOAD "TURBOTEST.KEY", 8, TEST.SCRIPT.BANK%, TEST.SCRIPT.ADDR
+  RETURN
+
+## Put key TEST.KEY.CODE% in the KERNAL's key buffer. The call is in ROM bank 0.
+TEST.KEY.PUT:
+  TEST.ROM.BANK% = PEEK(1)
+  POKE 1, 0
+  GP.CALL TEST.KBDPUT, TEST.KEY.CODE%, 0, 0, 0
+  POKE 1, TEST.ROM.BANK%
+  RETURN
+
+## The script is done. Dump the screen and type Esc, X and Y. A second arrival here means
+## the program did not quit.
+TEST.SCRIPT.END:
+  IF TEST.DUMPED <> 0 THEN GOTO TEST.REPORT
+  TEST.DUMPED = 1
+  BEN.PANE.NAME$ = "TURBOTEST.PANE"
+  GOSUB BEN.PANE.DUMP
+  OPEN 4, 8, 4, "@:TURBOTEST.BAR,S,W"
+  FOR TEST.BAR = 0 TO 1
+    TEST.ROW.ADDRESS = 45056 + TEST.BAR * 29 * 256
+    FOR TEST.BYTE = 0 TO 159
+      PRINT# 4, CHR$(VPEEK(1, TEST.ROW.ADDRESS + TEST.BYTE));
+    NEXT TEST.BYTE
+  NEXT TEST.BAR
+  CLOSE 4
+  TEST.KEY.CODE% = 27
+  GOSUB TEST.KEY.PUT
+  TEST.KEY.CODE% = 88
+  GOSUB TEST.KEY.PUT
+  TEST.KEY.CODE% = 89
+  GOSUB TEST.KEY.PUT
+  GOTO TURBO.KEY.WAIT
+
+## TEST.REPORT -- write TURBOTEST.RES and end. TEST.QUIT.SEEN is 1 when the program's exit
+## came here.
+TEST.REPORT:
+  OPEN 3, 8, 3, "@:TURBOTEST.RES,S,W"
+  PRINT# 3, "LINES"; LINE.COUNT%
+  PRINT# 3, "QUIT"; TEST.QUIT.SEEN
+  PRINT# 3, "FULL"; DOC.FULL%
+  GOSUB BEN.PANE.REPORT
+  PRINT# 3, "DONE"
+  CLOSE 3
+  END

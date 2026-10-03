@@ -1,0 +1,1458 @@
+## ============================================================================
+## TG-STORE.BASL -- the store and the edit buffer. The store is a line table and a content
+## arena in banked RAM. The edit buffer holds the cursor line.
+##
+## #INCLUDE it after the program's END or inside a GP.BANKED region. Call DOC.SETUP once.
+## DOC.INIT empties the document.
+##
+## The layout is MSEDIT's edoc and xarena:
+##
+##   Line table    3 bytes a line, [bank][address low][address high], 2048 entries a bank,
+##                 from bank DOC.TABLE.BANK%. Line I is in bank DOC.TABLE.BANK% + I / 2048,
+##                 at $A000 + (I mod 2048) * 3.
+##   Arena         [length][characters] records. A bump allocator hands them out over
+##                 $A000 to $BEFF in banks DOC.ARENA.FIRST.BANK% to DOC.ARENA.LAST.BANK%.
+##                 A record is never freed on its own.
+##   Edit buffer   one record image in low RAM at DOC.EDIT.ADDR. The cursor line is
+##                 edited there and stored by DOC.EDIT.CLOSE.
+##
+## The store holds three documents and the clipboard. DOC.SELECT changes the one it works on.
+##
+##   document       line table          arena                line limit
+##   0, A           banks 2-5           banks 16-38          7,936
+##   1, B           banks 6-7           banks 42-52          3,840
+##   2, C           banks 8-9           banks 53-63          3,840
+##   3, clipboard   bank 40, to $A5FF   bank 40, from $A600  512
+##
+## A load checks the limit after each block of 255 bytes, so a loaded document can end up
+## to 254 lines over it. A line table has room for 256 lines over the limit.
+##
+## Interface:
+##
+##   LINE.COUNT%        lines in the document
+##   DOC.NUMBER%        the document the store works on, 0 to 3
+##   DOC.NEXT.NUMBER%   in for DOC.SELECT
+##   DOC.LINE.LIMIT%    the document's line limit. DOC.LINE.SPLIT and DOC.SLOT.OPEN do not
+##                      check it.
+##   DOC.LINE%          the line a call works on
+##   DOC.EDIT.ADDR      the edit buffer: its length byte, then its characters
+##   DOC.EDIT.LINE%     the line the edit buffer holds
+##   DOC.EDIT.DIRTY%    -1 when the edit buffer differs from the stored line
+##   DOC.FULL%          -1 once the arena has refused a record, or a load reached
+##                      DOC.LINE.LIMIT%
+##   DOC.FILE.NAME$     in for DOC.LOADFILE and DOC.SAVEFILE
+##   DOC.FIND.TERM$     in for DOC.FIND
+##   DOC.BLOCK.ADDR     the block buffer: 256 bytes of low RAM the file, find, split and
+##                      join kernels work in
+##
+## Routines: DOC.NEW, DOC.SELECT, DOC.SELECT.ONLY, DOC.EDIT.OPEN, DOC.EDIT.CLOSE, DOC.FETCH, DOC.COMMIT,
+## DOC.EDIT.INSERT, DOC.EDIT.REMOVE, DOC.EDIT.WORD.RIGHT, DOC.EDIT.WORD.LEFT,
+## DOC.EDIT.TO.BLOCK, DOC.EDIT.APPEND, DOC.LINE.SPLIT, DOC.LINE.REMOVE, DOC.SLOT.OPEN,
+## DOC.SLOT.CLOSE, DOC.LOADFILE, DOC.SAVEFILE, DOC.FIND.
+##
+## Document text is PETSCII. A file on disk is ASCII.
+##
+## WARNING: the kernels use zero page $2C to $31.
+##
+## Checklist: a kernel that writes $00 is GP.ASM LOW. It pushes $00 on entry and puts it
+## back on every exit, because a caller in a GP.BANKED region runs from the bank $00 selects.
+## ============================================================================
+
+## DOC.SETUP -- claim the edit buffer and the block buffer. Call it once.
+##
+## Checklist: a variable a kernel names as {NAME} is assigned here or in DOC.INIT, above
+## the kernel.
+DOC.SETUP:
+  DIM DOC.EDIT.BUFFER%(127) : DOC.EDIT.ADDR = GP.ARRPTR(DOC.EDIT.BUFFER%()) : DOC.EDIT.PTR% = DOC.EDIT.ADDR
+  DIM DOC.BLOCK.BUFFER%(127) : DOC.BLOCK.ADDR = GP.ARRPTR(DOC.BLOCK.BUFFER%())
+  DOC.BLOCK.PTR% = DOC.BLOCK.ADDR
+  DOC.BLOCK.LENGTH% = 0 : DOC.NUMBER% = 0 : DOC.NEXT.NUMBER% = 0
+  DIM DOC.KEPT.LINES%(3) : DIM DOC.KEPT.ARENA.BANK%(3) : DIM DOC.KEPT.ARENA.PTR%(3) : DIM DOC.KEPT.FULL%(3)
+  GOSUB DOC.PLACE
+  DOC.STRING.PTR% = 0 : DOC.KEEP.LINE% = 0 : DOC.FILE.NAME$ = "" : DOC.FIND.TERM$ = ""
+  DOC.LOAD.STATUS% = 0 : DOC.LOAD.PENDING.CR% = 0 : DOC.SAVE.ERROR% = 0
+  DOC.WALK.LINE% = 0 : DOC.WALK.BANK% = 0 : DOC.FIND.LINE% = 0 : DOC.FIND.COLUMN% = 0 : DOC.FIND.FOUND% = 0 
+  DOC.EDIT.COLUMN% = 0 : DOC.EDIT.CHAR% = 0 : DOC.SPLIT.INDENT% = 0 : DOC.SLOT.LINE% = 0
+  DOC.MOVE.SEGMENT% = 0 : DOC.MOVE.FIRST% = 0 : DOC.MOVE.SLOTS% = 0 : DOC.MOVE.CARRY% = 0
+  GOSUB DOC.INIT
+  RETURN
+
+## DOC.INIT -- empty the document. It then has no line. DOC.NEW and DOC.LOADFILE give it
+## one.
+DOC.INIT:
+  DOC.ARENA.BANK% = DOC.ARENA.FIRST.BANK% : DOC.ARENA.PTR% = DOC.ARENA.START
+  DOC.FULL% = 0 : LINE.COUNT% = 0 : DOC.LINE% = 0 : DOC.EDIT.LINE% = 0 : DOC.EDIT.DIRTY% = 0 : POKE DOC.EDIT.ADDR, 0
+  RETURN
+
+## Set the banks, the arena's first address and the line limit of document DOC.NUMBER%.
+##
+## Checklist: the table in the file header and the Bank map of docs/blitz/TURBO-GPC.PLAN.md
+## give these numbers. Change them together.
+DOC.PLACE:
+  DOC.TABLE.BANK% = 2 : DOC.LINE.LIMIT% = 7936 : DOC.ARENA.FIRST.BANK% = 16 : DOC.ARENA.LAST.BANK% = 38
+  DOC.ARENA.START = 40960
+  IF DOC.NUMBER% = 0 THEN RETURN
+  IF DOC.NUMBER% = 3 THEN GOTO DOC.PLACE.CLIPBOARD
+  DOC.TABLE.BANK% = 4 + DOC.NUMBER% * 2 : DOC.LINE.LIMIT% = 3840
+  DOC.ARENA.FIRST.BANK% = 31 + DOC.NUMBER% * 11 : DOC.ARENA.LAST.BANK% = DOC.ARENA.FIRST.BANK% + 10
+  RETURN
+
+## The clipboard's line table and arena share bank 40. The table's 512 slots end at $A5FF.
+DOC.PLACE.CLIPBOARD:
+  DOC.TABLE.BANK% = 40
+  DOC.LINE.LIMIT% = 512
+  DOC.ARENA.FIRST.BANK% = 40
+  DOC.ARENA.LAST.BANK% = 40
+  DOC.ARENA.START = 42496
+  RETURN
+
+## DOC.NEW -- make the document one empty line. The edit buffer holds it.
+DOC.NEW:
+  GOSUB DOC.INIT : GOSUB DOC.LOAD.APPEND
+  RETURN
+
+## DOC.SELECT -- make document DOC.NEXT.NUMBER% the one the store works on. The document
+## it leaves keeps its lines. A document selected for the first time is one empty line.
+## Call DOC.EDIT.OPEN after it.
+##
+## WARNING: DOC.SELECT drops the edit buffer. Store a dirty one with DOC.EDIT.CLOSE first.
+DOC.SELECT:
+  GOSUB DOC.SELECT.ONLY
+  IF LINE.COUNT% = 0 THEN GOSUB DOC.NEW
+  RETURN
+
+## DOC.SELECT.ONLY -- DOC.SELECT without the empty line, so the edit buffer's content survives
+## the switch. A document selected for the first time has no line and no arena. Call DOC.INIT
+## for it.
+DOC.SELECT.ONLY:
+  DOC.KEPT.LINES%(DOC.NUMBER%) = LINE.COUNT% : DOC.KEPT.ARENA.BANK%(DOC.NUMBER%) = DOC.ARENA.BANK%
+  DOC.KEPT.ARENA.PTR%(DOC.NUMBER%) = DOC.ARENA.PTR% : DOC.KEPT.FULL%(DOC.NUMBER%) = DOC.FULL% : DOC.NUMBER% = DOC.NEXT.NUMBER%
+  GOSUB DOC.PLACE : LINE.COUNT% = DOC.KEPT.LINES%(DOC.NUMBER%)
+  DOC.ARENA.BANK% = DOC.KEPT.ARENA.BANK%(DOC.NUMBER%) : DOC.ARENA.PTR% = DOC.KEPT.ARENA.PTR%(DOC.NUMBER%)
+  DOC.FULL% = DOC.KEPT.FULL%(DOC.NUMBER%) : DOC.EDIT.DIRTY% = 0
+  RETURN
+
+## DOC.EDIT.OPEN -- put line DOC.LINE% in the edit buffer. The line the edit buffer holds
+## is stored first when DOC.EDIT.DIRTY% is set.
+DOC.EDIT.OPEN:
+  IF DOC.EDIT.DIRTY% <> 0 THEN GOSUB DOC.EDIT.CLOSE
+  DOC.EDIT.LINE% = DOC.LINE% : GOSUB DOC.FETCH
+  RETURN
+
+## DOC.EDIT.CLOSE -- store the edit buffer as line DOC.EDIT.LINE%. DOC.LINE% is kept.
+DOC.EDIT.CLOSE:
+  DOC.KEEP.LINE% = DOC.LINE% : DOC.LINE% = DOC.EDIT.LINE%
+  GOSUB DOC.COMMIT : DOC.LINE% = DOC.KEEP.LINE% : DOC.EDIT.DIRTY% = 0
+  RETURN
+
+## DOC.FETCH -- copy the record of line DOC.LINE% into the edit buffer.
+##
+## WARNING: DOC.LINE% must be below LINE.COUNT%. A slot that was never written holds
+## whatever the bank held.
+DOC.FETCH:
+  #REM 1
+  GP.ASM LOW
+  REM CLD
+  REM LDA $00
+  REM PHA
+  REM ; ---- the slot: table bank, then $A000 + (line mod 2048) * 3 in $2E
+  REM LDY #1
+  REM LDA {DOC.LINE%},Y
+  REM LSR
+  REM LSR
+  REM LSR
+  REM CLC
+  REM ADC {DOC.TABLE.BANK%}
+  REM STA $00
+  REM LDA {DOC.LINE%},Y
+  REM AND #$07
+  REM STA $2F
+  REM LDA {DOC.LINE%}
+  REM STA $2E
+  REM ASL
+  REM TAX
+  REM LDA $2F
+  REM ROL
+  REM PHA
+  REM TXA
+  REM CLC
+  REM ADC $2E
+  REM STA $2E
+  REM PLA
+  REM ADC $2F
+  REM CLC
+  REM ADC #$A0
+  REM STA $2F
+  REM ; ---- the record: its bank, its address in $2C
+  REM LDA ($2E)
+  REM PHA
+  REM LDA ($2E),Y
+  REM STA $2C
+  REM INY
+  REM LDA ($2E),Y
+  REM STA $2D
+  REM PLA
+  REM STA $00
+  REM ; ---- copy the length byte and the characters, last byte first
+  REM LDA {DOC.EDIT.PTR%}
+  REM STA $2E
+  REM LDY #1
+  REM LDA {DOC.EDIT.PTR%},Y
+  REM STA $2F
+  REM LDA ($2C)
+  REM TAY
+  REM FCOPY: LDA ($2C),Y
+  REM STA ($2E),Y
+  REM DEY
+  REM CPY #$FF
+  REM BNE FCOPY
+  REM PLA
+  REM STA $00
+  GP.ENDASM
+  #REM 0
+  RETURN
+
+## DOC.COMMIT -- store the edit buffer as a new record and point line DOC.LINE%'s slot
+## at it. The old record is left in the arena.
+##
+## A record that does not fit the bank starts the next bank. A record the arena cannot
+## hold sets DOC.FULL% and leaves the slot as it was.
+DOC.COMMIT:
+  #REM 1
+  GP.ASM LOW
+  REM CLD
+  REM LDA $00
+  REM PHA
+  REM LDA {DOC.EDIT.PTR%}
+  REM STA $2C
+  REM LDY #1
+  REM LDA {DOC.EDIT.PTR%},Y
+  REM STA $2D
+  REM ; ---- the address after the record, in $30: arena pointer + length + 1
+  REM LDA ($2C)
+  REM SEC
+  REM ADC {DOC.ARENA.PTR%}
+  REM STA $30
+  REM LDA {DOC.ARENA.PTR%},Y
+  REM ADC #0
+  REM STA $31
+  REM ; ---- it fits when that address is $BF00 or below
+  REM CMP #$BF
+  REM BCC CFIT
+  REM BNE CROLL
+  REM LDA $30
+  REM BEQ CFIT
+  REM CROLL: LDA {DOC.ARENA.BANK%}
+  REM CMP {DOC.ARENA.LAST.BANK%}
+  REM BCC CNEXT
+  REM LDA #$FF
+  REM STA {DOC.FULL%}
+  REM STA {DOC.FULL%},Y
+  REM JMP COUT
+  REM CNEXT: INC {DOC.ARENA.BANK%}
+  REM STZ {DOC.ARENA.PTR%}
+  REM LDA #$A0
+  REM STA {DOC.ARENA.PTR%},Y
+  REM STA $31
+  REM LDA ($2C)
+  REM CLC
+  REM ADC #1
+  REM STA $30
+  REM ; ---- the record's address in $2E, and the arena pointer moved past it
+  REM CFIT: LDA {DOC.ARENA.PTR%}
+  REM STA $2E
+  REM LDA {DOC.ARENA.PTR%},Y
+  REM STA $2F
+  REM LDA $30
+  REM STA {DOC.ARENA.PTR%}
+  REM LDA $31
+  REM STA {DOC.ARENA.PTR%},Y
+  REM LDA {DOC.ARENA.BANK%}
+  REM STA $00
+  REM LDA ($2C)
+  REM TAY
+  REM CCOPY: LDA ($2C),Y
+  REM STA ($2E),Y
+  REM DEY
+  REM CPY #$FF
+  REM BNE CCOPY
+  REM ; ---- the slot: table bank, then $A000 + (line mod 2048) * 3 in $30
+  REM LDY #1
+  REM LDA {DOC.LINE%},Y
+  REM LSR
+  REM LSR
+  REM LSR
+  REM CLC
+  REM ADC {DOC.TABLE.BANK%}
+  REM STA $00
+  REM LDA {DOC.LINE%},Y
+  REM AND #$07
+  REM STA $31
+  REM LDA {DOC.LINE%}
+  REM STA $30
+  REM ASL
+  REM TAX
+  REM LDA $31
+  REM ROL
+  REM PHA
+  REM TXA
+  REM CLC
+  REM ADC $30
+  REM STA $30
+  REM PLA
+  REM ADC $31
+  REM CLC
+  REM ADC #$A0
+  REM STA $31
+  REM LDA {DOC.ARENA.BANK%}
+  REM STA ($30)
+  REM LDA $2E
+  REM STA ($30),Y
+  REM INY
+  REM LDA $2F
+  REM STA ($30),Y
+  REM COUT: PLA
+  REM STA $00
+  GP.ENDASM
+  #REM 0
+  RETURN
+
+## DOC.LOADFILE -- replace the document with the file DOC.FILE.NAME$. The file is read a
+## block at a time.
+##
+## A line ends at CR, at LF, or at CR LF. A line over 250 characters is broken into lines
+## of 250. A file that ends on a line ending has no blank last line. An empty file gives
+## one empty line.
+##
+##   out  DOC.LOAD.STATUS%   the last read's ST. Bit 1 is a read error.
+##        DOC.FULL%          -1 when the arena refused a record, or the document reached
+##                           DOC.LINE.LIMIT% lines. The load stops after that block.
+##
+## WARNING: a name that is not on the disk opens. The first read then ends the load with
+## bit 1 set, and the document is one empty line.
+DOC.LOADFILE:
+  GOSUB DOC.INIT
+  DOC.OPEN.NAME$ = DOC.FILE.NAME$ + ",S,R"
+  OPEN 2, 8, 2, DOC.OPEN.NAME$
+  DOC.LOAD.PENDING.CR% = 0
+DOC.LOAD.LOOP:
+  GOSUB DOC.LOAD.BLOCK
+  IF LINE.COUNT% >= DOC.LINE.LIMIT% THEN DOC.FULL% = -1
+  IF DOC.FULL% <> 0 THEN GOTO DOC.LOAD.DONE
+  IF DOC.LOAD.STATUS% = 0 THEN GOTO DOC.LOAD.LOOP
+DOC.LOAD.DONE:
+  CLOSE 2
+  IF DOC.FULL% = 0 AND PEEK(DOC.EDIT.ADDR) > 0 THEN GOSUB DOC.LOAD.APPEND
+  IF LINE.COUNT% = 0 THEN GOSUB DOC.LOAD.APPEND
+  POKE DOC.EDIT.ADDR, 0
+  RETURN
+
+## Store the edit buffer as a new last line.
+DOC.LOAD.APPEND:
+  DOC.LINE% = LINE.COUNT%
+  GOSUB DOC.COMMIT
+  IF DOC.FULL% = 0 THEN LINE.COUNT% = LINE.COUNT% + 1
+  RETURN
+
+## DOC.LOAD.BLOCK -- read up to 255 bytes of file 2 and store the lines they complete.
+##
+## The line that the block leaves unfinished stays in the edit buffer, with its length
+## in the length byte. DOC.LOAD.PENDING.CR% is 1 when the block ended on a CR. A to Z
+## becomes $C1 to $DA, a to z becomes $41 to $5A, and a control byte becomes a space.
+##
+##   out  DOC.LOAD.STATUS%   0 while there is more to read
+##
+## WARNING: the read and its CHKIN stay in this one GP.ASM block. A PRINT between a CHKIN and
+## a MACPTR puts the input channel back on the keyboard.
+DOC.LOAD.BLOCK:
+  #REM 1
+  GP.ASM LOW
+  REM CLD
+  REM LDA $00
+  REM PHA
+  REM LDX #2
+  REM JSR $FFC6
+  REM LDA {DOC.BLOCK.PTR%}
+  REM STA $2C
+  REM LDY #1
+  REM LDA {DOC.BLOCK.PTR%},Y
+  REM STA $2D
+  REM LDA #255
+  REM LDX $2C
+  REM LDY $2D
+  REM CLC
+  REM JSR $FF44
+  REM BCS LFAIL
+  REM TYA
+  REM BEQ LREAD
+  REM LFAIL: LDA #$42
+  REM STA {DOC.LOAD.STATUS%}
+  REM JSR $FFCC
+  REM JMP LOUT
+  REM LREAD: TXA
+  REM STA {DOC.BLOCK.LENGTH%}
+  REM JSR $FFB7
+  REM LDX {DOC.BLOCK.LENGTH%}
+  REM BNE LSTAT
+  REM ORA #$40
+  REM LSTAT: STA {DOC.LOAD.STATUS%}
+  REM JSR $FFCC
+  REM ; ---- X = the unfinished line's length, $2E = where its next character goes
+  REM LDA {DOC.EDIT.PTR%}
+  REM STA $2E
+  REM LDY #1
+  REM LDA {DOC.EDIT.PTR%},Y
+  REM STA $2F
+  REM LDA ($2E)
+  REM TAX
+  REM SEC
+  REM ADC $2E
+  REM STA $2E
+  REM BCC LFIRST
+  REM INC $2F
+  REM LFIRST: LDA {DOC.BLOCK.PTR%}
+  REM STA $2C
+  REM LDA {DOC.BLOCK.PTR%},Y
+  REM STA $2D
+  REM LDY #0
+  REM ; ---- every byte of the block
+  REM LNEXT: CPY {DOC.BLOCK.LENGTH%}
+  REM BEQ LEND
+  REM LDA ($2C),Y
+  REM INY
+  REM CMP #$0A
+  REM BNE LNOTLF
+  REM LDA {DOC.LOAD.PENDING.CR%}
+  REM STZ {DOC.LOAD.PENDING.CR%}
+  REM BNE LNEXT
+  REM BRA LLINE
+  REM LNOTLF: STZ {DOC.LOAD.PENDING.CR%}
+  REM CMP #$0D
+  REM BNE LCHAR
+  REM INC {DOC.LOAD.PENDING.CR%}
+  REM LLINE: JSR LCOMIT
+  REM BRA LNEXT
+  REM LCHAR: CMP #$20
+  REM BCS LUPPER
+  REM LDA #$20
+  REM BRA LPUT
+  REM LUPPER: CMP #$41
+  REM BCC LPUT
+  REM CMP #$5B
+  REM BCS LLOWER
+  REM ORA #$80
+  REM BRA LPUT
+  REM LLOWER: CMP #$61
+  REM BCC LPUT
+  REM CMP #$7B
+  REM BCS LPUT
+  REM AND #$DF
+  REM LPUT: CPX #250
+  REM BCC LSTORE
+  REM PHA
+  REM JSR LCOMIT
+  REM PLA
+  REM LSTORE: STA ($2E)
+  REM INC $2E
+  REM BNE LCOUNT
+  REM INC $2F
+  REM LCOUNT: INX
+  REM BRA LNEXT
+  REM ; ---- the block is done: keep the unfinished line's length
+  REM LEND: LDA {DOC.EDIT.PTR%}
+  REM STA $2C
+  REM LDY #1
+  REM LDA {DOC.EDIT.PTR%},Y
+  REM STA $2D
+  REM TXA
+  REM STA ($2C)
+  REM LOUT: PLA
+  REM STA $00
+  REM RTS
+  REM ; ---- store the X characters in the edit buffer as line LINE.COUNT%. It keeps Y,
+  REM ; ---- and leaves X = 0 and $2C, $2E as the byte loop wants them.
+  REM LCOMIT: PHY
+  REM LDA {DOC.EDIT.PTR%}
+  REM STA $2C
+  REM LDY #1
+  REM LDA {DOC.EDIT.PTR%},Y
+  REM STA $2D
+  REM TXA
+  REM STA ($2C)
+  REM SEC
+  REM ADC {DOC.ARENA.PTR%}
+  REM STA $30
+  REM LDA {DOC.ARENA.PTR%},Y
+  REM ADC #0
+  REM STA $31
+  REM CMP #$BF
+  REM BCC LFIT
+  REM BNE LROLL
+  REM LDA $30
+  REM BEQ LFIT
+  REM LROLL: LDA {DOC.ARENA.BANK%}
+  REM CMP {DOC.ARENA.LAST.BANK%}
+  REM BCC LBANK
+  REM LDA #$FF
+  REM STA {DOC.FULL%}
+  REM STA {DOC.FULL%},Y
+  REM JMP LREST
+  REM LBANK: INC {DOC.ARENA.BANK%}
+  REM STZ {DOC.ARENA.PTR%}
+  REM LDA #$A0
+  REM STA {DOC.ARENA.PTR%},Y
+  REM STA $31
+  REM LDA ($2C)
+  REM CLC
+  REM ADC #1
+  REM STA $30
+  REM LFIT: LDA {DOC.ARENA.PTR%}
+  REM STA $2E
+  REM LDA {DOC.ARENA.PTR%},Y
+  REM STA $2F
+  REM LDA $30
+  REM STA {DOC.ARENA.PTR%}
+  REM LDA $31
+  REM STA {DOC.ARENA.PTR%},Y
+  REM LDA {DOC.ARENA.BANK%}
+  REM STA $00
+  REM LDA ($2C)
+  REM TAY
+  REM LCOPY: LDA ($2C),Y
+  REM STA ($2E),Y
+  REM DEY
+  REM CPY #$FF
+  REM BNE LCOPY
+  REM LDY #1
+  REM LDA {LINE.COUNT%},Y
+  REM LSR
+  REM LSR
+  REM LSR
+  REM CLC
+  REM ADC {DOC.TABLE.BANK%}
+  REM STA $00
+  REM LDA {LINE.COUNT%},Y
+  REM AND #$07
+  REM STA $31
+  REM LDA {LINE.COUNT%}
+  REM STA $30
+  REM ASL
+  REM TAX
+  REM LDA $31
+  REM ROL
+  REM PHA
+  REM TXA
+  REM CLC
+  REM ADC $30
+  REM STA $30
+  REM PLA
+  REM ADC $31
+  REM CLC
+  REM ADC #$A0
+  REM STA $31
+  REM LDA {DOC.ARENA.BANK%}
+  REM STA ($30)
+  REM LDA $2E
+  REM STA ($30),Y
+  REM INY
+  REM LDA $2F
+  REM STA ($30),Y
+  REM INC {LINE.COUNT%}
+  REM BNE LREST
+  REM LDX #1
+  REM INC {LINE.COUNT%},X
+  REM LREST: LDA {DOC.BLOCK.PTR%}
+  REM STA $2C
+  REM LDY #1
+  REM LDA {DOC.BLOCK.PTR%},Y
+  REM STA $2D
+  REM LDA {DOC.EDIT.PTR%}
+  REM CLC
+  REM ADC #1
+  REM STA $2E
+  REM LDA {DOC.EDIT.PTR%},Y
+  REM ADC #0
+  REM STA $2F
+  REM LDX #0
+  REM PLY
+  REM RTS
+  GP.ENDASM
+  #REM 0
+  RETURN
+
+## DOC.SAVEFILE -- write the document to the file DOC.FILE.NAME$ as ASCII, with CR LF
+## after every line. A file of that name is replaced. A dirty edit buffer is stored first.
+##
+##   out  DOC.SAVE.ERROR%   -1 when a write failed
+DOC.SAVEFILE:
+  IF DOC.EDIT.DIRTY% <> 0 THEN GOSUB DOC.EDIT.CLOSE
+  DOC.SAVE.ERROR% = 0
+  DOC.OPEN.NAME$ = "@:" + DOC.FILE.NAME$ + ",S,W"
+  OPEN 2, 8, 2, DOC.OPEN.NAME$
+  GOSUB DOC.SAVE.LINES
+  CLOSE 2
+  RETURN
+
+## DOC.SAVE.LINES -- write every stored line to file 2. $41 to $5A becomes a to z and
+## $C1 to $DA becomes A to Z.
+##
+## WARNING: the write and its CHKOUT stay in this one GP.ASM block. A PRINT between a CHKOUT
+## and an MCIOUT puts the output channel back on the screen.
+DOC.SAVE.LINES:
+  #REM 1
+  GP.ASM LOW
+  REM CLD
+  REM LDA $00
+  REM PHA
+  REM LDX #2
+  REM JSR $FFC9
+  REM BCC WOPEN
+  REM JMP WFAIL
+  REM WOPEN: LDA #0
+  REM STA {DOC.WALK.LINE%}
+  REM LDY #1
+  REM STA {DOC.WALK.LINE%},Y
+  REM LDA {DOC.TABLE.BANK%}
+  REM STA {DOC.WALK.BANK%}
+  REM STZ $30
+  REM LDA #$A0
+  REM STA $31
+  REM ; ---- every line. $30 is its slot, DOC.WALK.BANK% the slot's bank.
+  REM WLINE: LDA {DOC.WALK.LINE%}
+  REM CMP {LINE.COUNT%}
+  REM BNE WMORE
+  REM LDY #1
+  REM LDA {DOC.WALK.LINE%},Y
+  REM CMP {LINE.COUNT%},Y
+  REM BNE WMORE
+  REM JMP WDONE
+  REM WMORE: LDA {DOC.WALK.BANK%}
+  REM STA $00
+  REM LDA ($30)
+  REM PHA
+  REM LDY #1
+  REM LDA ($30),Y
+  REM STA $2C
+  REM INY
+  REM LDA ($30),Y
+  REM STA $2D
+  REM PLA
+  REM STA $00
+  REM LDA {DOC.BLOCK.PTR%}
+  REM STA $2E
+  REM LDY #1
+  REM LDA {DOC.BLOCK.PTR%},Y
+  REM STA $2F
+  REM ; ---- the characters as ASCII into the block buffer, then CR LF
+  REM LDA ($2C)
+  REM STA {DOC.BLOCK.LENGTH%}
+  REM TAY
+  REM BEQ WENDL
+  REM WCHAR: LDA ($2C),Y
+  REM CMP #$41
+  REM BCC WPUT
+  REM CMP #$5B
+  REM BCS WHIGH
+  REM ORA #$20
+  REM BRA WPUT
+  REM WHIGH: CMP #$C1
+  REM BCC WPUT
+  REM CMP #$DB
+  REM BCS WPUT
+  REM AND #$7F
+  REM WPUT: DEY
+  REM STA ($2E),Y
+  REM BNE WCHAR
+  REM WENDL: LDY {DOC.BLOCK.LENGTH%}
+  REM LDA #$0D
+  REM STA ($2E),Y
+  REM INY
+  REM LDA #$0A
+  REM STA ($2E),Y
+  REM INY
+  REM TYA
+  REM STA {DOC.BLOCK.LENGTH%}
+  REM ; ---- write it. One call can take fewer bytes than it was given.
+  REM WSEND: LDA {DOC.BLOCK.LENGTH%}
+  REM LDX $2E
+  REM LDY $2F
+  REM CLC
+  REM JSR $FEB1
+  REM BCS WFAIL
+  REM TXA
+  REM BEQ WFAIL
+  REM CLC
+  REM ADC $2E
+  REM STA $2E
+  REM BCC WLEFT
+  REM INC $2F
+  REM WLEFT: TXA
+  REM EOR #$FF
+  REM SEC
+  REM ADC {DOC.BLOCK.LENGTH%}
+  REM STA {DOC.BLOCK.LENGTH%}
+  REM BNE WSEND
+  REM ; ---- the next slot
+  REM CLC
+  REM LDA $30
+  REM ADC #3
+  REM STA $30
+  REM BCC WSAME
+  REM INC $31
+  REM WSAME: LDA $31
+  REM CMP #$B8
+  REM BCC WCOUNT
+  REM LDA #$A0
+  REM STA $31
+  REM INC {DOC.WALK.BANK%}
+  REM WCOUNT: INC {DOC.WALK.LINE%}
+  REM BNE WAGAIN
+  REM LDX #1
+  REM INC {DOC.WALK.LINE%},X
+  REM WAGAIN: JMP WLINE
+  REM WFAIL: LDA #$FF
+  REM STA {DOC.SAVE.ERROR%}
+  REM LDY #1
+  REM STA {DOC.SAVE.ERROR%},Y
+  REM WDONE: JSR $FFCC
+  REM PLA
+  REM STA $00
+  REM RTS
+  GP.ENDASM
+  #REM 0
+  RETURN
+
+## DOC.FIND -- find DOC.FIND.TERM$ in the stored lines. Letter case is ignored. The
+## search runs to the last line and does not wrap.
+##
+##   in   DOC.FIND.LINE%     the line to start on
+##        DOC.FIND.COLUMN%   the column to start at in that line
+##   out  DOC.FIND.FOUND%    -1 when the term was found
+##        DOC.FIND.LINE%     the line it is on
+##        DOC.FIND.COLUMN%   the column it starts at
+##
+## It reads the store, so store the edit buffer first. It uses the block buffer.
+DOC.FIND:
+  DOC.FIND.FOUND% = 0
+  IF LEN(DOC.FIND.TERM$) = 0 THEN RETURN
+  DOC.STRING.PTR% = GP.STRPTR(DOC.FIND.TERM$)
+  GOSUB DOC.FIND.SCAN
+  RETURN
+
+## DOC.FIND.SCAN -- the scan of DOC.FIND. DOC.STRING.PTR% is the term's string block.
+## The term must not be empty. An empty string has no block to read.
+DOC.FIND.SCAN:
+  #REM 1
+  GP.ASM LOW
+  REM CLD
+  REM LDA $00
+  REM PHA
+  REM ; ---- the term into the block buffer as [length][characters], case folded
+  REM LDA {DOC.STRING.PTR%}
+  REM STA $2C
+  REM LDY #1
+  REM LDA {DOC.STRING.PTR%},Y
+  REM STA $2D
+  REM LDA {DOC.BLOCK.PTR%}
+  REM STA $2E
+  REM LDA {DOC.BLOCK.PTR%},Y
+  REM STA $2F
+  REM LDA ($2C)
+  REM STA ($2E)
+  REM STA {DOC.BLOCK.LENGTH%}
+  REM TAY
+  REM NTERM: LDA ($2C),Y
+  REM JSR NFOLD
+  REM STA ($2E),Y
+  REM DEY
+  REM BNE NTERM
+  REM ; ---- the first line's slot in $30, the slot's bank in DOC.WALK.BANK%
+  REM LDY #1
+  REM LDA {DOC.FIND.LINE%},Y
+  REM LSR
+  REM LSR
+  REM LSR
+  REM CLC
+  REM ADC {DOC.TABLE.BANK%}
+  REM STA {DOC.WALK.BANK%}
+  REM LDA {DOC.FIND.LINE%},Y
+  REM AND #$07
+  REM STA $31
+  REM LDA {DOC.FIND.LINE%}
+  REM STA $30
+  REM ASL
+  REM TAX
+  REM LDA $31
+  REM ROL
+  REM PHA
+  REM TXA
+  REM CLC
+  REM ADC $30
+  REM STA $30
+  REM PLA
+  REM ADC $31
+  REM CLC
+  REM ADC #$A0
+  REM STA $31
+  REM ; ---- every line from there
+  REM NLINE: LDA {DOC.FIND.LINE%}
+  REM CMP {LINE.COUNT%}
+  REM BNE NHAVE
+  REM LDY #1
+  REM LDA {DOC.FIND.LINE%},Y
+  REM CMP {LINE.COUNT%},Y
+  REM BNE NHAVE
+  REM JMP NOUT
+  REM NHAVE: LDA {DOC.WALK.BANK%}
+  REM STA $00
+  REM LDA ($30)
+  REM PHA
+  REM LDY #1
+  REM LDA ($30),Y
+  REM STA $2C
+  REM INY
+  REM LDA ($30),Y
+  REM STA $2D
+  REM PLA
+  REM STA $00
+  REM ; ---- X = the places the term can start: length - term length - column + 1
+  REM LDA ($2C)
+  REM SEC
+  REM SBC {DOC.BLOCK.LENGTH%}
+  REM BCC NSKIP
+  REM SBC {DOC.FIND.COLUMN%}
+  REM BCC NSKIP
+  REM TAX
+  REM INX
+  REM ; ---- $2C = the record's address plus the column. Y then counts through the term
+  REM ; ---- and the line together.
+  REM LDA $2C
+  REM CLC
+  REM ADC {DOC.FIND.COLUMN%}
+  REM STA $2C
+  REM BCC NTRY
+  REM INC $2D
+  REM NTRY: LDY #1
+  REM LDA ($2C),Y
+  REM CMP #$C1
+  REM BCC NFIRST
+  REM CMP #$DB
+  REM BCS NFIRST
+  REM AND #$7F
+  REM NFIRST: CMP ($2E),Y
+  REM BEQ NREST
+  REM NMISS: INC {DOC.FIND.COLUMN%}
+  REM INC $2C
+  REM BNE NSTEP
+  REM INC $2D
+  REM NSTEP: DEX
+  REM BNE NTRY
+  REM ; ---- the next line, from its column 0
+  REM NSKIP: STZ {DOC.FIND.COLUMN%}
+  REM CLC
+  REM LDA $30
+  REM ADC #3
+  REM STA $30
+  REM BCC NSAME
+  REM INC $31
+  REM NSAME: LDA $31
+  REM CMP #$B8
+  REM BCC NCOUNT
+  REM LDA #$A0
+  REM STA $31
+  REM INC {DOC.WALK.BANK%}
+  REM NCOUNT: INC {DOC.FIND.LINE%}
+  REM BNE NAGAIN
+  REM LDX #1
+  REM INC {DOC.FIND.LINE%},X
+  REM NAGAIN: JMP NLINE
+  REM ; ---- the first character matches: the rest of the term, last character first
+  REM NREST: LDY {DOC.BLOCK.LENGTH%}
+  REM NCMP: CPY #1
+  REM BEQ NFOUND
+  REM LDA ($2C),Y
+  REM JSR NFOLD
+  REM CMP ($2E),Y
+  REM BNE NMISS
+  REM DEY
+  REM BRA NCMP
+  REM NFOUND: LDA #$FF
+  REM STA {DOC.FIND.FOUND%}
+  REM LDY #1
+  REM STA {DOC.FIND.FOUND%},Y
+  REM NOUT: PLA
+  REM STA $00
+  REM RTS
+  REM NFOLD: CMP #$C1
+  REM BCC NKEEP
+  REM CMP #$DB
+  REM BCS NKEEP
+  REM AND #$7F
+  REM NKEEP: RTS
+  GP.ENDASM
+  #REM 0
+  RETURN
+
+## DOC.EDIT.INSERT -- put character DOC.EDIT.CHAR% into the edit buffer at column
+## DOC.EDIT.COLUMN%. The characters from that column on move up one.
+##
+## A line of 250 characters is left as it is. DOC.EDIT.COLUMN% is 0 to the line's
+## length. The caller sets DOC.EDIT.DIRTY%.
+DOC.EDIT.INSERT:
+  #REM 1
+  GP.ASM
+  REM CLD
+  REM LDA {DOC.EDIT.PTR%}
+  REM STA $2C
+  REM LDY #1
+  REM LDA {DOC.EDIT.PTR%},Y
+  REM STA $2D
+  REM LDA ($2C)
+  REM CMP #250
+  REM BCS IDONE
+  REM TAY
+  REM ISHIFT: CPY {DOC.EDIT.COLUMN%}
+  REM BEQ IPUT
+  REM BCC IPUT
+  REM LDA ($2C),Y
+  REM INY
+  REM STA ($2C),Y
+  REM DEY
+  REM DEY
+  REM BRA ISHIFT
+  REM IPUT: INY
+  REM LDA {DOC.EDIT.CHAR%}
+  REM STA ($2C),Y
+  REM LDA ($2C)
+  REM CLC
+  REM ADC #1
+  REM STA ($2C)
+  REM IDONE: RTS
+  GP.ENDASM
+  #REM 0
+  RETURN
+
+## DOC.EDIT.REMOVE -- take the character at column DOC.EDIT.COLUMN% out of the edit buffer.
+## The characters after it move down one.
+##
+## DOC.EDIT.COLUMN% is below the line's length. The caller sets DOC.EDIT.DIRTY%.
+DOC.EDIT.REMOVE:
+  #REM 1
+  GP.ASM
+  REM CLD
+  REM LDA {DOC.EDIT.PTR%}
+  REM STA $2C
+  REM LDY #1
+  REM LDA {DOC.EDIT.PTR%},Y
+  REM STA $2D
+  REM LDA ($2C)
+  REM STA $2E
+  REM LDY {DOC.EDIT.COLUMN%}
+  REM INY
+  REM RSHIFT: CPY $2E
+  REM BCS RCUT
+  REM INY
+  REM LDA ($2C),Y
+  REM DEY
+  REM STA ($2C),Y
+  REM INY
+  REM BRA RSHIFT
+  REM RCUT: DEC $2E
+  REM LDA $2E
+  REM STA ($2C)
+  GP.ENDASM
+  #REM 0
+  RETURN
+
+## DOC.EDIT.WORD.RIGHT -- move DOC.EDIT.COLUMN% past the rest of the word it is in, then
+## past the spaces after that. A word is a run of characters that are not spaces. The
+## column stops at the line's length.
+##
+##   in   DOC.EDIT.COLUMN%   0 to the line's length
+##   out  DOC.EDIT.COLUMN%   the column of the next word, or the line's length
+DOC.EDIT.WORD.RIGHT:
+  #REM 1
+  GP.ASM
+  REM CLD
+  REM LDA {DOC.EDIT.PTR%}
+  REM STA $2E
+  REM LDY #1
+  REM LDA {DOC.EDIT.PTR%},Y
+  REM STA $2F
+  REM LDA ($2E)
+  REM STA $30
+  REM ; ---- $2C = the address of column 0, so ($2C),Y is the character at column Y
+  REM LDA $2E
+  REM CLC
+  REM ADC #1
+  REM STA $2C
+  REM LDA $2F
+  REM ADC #0
+  REM STA $2D
+  REM LDY {DOC.EDIT.COLUMN%}
+  REM XRWORD: CPY $30
+  REM BCS XRSET
+  REM LDA ($2C),Y
+  REM CMP #32
+  REM BEQ XRGAP
+  REM INY
+  REM BRA XRWORD
+  REM XRGAP: CPY $30
+  REM BCS XRSET
+  REM LDA ($2C),Y
+  REM CMP #32
+  REM BNE XRSET
+  REM INY
+  REM BRA XRGAP
+  REM XRSET: STY {DOC.EDIT.COLUMN%}
+  GP.ENDASM
+  #REM 0
+  RETURN
+
+## DOC.EDIT.WORD.LEFT -- move DOC.EDIT.COLUMN% back past the spaces in front of it, then
+## back to the start of the word in front of them. A word is a run of characters that are
+## not spaces. The column stops at 0.
+##
+##   in   DOC.EDIT.COLUMN%   0 to the line's length
+##   out  DOC.EDIT.COLUMN%   the column the word starts at, or 0
+DOC.EDIT.WORD.LEFT:
+  #REM 1
+  GP.ASM
+  REM CLD
+  REM LDA {DOC.EDIT.PTR%}
+  REM STA $2C
+  REM LDY #1
+  REM LDA {DOC.EDIT.PTR%},Y
+  REM STA $2D
+  REM ; ---- ($2C),Y is the character at column Y - 1, the one in front of the column
+  REM LDY {DOC.EDIT.COLUMN%}
+  REM XLGAP: CPY #0
+  REM BEQ XLSET
+  REM LDA ($2C),Y
+  REM CMP #32
+  REM BNE XLWORD
+  REM DEY
+  REM BRA XLGAP
+  REM XLWORD: CPY #0
+  REM BEQ XLSET
+  REM LDA ($2C),Y
+  REM CMP #32
+  REM BEQ XLSET
+  REM DEY
+  REM BRA XLWORD
+  REM XLSET: STY {DOC.EDIT.COLUMN%}
+  GP.ENDASM
+  #REM 0
+  RETURN
+
+## DOC.LINE.SPLIT -- split the line in the edit buffer at column DOC.EDIT.COLUMN%. The
+## characters from that column on become a new line below it. Both lines are stored.
+##
+##   in   DOC.EDIT.LINE%      the line the edit buffer holds
+##        DOC.EDIT.COLUMN%    0 to the line's length
+##        DOC.SPLIT.INDENT%   spaces to put in front of the new line, 0 to DOC.EDIT.COLUMN%
+##   out  DOC.EDIT.LINE%      the new line. The edit buffer holds it.
+##        DOC.LINE%           the same
+##
+## It uses the block buffer. With an indent it leaves DOC.EDIT.COLUMN% at 0 and
+## DOC.EDIT.CHAR% at 32.
+DOC.LINE.SPLIT:
+  GOSUB DOC.EDIT.SPLIT : DOC.LINE% = DOC.EDIT.LINE%
+  GOSUB DOC.COMMIT : DOC.SLOT.LINE% = DOC.EDIT.LINE% + 1
+  GOSUB DOC.SLOT.OPEN : GOSUB DOC.EDIT.FROM.BLOCK
+  IF DOC.SPLIT.INDENT% > 0 THEN GOSUB DOC.EDIT.INDENT
+  DOC.EDIT.LINE% = DOC.EDIT.LINE% + 1 : DOC.LINE% = DOC.EDIT.LINE%
+  GOSUB DOC.COMMIT : DOC.EDIT.DIRTY% = 0
+  RETURN
+
+## Put DOC.SPLIT.INDENT% spaces at the front of the edit buffer. The count is 1 or more.
+DOC.EDIT.INDENT:
+  DOC.EDIT.CHAR% = 32 : DOC.EDIT.COLUMN% = 0
+  FOR DOC.INDENT.COUNT = 1 TO DOC.SPLIT.INDENT%
+    GOSUB DOC.EDIT.INSERT
+  NEXT DOC.INDENT.COUNT
+  RETURN
+
+## DOC.EDIT.SPLIT -- move the edit buffer's characters from column DOC.EDIT.COLUMN% on
+## into the block buffer, as a record image. The edit buffer keeps the characters in
+## front of the column.
+DOC.EDIT.SPLIT:
+  #REM 1
+  GP.ASM
+  REM CLD
+  REM LDA {DOC.EDIT.PTR%}
+  REM STA $2C
+  REM LDY #1
+  REM LDA {DOC.EDIT.PTR%},Y
+  REM STA $2D
+  REM LDA {DOC.BLOCK.PTR%}
+  REM STA $2E
+  REM LDA {DOC.BLOCK.PTR%},Y
+  REM STA $2F
+  REM ; ---- $30 = the edit buffer's address plus the column
+  REM LDA $2C
+  REM CLC
+  REM ADC {DOC.EDIT.COLUMN%}
+  REM STA $30
+  REM LDA $2D
+  REM ADC #0
+  REM STA $31
+  REM LDA ($2C)
+  REM SEC
+  REM SBC {DOC.EDIT.COLUMN%}
+  REM STA ($2E)
+  REM TAY
+  REM BEQ SCUT
+  REM SCOPY: LDA ($30),Y
+  REM STA ($2E),Y
+  REM DEY
+  REM BNE SCOPY
+  REM SCUT: LDA {DOC.EDIT.COLUMN%}
+  REM STA ($2C)
+  GP.ENDASM
+  #REM 0
+  RETURN
+
+## DOC.EDIT.FROM.BLOCK -- copy the record image in the block buffer into the edit buffer.
+DOC.EDIT.FROM.BLOCK:
+  #REM 1
+  GP.ASM
+  REM CLD
+  REM LDA {DOC.BLOCK.PTR%}
+  REM STA $2C
+  REM LDY #1
+  REM LDA {DOC.BLOCK.PTR%},Y
+  REM STA $2D
+  REM LDA {DOC.EDIT.PTR%}
+  REM STA $2E
+  REM LDA {DOC.EDIT.PTR%},Y
+  REM STA $2F
+  REM LDA ($2C)
+  REM TAY
+  REM KCOPY: LDA ($2C),Y
+  REM STA ($2E),Y
+  REM DEY
+  REM CPY #$FF
+  REM BNE KCOPY
+  GP.ENDASM
+  #REM 0
+  RETURN
+
+## DOC.EDIT.TO.BLOCK -- copy the edit buffer's record image into the block buffer.
+DOC.EDIT.TO.BLOCK:
+  #REM 1
+  GP.ASM
+  REM CLD
+  REM LDA {DOC.EDIT.PTR%}
+  REM STA $2C
+  REM LDY #1
+  REM LDA {DOC.EDIT.PTR%},Y
+  REM STA $2D
+  REM LDA {DOC.BLOCK.PTR%}
+  REM STA $2E
+  REM LDA {DOC.BLOCK.PTR%},Y
+  REM STA $2F
+  REM LDA ($2C)
+  REM TAY
+  REM TCOPY: LDA ($2C),Y
+  REM STA ($2E),Y
+  REM DEY
+  REM CPY #$FF
+  REM BNE TCOPY
+  GP.ENDASM
+  #REM 0
+  RETURN
+
+## DOC.EDIT.APPEND -- add the characters of the record image in the block buffer to the
+## end of the edit buffer.
+##
+## The two lengths add up to 250 or less. DOC.EDIT.DIRTY% is left as it was.
+DOC.EDIT.APPEND:
+  #REM 1
+  GP.ASM
+  REM CLD
+  REM LDA {DOC.EDIT.PTR%}
+  REM STA $2C
+  REM LDY #1
+  REM LDA {DOC.EDIT.PTR%},Y
+  REM STA $2D
+  REM LDA {DOC.BLOCK.PTR%}
+  REM STA $2E
+  REM LDA {DOC.BLOCK.PTR%},Y
+  REM STA $2F
+  REM ; ---- the new length, with the old length in X and the added count in Y
+  REM LDA ($2E)
+  REM STA $30
+  REM LDA ($2C)
+  REM TAX
+  REM CLC
+  REM ADC $30
+  REM STA ($2C)
+  REM LDY $30
+  REM ; ---- $30 = the edit buffer's address plus the old length
+  REM TXA
+  REM CLC
+  REM ADC $2C
+  REM STA $30
+  REM LDA $2D
+  REM ADC #0
+  REM STA $31
+  REM CPY #0
+  REM BEQ JDONE
+  REM JCOPY: LDA ($2E),Y
+  REM STA ($30),Y
+  REM DEY
+  REM BNE JCOPY
+  REM JDONE: RTS
+  GP.ENDASM
+  #REM 0
+  RETURN
+
+## DOC.LINE.REMOVE -- take line DOC.LINE% out of the document. The lines below it move
+## up one. The only line of a document is emptied and kept.
+##
+## The edit buffer's changes are dropped and its content is stale. Open a line next.
+DOC.LINE.REMOVE:
+  DOC.EDIT.DIRTY% = 0 : IF LINE.COUNT% <= 1 THEN GOTO DOC.LINE.REMOVE.ONLY
+  DOC.SLOT.LINE% = DOC.LINE% : GOSUB DOC.SLOT.CLOSE
+  RETURN
+DOC.LINE.REMOVE.ONLY:
+  POKE DOC.EDIT.ADDR, 0 : DOC.LINE% = 0 : GOSUB DOC.COMMIT
+  RETURN
+
+## DOC.SLOT.OPEN -- make a slot for a new line DOC.SLOT.LINE%. The slots from there to the
+## last line move along one, and LINE.COUNT% goes up by one. The new slot is not written.
+DOC.SLOT.OPEN:
+  IF DOC.SLOT.LINE% >= LINE.COUNT% THEN GOTO DOC.SLOT.OPEN.DONE
+  DOC.SLOT.LAST = LINE.COUNT% - 1 : DOC.SLOT.LINE.SEGMENT = INT(DOC.SLOT.LINE% / 2048) : DOC.SLOT.LAST.SEGMENT = INT(DOC.SLOT.LAST / 2048)
+  FOR DOC.SLOT.SEGMENT = DOC.SLOT.LAST.SEGMENT TO DOC.SLOT.LINE.SEGMENT STEP -1
+    DOC.SLOT.FROM = 0
+    IF DOC.SLOT.SEGMENT = DOC.SLOT.LINE.SEGMENT THEN DOC.SLOT.FROM = DOC.SLOT.LINE% - DOC.SLOT.SEGMENT * 2048
+    DOC.SLOT.TO = 2047
+    IF DOC.SLOT.SEGMENT = DOC.SLOT.LAST.SEGMENT THEN DOC.SLOT.TO = DOC.SLOT.LAST - DOC.SLOT.SEGMENT * 2048
+    DOC.MOVE.CARRY% = 0
+    IF DOC.SLOT.TO = 2047 THEN DOC.MOVE.CARRY% = 1
+    IF DOC.SLOT.TO = 2047 THEN DOC.SLOT.TO = 2046
+    DOC.MOVE.SEGMENT% = DOC.SLOT.SEGMENT : DOC.MOVE.FIRST% = DOC.SLOT.FROM : DOC.MOVE.SLOTS% = DOC.SLOT.TO - DOC.SLOT.FROM + 1
+    GOSUB DOC.SLOT.MOVE.UP
+  NEXT DOC.SLOT.SEGMENT
+DOC.SLOT.OPEN.DONE:
+  LINE.COUNT% = LINE.COUNT% + 1
+  RETURN
+
+## DOC.SLOT.CLOSE -- take slot DOC.SLOT.LINE% out of the line table. The slots after it
+## move back one, and LINE.COUNT% goes down by one.
+DOC.SLOT.CLOSE:
+  DOC.SLOT.LAST = LINE.COUNT% - 1 : LINE.COUNT% = LINE.COUNT% - 1
+  IF DOC.SLOT.LINE% >= DOC.SLOT.LAST THEN RETURN
+  DOC.SLOT.LINE.SEGMENT = INT(DOC.SLOT.LINE% / 2048) : DOC.SLOT.LAST.SEGMENT = INT(DOC.SLOT.LAST / 2048)
+  FOR DOC.SLOT.SEGMENT = DOC.SLOT.LINE.SEGMENT TO DOC.SLOT.LAST.SEGMENT
+    DOC.SLOT.FROM = 0
+    IF DOC.SLOT.SEGMENT = DOC.SLOT.LINE.SEGMENT THEN DOC.SLOT.FROM = DOC.SLOT.LINE% - DOC.SLOT.SEGMENT * 2048
+    DOC.SLOT.TO = 2047 : DOC.MOVE.CARRY% = 1
+    IF DOC.SLOT.SEGMENT = DOC.SLOT.LAST.SEGMENT THEN DOC.SLOT.TO = DOC.SLOT.LAST - DOC.SLOT.SEGMENT * 2048
+    IF DOC.SLOT.SEGMENT = DOC.SLOT.LAST.SEGMENT THEN DOC.MOVE.CARRY% = 0
+    DOC.MOVE.SEGMENT% = DOC.SLOT.SEGMENT : DOC.MOVE.FIRST% = DOC.SLOT.FROM : DOC.MOVE.SLOTS% = DOC.SLOT.TO - DOC.SLOT.FROM
+    GOSUB DOC.SLOT.MOVE.DOWN
+  NEXT DOC.SLOT.SEGMENT
+  RETURN
+
+## DOC.SLOT.MOVE.UP -- inside one table bank, move DOC.MOVE.SLOTS% slots along one, from
+## slot DOC.MOVE.FIRST%. The bank is DOC.TABLE.BANK% + DOC.MOVE.SEGMENT%.
+##
+## With DOC.MOVE.CARRY% set, the bank's last slot is first copied to slot 0 of the next
+## bank.
+DOC.SLOT.MOVE.UP:
+  #REM 1
+  GP.ASM LOW
+  REM CLD
+  REM LDA $00
+  REM PHA
+  REM LDA {DOC.TABLE.BANK%}
+  REM CLC
+  REM ADC {DOC.MOVE.SEGMENT%}
+  REM STA $00
+  REM LDA {DOC.MOVE.CARRY%}
+  REM BEQ UMOVE
+  REM LDA $B7FD
+  REM PHA
+  REM LDA $B7FE
+  REM PHA
+  REM LDA $B7FF
+  REM INC $00
+  REM STA $A002
+  REM PLA
+  REM STA $A001
+  REM PLA
+  REM STA $A000
+  REM DEC $00
+  REM ; ---- $2C = the first slot's address, $2E = the slot after it
+  REM UMOVE: LDY #1
+  REM LDA {DOC.MOVE.FIRST%}
+  REM STA $2C
+  REM ASL
+  REM TAX
+  REM LDA {DOC.MOVE.FIRST%},Y
+  REM STA $2D
+  REM ROL
+  REM PHA
+  REM TXA
+  REM CLC
+  REM ADC $2C
+  REM STA $2C
+  REM PLA
+  REM ADC $2D
+  REM CLC
+  REM ADC #$A0
+  REM STA $2D
+  REM LDA $2C
+  REM CLC
+  REM ADC #3
+  REM STA $2E
+  REM LDA $2D
+  REM ADC #0
+  REM STA $2F
+  REM ; ---- $30 = the bytes to move, three a slot
+  REM LDA {DOC.MOVE.SLOTS%}
+  REM STA $30
+  REM ASL
+  REM TAX
+  REM LDA {DOC.MOVE.SLOTS%},Y
+  REM STA $31
+  REM ROL
+  REM PHA
+  REM TXA
+  REM CLC
+  REM ADC $30
+  REM STA $30
+  REM PLA
+  REM ADC $31
+  REM STA $31
+  REM ; ---- copy from the last byte down, the part page first
+  REM LDX $31
+  REM CLC
+  REM TXA
+  REM ADC $2D
+  REM STA $2D
+  REM CLC
+  REM TXA
+  REM ADC $2F
+  REM STA $2F
+  REM INX
+  REM LDY $30
+  REM BEQ UPAGE
+  REM DEY
+  REM BEQ UZERO
+  REM UCOPY: LDA ($2C),Y
+  REM STA ($2E),Y
+  REM DEY
+  REM BNE UCOPY
+  REM UZERO: LDA ($2C),Y
+  REM STA ($2E),Y
+  REM UPAGE: DEY
+  REM DEC $2D
+  REM DEC $2F
+  REM DEX
+  REM BNE UCOPY
+  REM PLA
+  REM STA $00
+  GP.ENDASM
+  #REM 0
+  RETURN
+
+## DOC.SLOT.MOVE.DOWN -- inside one table bank, move DOC.MOVE.SLOTS% slots back one, onto
+## slot DOC.MOVE.FIRST%. The bank is DOC.TABLE.BANK% + DOC.MOVE.SEGMENT%.
+##
+## With DOC.MOVE.CARRY% set, slot 0 of the next bank is then copied to the bank's last
+## slot.
+DOC.SLOT.MOVE.DOWN:
+  #REM 1
+  GP.ASM LOW
+  REM CLD
+  REM LDA $00
+  REM PHA
+  REM LDA {DOC.TABLE.BANK%}
+  REM CLC
+  REM ADC {DOC.MOVE.SEGMENT%}
+  REM STA $00
+  REM ; ---- $2E = the first slot's address, $2C = the slot after it
+  REM LDY #1
+  REM LDA {DOC.MOVE.FIRST%}
+  REM STA $2E
+  REM ASL
+  REM TAX
+  REM LDA {DOC.MOVE.FIRST%},Y
+  REM STA $2F
+  REM ROL
+  REM PHA
+  REM TXA
+  REM CLC
+  REM ADC $2E
+  REM STA $2E
+  REM PLA
+  REM ADC $2F
+  REM CLC
+  REM ADC #$A0
+  REM STA $2F
+  REM LDA $2E
+  REM CLC
+  REM ADC #3
+  REM STA $2C
+  REM LDA $2F
+  REM ADC #0
+  REM STA $2D
+  REM ; ---- $30 = the bytes to move, three a slot
+  REM LDA {DOC.MOVE.SLOTS%}
+  REM STA $30
+  REM ASL
+  REM TAX
+  REM LDA {DOC.MOVE.SLOTS%},Y
+  REM STA $31
+  REM ROL
+  REM PHA
+  REM TXA
+  REM CLC
+  REM ADC $30
+  REM STA $30
+  REM PLA
+  REM ADC $31
+  REM STA $31
+  REM ; ---- copy from the first byte up, the whole pages first
+  REM LDY #0
+  REM LDX $31
+  REM BEQ DREST
+  REM DPAGE: LDA ($2C),Y
+  REM STA ($2E),Y
+  REM INY
+  REM BNE DPAGE
+  REM INC $2D
+  REM INC $2F
+  REM DEX
+  REM BNE DPAGE
+  REM DREST: LDX $30
+  REM BEQ DCARRY
+  REM DBYTE: LDA ($2C),Y
+  REM STA ($2E),Y
+  REM INY
+  REM DEX
+  REM BNE DBYTE
+  REM DCARRY: LDA {DOC.MOVE.CARRY%}
+  REM BEQ DDONE
+  REM INC $00
+  REM LDA $A000
+  REM PHA
+  REM LDA $A001
+  REM PHA
+  REM LDA $A002
+  REM DEC $00
+  REM STA $B7FF
+  REM PLA
+  REM STA $B7FE
+  REM PLA
+  REM STA $B7FD
+  REM DDONE: PLA
+  REM STA $00
+  REM RTS
+  GP.ENDASM
+  #REM 0
+  RETURN

@@ -1,0 +1,102 @@
+## ============================================================================
+## TG-BENCH-CHECK.BASL -- the bench's configuration, the pane dump, and the checks that
+## the pane holds what the store holds. Nothing here is timed.
+## ============================================================================
+
+## BEN.CONFIG -- set VIEW.COLOUR.ON% from BENCH.CFG, which spike.py writes. Its one line is
+## 0 for syntax colouring off or 1 for on. Call it after VIEW.SETUP.
+BEN.CONFIG:
+  OPEN 4, 8, 4, "BENCH.CFG,S,R"
+  INPUT# 4, BEN.COLOUR
+  CLOSE 4
+  VIEW.COLOUR.ON% = BEN.COLOUR
+  RETURN
+
+## BEN.PANE.DUMP -- write the 28 text rows to file BEN.PANE.NAME$. A row is 160 bytes: a
+## character and its attribute for each of its 80 cells. spike.py checks the file.
+BEN.PANE.DUMP:
+  OPEN 4, 8, 4, "@:" + BEN.PANE.NAME$ + ",S,W"
+  FOR BEN.ROW = 1 TO 28
+    BEN.ROW.ADDRESS = 45056 + BEN.ROW * 256
+    FOR BEN.BYTE = 0 TO 159
+      PRINT# 4, CHR$(VPEEK(1, BEN.ROW.ADDRESS + BEN.BYTE));
+    NEXT BEN.BYTE
+  NEXT BEN.ROW
+  CLOSE 4
+  RETURN
+
+## BEN.PANE.REPORT -- write to file 3 the state of the pane that BEN.PANE.DUMP saved: the
+## colouring switch, the top line, the left column and the cursor. The caller has file 3
+## open.
+BEN.PANE.REPORT:
+  PRINT# 3, "COLOUR"; VIEW.COLOUR.ON%
+  PRINT# 3, "PANE.TOP"; VIEW.TOP.LINE%
+  PRINT# 3, "PANE.LEFT"; VIEW.LEFT.COL%
+  PRINT# 3, "PANE.CURSOR.LINE"; VIEW.CURSOR.LINE%
+  PRINT# 3, "PANE.CURSOR.COL"; VIEW.CURSOR.COL%
+  RETURN
+
+## BEN.SCREEN.SUM -- two weighted sums over every byte of the text rows.
+##
+##   out  BEN.SUM.BY.COLUMN   each byte weighted by its place in its row
+##        BEN.SUM.BY.ROW      each byte weighted by its row
+BEN.SCREEN.SUM:
+  BEN.SUM.BY.COLUMN = 0
+  BEN.SUM.BY.ROW = 0
+  FOR BEN.ROW = 1 TO 28
+    BEN.ROW.ADDRESS = 45056 + BEN.ROW * 256
+    FOR BEN.BYTE = 0 TO 159
+      BEN.VALUE = VPEEK(1, BEN.ROW.ADDRESS + BEN.BYTE)
+      BEN.SUM.BY.COLUMN = BEN.SUM.BY.COLUMN + BEN.VALUE * (BEN.BYTE + 1)
+      BEN.SUM.BY.ROW = BEN.SUM.BY.ROW + BEN.VALUE * BEN.ROW
+    NEXT BEN.BYTE
+  NEXT BEN.ROW
+  RETURN
+
+## BEN.REFERENCE.CHECK -- compare every text row with the store. The store is read here
+## in BASIC.
+##
+## It checks the 74 text characters, the last digit of the gutter number, and the
+## attribute of the last text cell. In colour it checks only the background of that
+## attribute. It expects VIEW.LEFT.COL% = 0 and an edit buffer that matches its stored
+## line.
+##
+##   out  BEN.MISMATCHES   cells that differ
+BEN.REFERENCE.CHECK:
+  BEN.MISMATCHES = 0
+  BEN.ATTR.MASK = 255
+  IF VIEW.COLOUR.ON% <> 0 THEN BEN.ATTR.MASK = 240
+  FOR BEN.ROW = 1 TO 28
+    BEN.LINE = VIEW.TOP.LINE% + BEN.ROW - 1
+    BEN.ROW.ADDRESS = 45056 + BEN.ROW * 256
+    BEN.LENGTH = 0
+    BEN.RECORD = 0
+    IF BEN.LINE < LINE.COUNT% THEN GOSUB BEN.FIND.RECORD
+    FOR BEN.COLUMN = 0 TO 73
+      BEN.EXPECTED = 32
+      IF BEN.COLUMN < BEN.LENGTH THEN BEN.EXPECTED = PEEK(VIEW.XLAT.ADDR + PEEK(BEN.RECORD + 1 + BEN.COLUMN))
+      IF VPEEK(1, BEN.ROW.ADDRESS + 12 + BEN.COLUMN * 2) <> BEN.EXPECTED THEN BEN.MISMATCHES = BEN.MISMATCHES + 1
+    NEXT BEN.COLUMN
+    BEN.EXPECTED = 32
+    IF BEN.LINE < LINE.COUNT% THEN BEN.EXPECTED = 48 + (BEN.LINE + 1) - INT((BEN.LINE + 1) / 10) * 10
+    IF VPEEK(1, BEN.ROW.ADDRESS + 6) <> BEN.EXPECTED THEN BEN.MISMATCHES = BEN.MISMATCHES + 1
+    BEN.EXPECTED = VIEW.ATTR.TEXT%
+    IF BEN.LINE = VIEW.CURSOR.LINE% THEN BEN.EXPECTED = VIEW.ATTR.BAND%
+    IF (VPEEK(1, BEN.ROW.ADDRESS + 159) AND BEN.ATTR.MASK) <> (BEN.EXPECTED AND BEN.ATTR.MASK) THEN BEN.MISMATCHES = BEN.MISMATCHES + 1
+  NEXT BEN.ROW
+  RETURN
+
+## BEN.FIND.RECORD -- find line BEN.LINE's record through the line table. It leaves the
+## record's bank selected.
+##
+##   out  BEN.RECORD   the record's address in the window
+##        BEN.LENGTH   its length
+BEN.FIND.RECORD:
+  BEN.SEGMENT = INT(BEN.LINE / 2048)
+  BEN.SLOT = 40960 + (BEN.LINE - BEN.SEGMENT * 2048) * 3
+  BANK DOC.TABLE.BANK% + BEN.SEGMENT
+  BEN.RECORD.BANK = PEEK(BEN.SLOT)
+  BEN.RECORD = PEEK(BEN.SLOT + 1) + PEEK(BEN.SLOT + 2) * 256
+  BANK BEN.RECORD.BANK
+  BEN.LENGTH = PEEK(BEN.RECORD)
+  RETURN

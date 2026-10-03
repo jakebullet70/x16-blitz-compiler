@@ -1,0 +1,218 @@
+## ============================================================================
+## TG-KEYS.BASL -- the key map of the edit pane. KEYS.DISPATCH runs the action of one key.
+##
+## #INCLUDE it after TG-VIEW.BASL and TG-CLIP.BASL. Call KEYS.SETUP once.
+##
+## Interface:
+##
+##   KEYS.CODE%        in: the key's code, as GET gives it
+##   KEYS.MODIFIERS%   in: the modifier keys held with it. Bit 0 is Shift, bit 1 is Alt and
+##                     bit 2 is Ctrl.
+##   KEYS.COMMAND%     out: 0 when the key moved the cursor, changed the document, used the
+##                     clipboard or has no action. Otherwise it is a command for the program
+##                     to run:
+##
+##                       1 find    2 find next    3 save     4 open
+##                       5 new     6 quit         7 build    8 help
+##                       9 next document    15 go to line
+##
+##                     Commands 6 and 10 to 14 have no key. A menu row runs them.
+##
+## The map:
+##
+##   cursor keys, Home, End, PgUp, PgDn    move the cursor
+##   Ctrl+PgUp, Ctrl+PgDn                  the first line, the last line
+##   Ctrl+Left, Ctrl+Right                 the word in front, the next word
+##   any move with Shift                   select
+##   RETURN, Backspace, Delete, Tab        change the document
+##   Ctrl+L                                delete the line
+##   Ctrl+Z, Ctrl+Y                        undo, redo
+##   Ctrl+X or Shift+Delete                cut
+##   Ctrl+C or Ctrl+Insert                 copy
+##   Ctrl+V                                paste
+##   Ctrl+A                                select all
+##   Ctrl+F or F6, F3                      find, find next
+##   Ctrl+G                                go to a line
+##   Ctrl+S or F2, Ctrl+O, Ctrl+N          save, open, new
+##   F5, F1                                build, help
+##   F7                                    the next document
+##   32 to 126, 160, 193 to 218            typed. 160 is typed as a space.
+##
+## A Ctrl+letter arrives as the letter's place in the alphabet. Ctrl+L is 12. Ctrl+S and
+## Ctrl+Y arrive as 19 and 25, the codes of Home and Delete. A code under 32 with Ctrl held
+## takes its action from the Ctrl table, which tells those apart. Ctrl+Delete arrives as 25
+## with Ctrl held too, so it redoes. Esc and Alt are the menu's, and TURBO.BASL hands them
+## to MENU.KEY before the map.
+##
+## Shift+Home and Shift+End arrive as 147 and 132. Shift+Delete arrives as 148, the code of
+## Insert, with Shift held.
+##
+## A typed character and RETURN replace the selection. Backspace and Delete take it out. Cut,
+## copy and paste work on it. Find keeps it for the program, which ends it. Any other action
+## ends it.
+##
+## WARNING: Ctrl+C and Stop send code 3, and the KERNAL raises its stop flag for code 3. The
+## runtime then ends the program with BREAK. The program points the KERNAL's stop vector at a
+## stub that answers no while it runs.
+##
+## Checklist: an action number in KEYS.SETUP's table is a place in the two ON lists of
+## KEYS.RUN or a case of KEYS.DISPATCH.CLIP. The TURBO.ACT defines of TURBO.BASL name
+## actions and commands by number, and KEYS.SELECTION.FIRST sorts the actions. Change all
+## four together.
+##
+## WARNING: TG-CLIP.BASL runs from its own GP.BANKED region. An ON GOSUB or a GOTO to it from
+## this region is refused. Reach it with a GOSUB.
+## ============================================================================
+
+## KEYS.SETUP -- build the table that gives each key code its action. Call it once.
+##
+## Action 0 is no action. An action of 1 to 16 is a place in the ON lists of KEYS.RUN, and
+## 17 to 21 a case of KEYS.DISPATCH.CLIP. An action of 65 or more is a command. KEYS.COMMAND% is the action less
+## 64. The Ctrl table is the 32 bytes after the 256 of the key table.
+KEYS.SETUP:
+  DIM KEYS.ACTION.TABLE%(143)
+  KEYS.ACTION.ADDR = GP.ARRPTR(KEYS.ACTION.TABLE%())
+  KEYS.CONTROL.ADDR = KEYS.ACTION.ADDR + 256
+  KEYS.CODE% = 0
+  KEYS.MODIFIERS% = 0
+  KEYS.COMMAND% = 0
+  KEYS.SETTLE.ACTION% = 0
+  FOR KEYS.FILL.CODE = 32 TO 126
+    POKE KEYS.ACTION.ADDR + KEYS.FILL.CODE, 1
+  NEXT KEYS.FILL.CODE
+  FOR KEYS.FILL.CODE = 193 TO 218
+    POKE KEYS.ACTION.ADDR + KEYS.FILL.CODE, 1
+  NEXT KEYS.FILL.CODE
+  POKE KEYS.ACTION.ADDR + 160, 1
+  POKE KEYS.ACTION.ADDR + 17, 2
+  POKE KEYS.ACTION.ADDR + 145, 3
+  POKE KEYS.ACTION.ADDR + 29, 4
+  POKE KEYS.ACTION.ADDR + 157, 5
+  POKE KEYS.ACTION.ADDR + 19, 6
+  POKE KEYS.ACTION.ADDR + 4, 7
+  POKE KEYS.ACTION.ADDR + 2, 8
+  POKE KEYS.ACTION.ADDR + 130, 9
+  POKE KEYS.ACTION.ADDR + 13, 10
+  POKE KEYS.ACTION.ADDR + 20, 11
+  POKE KEYS.ACTION.ADDR + 25, 12
+  POKE KEYS.ACTION.ADDR + 9, 13
+  POKE KEYS.ACTION.ADDR + 12, 14
+  POKE KEYS.ACTION.ADDR + 26, 15
+  POKE KEYS.ACTION.ADDR + 6, 65
+  POKE KEYS.ACTION.ADDR + 139, 65
+  POKE KEYS.ACTION.ADDR + 134, 66
+  POKE KEYS.ACTION.ADDR + 7, 79
+  POKE KEYS.ACTION.ADDR + 137, 67
+  POKE KEYS.ACTION.ADDR + 15, 68
+  POKE KEYS.ACTION.ADDR + 14, 69
+  POKE KEYS.ACTION.ADDR + 135, 71
+  POKE KEYS.ACTION.ADDR + 133, 72
+  POKE KEYS.ACTION.ADDR + 136, 73
+  POKE KEYS.ACTION.ADDR + 147, 6
+  POKE KEYS.ACTION.ADDR + 132, 7
+  POKE KEYS.ACTION.ADDR + 148, 21
+  FOR KEYS.FILL.CODE = 0 TO 31
+    POKE KEYS.CONTROL.ADDR + KEYS.FILL.CODE, PEEK(KEYS.ACTION.ADDR + KEYS.FILL.CODE)
+  NEXT KEYS.FILL.CODE
+  POKE KEYS.CONTROL.ADDR + 19, 67
+  POKE KEYS.CONTROL.ADDR + 25, 16
+  POKE KEYS.CONTROL.ADDR + 24, 17
+  POKE KEYS.CONTROL.ADDR + 3, 18
+  POKE KEYS.CONTROL.ADDR + 22, 19
+  POKE KEYS.CONTROL.ADDR + 1, 20
+  RETURN
+
+## KEYS.DISPATCH -- run the action of key KEYS.CODE%, held with KEYS.MODIFIERS%.
+##
+##   out  KEYS.COMMAND%   0, or the command the program runs
+KEYS.DISPATCH:
+  KEYS.ACTION% = PEEK(KEYS.ACTION.ADDR + KEYS.CODE%)
+  IF KEYS.CODE% < 32 THEN IF (KEYS.MODIFIERS% AND 4) <> 0 THEN KEYS.ACTION% = PEEK(KEYS.CONTROL.ADDR + KEYS.CODE%)
+  IF KEYS.ACTION% >= 2 AND KEYS.ACTION% <= 9 THEN GOSUB KEYS.SELECT.MOVE
+
+## KEYS.RUN -- run action KEYS.ACTION%, numbered as KEYS.SETUP's table numbers it. A menu row
+## runs its action here, with KEYS.MODIFIERS% 0.
+##
+##   out  KEYS.COMMAND%   0, or the command the program runs
+KEYS.RUN:
+  KEYS.COMMAND% = 0
+  IF VIEW.SELECT.ON% <> 0 THEN GOSUB KEYS.SELECTION.FIRST
+  IF KEYS.ACTION% >= 64 THEN GOTO KEYS.COMMAND.SET
+  IF KEYS.ACTION% > 16 THEN GOTO KEYS.DISPATCH.CLIP
+  IF KEYS.ACTION% > 8 THEN GOTO KEYS.DISPATCH.HIGH
+  ON KEYS.ACTION% GOSUB KEYS.TYPE, VIEW.CURSOR.DOWN, VIEW.CURSOR.UP, KEYS.CURSOR.RIGHT, KEYS.CURSOR.LEFT, VIEW.CURSOR.HOME, VIEW.CURSOR.END, KEYS.PAGE.DOWN
+  RETURN
+KEYS.DISPATCH.HIGH:
+  ON KEYS.ACTION% - 8 GOSUB KEYS.PAGE.UP, VIEW.KEY.RETURN, VIEW.BACKSPACE, VIEW.DELETE.CHAR, VIEW.KEY.TAB, VIEW.DELETE.LINE, VIEW.UNDO, VIEW.REDO
+  RETURN
+KEYS.DISPATCH.CLIP:
+  GP.SELECT KEYS.ACTION%
+    GP.CASE 17 : GOSUB CLIP.CUT
+    GP.CASE 18 : GOSUB CLIP.COPY
+    GP.CASE 19 : GOSUB CLIP.PASTE
+    GP.CASE 20 : GOSUB VIEW.SELECT.ALL
+    GP.OTHER   : GOSUB KEYS.INSERT
+  GP.ENDSEL
+  RETURN
+KEYS.COMMAND.SET:
+  KEYS.COMMAND% = KEYS.ACTION% - 64
+  RETURN
+
+## A cursor move with Shift held starts a selection or moves its far end. Without Shift it
+## ends the selection.
+KEYS.SELECT.MOVE:
+  IF (KEYS.MODIFIERS% AND 1) = 0 THEN GOTO VIEW.SELECT.DROP
+  IF VIEW.SELECT.ON% = 0 THEN GOSUB VIEW.SELECT.START
+  RETURN
+
+## Settle the selection before action KEYS.ACTION% runs. Cursor moves keep it, empty or not.
+## Before any other action an empty selection ends. Cut, copy, paste, select all, Insert and
+## find keep it. A typed character and RETURN take the selected text out first, and Backspace
+## and Delete take it out and do nothing more. Every other action ends it.
+##
+## WARNING: KEYS.SELECT.MOVE starts a selection empty, before its move runs. The moves must
+## return ahead of the empty test, or no selection outlives its first key.
+KEYS.SELECTION.FIRST:
+  KEYS.SETTLE.ACTION% = KEYS.ACTION%
+  IF KEYS.SETTLE.ACTION% >= 2 AND KEYS.SETTLE.ACTION% <= 9 THEN RETURN
+  IF VIEW.SELECT.ANCHOR.LINE% = VIEW.CURSOR.LINE% AND VIEW.SELECT.ANCHOR.COL% = VIEW.CURSOR.COL% THEN VIEW.SELECT.ON% = 0
+  IF VIEW.SELECT.ON% = 0 THEN RETURN
+  GP.SELECT KEYS.SETTLE.ACTION%
+    GP.CASE 17, 18, 19, 20, 21, 65
+    GP.CASE 1, 10
+      GOSUB VIEW.SELECTION.DELETE
+      IF VIEW.SELECTION.DELETED% = 0 THEN KEYS.ACTION% = 0
+    GP.CASE 11, 12
+      GOSUB VIEW.SELECTION.DELETE
+      KEYS.ACTION% = 0
+    GP.OTHER
+      GOSUB VIEW.SELECT.DROP
+  GP.ENDSEL
+  RETURN
+
+KEYS.TYPE:
+  VIEW.KEY.CHAR% = KEYS.CODE%
+  IF KEYS.CODE% = 160 THEN VIEW.KEY.CHAR% = 32
+  GOTO VIEW.TYPE.CHAR
+
+KEYS.CURSOR.RIGHT:
+  IF (KEYS.MODIFIERS% AND 4) <> 0 THEN GOTO VIEW.WORD.RIGHT
+  GOTO VIEW.CURSOR.RIGHT
+
+KEYS.CURSOR.LEFT:
+  IF (KEYS.MODIFIERS% AND 4) <> 0 THEN GOTO VIEW.WORD.LEFT
+  GOTO VIEW.CURSOR.LEFT
+
+KEYS.PAGE.DOWN:
+  IF (KEYS.MODIFIERS% AND 4) <> 0 THEN GOTO VIEW.CURSOR.BOTTOM
+  GOTO VIEW.PAGE.DOWN
+
+KEYS.PAGE.UP:
+  IF (KEYS.MODIFIERS% AND 4) <> 0 THEN GOTO VIEW.CURSOR.TOP
+  GOTO VIEW.PAGE.UP
+
+## Insert. Shift+Delete arrives as Insert with Shift held.
+KEYS.INSERT:
+  IF (KEYS.MODIFIERS% AND 1) <> 0 THEN GOSUB CLIP.CUT
+  IF (KEYS.MODIFIERS% AND 5) = 4 THEN GOSUB CLIP.COPY
+  RETURN
