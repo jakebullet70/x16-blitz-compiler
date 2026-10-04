@@ -52,7 +52,7 @@ junction; re-make it first if a rename breaks it. See [memory-is-git-tracked](me
 
 ## Compiler limits, memory and banking
 - [Scalar variable space caps at 4,096 bytes](scalar-variable-space-caps-at-4096.md) — 11-bit halved operand, now checked; [every scalar was allocated 6 bytes](every-scalar-allocated-six-bytes.md), FIXED
-- [PROGRAM TOO BIG was the workspace](program-too-big-fires-early.md) — FIXED; [OUT OF MEMORY $02B8](gpbmods-out-of-memory-02b8.md) was StartRuntime never setting X
+- [PROGRAM TOO BIG was the workspace](program-too-big-fires-early.md) — FIXED; the line table holds 12,286 code lines in six bank pairs, STRPageLine alone pages it; [OUT OF MEMORY $02B8](gpbmods-out-of-memory-02b8.md) was StartRuntime never setting X
 - [SHARED p-code cap is RTBASE](gpc-shared-pcode-cap-is-rtbase.md) — 22,016 bytes, not $9F00; [the full slack table](gpc-blitz-runtime-slack-and-limits.md)
 - [Run-side workspace, read from the PRG](run-side-workspace-read-from-the-prg.md) — two bootstrap page numbers give the budget; [2 B cushion below GPBase](gpc-core-page-cushion-below-gpbase.md)
 - [Compiler-emitted bank switch](compiler-emitted-bank-switch.md) — .bgosub emitted, shims deleted; [banks work in progress](banks-work-in-progress.md), HANDLER-BANK at step 28, uncommitted

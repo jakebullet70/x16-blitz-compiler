@@ -245,7 +245,7 @@ keyword .macro
 ;		* No nesting, and no jsr at all. Verified: none of the windows contains another, and
 ;		  every one of them is now a straight run of loads and stores. STRFindLine used to
 ;		  hold one open across its whole search and call _STRPrevLine inside it; the line
-;		  table spanning two banks ended that, because the bank has to be re-chosen per entry.
+;		  table spanning several banks ended that, because the bank has to be re-chosen per entry.
 ;
 ; ************************************************************************************************
 
@@ -264,38 +264,30 @@ CompilerRAMBankReg	= $0000
 ;			0	the KERNAL's (FAT32 buffers and friends). Never ours.
 ;			1	the NATIVE TEST HARNESS's p-code buffer. source/compiler/testing/api/api.asm
 ;				does "lda #1 / sta 0" in _TAResetOut and then writes the object from $A000 up.
-;			2	the LINE NUMBER TABLE, first half.
+;			2	the LINE NUMBER TABLE at virtual $A000-$BFFF.
 ;			3	GP.ASM's blob pool and fixup list (see the second pair of macros below).
 ;			4	the VARIABLE NAME LIST.
-;			5	the BLOCK DEPTH of each line, one byte per line-table entry -- first half.
+;			5	the BLOCK DEPTH of each line, one byte per line-table entry, at virtual $A000-$BFFF.
 ;			6	WHERE EACH BLOCK ENDS, and where each of its alternatives goes next.
 ;			7	the OBJECT BUFFER -- the application's, not the compiler's.
 ;			8	the ONE scratch bank EVERY region shares -- cleared as each one opens, and
 ;				emptied to that region's own .nnn file as it closes.
-;			9	the LINE NUMBER TABLE, second half.
-;			10	the BLOCK DEPTH, second half. It follows the line table's split exactly.
+;			9	the LINE NUMBER TABLE at virtual $8000-$9FFF.
+;			10	the BLOCK DEPTH at virtual $8000-$9FFF.
 ;			11	DEAD-CODE REMOVAL's bit planes and swallow list (main/deadcode.asm), pass zero only.
 ;			12	...and its edge list.
 ;			13	the #SYMFILE's variables, for GP.ASM {VAR} -- the application's, like bank 7.
 ;			14	...and their second 8K. Both are application/source/compiler/symfile.asm.
 ;			15	the embedded BANK CODE, held for the object -- the application's, like bank 7.
+;			16-23	the LINE NUMBER TABLE and its BLOCK DEPTH below virtual $8000, a pair a
+;				segment: 16 and 17 at $6000, 18 and 19 at $4000, 20 and 21 at $2000, 22 and
+;				23 at $0000.
 ;			63	the GP.BANKEDSTR pool, growing DOWN from the top bank a 512K machine has.
 ;
-;		BANKS 2 AND 4 WERE ONE BANK, and that was the wall. The two tables shared 8K, growing
-;		towards each other, and GPC-BASIC-TOOLS-SRC/edit had used 7,981 bytes of it -- 1,461 line entries
-;		at 4 bytes plus 356 variable records at 6 -- leaving 211. Fifty-two more lines of source
-;		and the tables touched, and the compiler said PROGRAM TOO BIG with 7,106 bytes of the
-;		OBJECT budget still free. Same message, wrong limit: three sites raise it (STRMarkLine,
-;		CreateVariableRecord and _CAWriteByte) and only the last one is about the object. A bank
-;		each takes the tables to 2,048 lines and 1,365 variables, so the limit a program meets
-;		is the object ceiling -- the one that is really there.
-;
-;		AND 2,048 LINES WAS THE WALL AGAIN, at GPC-BASIC-TOOLS-SRC/GPB-MODS-TESTING/GPBMODS.BASL, which
-;		marks about 2,200. Same message, same wrong limit, one table further along. The line
-;		table has a SECOND bank under it now and its pointers are virtual addresses covering
-;		both -- see STRPageLine in storage/mark_line.asm, which is the only thing that knows.
-;		4,096 lines, and the depth table splits with it because its byte for a record is at the
-;		record's own address.
+;		The line table is six banks and one virtual address space, $0000-$BFFF, 12,288 entries.
+;		STRPageLine in storage/mark_line.asm is the only code that turns a virtual address into
+;		a bank and a real address. The depth table has the same six segments, because a record's
+;		depth byte sits at the record's own address.
 ;
 ;		This was bank 1 for one build, and the compiler-runtime `variables` and `arrays` suites
 ;		hung: the harness's object code and the variable name list were overwriting each other,
@@ -307,25 +299,34 @@ CompilerStorageBank	= 2 					; line number table, grows DOWN from $C000
 CompilerVarBank		= 4 					; variable name list, grows UP from $A000
 CompilerDepthBank	= 5 					; block depth per line, alongside the line table
 CompilerBlockBank	= 6 					; where each block ends, and its alternatives
-CompilerStorageBank2 = 9 					; the second 8K the line table runs on down into
-CompilerDepthBank2	= 10 					; ...and the second 8K of depth bytes shadowing it
+CompilerStorageBank2 = 9 					; line number table, virtual $8000-$9FFF
+CompilerDepthBank2	= 10 					; ...and its depth bytes
 CompilerDeadBank	= 11 					; dead-code removal: bit planes and swallow list
 CompilerEdgeBank	= 12 					; ...and the edges between lines
+CompilerStorageBank3 = 16 					; line number table, virtual $6000-$7FFF
+CompilerDepthBank3	= 17 					; ...and its depth bytes
+CompilerStorageBank4 = 18 					; line number table, virtual $4000-$5FFF
+CompilerDepthBank4	= 19
+CompilerStorageBank5 = 20 					; line number table, virtual $2000-$3FFF
+CompilerDepthBank5	= 21
+CompilerStorageBank6 = 22 					; line number table, virtual $0000-$1FFF
+CompilerDepthBank6	= 23
 
 ;
-;		THE FLOOR OF THE LINE TABLE'S VIRTUAL ADDRESS SPACE. It starts at compilerEndHigh:$00,
-;		which is CompilerWorkspaceEnd ($C000, application/source/compiler/start.asm), and runs
-;		down through two banks of $2000 -- so $8000, and 4,096 four-byte entries. Change either
-;		of those and this moves with them.
+;		The line table's virtual address space runs from compilerEndHigh:$00 down to $0000. The
+;		floor is the bottom of the address space, so a step below it is a borrow.
 ;
-LineTableFloorHigh	= $80
+;		WARNING: STRPageLine's bank tables assume compilerEndHigh is $C0, which is
+;		CompilerWorkspaceEnd in application/source/compiler/start.asm and EndWorkspace in the
+;		test harnesses. Move it and the tables move with it.
+;
 
 BlockEndTable		= $A000 				; 2,048 entries of 2 bytes: where block N ends
 BlockAltTable		= $B000 				; ...and the same for its alternatives
 BLOCK_MAX 			= 2048
 
 ;
-;		THE BANK IS A VARIABLE HERE, not a constant, because the line table spans two of them:
+;		THE BANK IS A VARIABLE HERE, not a constant, because the line table spans six of them:
 ;		STRPageLine writes storageBankNow as it translates a virtual table address, and nothing
 ;		else ever writes it. Open a window without having paged a record first and you get
 ;		whichever segment the last call left selected -- which is why every walk of the table
@@ -354,7 +355,7 @@ storage_release .macro
 		.section storage
 storageSavedBank: 							; caller's RAM bank, saved across a storage window
 		.fill 	1
-storageBankNow: 							; which half of the line table is being reached --
+storageBankNow: 							; which segment of the line table is being reached --
 		.fill 	1 							; STRReset seeds it, STRPageLine keeps it right
 		.send 	storage
 
@@ -403,8 +404,8 @@ varSavedBank: 								; caller's RAM bank, saved across a variable window
 ;		cost nothing that was ever available. Widening the line record to carry the byte instead
 ;		would have cost real ground: 5 bytes an entry drops the limit from 2,048 lines to 1,638.
 ;
-;		IT IS TWO BANKS NOW, in the same halves as the line table and for the same reason, and
-;		the bank is a variable here for the same reason as well. STRPageLine writes both.
+;		It is six banks, in the same segments as the line table, and the bank is a variable here
+;		for the same reason. STRPageLine writes both.
 ;
 
 depth_access .macro
@@ -430,7 +431,7 @@ depth_release .macro
 		.section storage
 depthSavedBank: 							; caller's RAM bank, saved across a depth window
 		.fill 	1
-depthBankNow: 								; which half of the depth table is being reached --
+depthBankNow: 								; which segment of the depth table is being reached --
 		.fill 	1 							; STRReset seeds it, STRPageLine keeps it right
 		.send 	storage
 
@@ -536,6 +537,8 @@ dcedge_release .macro
 ;		08/09/26		Banks 9 and 10 added: a second half for the line table and for the
 ;						depth table, reached through STRPageLine. 4,096 lines.
 ;		13/09/26		Banks 11 and 12 added for dead-code removal.
+;		03/10/26		Banks 16 to 23 added: four more segments for the line table and the
+;						depth table. 12,288 lines.
 ;
 ; ************************************************************************************************
 
@@ -2518,15 +2521,15 @@ _CTDataDone:
 ;		them, and the swallow list says how many there were, so that a later pass which leaves
 ;		the opener out can read past them too.
 ;
-;		Bank 11 holds four bit planes, one bit an entry, 512 bytes each. That is 4,096 entries,
-;		the line table's own limit, so a plane is never what fills.
+;		Bank 11 holds four bit planes, one bit an entry, 1,536 bytes each. That is 12,288
+;		entries, the line table's own limit, so a plane is never what fills.
 ;
 ;			$A000	reached 	some path from the first line runs it
-;			$A200	retained 	compiled although nothing runs it (DATA, DIM, GP.DEFPROC,
+;			$A600	retained 	compiled although nothing runs it (DATA, DIM, GP.DEFPROC,
 ;								GP.BANKED, GP.ENDBANKED, GP.BANKEDSTR)
-;			$A400	falls 		when reached, it reaches the next line
-;			$A600	structure 	inside or on the edge of a GP.IF, GP.DO or GP.SELECT
-;			$A800	swallow list: the entry (2), the lines it read past its own (2)
+;			$AC00	falls 		when reached, it reaches the next line
+;			$B200	structure 	inside or on the edge of a GP.IF, GP.DO or GP.SELECT
+;			$B800	swallow list: the entry (2), the lines it read past its own (2), 512 records
 ;
 ;		Bank 12 holds the edge list: the source entry (2, bit 15 set when the target is an
 ;		address) and the target (2). The target is a line number or an address until the solve
@@ -2549,11 +2552,11 @@ _CTDataDone:
 ; ************************************************************************************************
 
 DCPlaneReached 		= $A0
-DCPlaneRetained 	= $A2
-DCPlaneFalls 		= $A4
-DCPlaneStructure 	= $A6
+DCPlaneRetained 	= $A6
+DCPlaneFalls 		= $AC
+DCPlaneStructure 	= $B2
 
-DCSwallowTable 		= $A800
+DCSwallowTable 		= $B800
 DCSwallowMax 		= ($C000 - DCSwallowTable) / 4
 DCEdgeTable 		= $A000
 DCEdgeMax 			= ($C000 - DCEdgeTable) / 4
@@ -3861,6 +3864,7 @@ dcKeepKind: 								; the marker a spelling being matched is
 ;		13/09/26		Written. Pass zero records and solves, and prints the removed lines.
 ;		13/09/26		Passes one and two leave the removed lines out, and pass one lists them.
 ;		13/09/26		Keep regions: every line between a KEEP and an ENDKEEP marker is a root.
+;		03/10/26		Planes of 1,536 bytes for 12,288 entries; the swallow list moves to $B800.
 ;
 ; ************************************************************************************************
 ; ************************************************************************************************
@@ -10321,9 +10325,10 @@ _GBFPBOut:
 ;		compilerEndHigh:$00 to lineNumberTable -- and the window is opened and closed once per
 ;		entry rather than held across the loop, for the reason x16_storage.inc gives.
 ;
-;		Those addresses are VIRTUAL and the table is two banks; STRPageLine is what turns one
+;		Those addresses are virtual and the table is six banks; STRPageLine is what turns one
 ;		into a real address and a bank. The compare that ends the walk is a plain 16-bit
-;		compare of two virtual addresses either way.
+;		compare of two virtual addresses. A full table ends at $0000, and the borrow from the
+;		step below it ends the walk too.
 ;
 ; ************************************************************************************************
 
@@ -10339,6 +10344,7 @@ _GBFLTLoop:
 		lda 	gpBankWalk+1
 		sbc 	#0
 		sta 	gpBankWalk+1
+		bcc 	_GBFLTDone 					; the step below $0000
 		lda 	gpBankWalk+1 				; stop below the last (lowest) entry
 		cmp 	lineNumberTable+1
 		bcc 	_GBFLTDone
@@ -10347,7 +10353,7 @@ _GBFLTLoop:
 		cmp 	lineNumberTable
 		bcc 	_GBFLTDone
 _GBFLTEntry:
-		lda 	gpBankWalk 					; gpBankWalk is a VIRTUAL address covering both banks
+		lda 	gpBankWalk 					; gpBankWalk is a VIRTUAL address covering every bank
 		sta 	lineWalk 					; of the table -- STRPageLine turns it into the real
 		lda 	gpBankWalk+1 				; one in zTemp0 and selects the bank it is in
 		sta 	lineWalk+1
@@ -11147,6 +11153,7 @@ gpBankAsmLen:									; ...and the one GPBankRelocate is moving
 ;						one, from line numbers.
 ;		14/09/26		An embedded compile stops at the first GP.BANKED with GP.BANKED NEEDS
 ;						SHARED, at its own line rather than NOT IMPLEMENTED at the last one.
+;		03/10/26		_GBFixLineTable stops on the borrow below $0000: the line table is six banks.
 ;
 ; ************************************************************************************************
 ; ************************************************************************************************
@@ -14022,13 +14029,15 @@ LinputSyntax:
 
 ; ************************************************************************************************
 ;
-;		THE TABLE IS TWO BANKS AND ONE ADDRESS SPACE. Every pointer into it -- here, in
-;		GPBankRelocate and in WriteMapFile -- is a VIRTUAL address running from compilerEndHigh:$00
-;		down to LineTableFloorHigh:$00, sixteen kilobytes and so 4,096 entries. STRPageLine turns
-;		one into the real $A000-$BFFF address and the bank it is in, and nothing else knows the
-;		table is split: the walks still start at the top, still step down four bytes an entry,
-;		still stop at lineNumberTable, and the compare that ends them is a plain sixteen bit
-;		compare of two virtual addresses.
+;		The table is six banks and one address space. Every pointer into it, here, in
+;		_GBFixLineTable, in WriteMapFile and in DCPageEntryYA, is a virtual address running from
+;		compilerEndHigh:$00 down to $0000: 48K, 12,288 entries. STRPageLine turns one into the
+;		real $A000-$BFFF address and the bank it is in, and nothing else knows the table is
+;		split. A walk starts at the top and steps down four bytes an entry. The compare that
+;		ends it is a plain 16-bit compare of two virtual addresses.
+;
+;		A step below $0000 wraps to $FFFC, which STRPageLine cannot page. Every walk stops on
+;		the borrow out of that step.
 ;
 ;		SELECT THE BANK THROUGH STRPageLine, NEVER BY HAND. It sets the storage bank AND the
 ;		depth bank together, because the depth byte for a record sits at the same address in a
@@ -14047,33 +14056,24 @@ LinputSyntax:
 STRMarkLine:
 		pha
 		sec 								; allocate 4 bytes (line #,address)
-		lda 	lineNumberTable 			; and copy to the walk pointer
+		lda 	lineNumberTable 			; in the walk pointer first
 		sbc 	#4
-		sta 	lineNumberTable
 		sta 	lineWalk
 		lda 	lineNumberTable+1
 		sbc 	#0
-		sta 	lineNumberTable+1
 		sta 	lineWalk+1
-
 		;
-		;		Still inside the table? It grows DOWN from compilerEndHigh:$00 and the floor is
-		;		two banks under that, and without a test it was free to walk out of the bottom
-		;		in silence. (A is free here: the caller's value is on the stack until the pla
-		;		below, and ExitCompiler restores SP, so raising with it still pushed is fine.)
+		;		A borrow is the step below $0000, the table's floor, and the table pointer is
+		;		left where it was. (A is free here: the caller's value is on the stack until the
+		;		pla below, and ExitCompiler restores SP, so raising with it still pushed is fine.)
 		;
-		;		THIS USED TO TEST AGAINST variableListEnd. Both tables lived in one 8K bank and
-		;		grew towards each other, so the real limit was the SUM of the two -- and
-		;		GPC-BASIC-TOOLS-SRC/edit had reached 7,981 of 8,192 with 1,461 lines and 356 variables.
-		;		Fifty-two more lines and this test fired PROGRAM TOO BIG with a THIRD of the
-		;		object budget unused. One bank each (x16_storage.inc) made the limit this table's
-		;		own window, 2,048 lines; a second bank under it makes that 4,096.
-		;
-		lda 	lineNumberTable+1 			; the entry is 4 bytes AT the pointer and the floor is
-		cmp 	#LineTableFloorHigh 		; a page boundary, so the high byte is the whole test
-		bcs 	_SMLRoom 					; -- any offset within that page is inside.
+		bcs 	_SMLRoom
 		.error_toobig
 _SMLRoom:
+		lda 	lineWalk
+		sta 	lineNumberTable
+		lda 	lineWalk+1
+		sta 	lineNumberTable+1
 		jsr 	STRPageLine 				; lineWalk -> zTemp0, and the two banks it lives in
 
 		.storage_access
@@ -14143,6 +14143,9 @@ _SMLWrite:
 ;				If FOUND: of the matching line, with Carry Clear.
 ;				If NOT FOUND : of the previous line (e.g. next code line), with Carry Set.
 ;
+;		Pass two only. The search runs on below lineNumberTable, through the records pass one
+;		wrote, and ends at the $FFFF record pass one wrote last, which every target matches.
+;
 ; ************************************************************************************************
 
 STRFindLine:
@@ -14155,6 +14158,7 @@ STRFindLine:
 
 _STRSearch:
 		jsr 	_STRPrevLine 				; look at previous record.
+		bcc 	_STRMissing 				; the step below $0000
 		jsr 	STRPageLine 				; lineWalk -> zTemp0, in whichever bank it is in
 		;
 		;		THE WHOLE RECORD COMES OUT IN ONE GO, and the window closes before anything is
@@ -14187,6 +14191,7 @@ _STRSearch:
 		lda 	lineRec+1 					; next table entry, until off the bottom of what was
 		cmp 	#$FF 						; ever written. Should not be required !
 		bne 	_STRSearch
+_STRMissing:
 		jsr 	CallErrorHandler
 		.text 	"INTERNAL ERROR LINE NOT FOUND", 0
 
@@ -14221,6 +14226,9 @@ _STROut:
 		plp
 		rts
 
+;
+;		Back one entry. CC when the step went below $0000.
+;
 _STRPrevLine:
 		sec 								; move backwards one entry.
 		lda 	lineWalk
@@ -14234,41 +14242,45 @@ _STRPrevLine:
 ; ************************************************************************************************
 ;
 ;			Virtual line-table address in lineWalk -> real address in zTemp0, with the storage
-;			bank and the depth bank selected for it. Preserves X and Y.
+;			bank and the depth bank selected for it. Preserves A, X, Y and the flags.
 ;
-;		BIT 13 IS THE WHOLE OF IT. The virtual space is compilerEndHigh:$00 down to
-;		LineTableFloorHigh:$00, sixteen kilobytes, and each bank shows eight of them at
-;		$A000-$BFFF: $A000-$BFFF is the first bank at its own address, $8000-$9FFF is the second
-;		bank with $2000 added back. So the segment is one bit of the high byte and the
-;		translation is an ORA.
+;			lineWalk must be under $C000. The top three bits of its high byte pick the
+;			segment, and the low five are the page inside that segment's bank.
 ;
 ; ************************************************************************************************
 
 STRPageLine:
+		php
 		pha
+		phx
 		lda 	lineWalk
 		sta 	zTemp0
 		lda 	lineWalk+1
-		and 	#$20 						; bit 13: set is the first bank, clear the second
-		beq 	_SPLSecond
-		lda 	#CompilerStorageBank
+		lsr 	a
+		lsr 	a
+		lsr 	a
+		lsr 	a
+		lsr 	a
+		tax
+		lda 	_SPLStorageBank,x
 		sta 	storageBankNow
-		lda 	#CompilerDepthBank
+		lda 	_SPLDepthBank,x
 		sta 	depthBankNow
 		lda 	lineWalk+1
+		and 	#$1F
+		ora 	#$A0
 		sta 	zTemp0+1
+		plx
 		pla
+		plp
 		rts
-_SPLSecond:
-		lda 	#CompilerStorageBank2
-		sta 	storageBankNow
-		lda 	#CompilerDepthBank2
-		sta 	depthBankNow
-		lda 	lineWalk+1 					; $8000-$9FFF is that bank's own $A000-$BFFF
-		ora 	#$20
-		sta 	zTemp0+1
-		pla
-		rts
+
+_SPLStorageBank: 							; by segment, virtual $0000 first and $A000 last
+		.byte 	CompilerStorageBank6, CompilerStorageBank5, CompilerStorageBank4
+		.byte 	CompilerStorageBank3, CompilerStorageBank2, CompilerStorageBank
+_SPLDepthBank:
+		.byte 	CompilerDepthBank6, CompilerDepthBank5, CompilerDepthBank4
+		.byte 	CompilerDepthBank3, CompilerDepthBank2, CompilerDepthBank
 
 ; ************************************************************************************************
 ;
@@ -14331,6 +14343,7 @@ lineRec: 									; one whole record, copied out of the bank
 ;		==== 			=====
 ;		08/09/26		A second bank under the line table, 2,048 entries to 4,096, reached
 ;						through STRPageLine. STRFindLine's high byte compare fixed with it.
+;		03/10/26		Six banks, 12,288 entries, floor $0000. STRPageLine pages by table.
 ;
 ; ************************************************************************************************
 ; ************************************************************************************************

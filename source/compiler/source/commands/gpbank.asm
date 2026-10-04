@@ -793,9 +793,10 @@ _GBFPBOut:
 ;		compilerEndHigh:$00 to lineNumberTable -- and the window is opened and closed once per
 ;		entry rather than held across the loop, for the reason x16_storage.inc gives.
 ;
-;		Those addresses are VIRTUAL and the table is two banks; STRPageLine is what turns one
+;		Those addresses are virtual and the table is six banks; STRPageLine is what turns one
 ;		into a real address and a bank. The compare that ends the walk is a plain 16-bit
-;		compare of two virtual addresses either way.
+;		compare of two virtual addresses. A full table ends at $0000, and the borrow from the
+;		step below it ends the walk too.
 ;
 ; ************************************************************************************************
 
@@ -811,6 +812,7 @@ _GBFLTLoop:
 		lda 	gpBankWalk+1
 		sbc 	#0
 		sta 	gpBankWalk+1
+		bcc 	_GBFLTDone 					; the step below $0000
 		lda 	gpBankWalk+1 				; stop below the last (lowest) entry
 		cmp 	lineNumberTable+1
 		bcc 	_GBFLTDone
@@ -819,7 +821,7 @@ _GBFLTLoop:
 		cmp 	lineNumberTable
 		bcc 	_GBFLTDone
 _GBFLTEntry:
-		lda 	gpBankWalk 					; gpBankWalk is a VIRTUAL address covering both banks
+		lda 	gpBankWalk 					; gpBankWalk is a VIRTUAL address covering every bank
 		sta 	lineWalk 					; of the table -- STRPageLine turns it into the real
 		lda 	gpBankWalk+1 				; one in zTemp0 and selects the bank it is in
 		sta 	lineWalk+1
@@ -1619,5 +1621,6 @@ gpBankAsmLen:									; ...and the one GPBankRelocate is moving
 ;						one, from line numbers.
 ;		14/09/26		An embedded compile stops at the first GP.BANKED with GP.BANKED NEEDS
 ;						SHARED, at its own line rather than NOT IMPLEMENTED at the last one.
+;		03/10/26		_GBFixLineTable stops on the borrow below $0000: the line table is six banks.
 ;
 ; ************************************************************************************************

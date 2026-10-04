@@ -25,15 +25,15 @@
 ;		them, and the swallow list says how many there were, so that a later pass which leaves
 ;		the opener out can read past them too.
 ;
-;		Bank 11 holds four bit planes, one bit an entry, 512 bytes each. That is 4,096 entries,
-;		the line table's own limit, so a plane is never what fills.
+;		Bank 11 holds four bit planes, one bit an entry, 1,536 bytes each. That is 12,288
+;		entries, the line table's own limit, so a plane is never what fills.
 ;
 ;			$A000	reached 	some path from the first line runs it
-;			$A200	retained 	compiled although nothing runs it (DATA, DIM, GP.DEFPROC,
+;			$A600	retained 	compiled although nothing runs it (DATA, DIM, GP.DEFPROC,
 ;								GP.BANKED, GP.ENDBANKED, GP.BANKEDSTR)
-;			$A400	falls 		when reached, it reaches the next line
-;			$A600	structure 	inside or on the edge of a GP.IF, GP.DO or GP.SELECT
-;			$A800	swallow list: the entry (2), the lines it read past its own (2)
+;			$AC00	falls 		when reached, it reaches the next line
+;			$B200	structure 	inside or on the edge of a GP.IF, GP.DO or GP.SELECT
+;			$B800	swallow list: the entry (2), the lines it read past its own (2), 512 records
 ;
 ;		Bank 12 holds the edge list: the source entry (2, bit 15 set when the target is an
 ;		address) and the target (2). The target is a line number or an address until the solve
@@ -56,11 +56,11 @@
 ; ************************************************************************************************
 
 DCPlaneReached 		= $A0
-DCPlaneRetained 	= $A2
-DCPlaneFalls 		= $A4
-DCPlaneStructure 	= $A6
+DCPlaneRetained 	= $A6
+DCPlaneFalls 		= $AC
+DCPlaneStructure 	= $B2
 
-DCSwallowTable 		= $A800
+DCSwallowTable 		= $B800
 DCSwallowMax 		= ($C000 - DCSwallowTable) / 4
 DCEdgeTable 		= $A000
 DCEdgeMax 			= ($C000 - DCEdgeTable) / 4
@@ -1368,5 +1368,6 @@ dcKeepKind: 								; the marker a spelling being matched is
 ;		13/09/26		Written. Pass zero records and solves, and prints the removed lines.
 ;		13/09/26		Passes one and two leave the removed lines out, and pass one lists them.
 ;		13/09/26		Keep regions: every line between a KEEP and an ENDKEEP marker is a root.
+;		03/10/26		Planes of 1,536 bytes for 12,288 entries; the swallow list moves to $B800.
 ;
 ; ************************************************************************************************

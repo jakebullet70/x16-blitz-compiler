@@ -45,7 +45,7 @@
 ;		* No nesting, and no jsr at all. Verified: none of the windows contains another, and
 ;		  every one of them is now a straight run of loads and stores. STRFindLine used to
 ;		  hold one open across its whole search and call _STRPrevLine inside it; the line
-;		  table spanning two banks ended that, because the bank has to be re-chosen per entry.
+;		  table spanning several banks ended that, because the bank has to be re-chosen per entry.
 ;
 ; ************************************************************************************************
 
@@ -64,38 +64,30 @@ CompilerRAMBankReg	= $0000
 ;			0	the KERNAL's (FAT32 buffers and friends). Never ours.
 ;			1	the NATIVE TEST HARNESS's p-code buffer. source/compiler/testing/api/api.asm
 ;				does "lda #1 / sta 0" in _TAResetOut and then writes the object from $A000 up.
-;			2	the LINE NUMBER TABLE, first half.
+;			2	the LINE NUMBER TABLE at virtual $A000-$BFFF.
 ;			3	GP.ASM's blob pool and fixup list (see the second pair of macros below).
 ;			4	the VARIABLE NAME LIST.
-;			5	the BLOCK DEPTH of each line, one byte per line-table entry -- first half.
+;			5	the BLOCK DEPTH of each line, one byte per line-table entry, at virtual $A000-$BFFF.
 ;			6	WHERE EACH BLOCK ENDS, and where each of its alternatives goes next.
 ;			7	the OBJECT BUFFER -- the application's, not the compiler's.
 ;			8	the ONE scratch bank EVERY region shares -- cleared as each one opens, and
 ;				emptied to that region's own .nnn file as it closes.
-;			9	the LINE NUMBER TABLE, second half.
-;			10	the BLOCK DEPTH, second half. It follows the line table's split exactly.
+;			9	the LINE NUMBER TABLE at virtual $8000-$9FFF.
+;			10	the BLOCK DEPTH at virtual $8000-$9FFF.
 ;			11	DEAD-CODE REMOVAL's bit planes and swallow list (main/deadcode.asm), pass zero only.
 ;			12	...and its edge list.
 ;			13	the #SYMFILE's variables, for GP.ASM {VAR} -- the application's, like bank 7.
 ;			14	...and their second 8K. Both are application/source/compiler/symfile.asm.
 ;			15	the embedded BANK CODE, held for the object -- the application's, like bank 7.
+;			16-23	the LINE NUMBER TABLE and its BLOCK DEPTH below virtual $8000, a pair a
+;				segment: 16 and 17 at $6000, 18 and 19 at $4000, 20 and 21 at $2000, 22 and
+;				23 at $0000.
 ;			63	the GP.BANKEDSTR pool, growing DOWN from the top bank a 512K machine has.
 ;
-;		BANKS 2 AND 4 WERE ONE BANK, and that was the wall. The two tables shared 8K, growing
-;		towards each other, and GPC-BASIC-TOOLS-SRC/edit had used 7,981 bytes of it -- 1,461 line entries
-;		at 4 bytes plus 356 variable records at 6 -- leaving 211. Fifty-two more lines of source
-;		and the tables touched, and the compiler said PROGRAM TOO BIG with 7,106 bytes of the
-;		OBJECT budget still free. Same message, wrong limit: three sites raise it (STRMarkLine,
-;		CreateVariableRecord and _CAWriteByte) and only the last one is about the object. A bank
-;		each takes the tables to 2,048 lines and 1,365 variables, so the limit a program meets
-;		is the object ceiling -- the one that is really there.
-;
-;		AND 2,048 LINES WAS THE WALL AGAIN, at GPC-BASIC-TOOLS-SRC/GPB-MODS-TESTING/GPBMODS.BASL, which
-;		marks about 2,200. Same message, same wrong limit, one table further along. The line
-;		table has a SECOND bank under it now and its pointers are virtual addresses covering
-;		both -- see STRPageLine in storage/mark_line.asm, which is the only thing that knows.
-;		4,096 lines, and the depth table splits with it because its byte for a record is at the
-;		record's own address.
+;		The line table is six banks and one virtual address space, $0000-$BFFF, 12,288 entries.
+;		STRPageLine in storage/mark_line.asm is the only code that turns a virtual address into
+;		a bank and a real address. The depth table has the same six segments, because a record's
+;		depth byte sits at the record's own address.
 ;
 ;		This was bank 1 for one build, and the compiler-runtime `variables` and `arrays` suites
 ;		hung: the harness's object code and the variable name list were overwriting each other,
@@ -107,25 +99,34 @@ CompilerStorageBank	= 2 					; line number table, grows DOWN from $C000
 CompilerVarBank		= 4 					; variable name list, grows UP from $A000
 CompilerDepthBank	= 5 					; block depth per line, alongside the line table
 CompilerBlockBank	= 6 					; where each block ends, and its alternatives
-CompilerStorageBank2 = 9 					; the second 8K the line table runs on down into
-CompilerDepthBank2	= 10 					; ...and the second 8K of depth bytes shadowing it
+CompilerStorageBank2 = 9 					; line number table, virtual $8000-$9FFF
+CompilerDepthBank2	= 10 					; ...and its depth bytes
 CompilerDeadBank	= 11 					; dead-code removal: bit planes and swallow list
 CompilerEdgeBank	= 12 					; ...and the edges between lines
+CompilerStorageBank3 = 16 					; line number table, virtual $6000-$7FFF
+CompilerDepthBank3	= 17 					; ...and its depth bytes
+CompilerStorageBank4 = 18 					; line number table, virtual $4000-$5FFF
+CompilerDepthBank4	= 19
+CompilerStorageBank5 = 20 					; line number table, virtual $2000-$3FFF
+CompilerDepthBank5	= 21
+CompilerStorageBank6 = 22 					; line number table, virtual $0000-$1FFF
+CompilerDepthBank6	= 23
 
 ;
-;		THE FLOOR OF THE LINE TABLE'S VIRTUAL ADDRESS SPACE. It starts at compilerEndHigh:$00,
-;		which is CompilerWorkspaceEnd ($C000, application/source/compiler/start.asm), and runs
-;		down through two banks of $2000 -- so $8000, and 4,096 four-byte entries. Change either
-;		of those and this moves with them.
+;		The line table's virtual address space runs from compilerEndHigh:$00 down to $0000. The
+;		floor is the bottom of the address space, so a step below it is a borrow.
 ;
-LineTableFloorHigh	= $80
+;		WARNING: STRPageLine's bank tables assume compilerEndHigh is $C0, which is
+;		CompilerWorkspaceEnd in application/source/compiler/start.asm and EndWorkspace in the
+;		test harnesses. Move it and the tables move with it.
+;
 
 BlockEndTable		= $A000 				; 2,048 entries of 2 bytes: where block N ends
 BlockAltTable		= $B000 				; ...and the same for its alternatives
 BLOCK_MAX 			= 2048
 
 ;
-;		THE BANK IS A VARIABLE HERE, not a constant, because the line table spans two of them:
+;		THE BANK IS A VARIABLE HERE, not a constant, because the line table spans six of them:
 ;		STRPageLine writes storageBankNow as it translates a virtual table address, and nothing
 ;		else ever writes it. Open a window without having paged a record first and you get
 ;		whichever segment the last call left selected -- which is why every walk of the table
@@ -154,7 +155,7 @@ storage_release .macro
 		.section storage
 storageSavedBank: 							; caller's RAM bank, saved across a storage window
 		.fill 	1
-storageBankNow: 							; which half of the line table is being reached --
+storageBankNow: 							; which segment of the line table is being reached --
 		.fill 	1 							; STRReset seeds it, STRPageLine keeps it right
 		.send 	storage
 
@@ -203,8 +204,8 @@ varSavedBank: 								; caller's RAM bank, saved across a variable window
 ;		cost nothing that was ever available. Widening the line record to carry the byte instead
 ;		would have cost real ground: 5 bytes an entry drops the limit from 2,048 lines to 1,638.
 ;
-;		IT IS TWO BANKS NOW, in the same halves as the line table and for the same reason, and
-;		the bank is a variable here for the same reason as well. STRPageLine writes both.
+;		It is six banks, in the same segments as the line table, and the bank is a variable here
+;		for the same reason. STRPageLine writes both.
 ;
 
 depth_access .macro
@@ -230,7 +231,7 @@ depth_release .macro
 		.section storage
 depthSavedBank: 							; caller's RAM bank, saved across a depth window
 		.fill 	1
-depthBankNow: 								; which half of the depth table is being reached --
+depthBankNow: 								; which segment of the depth table is being reached --
 		.fill 	1 							; STRReset seeds it, STRPageLine keeps it right
 		.send 	storage
 
@@ -336,6 +337,8 @@ dcedge_release .macro
 ;		08/09/26		Banks 9 and 10 added: a second half for the line table and for the
 ;						depth table, reached through STRPageLine. 4,096 lines.
 ;		13/09/26		Banks 11 and 12 added for dead-code removal.
+;		03/10/26		Banks 16 to 23 added: four more segments for the line table and the
+;						depth table. 12,288 lines.
 ;
 ; ************************************************************************************************
 

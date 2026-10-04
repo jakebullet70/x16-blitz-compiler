@@ -1714,7 +1714,8 @@ NoRuntimeImageText:
 ;		It is built straight from the compiler's line-number table (STRMarkLine): 4-byte entries
 ;		[line# lo, line# hi, addr lo, addr hi], growing DOWNWARD from compilerEndHigh:$00 to
 ;		lineNumberTable, walked here from the top down. Those are VIRTUAL addresses and the
-;		table is two banks, so each entry is paged in through STRPageLine as it is reached. The
+;		table is six banks, so each entry is paged in through STRPageLine as it is reached. A
+;		full table ends at $0000, and the borrow from the step below it ends the walk. The
 ;		stored addr is the compile-time position in the object buffer (based at FreeMemory), so
 ;		offset = addr - FreeMemory -- the same number the runtime reports, because the object is
 ;		copied verbatim from FreeMemory to its run address. The two synthetic lines the implicit
@@ -1742,6 +1743,7 @@ _WMFLoop:
 		lda 	mapWalk+1
 		sbc 	#0
 		sta 	mapWalk+1
+		bcc 	_WMFDone 					; the step below $0000
 		lda 	mapWalk+1 					; stop once below the last (lowest) entry.
 		cmp 	lineNumberTable+1
 		bcc 	_WMFDone
@@ -1761,7 +1763,7 @@ _WMFDone:
 ;		but mapValue/mapOff are plain RAM and survive it.
 ;
 _WMFWriteEntry:
-		lda 	mapWalk 					; mapWalk is a VIRTUAL address covering both banks of
+		lda 	mapWalk 					; mapWalk is a VIRTUAL address covering every bank of
 		sta 	lineWalk 					; the table; STRPageLine points zTemp0 at the entry
 		lda 	mapWalk+1 					; for real, and selects the bank it is in.
 		sta 	lineWalk+1
@@ -1977,5 +1979,6 @@ imageBuffer:
 ;
 ;		Date			Notes
 ;		==== 			=====
+;		03/10/26		WriteMapFile stops on the borrow below $0000: the line table is six banks.
 ;
 ; ************************************************************************************************

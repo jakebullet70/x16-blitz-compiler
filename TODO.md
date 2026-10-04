@@ -1325,6 +1325,32 @@ compiles clean and writes a different variable.
 
 A `%` saves 4 bytes a scalar and 4 bytes an array element. An address and a `FOR` index stay float.
 
+### A debugger in TURBO GPC — RESEARCH, raised 2026-10-04
+
+Work out how TURBO GPC can run the program it is editing under a debugger: breakpoints, step,
+continue, a look at variables, and a return to the editor at the source line.
+
+What exists to build on:
+
+- The compiler's map file has one row per line: the line number and its object address.
+- BASLOAD's `#SYMFILE` (`NAME.SRC.SYM`) gives the source name of every crunched label and variable.
+- The runtime polls STOP through the vector at `$0328` every 16 p-code words.
+- A runtime error in a region prints `$bb:AAAA`.
+
+Questions to answer:
+
+1. **Breakpoints.** Is a breakpoint a trap opcode patched in at the map address, or a check on the
+   p-code address from the `$0328` hook? The opcode space is nearly full, and the hook sees every
+   16th word, not every line.
+2. **Where the debugger lives.** A LOAD chain clears memory, so neither the editor nor its text
+   survives a run. Does the debugger go in a bank, in a debug build of the runtime, or both?
+3. **Source lines.** The map numbers the tokenised lines. Find what maps a tokenised line back to a
+   line of the `.BASL` the editor holds.
+4. **Variables.** Find where the compiler places each variable, and whether the map or the SYM file
+   can give the debugger that address.
+5. **The way back.** How the program returns control to the editor at a stop, with the editor's
+   document intact.
+
 ### `FILEDIR` reads a directory too slowly — QUEUED, raised 2026-09-20
 
 A `FILEPICK` box takes about two seconds to appear, and most of that is `FILEDIR` pulling the
@@ -2742,9 +2768,10 @@ workspace, and a program is refused when it would fall below 4,096. The editor's
 and not 22,272, is the number to quote.
 
 **Which limit now binds.** For editor-density code (10.4 bytes of p-code per line) the object wall
-arrives at ~1,675 lines and the line table not until 2,048, so **the object budget binds first,
-which is the correct outcome** -- the wall a program meets is now a real one about the program's own
-size. Sparse code (many short lines) still meets the line table at 2,048 first.
+arrives at ~1,675 lines and the line table not until 12,286 code lines, so **the object budget binds
+first, which is the correct outcome** -- the wall a program meets is now a real one about the program's
+own size. Sparse code (many short lines) still meets the line table at 12,286 first. The line table is
+six banks, 12,288 entries, two of them the compiler's own end lines.
 
 **What could be done next, if the ceiling ever needs raising**, in increasing order of work: drop
 `MIN_WS_PAGES` for a program that provably needs little workspace (it is a policy, not a hardware
