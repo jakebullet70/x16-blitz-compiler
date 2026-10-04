@@ -203,6 +203,19 @@ COMBO.GETKEY:
 ## ***********************************************************************
 
 COMBO.OPEN:
+    GOSUB COMBO.DROP
+    GP.IF COMBO.PICK% <> 0 AND COMBO.PICK% <> COMBO.SEL% THEN
+        GUI.CTRL.SEL%(COMBO.CTRL%) = COMBO.PICK%
+        GUI.FORM.CHANGED% = COMBO.CTRL%
+    GP.ENDIF
+    GUI.PAINT.N% = COMBO.CTRL%
+    GOSUB COMBO.DRAW
+    RETURN
+
+## COMBO.DROP -- the list of control COMBO.CTRL%, from COMBO.X% .Y .W .COUNT .SEL.
+##   out  COMBO.PICK%   the item chosen, 0 on ESC or when the cells could not be saved
+COMBO.DROP:
+    COMBO.PICK% = 0
     COMBO.SCRROWS% = GUI.SCREEN.ROWS%
     IF COMBO.SCRROWS% < 8 THEN COMBO.SCRROWS% = 60
     COMBO.BOXH% = COMBO.COUNT% + 2 : COMBO.BOXY% = COMBO.Y% + 1
@@ -229,14 +242,32 @@ COMBO.OPEN:
     GOSUB COMBO.LOAD : GOSUB COMBO.STYLE
     COMBO.PICK% = GP.FN(MENUTO.VERT, COMBO.BOXY% + 1, COMBO.X% + 1, MENU.NOBOX)
     GOSUB COMBO.UNSTYLE
-    GP.IF COMBO.PICK% <> 0 AND COMBO.PICK% <> COMBO.SEL% THEN
-        GUI.CTRL.SEL%(COMBO.CTRL%) = COMBO.PICK%
-        GUI.FORM.CHANGED% = COMBO.CTRL%
-    GP.ENDIF
-
     GOSUB COMBO.RESTORE
-    GUI.PAINT.N% = COMBO.CTRL%
-    GOSUB COMBO.DRAW
+    RETURN
+
+## COMBO.FIELD.DROP -- Down in the focused field. A FORM.EDITCOMBO field opens its list
+## under the field and the arrow, and a choice replaces the text. GUI.FORM.KEY% is 0 when
+## the list opened, so the field keeps the focus.
+COMBO.FIELD.DROP:
+    COMBO.CTRL% = GUI.FOCUS%
+    IF (GUI.CTRL.FLAGS%(COMBO.CTRL%) AND GUI.CF.DROP) = 0 THEN RETURN
+    GOSUB COMBO.READ
+    IF COMBO.COUNT% = 0 THEN RETURN
+    GUI.FORM.KEY% = 0
+    COMBO.X% = COMBO.X% - 1
+    COMBO.W% = COMBO.W% + 2
+    GOSUB COMBO.DROP
+    IF COMBO.PICK% = 0 THEN RETURN
+    GUI.ITEM.CTRL% = COMBO.CTRL%
+    GUI.ITEM.AT% = COMBO.PICK%
+    GOSUB GUI.ITEM.FETCH
+    GUI.CTRL.TEXT$(COMBO.CTRL%) = LEFT$(GUI.LIST.TEXT$, GUI.CTRL.W%(COMBO.CTRL%))
+    GUI.FORM.CHANGED% = COMBO.CTRL%
+    RETURN
+
+## COMBO.FIELD.ARROW -- the arrow of FORM.EDITCOMBO field GUI.PAINT.N%
+COMBO.FIELD.ARROW:
+    GP.FILL GUI.CTRL.X%(GUI.PAINT.N%) + GUI.CTRL.W%(GUI.PAINT.N%), GUI.CTRL.Y%(GUI.PAINT.N%), 1, 1, COMBO.ARROW, GUI.BORDER%
     RETURN
 
 ## ---- the cells under the dropdown, kept by GUI.SAVEMODE%. COMBO.SAVED% is

@@ -192,11 +192,6 @@ DLG.SETHOTKEY:
     GUI.HOTFG% = DLG.HOTFG%
     RETURN
 
-## DLG.INTERNAL.INPUT hands the list to the field and empties it.
-DLG.SETHISTORY:
-    GP.DEFPROC DLGHISTORY, DLG.HISTORY$
-    RETURN
-
 ## ***********************************************************************
 ## **  KBCLEAR -- throw away whatever is already typed.
 ## **
@@ -345,8 +340,6 @@ DLG.INTERNAL.INPUT:
     LINEINPUT.X = GUI.FIELD.LEFT% : LINEINPUT.Y = GUI.INNER.TOP%
     LINEINPUT.LEN = GUI.LEN% : LINEINPUT.ATTR = THEME.CLR%(THEME.HILITE)
     LINEINPUT.TEXT$ = GUI.TEXT$ : LINEINPUT.MASK = GUI.MASK%
-    LINEINPUT.HISTORY$ = DLG.HISTORY$
-    DLG.HISTORY$ = ""
 
 ## ---- The field is control 1 and the buttons are 2 and 3, so BEGIN comes
 ## ---- first and the row appends to it. Focus starts on the field, which is
@@ -354,7 +347,6 @@ DLG.INTERNAL.INPUT:
     GOSUB GUI.FORM.BEGIN : GOSUB GUI.FORM.ADD.FIELD
     GUI.BTN.Y% = GUI.INNER.TOP% + 2
     GOSUB GUI.BUTTON.ROW : GUI.FOCUS% = 1 : GOSUB GUI.FORM.RUN
-    LINEINPUT.HISTORY$ = ""
 
     GUI.TEXT$ = LINEINPUT.TEXT$ : GUI.KEY% = GUI.FORM.KEY% : GUI.OK% = 0
 
@@ -700,6 +692,8 @@ DLG.PANELCLOSE:
 ## **                          Before the first combo, list or radio
 ## **  FORM.COLUMN col         the controls after it start col cells in
 ## **                          from the box's left edge. 0 at FORM.BEGIN
+## **  FORM.DEFAULT n          button n, 1 or 2, answers RETURN. 1 at
+## **                          FORM.BEGIN
 ## **  FORM.FIELD row, label$, labw, w, text$
 ## **                          label$, then a field w wide. labw is the
 ## **                          column the fields line up in, 0 to fit
@@ -766,6 +760,10 @@ DLG.FORMCOLUMN:
     GP.DEFPROC FORM.COLUMN, DLG.COLUMN%
     RETURN
 
+DLG.FORMDEFAULT:
+    GP.DEFPROC FORM.DEFAULT, GUI.DEFAULT%
+    RETURN
+
 ## ---- label$ at the row's left edge, and DLG.CONTROL.X% where the control after it
 ## ---- starts: labw past the edge, or the edge itself for no label and no labw.
 DLG.FORMLABEL:
@@ -777,6 +775,7 @@ DLG.FORMLABEL:
 
 DLG.FORMFIELD:
     GP.DEFPROC FORM.FIELD, DLG.ROW%, DLG.LABEL$, DLG.LABW%, DLG.WIDTH%, DLG.TEXT$ RETURNS GUI.CTRL.N%
+DLG.FORMFIELD.ADD:
     GOSUB GUI.ITEM.SEAL
     GOSUB DLG.FORMLABEL
     LINEINPUT.X = DLG.CONTROL.X%
@@ -784,6 +783,17 @@ DLG.FORMFIELD:
     LINEINPUT.LEN = DLG.WIDTH% : LINEINPUT.TEXT$ = DLG.TEXT$
     LINEINPUT.ATTR = THEME.CLR%(THEME.HILITE) : LINEINPUT.MASK = 0
     GOSUB GUI.FORM.ADD.FIELD
+    RETURN
+
+## A field with a history list. FORM.ITEM after it adds the entries, newest first, and Down
+## opens the list. The arrow sits in the column past the field.
+DLG.FORMEDITCOMBO:
+    GP.DEFPROC FORM.EDITCOMBO, DLG.ROW%, DLG.LABEL$, DLG.LABW%, DLG.WIDTH%, DLG.TEXT$ RETURNS GUI.CTRL.N%
+    GOSUB DLG.FORMFIELD.ADD
+    GUI.CTRL.FLAGS%(GUI.CTRL.N%) = GUI.CF.DROP
+    GUI.PAINT.N% = GUI.CTRL.N%
+    GOSUB COMBO.FIELD.ARROW
+    GOSUB GUI.ITEM.CLAIM
     RETURN
 
 DLG.FORMTEXT:
@@ -878,14 +888,15 @@ DLG.FORMEVENT:
 DLG.FORMSTART:
     GOSUB GUI.ITEM.SEAL
     GUI.BTN.Y% = GUI.INNER.TOP% + DLG.FORMROWS% + 1
+    DLG.FIRSTBUTTON% = GUI.CTRL.N% + 1
     GOSUB GUI.BUTTON.ROW
     GUI.FOCUS% = 1
     RETURN
 
-## ---- a cancel is GUI.FORM.HIT% 0, whose flags are never set
+## ---- a cancel is GUI.FORM.HIT% 0
 DLG.FORMANSWER:
     DLG.ANSWER% = 0
-    IF (GUI.CTRL.FLAGS%(GUI.FORM.HIT%) AND GUI.CF.DEFAULT) <> 0 THEN DLG.ANSWER% = -1
+    IF GUI.FORM.HIT% = DLG.FIRSTBUTTON% THEN DLG.ANSWER% = -1
     RETURN
 
 DLG.FORMCHECKED:

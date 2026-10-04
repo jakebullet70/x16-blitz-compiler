@@ -1351,6 +1351,30 @@ Questions to answer:
 5. **The way back.** How the program returns control to the editor at a stop, with the editor's
    document intact.
 
+### Smart editing popups in TURBO GPC — OPEN, raised 2026-10-04
+
+A separate scan of the source builds a list of every line label and every `GP.DEFPROC` target. The
+editor pops the list up at the cursor, and a pick inserts the name. The scan follows `#INCLUDE`s, so
+the library's verbs are in the list.
+
+To decide: whether the scan runs in the editor or as its own tool, where the list is kept, which key
+opens the popup, and whether typing filters it.
+
+### A standard syntax comment on every callable routine — OPEN, raised 2026-10-04
+
+Every routine and `GP.DEFPROC` verb has a comment in a fixed form that gives its call syntax and
+its parameters, one parameter a line:
+
+    ## - FORM.ITEMS, Bank#, Address
+    ## - Bank# is the bank
+    ## - Address is the location in the bank
+
+The editor shows the comment for the name at the cursor, and the popups above show it beside each
+name. The scan collects it with the names.
+
+To decide: the exact marker the scan looks for, and a sweep of the library's contract comments into
+the form.
+
 ### `FILEDIR` reads a directory too slowly — QUEUED, raised 2026-09-20
 
 A `FILEPICK` box takes about two seconds to appear, and most of that is `FILEDIR` pulling the

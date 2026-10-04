@@ -29,8 +29,6 @@
 ## **                                  0 means "the field's", which is what it
 ## **                                  used to do to the label whether you
 ## **                                  wanted it or not
-## **        LINEINPUT.HISTORY$          earlier entries, newest first, each
-## **                                  followed by CHR$(13). "" is none
 ## **
 ## **   out  LINEINPUT.TEXT$             what was typed. ESC restores what it
 ## **                                  was when you called, so a cancelled
@@ -61,12 +59,6 @@
 ## **  append-and-rub-out field.
 ## **
 ## **   also out  LINEINPUT.POS   where the caret ended up, 0..LEN(TEXT$)
-## **
-## **  WITH A HISTORY, UP AND DOWN STAY IN THE FIELD. UP shows the next older
-## **  entry and DOWN the next newer one. DOWN past the newest shows the
-## **  starting value again. An entry the same as the text shown is passed
-## **  over, and an entry longer than LINEINPUT.LEN is cut to it. TAB and
-## **  SHIFT+TAB still leave the field.
 ## **
 ## **  TO RUN IT FROM A RAM BANK, put the #INCLUDE between GP.BANKED and
 ## **  GP.ENDBANKED. A call from outside the region selects the region's bank
@@ -112,7 +104,6 @@ LINEINPUT.GET:
     LINEINPUT.INV = (LINEINPUT.ATTR AND 15) * 16 + INT(LINEINPUT.ATTR / 16)
     LINEINPUT.WAS$ = LINEINPUT.TEXT$ : LINEINPUT.POS = LEN(LINEINPUT.TEXT$)
     LINEINPUT.DONE = 0 : LINEINPUT.KEY = 0 : LINEINPUT.LIT = 1  : LINEINPUT.TICK = TI
-    LINEINPUT.PLACE% = 0
 
 LINEINPUT.REDRAW:  
     GOSUB LINEINPUT.RENDER
@@ -140,10 +131,7 @@ LINEINPUT.KEYED:
         GP.CASE LINEINPUT.RETURN : LINEINPUT.DONE = -1
         GP.CASE LINEINPUT.ESCAPE, LINEINPUT.STOP
             LINEINPUT.TEXT$ = LINEINPUT.WAS$ : LINEINPUT.POS = LEN(LINEINPUT.TEXT$) : LINEINPUT.DONE = -1
-        GP.CASE LINEINPUT.DOWN, LINEINPUT.UP
-            IF LINEINPUT.HISTORY$ = "" THEN LINEINPUT.DONE = -1
-            IF LINEINPUT.HISTORY$ <> "" THEN GOSUB LINEINPUT.RECALL
-        GP.CASE LINEINPUT.TAB, LINEINPUT.SHTAB
+        GP.CASE LINEINPUT.DOWN, LINEINPUT.UP, LINEINPUT.TAB, LINEINPUT.SHTAB
             LINEINPUT.DONE = -1
         GP.CASE LINEINPUT.LEFT   : IF LINEINPUT.POS > 0 THEN LINEINPUT.POS = LINEINPUT.POS - 1
         GP.CASE LINEINPUT.RIGHT  : IF LINEINPUT.POS < LEN(LINEINPUT.TEXT$) THEN LINEINPUT.POS = LINEINPUT.POS + 1
@@ -231,36 +219,6 @@ LINEINPUT.RUBOUT:
     IF LINEINPUT.POS = 0 THEN RETURN
     LINEINPUT.TEXT$ = LEFT$(LINEINPUT.TEXT$, LINEINPUT.POS - 1) + MID$(LINEINPUT.TEXT$, LINEINPUT.POS + 1)
     LINEINPUT.POS = LINEINPUT.POS - 1
-    RETURN
-
-## ***********************************************************************
-## **  LINEINPUT.RECALL -- UP or DOWN with a history. LINEINPUT.PLACE% is the
-## **  entry shown, and 0 is the starting value. UP on the oldest entry and
-## **  DOWN on the starting value change nothing.
-## ***********************************************************************
-
-LINEINPUT.RECALL:
-    LINEINPUT.WANTED% = LINEINPUT.PLACE% + 1
-    IF LINEINPUT.CODE% = LINEINPUT.DOWN THEN LINEINPUT.WANTED% = LINEINPUT.PLACE% - 1
-    IF LINEINPUT.WANTED% < 0 THEN RETURN
-    LINEINPUT.ENTRY$ = LINEINPUT.WAS$
-    LINEINPUT.FROM% = 1
-    LINEINPUT.WALKED% = 0
-LINEINPUT.RECALL.WALK:
-    IF LINEINPUT.WALKED% = LINEINPUT.WANTED% THEN GOTO LINEINPUT.RECALL.SHOW
-    IF LINEINPUT.FROM% > LEN(LINEINPUT.HISTORY$) THEN RETURN
-    LINEINPUT.CUT% = GP.INSTR(LINEINPUT.HISTORY$, CHR$(LINEINPUT.RETURN), LINEINPUT.FROM%)
-    IF LINEINPUT.CUT% = 0 THEN RETURN
-    LINEINPUT.ENTRY$ = MID$(LINEINPUT.HISTORY$, LINEINPUT.FROM%, LINEINPUT.CUT% - LINEINPUT.FROM%)
-    LINEINPUT.FROM% = LINEINPUT.CUT% + 1
-    LINEINPUT.WALKED% = LINEINPUT.WALKED% + 1
-    GOTO LINEINPUT.RECALL.WALK
-LINEINPUT.RECALL.SHOW:
-    LINEINPUT.PLACE% = LINEINPUT.WANTED%
-    LINEINPUT.ENTRY$ = LEFT$(LINEINPUT.ENTRY$, LINEINPUT.LEN)
-    IF LINEINPUT.ENTRY$ = LINEINPUT.TEXT$ THEN GOTO LINEINPUT.RECALL
-    LINEINPUT.TEXT$ = LINEINPUT.ENTRY$
-    LINEINPUT.POS = LEN(LINEINPUT.TEXT$)
     RETURN
 
 ## ---- What the field displays, which is not always what it holds.
