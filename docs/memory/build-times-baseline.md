@@ -18,6 +18,8 @@ Time every build and compare it with this table. A build that takes twice its no
 | TURBO | tokenise (build_basl.py) | about 55 s | 54 s on 2026-10-05 |
 | compiler tests | `gpctest.py full` | about 180 s | 183 s on 2026-10-05 with every compile stripping by default; 158 s earlier that day |
 | GPC.PRG | `make -C source/gpc`, tokenise and compile | about 10 s | 10 s on 2026-10-05, 1,551 B |
+| compiler tests | `gpctest.py ref` | about 75 s | 72 s on 2026-10-05 |
+| stripped samples | `source/scratch/playtest.py`, ten 15 s headless runs | about 30 s | 30 s on 2026-10-05 |
 | current programs | `source/scratch/step4.py`, stripped identity on 15 programs | about 3 min | 178 s on 2026-10-05, plus 54 s to tokenise TURBO |
 | TURBO | compile (compile_shared.py) | about 45 s | 45 s on 2026-10-05; 10-15 min when the {VAR} cache overflowed, see [[turbo-compile-slow-open]] |
 

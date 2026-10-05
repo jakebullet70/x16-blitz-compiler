@@ -1,6 +1,6 @@
 # Compiler directives and string defines
 
-Handoff document. Build steps 1 to 7 are done. The runs of the stripped samples (§3.1) are left. Every part is assembly in GPC or in BASLOAD-GPC.
+Handoff document. Build steps 1 to 7 are done. Playing the stripped samples (§3.1) is left. Every part is assembly in GPC or in BASLOAD-GPC.
 
 The plan has three parts:
 - `#GPC` directives set compiler options from the source.
@@ -111,15 +111,19 @@ its change.
    | MANDEL | 0 | 0 |
    | GPC.PRG | 0 | 0 |
 
-   `gpctest.py full`, against the current compiler: the stripped identity holds on 15 of 16
-   programs, `dctest` passes DC1-DC12 and `dcstrip` holds on all eight. RGT stops on and off with
-   `GP.BANKEDSTR TEXT IN ONE BANK OVER 8K`; its slot 0 is built to sit just under 8K, and the
-   09-15 compiler took it. The off and on rows fail against `gpctest/ref`, which predates 30
-   compiler commits. Rebuild the reference before it is used again.
+   `gpctest.py full` passes against a reference rebuilt on 2026-10-05: the off, on and stripped
+   rows on all 16 programs, `dctest` DC1-DC12 and `dcstrip` on all eight.
+
+   RGT's slot 0 had 193 strings of 39 characters, built to fit one bank when a record was
+   `[length][text]`: 8,108 bytes. Commit 5597a3b added a capacity byte to every record, which made
+   it 8,301, and the compiler correctly stopped with `GP.BANKEDSTR TEXT IN ONE BANK OVER 8K`. The
+   slot now has 190 strings, 8,172 bytes. `source/drive/RGT.BASL` is not tracked.
 
    The identity proves the compiler skips exactly the listed lines. It does not prove those lines
    were dead. TURBO, whose build always strips, has been run stripped. So have GPC.HELP and GPC.ERR,
-   by hand. The rest are owed a run.
+   by hand. `source/scratch/playtest.py` runs the other ten stripped objects headless for 15 s:
+   each reaches its first screen with no error. Each copy in `source/scratch/playtest/<name>/`
+   has a `PLAY.BAT` that opens it in a window. Playing them is owed.
 3. Then flip the default. Done.
 
 ## 4. DEBUG_ON and DEBUG_OFF
@@ -199,7 +203,8 @@ replaced.
 1. Fix the pass-0 `{VAR}` failure (§3.1). Done.
 2. The prescan and the program-wide directives (§2). Done.
 3. The region directives `DEBUG_ON` and `DEBUG_OFF` (§4). Done.
-4. The stripped compiles of every repo program (§3.1). Compiled; the runs are owed.
+4. The stripped compiles of every repo program (§3.1). Compiled and smoke-run; playing them is
+   owed.
 5. Dead-code removal on by default (§3). Done.
 6. String defines in BASLOAD-GPC (§6). Done.
 7. Help: the `#GPC` section in `GP-BASIC.md`, the stale "nothing reads these yet" line in
