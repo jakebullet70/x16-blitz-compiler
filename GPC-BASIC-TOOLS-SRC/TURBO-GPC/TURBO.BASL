@@ -581,16 +581,26 @@ TURBO.SAVE.FAILED:
 TURBO.SAVE.AS:
   GOSUB TURBO.SAVE.NAME
   IF GUI.OK% = 0 THEN RETURN
-  IF LEN(GUI.TEXT$) = 0 THEN RETURN
   GOTO TURBO.SAVE
 
-## Ask for the name to save under. The box starts with the document's name. TURBO.FILE.NAME$
-## stays as it was when the box is left with Esc or with no text.
+## Ask for the name to save under. The box starts with the document's name. A name that is
+## not the document's own and is on the disk asks before it is replaced, and the focus starts
+## on No.
+##
+##   out  GUI.OK%   -1 when TURBO.FILE.NAME$ took the new name. 0 for Esc, no text, or a No.
 TURBO.SAVE.NAME:
   GP.SUB INPUTBOX, GP.FN(TURBO.PETSCII, "Save as:"), TURBO.FILE.NAME$, TURBO.FIELD.LENGTH
   IF GUI.OK% = 0 THEN RETURN
-  IF LEN(GUI.TEXT$) = 0 THEN RETURN
-  TURBO.FILE.NAME$ = GUI.TEXT$
+  IF LEN(GUI.TEXT$) = 0 THEN GUI.OK% = 0 : RETURN
+  TURBO.SAVE.NEW.NAME$ = GUI.TEXT$
+  IF TURBO.SAVE.NEW.NAME$ = TURBO.FILE.NAME$ THEN GOTO TURBO.SAVE.NAME.TAKE
+  IF GP.FN(FEXISTS, TURBO.SAVE.NEW.NAME$) = 0 THEN GOTO TURBO.SAVE.NAME.TAKE
+  GP.SUB ASKYNEX, "", GP.FN(TURBO.PETSCII, "Replace ") + TURBO.SAVE.NEW.NAME$ + "?", "", "", 2, 0
+  GUI.OK% = GUI.ANSWER%
+  IF GUI.OK% = 0 THEN RETURN
+TURBO.SAVE.NAME.TAKE:
+  TURBO.FILE.NAME$ = TURBO.SAVE.NEW.NAME$
+  GUI.OK% = -1
   GOSUB TURBO.STATUS.PAINT
   RETURN
 
