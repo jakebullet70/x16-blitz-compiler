@@ -1,11 +1,11 @@
 ---
 name: turbo-gpc-ide-plan
-description: "TURBO GPC is the on-machine IDE: a new GP.BASIC editor on MSEDIT's design; the speed spike passed on all nine paths on 2026-10-02, with syntax colouring on and off and an undo record on every edit; the source is in GPC-BASIC-TOOLS-SRC/TURBO-GPC and TURBO.PRG holds three documents, switched with F7, with open, save, find, new and quit; the undo note, character delete, line join and word left and right are GP.ASM kernels; the menu bar and the file picker are built, the keys follow Notepad++; the bank map is in the plan; layout, how to build and test, decisions, numbers and what is next"
+description: "TURBO GPC is the on-machine IDE: a new GP.BASIC editor on MSEDIT's design, source in GPC-BASIC-TOOLS-SRC/TURBO-GPC; the speed spike passed on all nine paths; the editor core (plan Order step 2) is built: three documents on F7, menu bar, file picker, Notepad++ keys, clipboard, find and replace in TG-FIND.BASL with options and combo-box histories, the ISO glyphs, an About box and a scroll bar; TURBO.BASL names its outputs with #GPC lines, TURBO.PRG is 7,658 B SHARED; the relay is next and waits on the user's naming decisions; layout, build, test, decisions and numbers"
 metadata:
   node_type: memory
   type: project
   originSessionId: f2ef33fe-6565-4754-b1b1-05111d41cf23
-  modified: 2026-10-03T14:34:00.080Z
+  modified: 2026-10-05T22:30:00.000Z
 ---
 
 **TURBO GPC is the name of the on-machine IDE, chosen by the user on 2026-10-02.** The plan is
@@ -19,26 +19,34 @@ measurement spike gated the route and every path passed, so MSEDIT is not forked
 ## Layout, build and test
 
 - The editor is in `GPC-BASIC-TOOLS-SRC/TURBO-GPC/`: `TURBO.BASL` (the program), `TG-STORE.BASL`,
-  `TG-UNDO.BASL`, `TG-VIEW.BASL`, `TG-KEYS.BASL`, `tgkeys.py`, `TGKEYS.BIN`, `build.py`, and
-  `GPC-BASIC/` (the library copies: GPB, APPSYS and LINEINPUT, which the program includes, and MEM,
-  which only the benches include).
-- `bench/` holds only the benches: the six `*BEN.BASL`, `TG-BENCH-CHECK.BASL`,
-  `TURBOTEST-DRIVER.BASL`, `FIX2000.TXT`, `MSBENCH.P8`, `spike.py`, `keymodel.py`, `turbomodel.py`,
-  `mkfixture.py`, `msedit_bench.py`.
+  `TG-UNDO.BASL`, `TG-VIEW.BASL`, `TG-KEYS.BASL`, `TG-CLIP.BASL`, `TG-FIND.BASL`, `TG-LOW.BASL`,
+  `tgkeys.py`, `TGKEYS.BIN`, `build.py`, and `GPC-BASIC/` (the library copies the program includes,
+  and MEM, which only the benches include).
+- `bench/` holds the benches: the six `*BEN.BASL`, `TG-BENCH-CHECK.BASL`, `TURBOTEST-DRIVER.BASL`,
+  `FIX2000.TXT`, `MSBENCH.P8`, `spike.py`, `keymodel.py`, `turbomodel.py`, `mkfixture.py`,
+  `msedit_bench.py`.
 - A BASLOAD `#INCLUDE` cannot name `../`. `spike.py` copies the editor's modules, `TGKEYS.BIN` and
   `GPC-BASIC/` into `bench/` for a build and removes them after the run, with everything the build
   and the run wrote. `--keep` leaves them. Edit a module in `TURBO-GPC/`, never the copy.
 - The clean-up deletes every file in `bench/` whose name does not end in `.BASL`, `.py`, `.P8` or
   `.TXT`. A note or a data file of another kind put there is gone after the next run.
+- `TURBO.BASL` begins with `#GPC SHARED`, `#GPC OBJECT "TURBO.PRG"`, `#GPC MAP "TURBO.MAP"` and
+  `#GPC DEADLIST "TURBO.DEAD"`. GPC 1.2.0 reads them (commit 0757c08).
 - Build the editor: `python build.py` in `TURBO-GPC/`. It writes `TGKEYS.BIN`, tokenises
-  `TURBO.BASL` and compiles it SHARED. `TURBO.PRG` is 11,357 bytes. The SHARED p-code cap is 22,016.
+  `TURBO.BASL` and calls `compile_shared.py` with only the source and the object. It prints each
+  step's time and the `{VAR}` cache need.
+- The object name `build.py` passes must match `#GPC OBJECT`. `compile_shared.py` checks the file
+  it was given and reports a false failure when they differ.
+- Sizes on 2026-10-05: `TURBO.PRG` 7,658 B SHARED, `TURBO.OVL` 40,975 B. Dead-code removal drops
+  499 lines, 4,190 B. Tokenise about 54 s, compile about 42 s. The `{VAR}` cache needs 16,423 of
+  32,768 B. The SHARED p-code cap is 22,016.
 - Run a bench: `python spike.py NAME` in `bench/` tokenises, compiles, runs at real speed with
   colouring off and prints `NAME.RES`. `NAME colour` runs with colouring on. `NAME both` builds
   once and runs with colouring off, then on.
 - Test the program: `python spike.py TURBOTEST` in `bench/`.
 - Run it in a window: `USER-RUNS/turbo-gpc-demo.bat`. It mounts `GPC-BASIC-TOOLS-SRC`, and
-  `turbo-gpc-demo.bas` changes into `TURBO-GPC`, so the runtime comes from `/GPC/`. The bat has not
-  been run. Its three driver lines ran headless and the program stayed in its key loop.
+  `turbo-gpc-demo.bas` changes into `TURBO-GPC`, so the runtime comes from `/GPC/`. The bat passes
+  `-noemucmdkeys` so Ctrl+F reaches the editor.
 
 ## The spike, started 2026-10-02 on the user's go
 
@@ -94,8 +102,8 @@ painted row. The plan's Result section says the spike selects the GP.BASIC edito
 The type, RETURN and delete line rows are the `EDITBEN` run with the undo kernel in. That run read,
 in jiffies for the whole operation with colouring off / on: load 74 / 74, type 38 / 49 (200 keys),
 RETURN 93 / 108 (50 keys), delete line 88 / 100 (50 keys), save 45 / 42, find 26 / 27. The load and
-save rows of the table are the earlier run and were left as they are. `SCROLLBEN` after the kernel
-read 5 / 7 for the 27 moves and 181 / 198 for the 300 scrolls, with 0 mismatches.
+save rows of the table are the earlier run. `SCROLLBEN` after the kernel read 5 / 7 for the 27
+moves and 181 / 198 for the 300 scrolls, with 0 mismatches.
 
 **The MSEDIT baseline is `python msedit_bench.py [plain|syntax]`** in the bench folder. It copies
 MSEDIT's sources to `source/scratch/msedit-bench`, pastes `MSBENCH.P8` into `edit.p8` ahead of the
@@ -103,153 +111,110 @@ key loop, builds with MSEDIT's own `prog8c.jar` and reads back 18 words from `MS
 low RAM is full, so the script empties `act_replace` and `comment_apply` in the copy to make room.
 Save and find are called below their keys because `notify()` waits 60 jiffies.
 
-No gap is left between the benches and MSEDIT. The colouring gap and the undo gap both closed on
-2026-10-02.
+## The program, state 2026-10-05
 
-## The program, built 2026-10-02
+**The editor core, step 2 of the plan's Order, is built.** Commits 4818871, 047bb50, 781f699,
+70b12cd and 973db63.
 
-**The user gave the go for the editor core on 2026-10-02** (step 2 of the plan's Order). Two slices
-are built and checked: the edit keys with the key map, and the program `TURBO.BASL`.
-
-- Three documents, A, B and C, built 2026-10-03. F7 shows the next. Each has its own line table,
-  arena, undo rings, line limit, name and cursor. The bank map is the plan's Bank map section.
-- Row 0 is a title bar with the name, a key list and A, B and C at columns 76 to 78, until the menu
-  bar exists. Rows
-  1 to 28 are the pane. Row 29 is the status bar: `Line` and `Col` numbers, `*` when the document
-  differs from its file, the file name, and a message that the next key clears.
-- The key loop is on `GET`. The modifiers are read from `$FEC0` only for PgUp, PgDn, Left and Right.
-  Ctrl with PgUp and PgDn gives the first and the last line. Ctrl with Left and Right moves a word.
-- Commands from the key map: find (a prompt), find next, save (it asks for a name when there is
-  none), open (a prompt; a name not on the disk gives an empty document of that name), new, and
-  quit on Esc after a yes or no question. Build and help show `Not in this version`. Open, new and
-  quit ask before changes are lost. Esc is command 6 of `TG-KEYS.BASL`, which that file calls menu.
-- The prompt is the library's `LINEINPUT.ASK` on the status bar. `APPSYS` remembers the screen mode,
-  the charset and the colour at the start and puts them back at the exit. Charset 5 is set at the
-  start. The five ISO glyphs are not stamped yet.
+- Three documents, A, B and C. F7 shows the next. Each has its own line table, arena, undo rings,
+  line limit, name and cursor. The plan's Bank map section has the banks.
+- Row 0 is the menu bar: File, Edit, Search, Window and Help through MENUKEY, the name, and A, B and
+  C at columns 76 to 78. Esc opens File, Alt with a bar letter opens that menu, Alt alone lights
+  the bar, and File, Exit quits (no key). Rows 1 to 28 are the pane, and column 79 of them is the
+  scroll bar. Row 29 is the status bar: `Line`, `Col`, `*` for a change, the file name, `Lines`
+  with the count, the file form and the tab width, and a message that the next key clears.
+- A row's action is a byte in `TURBO.MENU.ACTIONS$`: a key-map action run through `KEYS.RUN` in
+  TG-KEYS, or 64 plus a command (`TURBO.ACT.*` defines). The menu library pairs PETSCII shifted hot
+  keys (193-218) with 65-90, because TURBO makes its labels PETSCII.
+- The keys follow Notepad++ where the X16 allows it: Ctrl+S, Ctrl+Y, Ctrl+L, F3, Ctrl+G go to line,
+  Ctrl+H replace. TG-KEYS has a 32-byte Ctrl table, because Ctrl+S and Ctrl+Y arrive as Home's and
+  Delete's codes. Ctrl with PgUp and PgDn gives the first and the last line. The key wait reads the
+  modifiers on every key and calls `MENU.KEY` only for Esc or Alt. An empty `GET` polls
+  `MENU.KEY(0)` for the Alt tap and goes to `TURBO.KEY.IDLE`.
+- Commands: open, save, save as, find, find next, replace, go to line, new, document A, B and C,
+  About, and exit. Help shows `Not in this version`. Open, new and quit ask before changes are lost.
+- Open uses `PICKFILE` from FILEPICK, which walks directories as MSEDIT's picker does: `..`, `/`
+  dirs, files; D deletes after Y, F hides folders, Esc climbs back to the start directory. Its list
+  space is 6,144 B in bank 14 (95 entries).
+- Dialogs come from the GUI library (`INPUTBOX`, `ASK3`, `ASKYNEX`, `MSGBOX`, forms) and keep the
+  screen under them in VRAM. Dialogs and dropdowns have shadows and are framed with `DLGGLYPH 1`
+  and six screen codes held in a `%` array: `$70` `$6E` `$6D` `$7D` corners, `$40` horizontal,
+  `$5D` vertical. `GP.BOX` style 1 draws its vertical edge as the letter B under charset 5.
+  `DLGLABELS` gives the library's buttons TURBO's case. Hot letters are yellow.
+- Selection, cut, copy and paste: the clipboard is store document 3 in bank 40 (table to $A5FF,
+  arena from $A600, 512 lines). TG-CLIP runs from bank 39 with KVBIN. TURBOTEST drives the
+  clipboard through the Edit menu, because injected keys carry no modifiers.
+- Find and replace are in `TG-FIND.BASL`, which runs from bank 38 with CHECK, the About box and the
+  status bar's fields. The boxes are forms with four check boxes: Match case, Whole word, Wrap
+  around, In selection. A found term is selected whole. The find box starts with a one-line
+  selection. Each term field is an editable combo box with its history in a list under it, and
+  Down opens the list. The find and the replace boxes each keep their own history of 6 terms in
+  `/SETTINGS.KVB` through KVBIN: `TG.FIND.1` to `TG.FIND.6` and `TG.REPLACE.1` to `TG.REPLACE.6`.
+  Replace asks Y, N, A or Esc at each place, defaults to Cancel, and the run is one undo edit.
+- `TURBO.GLYPHS.SETUP` copies the ISO glyphs of `\ ^ _ ` { | } ~` over the reverse glyphs at
+  screen codes `$F8` to `$FF`. Call it after `VIEW.SETUP` and after every `APPSYS.SETCHR`.
+- The About box shows the name, then what the banked RAM, the workspace and each document hold.
+- `APPSYS` remembers the screen mode, the charset and the colour at the start and puts them back at
+  the exit. Charset 5 is set at the start.
 - A change is `UNDO.GROUP%` differing from its value at the last load or save. An undo back to the
   saved text still shows `*`.
-- `TURBO.ASCII.TO.PETSCII` turns an ASCII literal into PETSCII before it is drawn.
-- `DOC.NEW` in `TG-STORE.BASL` makes the document one empty line.
+- `TURBO.ASCII.TO.PETSCII` and `GP.FN(TURBO.PETSCII, "...")` turn an ASCII literal into PETSCII
+  before it is drawn.
+- The GUI library and the setup routines run from banks 10 to 12. LINEINPUT and the TG modules
+  other than TG-CLIP and TG-FIND run from bank 41. Kernels that write `$00` are `GP.ASM LOW` and
+  push and restore `$00`. BLOAD and BANK are in `TG-LOW.BASL`.
+- `TURBO.GUI.SETUP` claims banks 2 to 12 and 15 to 63 and runs `MENU.BEGIN`, which claims bank 13.
 - Syntax colouring is on.
 
 **The program test is `python spike.py TURBOTEST`.**
 
-- `spike.py` makes `TURBOTEST.BASL` from `TURBO.BASL` with five exact replacements, each asserted to
-  occur once: two file names, the empty-key line of `TURBO.KEY.WAIT`, the exit, and one `#INCLUDE`.
-  A change to any of those lines of `TURBO.BASL` needs `turbo_test_source()` changed with it.
+- `spike.py` makes `TURBOTEST.BASL` from `TURBO.BASL` with nine exact replacements, each asserted
+  to occur once: the `#SAVEAS` and `#SYMFILE` names, the three `#GPC` output names (renamed to
+  `TURBOTEST.*`), the empty-key line of `TURBO.KEY.WAIT`, the exit, the settings store's name, and
+  one `#INCLUDE`. It reads `TURBO.BASL` with LF line endings, so its newline-ending strings match a
+  CRLF copy. A change to any of those lines of `TURBO.BASL` needs `turbo_test_source()` changed
+  with it.
 - `TURBOTEST-DRIVER.BASL` feeds key groups from `TURBOTEST.KEY` into the KERNAL key buffer with
-  `kbdbuf_put` (`$FEC3`), 10 keys a group at most, so the program's own `GET` loop and
-  `LINEINPUT`'s read them. A key that opens a prompt and the prompt's keys go in one group, because
-  `LINEINPUT` never returns to the driver for more. `turbomodel.py` writes the groups and holds the
-  expectations.
-- 103 keys in 26 groups: type on the empty document, open `W.DOC` (a copy of the fixture) over it and
-  answer yes to the discard question, edit, find a term, find next, find a term that is nowhere,
-  answer no to quit, F1, save, new document, save it under the prompted name `N.DOC`, open `W.DOC`
-  again, move, save; then F7 to document B, two lines saved as `B.DOC`, F7 to document C, one line
-  not saved, F7 through A to B, undo, undo, redo, undo, save `B.DOC` again as one line, F7 through
-  C to A, save. The driver then dumps the pane and the two bars and types Esc and Y.
-- Result on 2026-10-03: `W.DOC`, `N.DOC` and `B.DOC` 0 lines differ from the model, the cursor matches
-  (line 29, column 91), the pane differs in 0 bytes (top 2, left 18), the bars have 0 faults (title,
-  labels, line and column numbers, change mark, file name, the `Saved` message, the letters A, B and
-  C and their three attributes), and the program left through its own exit (`QUIT 1`).
-  `TURBOTEST.PRG` is 12,481 bytes.
-- Not covered: Ctrl with PgUp, PgDn, Left and Right, the cursor keys inside a prompt, and how the
-  screen looks. The driver puts keys in the KERNAL key buffer and the program reads the modifiers
-  from the keyboard, so the test cannot hold Ctrl. `KEYBEN` covers the dispatch of all four.
+  `kbdbuf_put` (`$FEC3`), 10 keys a group at most, so the program's own `GET` loop and the dialogs
+  read them. A key that opens a box and the box's keys go in one group. `GUI.TYPEAHEAD%` non-zero
+  keeps queued keys from being drained when a form opens, and the driver sets it. The driver takes
+  its 1,024 B key script from `BANKMGR.SPACE`, in bank 14. `turbomodel.py` writes the groups and
+  holds the expectations.
+- The script types, opens, edits, finds, picks terms from the find history, replaces with Y, N, Y
+  and Esc, then A with an empty replacement that it undoes, then A with a term from the replace
+  history, switches documents with F7, undoes and redoes, and saves `W.DOC`, `N.DOC` and `B.DOC`.
+  `spike.py` compares the saved documents, the cursor, the pane, the two bars and the settings
+  store with the model. TURBOTEST's store is `SETTINGS.KVB` in `bench/`.
+- Not covered: Ctrl with PgUp, PgDn, Left and Right, and how the screen looks. The driver puts keys
+  in the KERNAL key buffer and the program reads the modifiers from the keyboard, so the test
+  cannot hold Ctrl. `KEYBEN` covers the dispatch of all four.
 
-**State, 2026-10-03.** Step 1, the library change, is done in the working copy
-`GPB-MODS-TESTING/GPC-BASIC/`, and GPBMODS builds:
-- The 14 modules take `%`, public names included, and `int16scan --check GPBMODS` finds no split
-  name. Root's copies were renamed in place but do not have the bank-plus-address change yet:
-  copying the 14 whole to root is owed.
-- `BANKMGR.SPACE` hands out a bank and an address. `DLGRESET bank, addr, size`;
-  `LIST.BANK` and `LIST.SORT bank, addr, first, last`; `FORM.ITEMS bank, addr`; `PICKSPACE` and
-  `PICKDIRSPACE`; FILEDIR reads into `FILE.DIR.PTR` and `FILE.DIR.CAP%`; `MENU.TEXTBANK` has no
-  default. GUI hot keys pair PETSCII shifted letters too.
-- GPBMODS had hit BASLOAD's name limit; the compiler and BASLOAD were widened
-  ([[basload-name-space-widened]]).
+**The library change for TURBO, first part,** is in the working copy `GPB-MODS-TESTING/GPC-BASIC/`
+and in root `GPC-BASIC/`, and the help is rebuilt: the 14 modules take `%`; `BANKMGR.SPACE` hands out a bank
+and an address (`DLGRESET bank, addr, size`, `LIST.BANK`, `LIST.SORT`, `FORM.ITEMS`, `PICKSPACE`,
+`PICKDIRSPACE`, `FILE.DIR.PTR` and `FILE.DIR.CAP%`; `MENU.TEXTBANK` has no default);
+`GUI.SAVEMODE%` set with `GP.SUB DLGSAVESCREEN, mode` (`GUI.SAVE.VRAM` the default, `GUI.SAVE.BANK`
+keeps the cells with STASH in the `DLGRESET` space); `SV.START` in STASHVRAM DIMs the handle table
+to `SV.MAX%` (0 gives 4) on the first call; `DLGLABELS`. GPBMODS keeps bank mode with
+`SV.MAX% = 8`.
 
-Step 2, the GUI in the editor, is written in `TURBO.BASL` and builds. The GUI block is at the
-top; `TURBO.GUI.SETUP` claims 2 to 12 and 15 to 63 and runs `MENU.BEGIN` so bank 13 is claimed.
-`INPUTBOX`, `ASK3`, `ASKYNEX` and `MSGBOX` replace the prompts; `GP.FN(TURBO.PETSCII, "...")`
-makes text PETSCII. TURBOTEST's driver takes its 1,024 B key script from `BANKMGR.SPACE`, which lands in
-bank 14, and the model answers the open key's question with D.
+**The second part is not in root.** CHECK, COMBO, FILEDIR, FILEPICK, GUI-DIALOGS and GUI in
+TURBO's `GPC-BASIC/` differ from root on 2026-10-05: the picker walk, `FILE.DIR.REWIND`,
+`DLGHOTKEY`, `DLGHISTORY`, check box hot keys and the `FORM.EDITCOMBO` field. The working copy matches
+TURBO's except FILEPICK, which has uncommitted edits. Root, GP-BASIC.md and the help wait for the
+user's GPBMODS test of PICKFILE.
 
-Step 3, the dialog save option, is done in the working copy:
-- `GUI.SAVEMODE%`, set with `GP.SUB DLGSAVESCREEN, mode`. `GUI.SAVE.VRAM`, the default, keeps
-  the covered cells in STASHVRAM; `GUI.SAVE.BANK` keeps them with STASH in the `DLGRESET` space.
-  `DLGRESET` sets that space only. COMBO's dropdown saves where its dialog does.
-- `SV.START` in STASHVRAM DIMs the handle table to `SV.MAX%` (0 gives 4) and runs `SV.INIT`, on
-  the first call only. GUI, COMBO and MENUPULL call it. `MENUPULL.SVSTART` is gone.
-- GPBMODS keeps bank mode: `DLGSAVESCREEN, GUI.SAVE.BANK` after `DLGRESET`, and `SV.MAX% = 8`.
-- TURBO uses VRAM and has no `DLGRESET` and no 3,072 B piece. Boxes are framed with `DLGGLYPH 1`
-  and six screen codes: `$70` `$6E` `$6D` `$7D` corners, `$40` horizontal, `$5D` vertical.
-  `GP.BOX` style 1 draws its vertical edge as the letter B under charset 5.
+**Next.** The relay, step 3 of the plan's Order, needs the user's decisions first: the job file's
+name, the error file's name and folder, and the program's on-disk name (`TURBO.PRG` is the working
+name). Owed before it:
 
-**The TURBOTEST hang is fixed.** `GUI.FORM.DRAIN` dropped the dialog keys the driver had queued
-with the key that opened the box. `GUI.TYPEAHEAD%` non-zero keeps them, and the driver sets it.
-TURBOTEST passes in full again (every check 0). `TURBO.PRG` is 13,683 B, `TURBOTEST.PRG` 14,758 B;
-GPBMODS embedded is 28,305 B with a 48,667 B overlay.
+- Reconcile the sample folders' copies of the modules. XBASE, edit and GPC-GUI-HELPER have copies
+  that differ. GUIFRMT uses retired modules and cannot rebuild.
+- The clipboard's spill to disk in the editor's home folder, and later five clip slots there.
+- Settings in `/SETTINGS.KVB` beyond the find and replace histories.
 
-**Library button labels under charset 5** (2026-10-03, the user's pick of the recommendation):
-`GP.SUB DLGLABELS, ok$, cancel$, yes$, no$` sets the labels the library names itself, kept in
-`DLG.LABELS.*`; `GUI.DEFAULTS` fills a `""` one with `&OK`, `&CANCEL`, `&YES`, `&NO`. TURBO passes
-them through `TURBO.PETSCII` in `TURBO.GUI.SETUP`. `source/scratch/int16/turbocap.py --hold=15,68`
-captures the Open box; it shows "OK" and "Cancel". The user crunched `TG-UNDO` the same day and
-TURBOTEST still passes in full; `TURBO.PRG` is 13,729 B. The user play-tested GPBMODS (about 15
-menus) on the new library and it worked. GUI-FIELD-EDIT also worked, but on its own older copy.
-
-**Copied to root 2026-10-03.** Every working-copy module is now in root `GPC-BASIC/`, with the
-example programs brought up to the new library: each `#DEFINE`s `MENU.TEXTBANK 62`, a MENU user
-includes THEME, and GUI.EXP.BL saves to VRAM. All nine examples compile, deferscan CLEAN; none was
-run. The help is rebuilt with the plain three commands.
-
-**Step 4, the menu bar, is built 2026-10-03.** Row 0 holds File, Edit, Search, Window and Help
-through MENUKEY: Esc opens File, Alt with a bar letter opens that menu, Alt alone lights the bar,
-and File, Exit quits (no key). A row's action is a byte in `TURBO.MENU.ACTIONS$`: a key-map action
-run through `KEYS.RUN` in TG-KEYS, or 64 plus a command (`TURBO.ACT.*` defines). New commands:
-Save As, Document A/B/C, About. The key wait reads the modifiers on every key and calls
-`MENU.KEY` only for Esc or Alt; an empty GET polls `MENU.KEY(0)` for the Alt tap, so spike.py's
-replaced line now ends `GOTO TURBO.KEY.IDLE`. The bars take the X16 theme (bar 193, changed letter
-yellow 199). Dropdowns and dialogs have shadows; dropdowns are framed from a glyph table in a `%`
-array, because a string can move. The menu library now pairs PETSCII shifted hot keys (193-218)
-with 65-90, needed because TURBO makes its labels PETSCII. The bat passes `-noemucmdkeys` so Ctrl+F reaches
-the editor. TURBO.PRG 14,822 B, TURBOTEST 15,906 B, every check 0.
-
-**Step 5, the file picker, is built 2026-10-03.** `PICKFILE` in FILEPICK now walks directories
-the way MSEDIT's picker does: `..`, `/`dirs, files; D deletes after Y, F hides folders, Esc climbs
-back to the start directory. A title bar and a footer sit on the box's edges; `PICKLABELS` sets the
-footer texts. TURBO's Open uses it, with 6,144 B of list space in bank 14 (95 entries).
-The same day the keys moved to Notepad++ where the X16 allows it (Ctrl+S, Ctrl+Y, Ctrl+L, F3,
-Ctrl+G go to line); TG-KEYS has a 32-byte Ctrl table, because Ctrl+S and Ctrl+Y arrive as Home's
-and Delete's codes. Hot letters are yellow: `MENU.THEME` then two MENU attributes, and the new
-`DLGHOTKEY` verb for buttons and the picker footer.
-TURBOTEST then ran out of string space (FRE 645 after the first dialog and the picker). Fix: the
-setup routines and `TURBO.PETSCII` moved into the regions (banks 10 and 12) and KVBIN was dropped
-until the settings exist. FRE 2,324 at the script's end. LINEINPUT then moved to code bank 41 (786 B, taken from the top of A's arena, A now banks 16-40): TURBO.PRG 12,796 B, TURBOTEST passes. The TG modules then joined bank 41 (5,504 B of p-code in the region; kernels that write $00 are GP.ASM LOW and push/restore $00; BLOAD and BANK moved to TG-LOW.BASL): TURBO.PRG 7,511 B, FRE 8,210 at the script's end, TURBOTEST, KEYBEN and PAGEBEN pass. Bank
-10's region is nearly full (about 7,950 of 8,188).
-Selection, cut, copy and paste were built 2026-10-03: the clipboard is store document 3 in
-bank 40 (table to $A5FF, arena from $A600, 512 lines), TG-CLIP.BASL runs from region bank 39,
-A's arena is now 16-38. The one new asm is VIEW.SELECT.PAINT (GP.ASM, not LOW). Bank 41 holds
-about 6,680 B of p-code and overflowed with TG-CLIP in it. TURBOTEST drives the clipboard
-through the Edit menu, because injected keys carry no modifiers. The user wants the clipboard
-to spill to disk in the editor's home folder, and later five clip slots there: not built.
-The user also wants TURBO to show off GPC-BASIC (GP.DO, GP.SELECT) over plain GOTO style;
-working code first, refactor later.
-The library change (FILEPICK, FILEDIR's `FILE.DIR.REWIND`, `DLGHOTKEY` in GUI-DIALOGS and GUI) is
-in the working copy and TURBO's copy, not root: root, GP-BASIC.md and the help wait for the user's
-GPBMODS test of PICKFILE.
-Find history built 2026-10-03 on the user's ask: the find box starts with a one-line selection
-(Find keeps the selection in KEYS.SELECTION.FIRST), Up and Down walk the last 6 terms, kept as
-TG.FIND.1-6 in /SETTINGS.KVB through KVBIN, which now runs from bank 39 with TG-CLIP. Library
-side: `LINEINPUT.HISTORY$` and the one-shot verb `DLGHISTORY list$` (working copy plus TURBO's
-copy; GPBMODS built with a history on its INPUTBOX demo, not hand-tested, root waits). The user
-asked for FIND and REPLACE histories; Replace is not built, so only Find has one.
-
-**Next:** step 6 of the plan's GUI order is not set; the plan's Order goes on to the relay. Also
-owed: the sample folders' copies of the modules, which are unchanged and still build; XBASE, edit
-and GPC-GUI-HELPER copies differ and need reconciling first. GUIFRMT uses retired modules and
-cannot rebuild.
+The user wants TURBO to show off GPC-BASIC (GP.DO, GP.SELECT) over plain GOTO style; working code
+first, refactor later.
 
 Decided 2026-10-03:
 
@@ -258,20 +223,19 @@ Decided 2026-10-03:
 - The library names no bank. Banks are shared ([[library-never-hard-codes-a-bank]]).
 - The picker starts from `FILEPICK` and gains MSEDIT's features. TODO.md, Wanted, has the list.
 - 16 undo steps a document are enough.
-- Copy and paste are owed. A large clipboard can spill to disk.
+- A large clipboard can spill to disk.
 - The editor's own persistence is a `KVBIN.INC.BL` store. The `KV-BIN-STORE` sample uses the same
   module. The store is a file and takes no bank. It opens logical files 12 and 15. The editor loads
   and saves on logical file 2.
 
-**The GUI's cost is measured, 2026-10-03.** `source/scratch/guimeasure/measure.py packed` builds
+**The GUI's cost was measured on 2026-10-03.** `source/scratch/guimeasure/measure.py packed` builds
 the editor with three regions: BANKMGR, STASHVRAM, THEME, MENU and MENUPULL in bank 10 (6,761 B);
 GUI, COMBO and CHECK in bank 11 (7,499 B); GUI-DIALOGS, FILEIO, FILEDIR, FILEPICK and KVBIN in
-bank 12 (6,153 B). STASH and MENUKEY stay in low memory. The object grows from 11,357 to 13,515
-bytes and the workspace shrinks from 12,800 to 10,496. Scalars grow from 572 to 3,242 bytes of the
-4,096 ceiling, which leaves 854. The scalar ceiling is the limit to watch. About 400 of the
-library's scalars are floats, and they are where bytes can be won back. Nine regions instead of
-three cost 1,280 B more workspace. The menu store is 6,656 B in a text bank of its own. The plan's
-"The GUI's cost" has the table.
+bank 12 (6,153 B). The workspace shrank from 12,800 to 10,496. Scalars grew from 572 to 3,242 bytes
+of the 4,096 ceiling. The scalar ceiling is the limit to watch. About 400 of the library's scalars
+are floats, and they are where bytes can be won back. Nine regions instead of three cost 1,280 B
+more workspace. The menu store is 6,656 B in a text bank of its own. The plan's "The GUI's cost"
+has the table. The program's banks have moved since; the plan's Bank map is current.
 
 What the key bench proved:
 
@@ -330,16 +294,11 @@ What the undo kernel proved:
 - `UNDO.PUSH` in `TG-UNDO.BASL` is a `GP.ASM` kernel. The user agreed to it as `GP.ASM`; their go
   covered it. It reads the line's slot from the line table itself, places the record, drops the
   oldest edit of a full ring and writes the 8 bytes. Undo and redo apply through the same kernel.
-  `UNDO.SLOT.READ` and `UNDO.DROP.OLDEST` are gone.
-- A record was about 0.4 jiffies in BASIC. It is about 0.08 to 0.10 with the kernel, group begin
-  included. With colouring off, RETURN (two records) is 1.86 with undo and 1.70 without, and delete
+- A record is about 0.08 to 0.10 jiffies with the kernel, group begin included, against about 0.4
+  in BASIC. With colouring off, RETURN (two records) is 1.86 with undo and 1.70 without, and delete
   line (one record) is 1.76 and 1.66. Without undo and with colouring on they are 2.00 and 1.90.
-- In the nine-path table the kernel took RETURN from 2.54 / 2.84 jiffies to 1.86 / 2.16 and delete
-  line from 2.14 / 2.38 to 1.76 / 2.00. In `KEYBEN`, RETURN at column 0 went from 2.60 / 3.10 to
-  1.95 / 2.40 and the join from 3.45 / 3.80 to 2.65 / 3.00.
 - `ADC`, `SBC` and `CMP` assemble with `{VAR},X`. `INC`, `DEC`, `ASL`, `ROL` and `STZ` assemble on a
-  zero page address. A `JSR` to a label of the same block works. The kernel assembled and passed on
-  its first build.
+  zero page address. A `JSR` to a label of the same block works.
 - The byte order of a `%` array's elements is not established. The kernel takes the ring's first
   record and count in two scalars. BASIC copies them from the two `%` arrays and back, four
   statements.
@@ -378,11 +337,12 @@ What the first kernels proved:
 
 ## Other decisions the user took
 
-- Charset is MSEDIT's scheme, not CP437: thin PETSCII font (charset 5), five ISO glyphs stamped in,
-  ASCII on disk, a PETSCII or ISO mode a document. The ISO-8859-15 capitals round trip is not a
-  concern of the user's. See [[gpc-editor-is-ascii-inside-petscii-outside]].
-- Version 1 is three documents with F7 switching, plus the relay. Switching was built on
-  2026-10-03 and cost 771 bytes, 10,654 to 11,425. The user kept it in version 1 the same day.
+- Charset is MSEDIT's scheme, not CP437: thin PETSCII font (charset 5), the eight ASCII-only
+  glyphs copied in from the ISO font at `$F8` to `$FF`, ASCII on disk, a PETSCII or ISO mode a
+  document. The ISO-8859-15 capitals round trip is not a concern of the user's. See
+  [[gpc-editor-is-ascii-inside-petscii-outside]].
+- Version 1 is three documents with F7 switching, plus the relay. Switching cost 771 bytes. The
+  user kept it in version 1 on 2026-10-03.
 - F5 builds and runs, and a failure reloads the editor on the error line. Tokenise, compile and run
   are also separate Build menu rows. Keys are menu first: only F5 and F12 are function keys.
 - Errors come back in an error file, with a screen scrape as the fallback.
@@ -406,4 +366,4 @@ assembly moves bytes, and no loop over bytes or rows is p-code.
 [[gpc-input-sixth-line-chain]]. The layout step is [[tool-home-layout-deferred]]. Related:
 [[msedit-is-the-syntax-colouring-master]], [[gpcerr-builds-in-its-sample-folder]],
 [[editor-return-is-the-line-table]], [[measure-before-changing-code]],
-[[headless-basl-build-recipe]], [[gpc-shared-pcode-cap-is-rtbase]].
+[[headless-basl-build-recipe]], [[gpc-shared-pcode-cap-is-rtbase]], [[build-times-baseline]].

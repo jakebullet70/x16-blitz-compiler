@@ -146,9 +146,10 @@ render. No bench times the assembly alone.
 - `KEYBEN` checks the key map and the edit keys, and times the keys the other
   benches do not. `keymodel.py` writes its keys and holds a model of what they do.
 - `TURBOTEST` checks the program and times nothing. `spike.py` makes
-  `TURBOTEST.BASL` from `TURBO.BASL` with five replacements: two file names, the
-  empty-key line of `TURBO.KEY.WAIT`, the exit and one `#INCLUDE`. It stops unless
-  each occurs once. `TURBOTEST-DRIVER.BASL` puts groups of keys from
+  `TURBOTEST.BASL` from `TURBO.BASL` with nine replacements: the `#SAVEAS` and
+  `#SYMFILE` names, the three `#GPC` output names, the empty-key line of
+  `TURBO.KEY.WAIT`, the exit, the settings store's name and one `#INCLUDE`. It
+  stops unless each occurs once. `TURBOTEST-DRIVER.BASL` puts groups of keys from
   `TURBOTEST.KEY` into the KERNAL key buffer with `kbdbuf_put`, `$FEC3`, 10 keys a
   group at most. The program's `GET` loop and `LINEINPUT`'s read them.
   `turbomodel.py` writes the groups and holds what the program must do with them.
@@ -602,8 +603,9 @@ the limit or past it. A full arena stops it the same way. Either shows
 | 13 | the menu builder's text, `MENU.TEXTBANK`. The first `MENU.BEGIN` claims it. |
 | 14 | pieces from `BANKMGR.SPACE`: the file picker's list, 6,144 bytes, and the TURBOTEST key script, 1,024 bytes, in TURBOTEST only. The clipboard is not placed. |
 | 15 | keyword table, inks and the classify buffers |
-| 16 to 38 | arena of A |
-| 39 | the code of `TG-CLIP`, `KVBIN`, the histories and the replace run |
+| 16 to 37 | arena of A |
+| 38 | the code of `TG-FIND` and `CHECK`: find, replace, the histories, the About box and the status bar's fields |
+| 39 | the code of `TG-CLIP` and `KVBIN` |
 | 40 | the clipboard, document 3 of the store: its line table to $A5FF, its arena from $A600 |
 | 41 | the code of `LINEINPUT` and the TG modules other than `TG-CLIP` |
 | 42 to 52 | arena of B |
@@ -776,7 +778,6 @@ letter in the other case there. Every text the editor hands the library goes thr
 - The clipboard's spill to disk: a copy too big for bank 40 goes to a file in the editor's
   home folder. Later, five clipboard slots on disk there.
 - The settings, in `/SETTINGS.KVB`.
-- The stamp of the five ISO glyphs. See Charset.
 - The relay. See Data flow: the relay.
 
 ## Charset
@@ -785,17 +786,17 @@ The editor follows MSEDIT's scheme.
 
 - The screen font is charset 5, thin PETSCII, in stock order. One font serves
   both document modes.
-- `{`, `}`, `\`, `|` and `~` are copied from charset 6, the thin ISO font, into
-  five free screen code slots. A charset reload erases them. They are stamped
-  again after each reload.
+- `TURBO.GLYPHS.SETUP` gives the eight ASCII characters charset 5 lacks their
+  ISO glyphs: `\`, `^`, `_`, the backtick, `{`, `|`, `}` and `~`. It writes them
+  over the reverse glyphs at screen codes `$F8` to `$FF` and points the row
+  kernel's table at them. A charset reload erases them. Call it after
+  `VIEW.SETUP` and after every `APPSYS.SETCHR`.
 - A file is ASCII on disk.
 - A document is in PETSCII mode or in ISO mode. A PETSCII document is PETSCII in
   memory, and load and save convert. An ISO document is ASCII in memory.
 - ISO mode also sets bit 6 of `$0372`, which makes the keyboard deliver ISO codes.
 - The row kernel turns each byte into a screen code through a table, one table a
   mode. The lookup is 6 cycles on a 31-cycle cell.
-- `_` and the backtick have no glyph in the font. They show as their PETSCII
-  graphics.
 - The stock order keeps `PRINT` and the PETSCII box glyphs usable.
 
 WARNING: a BASL string literal is ASCII. The text of a PETSCII document is
@@ -953,9 +954,10 @@ Line 6 is the design agreed for BUILD ALL.
 ## Order
 
 1. The spike. It is done.
-2. The editor core: three documents, edit, undo, find, the menu bar and the file
-   picker. The edit keys, the key map, the store, the menu bar, the file picker, and the
-   program with open, save, find, go to line, new, quit and F7 are built.
+2. The editor core: three documents, edit, undo, find and replace, the menu bar,
+   the file picker, the ISO glyphs, an About box and a scroll bar. It is built: the
+   edit keys, the key map, the store, the menu bar, the file picker, find and replace
+   in `TG-FIND.BASL`, and the program with open, save, go to line, new, quit and F7.
 3. The relay with no assembly: job file, `.BASLOAD.NEXT` stub, `GPC.INPUT` from a
    fixed answer set, screen scrape for a compile error, F8 to return. Steps 2 and
    3 are version 1.

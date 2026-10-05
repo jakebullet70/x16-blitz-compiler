@@ -56,8 +56,9 @@
 ## build.py builds it. In bench/, python spike.py TURBOTEST drives it with a key script and
 ## checks it.
 ##
-## Checklist: turbo_test_source() in bench/spike.py replaces six strings of this file.
-## They are the #SAVEAS name, the #SYMFILE name, the empty-key line of TURBO.KEY.WAIT, the
+## Checklist: turbo_test_source() in bench/spike.py replaces nine strings of this file.
+## They are the #SAVEAS name, the #SYMFILE name, the names in #GPC OBJECT, MAP and
+## DEADLIST, the empty-key line of TURBO.KEY.WAIT, the
 ## pair of lines GOSUB APPSYS.RESTORE and END, the settings store's name in TURBO.SETUP,
 ## and the #INCLUDE of TG-LOW.BASL. Each occurs once. Change the function when one of them
 ## changes.
