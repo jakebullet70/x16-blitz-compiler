@@ -5,7 +5,7 @@ The GP.BASIC and BASL reference that `GPC.HELP.PRG` shows on the X16, in one fil
 **Generated. Do not edit.** `MKHELP.PY` builds it and the `.HLP` files together from `GPC-BASIC/` -- the manual, the name register and the module banner headers. Fix anything wrong at the source and rebuild:
 
 ```
-python MKHELP.PY
+python GPC-BASIC-TOOLS-SRC/GPC-HELP/MKHELP.PY
 ```
 
 ## Contents
@@ -260,8 +260,8 @@ Run `GPC.PRG` on BASLOAD's `.PRG`, then run the object it writes.
 ```
 
 A `#GPC` line tells GPC how to build the program. BASLOAD-GPC, the tokeniser the build runs, passes
-it through as the BASIC line `REM#GPC <text>`. ROM BASLOAD does not know `#GPC`. A `#GPC` line
-inside a hidden `#IFDEF` block emits nothing.
+it through as the BASIC line `REM#GPC <text>`. A `#GPC` line inside a hidden
+`#IFDEF` block emits nothing.
 
 | directive | does |
 |---|---|
@@ -290,6 +290,32 @@ removal.
   open region, a close without an open, or a region open at the end of the source is
   `BLOCK MISMATCH`. A keep region and a debug region may overlap. Under `NOSTRIP` the keep markers
   are not checked.
+
+###### Under ROM BASLOAD
+
+```basl
+#REM 1
+REM #GPC SHARED
+REM #GPC OBJECT "MANDEL.PRG"
+#REM 0
+```
+
+ROM BASLOAD stops with an error at an unknown `#` option, so the short `#GPC` spelling builds only
+with BASLOAD-GPC. GPC also reads `REM #GPC` as a directive: any number of spaces after the `REM`
+token, letters in any case. ROM BASLOAD drops REM lines unless `#REM 1` is set, and drops them
+again after a later `#REM 0`. Both tokenisers produce byte-identical programs from the form above.
+
+- A program past a ROM BASLOAD limit, 38,655 bytes tokenised or about 950 variable names, builds
+  only with BASLOAD-GPC. It may use the short `#GPC` spelling and a string `#DEFINE`. GPBMODS,
+  EDIT, GPC.ERR, GPC.GUI, GPC.HELP, KV-BIN-STORE, GUI-FIELD-EDIT and TURBO are such programs.
+- A program inside both limits stays buildable with ROM BASLOAD. It uses the `REM #GPC` spelling
+  between `#REM 1` and `#REM 0`, and number defines only. ROM BASLOAD rejects a string `#DEFINE`
+  with `INVALID PARAMETER`.
+- Every library module (`.INC.BL`) follows the second rule. Programs built by ROM BASLOAD include
+  them.
+
+WARNING: `#REM 0` after the directives also drops the REM lines that carry a `GP.ASM` body. A
+program with `GP.ASM` blocks sets `#REM 1` again before each block (§3.9).
 
 ##### `#DEFINE` — a name for a constant
 
@@ -351,7 +377,7 @@ anything wider compiles through the float encoder. Neither wraps.
 ---
 
 
-*See also: 7. Memory, and what the compiler tells you, 6. The traps, collected*
+*See also: 7. Memory, and what the compiler tells you, 3.9 Inline assembly, 6. The traps, collected*
 
 ---
 
@@ -546,7 +572,7 @@ reads the debug map the compiler writes when `MAKE A DEBUG MAP?` is answered yes
 the address cannot be resolved.
 
 `GPC.HELP.PRG` is this reference, on the machine. It reads `HELP-TXT/` beside it — `GPC.HELP.IDX`
-and one `.HLP` per topic — and shows 75 topics at 80x30. Arrows, `PgUp` / `PgDn`, `HOME` and `END`
+and one `.HLP` per topic — and shows 76 topics at 80x30. Arrows, `PgUp` / `PgDn`, `HOME` and `END`
 move. `RETURN` opens the highlighted index row. `/` finds and `N` repeats the search. `L` follows a
 topic's cross references, `X` writes its code out as a `.BL` where it has any, `T` cycles the colour
 themes, `?` is the about box. `ESC` goes back a step, and quits from the index.

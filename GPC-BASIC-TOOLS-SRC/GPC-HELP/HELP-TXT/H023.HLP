@@ -80,5 +80,5 @@
 .
 =EXAMPLE PROGRAM
 .
->178|ISO.EXP.BL  GP.PRINTAT and GP.BOX in ISO mode
->188|SCREEN.EXP.BL  the GP.BASIC text drawing set
+>179|ISO.EXP.BL  GP.PRINTAT and GP.BOX in ISO mode
+>189|SCREEN.EXP.BL  the GP.BASIC text drawing set

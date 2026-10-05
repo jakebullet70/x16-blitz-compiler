@@ -24,9 +24,9 @@
 .
 =IN THIS SECTION
 .
->56|3.11.1 GP.DEFPROC -- declare a verb and its arguments
->57|3.11.2 GP.SUB -- call a verb
->58|3.11.3 GP.FN -- call a verb from inside an expression
+>57|3.11.1 GP.DEFPROC -- declare a verb and its arguments
+>58|3.11.2 GP.SUB -- call a verb
+>59|3.11.3 GP.FN -- call a verb from inside an expression
 .
 =The formals are ordinary variables
 .

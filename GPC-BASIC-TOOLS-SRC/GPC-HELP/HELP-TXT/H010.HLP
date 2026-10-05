@@ -199,15 +199,15 @@
 .
 =SEE ALSO
 .
->65|4. Module reference -- the BASL library
->46|3.8 Block IF
->47|3.9 Inline assembly
->36|3.4 Strings
->35|3.3.1 GP.HIBYTE / GP.LOBYTE -- split an address into two bytes
->53|3.10 Text in a bank
->54|3.11 Calling a routine in one statement
->67|4.1 THEME.INC.BL -- named colour roles
->68|4.2 STRINGS.INC.BL -- string helpers
->76|4.3 APPSYS.INC.BL -- start politely, leave it as you found it
->77|4.4 LINEINPUT.INC.BL -- a positioned entry field
->78|4.5 BMX.INC.BL -- a BMX bitmap into VERA
+>66|4. Module reference -- the BASL library
+>47|3.8 Block IF
+>48|3.9 Inline assembly
+>37|3.4 Strings
+>36|3.3.1 GP.HIBYTE / GP.LOBYTE -- split an address into two bytes
+>54|3.10 Text in a bank
+>55|3.11 Calling a routine in one statement
+>68|4.1 THEME.INC.BL -- named colour roles
+>69|4.2 STRINGS.INC.BL -- string helpers
+>77|4.3 APPSYS.INC.BL -- start politely, leave it as you found it
+>78|4.4 LINEINPUT.INC.BL -- a positioned entry field
+>79|4.5 BMX.INC.BL -- a BMX bitmap into VERA

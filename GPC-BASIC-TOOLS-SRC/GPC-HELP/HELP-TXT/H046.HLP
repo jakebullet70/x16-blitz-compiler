@@ -30,5 +30,5 @@
 .
 =SEE ALSO
 .
->93|4.14 KB.INC.BL -- the keyboard buffer, emptied
->88|4.11 GUI.INC.BL -- the box that puts the screen back, and the form in 
+>94|4.14 KB.INC.BL -- the keyboard buffer, emptied
+>89|4.11 GUI.INC.BL -- the box that puts the screen back, and the form in 

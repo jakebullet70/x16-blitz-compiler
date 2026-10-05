@@ -40,9 +40,8 @@
 :#GPC DEADLIST "GPBMODS.DEAD"
 .
 .A #GPC line tells GPC how to build the program. BASLOAD-GPC, the tokeniser
-.the build runs, passes it through as the BASIC line REM#GPC <text>. ROM
-.BASLOAD does not know #GPC. A #GPC line inside a hidden #IFDEF block emits
-.nothing.
+.the build runs, passes it through as the BASIC line REM#GPC <text>. A #GPC
+.line inside a hidden #IFDEF block emits nothing.
 .
 .  #GPC SHARED
 .      DOES: compiles against the resident runtime. Replaces GPC.INPUT line 4
@@ -85,6 +84,34 @@
 .    An open inside an open region, a close without an open, or a region open
 .    at the end of the source is BLOCK MISMATCH. A keep region and a debug
 .    region may overlap. Under NOSTRIP the keep markers are not checked.
+.
+=Under ROM BASLOAD
+.
+:#REM 1
+:REM #GPC SHARED
+:REM #GPC OBJECT "MANDEL.PRG"
+:#REM 0
+.
+.ROM BASLOAD stops with an error at an unknown # option, so the short #GPC
+.spelling builds only with BASLOAD-GPC. GPC also reads REM #GPC as a
+.directive: any number of spaces after the REM token, letters in any case.
+.ROM BASLOAD drops REM lines unless #REM 1 is set, and drops them again after
+.a later #REM 0. Both tokenisers produce byte-identical programs from the
+.form above.
+.
+.  - A program past a ROM BASLOAD limit, 38,655 bytes tokenised or about 950
+.    variable names, builds only with BASLOAD-GPC. It may use the short #GPC
+.    spelling and a string #DEFINE. GPBMODS, EDIT, GPC.ERR, GPC.GUI,
+.    GPC.HELP, KV-BIN-STORE, GUI-FIELD-EDIT and TURBO are such programs.
+.  - A program inside both limits stays buildable with ROM BASLOAD. It uses
+.    the REM #GPC spelling between #REM 1 and #REM 0, and number defines
+.    only. ROM BASLOAD rejects a string #DEFINE with INVALID PARAMETER.
+.  - Every library module (.INC.BL) follows the second rule. Programs built
+.    by ROM BASLOAD include them.
+.
+.WARNING: #REM 0 after the directives also drops the REM lines that carry a
+.GP.ASM body. A program with GP.ASM blocks sets #REM 1 again before each
+.block (SEC 3.9).
 .
 =#DEFINE -- a name for a constant
 .
@@ -159,5 +186,6 @@
 .
 =SEE ALSO
 .
->162|7. Memory, and what the compiler tells you
->156|6. The traps, collected
+>163|7. Memory, and what the compiler tells you
+>48|3.9 Inline assembly
+>157|6. The traps, collected

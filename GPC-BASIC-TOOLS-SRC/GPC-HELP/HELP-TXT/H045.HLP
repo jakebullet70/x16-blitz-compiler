@@ -71,5 +71,5 @@
 .
 =SEE ALSO
 .
->59|3.12 Code in a bank
->92|4.13 BANKMGR.INC.BL -- who owns which RAM bank
+>60|3.12 Code in a bank
+>93|4.13 BANKMGR.INC.BL -- who owns which RAM bank

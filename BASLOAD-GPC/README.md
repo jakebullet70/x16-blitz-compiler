@@ -290,6 +290,12 @@ It costs a line number and the bytes of the text. A `#GPC` line is never
 searched for a define name. GPC reads ten words; `GPC-BASIC/GP-BASIC.md` §2,
 "`#GPC` - directives to the compiler", lists them.
 
+Under ROM BASLOAD the same directives are written as `REM #GPC` lines between
+`#REM 1` and `#REM 0`. GPC accepts any number of spaces after the `REM` token
+and letters in any case, and both tokenisers give byte-identical programs
+from that spelling. `GPC-BASIC/GP-BASIC.md` §2 says which programs may use the
+short `#GPC` form.
+
 ## `#DEFINE` with a string
 
 A value in quotes makes a string define:

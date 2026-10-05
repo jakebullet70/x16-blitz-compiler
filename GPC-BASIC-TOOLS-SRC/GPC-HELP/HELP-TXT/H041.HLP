@@ -80,13 +80,13 @@
 .
 =EXAMPLE PROGRAM
 .
->185|MENUTO.EXP.BL  MENUTO.VERT and MENUTO.BAR by hand
+>186|MENUTO.EXP.BL  MENUTO.VERT and MENUTO.BAR by hand
 .
 =SEE ALSO
 .
->79|4.6 MENU.INC.BL -- menus built a row at a time
->43|3.6 Screen -- stash and restore
->97|4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM
->92|4.13 BANKMGR.INC.BL -- who owns which RAM bank
->86|4.9 MENUPULL.INC.BL -- a dropdown under a bar item
->115|STASH.INC.BL -- save a text rectangle, and put it back.
+>80|4.6 MENU.INC.BL -- menus built a row at a time
+>44|3.6 Screen -- stash and restore
+>98|4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM
+>93|4.13 BANKMGR.INC.BL -- who owns which RAM bank
+>87|4.9 MENUPULL.INC.BL -- a dropdown under a bar item
+>116|STASH.INC.BL -- save a text rectangle, and put it back.

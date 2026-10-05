@@ -22,11 +22,11 @@
 .
 =IN THIS SECTION
 .
->108|4.25.1 DOSX -- send a command, read the answer
->109|4.25.2 DOSX.EXISTS -- whether a file opens
+>109|4.25.1 DOSX -- send a command, read the answer
+>110|4.25.2 DOSX.EXISTS -- whether a file opens
 .
 =SEE ALSO
 .
->94|4.15 FILEIO.INC.BL -- the drive: status, files, directories
->54|3.11 Calling a routine in one statement
->107|4.25 DOS.INC.BL -- a drive command, and a test for a file
+>95|4.15 FILEIO.INC.BL -- the drive: status, files, directories
+>55|3.11 Calling a routine in one statement
+>108|4.25 DOS.INC.BL -- a drive command, and a test for a file

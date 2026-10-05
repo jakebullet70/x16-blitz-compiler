@@ -36,12 +36,12 @@
 .
 =IN THIS SECTION
 .
->35|3.3.1 GP.HIBYTE / GP.LOBYTE -- split an address into two bytes
+>36|3.3.1 GP.HIBYTE / GP.LOBYTE -- split an address into two bytes
 .
 =EXAMPLE PROGRAM
 .
->187|MLCALL.EXP.BL  GP.CALL and GP.A / GP.X / GP.Y / GP.C
+>188|MLCALL.EXP.BL  GP.CALL and GP.A / GP.X / GP.Y / GP.C
 .
 =SEE ALSO
 .
->47|3.9 Inline assembly
+>48|3.9 Inline assembly

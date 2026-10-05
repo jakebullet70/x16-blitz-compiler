@@ -90,5 +90,5 @@
 .
 =SEE ALSO
 .
->99|4.20 KV.INC.BL -- keys and values in one RAM bank
->110|4.26 KVBIN.INC.BL -- keys and values in one file of fixed records
+>100|4.20 KV.INC.BL -- keys and values in one RAM bank
+>111|4.26 KVBIN.INC.BL -- keys and values in one file of fixed records

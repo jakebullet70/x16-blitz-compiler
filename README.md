@@ -97,7 +97,7 @@ LOAD "GPC.PRG",8
 RUN
 
 GPC... A BLITZ INSPIRED X16 COMPILER
-           V1.1 - SUMMER 2026
+           V1.2 - FALL 2026
 
 INPUT  FILE: DIR.PRG
 OUTPUT FILE:
@@ -112,18 +112,23 @@ REMOVE DEAD CODE? NO
 | `OUTPUT FILE:` | `C.` and the source name: `DIR.PRG` gives `C.DIR.PRG` |
 | `MAKE A DEBUG MAP?` | no |
 | `SHARED RUNTIME?` | no: the program carries its own runtime |
-| `REMOVE DEAD CODE?` | no |
+| `REMOVE DEAD CODE?` | yes |
 
 - `Y` to `MAKE A DEBUG MAP?` writes a [debug map](#the-debug-map) named after
   the source, with `.PRG` and then `.SRC` taken off the end and `.MAP` added:
   `DIR.PRG` gives `DIR.MAP`.
 - `Y` to `SHARED RUNTIME?` compiles the program [shared](#shared).
 - `Y` to `REMOVE DEAD CODE?` leaves out every line nothing reaches, and writes
-  their numbers to `D.` and the source name. `GPC-BASIC/GP-BASIC.md` section 7
-  has the rules.
+  their numbers to `D.` and the source name. `N` compiles every line.
+  `GPC-BASIC/GP-BASIC.md` section 7 has the rules.
 
 The yes/no prompts take `Y` or `N` in either case. A file name holds up to 39
 characters.
+
+A `#GPC` directive at the head of the source answers its prompt. `GPC.PRG`
+skips that prompt and prints the value with `(SOURCE)` after it, for example
+`OUTPUT FILE: PORT.PRG (SOURCE)`. `GPC-BASIC/GP-BASIC.md` section 2 lists the
+directives.
 
 `GPC.PRG` checks the input file before it asks for the output name. A name not
 on the drive stops with `INPUT FILE NOT FOUND`. A file that does not load at
@@ -144,7 +149,7 @@ go](#where-the-runtime-files-go)).
 The engine prints its name and version, then the two file names:
 
 ```text
-GPC SQUEALING... V1.1.0
+GPC SQUEALING... V1.2.0
 IN:  DIR.PRG
 OUT: C.DIR.PRG
 ```

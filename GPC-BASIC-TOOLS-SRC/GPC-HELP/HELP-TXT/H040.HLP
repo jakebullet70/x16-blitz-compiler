@@ -68,12 +68,12 @@
 .
 =EXAMPLE PROGRAM
 .
->194|STRINGS.EXP.BL  the GP.BASIC string set
->193|STRCTST.EXP.BL  STRCASE.INC.BL, eight cases
->195|STRTST.EXP.BL  the parts of STRINGS.INC.BL that STRCTST and
+>195|STRINGS.EXP.BL  the GP.BASIC string set
+>194|STRCTST.EXP.BL  STRCASE.INC.BL, eight cases
+>196|STRTST.EXP.BL  the parts of STRINGS.INC.BL that STRCTST and
 .
 =SEE ALSO
 .
->54|3.11 Calling a routine in one statement
->68|4.2 STRINGS.INC.BL -- string helpers
->85|4.8 STRCASE.INC.BL -- case, in place
+>55|3.11 Calling a routine in one statement
+>69|4.2 STRINGS.INC.BL -- string helpers
+>86|4.8 STRCASE.INC.BL -- case, in place

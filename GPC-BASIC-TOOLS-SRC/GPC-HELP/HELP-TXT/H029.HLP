@@ -23,5 +23,5 @@
 .
 =SEE ALSO
 .
->58|3.11.3 GP.FN -- call a verb from inside an expression
->56|3.11.1 GP.DEFPROC -- declare a verb and its arguments
+>59|3.11.3 GP.FN -- call a verb from inside an expression
+>57|3.11.1 GP.DEFPROC -- declare a verb and its arguments

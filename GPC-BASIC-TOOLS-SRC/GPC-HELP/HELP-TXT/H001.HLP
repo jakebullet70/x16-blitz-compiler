@@ -120,11 +120,11 @@
 =SEE ALSO
 .
 >9|2. Using it
->162|7. Memory, and what the compiler tells you
->65|4. Module reference -- the BASL library
->122|5. Variables
->59|3.12 Code in a bank
->115|STASH.INC.BL -- save a text rectangle, and put it back.
->84|4.7 SORT.INC.BL -- shell sort a string array
->85|4.8 STRCASE.INC.BL -- case, in place
->68|4.2 STRINGS.INC.BL -- string helpers
+>163|7. Memory, and what the compiler tells you
+>66|4. Module reference -- the BASL library
+>123|5. Variables
+>60|3.12 Code in a bank
+>116|STASH.INC.BL -- save a text rectangle, and put it back.
+>85|4.7 SORT.INC.BL -- shell sort a string array
+>86|4.8 STRCASE.INC.BL -- case, in place
+>69|4.2 STRINGS.INC.BL -- string helpers

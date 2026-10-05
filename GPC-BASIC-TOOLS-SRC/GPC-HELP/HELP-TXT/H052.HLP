@@ -141,11 +141,11 @@
 .
 =EXAMPLE PROGRAM
 .
->179|KV.EXP.BL  every routine in KV.INC.BL
+>180|KV.EXP.BL  every routine in KV.INC.BL
 .
 =SEE ALSO
 .
->110|4.26 KVBIN.INC.BL -- keys and values in one file of fixed records
->59|3.12 Code in a bank
->92|4.13 BANKMGR.INC.BL -- who owns which RAM bank
->99|4.20 KV.INC.BL -- keys and values in one RAM bank
+>111|4.26 KVBIN.INC.BL -- keys and values in one file of fixed records
+>60|3.12 Code in a bank
+>93|4.13 BANKMGR.INC.BL -- who owns which RAM bank
+>100|4.20 KV.INC.BL -- keys and values in one RAM bank

@@ -871,19 +871,19 @@
 .
 =EXAMPLE PROGRAM
 .
->175|FORM.EXP.BL  three fields you can move between, LINEINPUT style
+>176|FORM.EXP.BL  three fields you can move between, LINEINPUT style
 .
 =SEE ALSO
 .
->67|4.1 THEME.INC.BL -- named colour roles
->76|4.3 APPSYS.INC.BL -- start politely, leave it as you found it
->68|4.2 STRINGS.INC.BL -- string helpers
->87|4.10 STRUSING.INC.BL -- a number to a template
->93|4.14 KB.INC.BL -- the keyboard buffer, emptied
->77|4.4 LINEINPUT.INC.BL -- a positioned entry field
->78|4.5 BMX.INC.BL -- a BMX bitmap into VERA
->94|4.15 FILEIO.INC.BL -- the drive: status, files, directories
->95|4.16 FILEDIR.INC.BL -- a directory, into a bank or into low RAM
->107|4.25 DOS.INC.BL -- a drive command, and a test for a file
->97|4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM
->99|4.20 KV.INC.BL -- keys and values in one RAM bank
+>68|4.1 THEME.INC.BL -- named colour roles
+>77|4.3 APPSYS.INC.BL -- start politely, leave it as you found it
+>69|4.2 STRINGS.INC.BL -- string helpers
+>88|4.10 STRUSING.INC.BL -- a number to a template
+>94|4.14 KB.INC.BL -- the keyboard buffer, emptied
+>78|4.4 LINEINPUT.INC.BL -- a positioned entry field
+>79|4.5 BMX.INC.BL -- a BMX bitmap into VERA
+>95|4.15 FILEIO.INC.BL -- the drive: status, files, directories
+>96|4.16 FILEDIR.INC.BL -- a directory, into a bank or into low RAM
+>108|4.25 DOS.INC.BL -- a drive command, and a test for a file
+>98|4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM
+>100|4.20 KV.INC.BL -- keys and values in one RAM bank

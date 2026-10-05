@@ -57,7 +57,7 @@
 .
 =SEE ALSO
 .
->90|4.12 GUI-DIALOGS.INC.BL -- every dialog as a verb
->88|4.11 GUI.INC.BL -- the box that puts the screen back, and the form in 
->79|4.6 MENU.INC.BL -- menus built a row at a time
->96|4.17 COMBO.INC.BL -- a drop-down list that folds into one row
+>91|4.12 GUI-DIALOGS.INC.BL -- every dialog as a verb
+>89|4.11 GUI.INC.BL -- the box that puts the screen back, and the form in 
+>80|4.6 MENU.INC.BL -- menus built a row at a time
+>97|4.17 COMBO.INC.BL -- a drop-down list that folds into one row

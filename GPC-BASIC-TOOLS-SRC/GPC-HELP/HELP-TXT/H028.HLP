@@ -45,5 +45,5 @@
 .
 =SEE ALSO
 .
->58|3.11.3 GP.FN -- call a verb from inside an expression
->57|3.11.2 GP.SUB -- call a verb
+>59|3.11.3 GP.FN -- call a verb from inside an expression
+>58|3.11.2 GP.SUB -- call a verb

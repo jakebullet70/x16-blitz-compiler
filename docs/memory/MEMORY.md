@@ -26,7 +26,7 @@ junction; re-make it first if a rename breaks it. See [memory-is-git-tracked](me
 - [Compact early, not at the end](compact-early-not-at-the-end.md) — remind the user to /compact at the end of every turn that lands a step
 
 ## Build and toolchain
-- [Release 1.1.0 state](release-1-1-0-state.md) — zip rebuilt 2026-10-02 on build 131, not sent yet; the smoke test of release/TMP is owed
+- [Release 1.1.0 state](release-1-1-0-state.md) — 1.1.0 zip rebuilt 2026-10-02 on build 131, not sent; the version is 1.2.0 since 2026-10-05, no 1.2.0 zip yet
 - [USER-RUNS demos broken by Build 127](user-runs-demos-broken-by-build-127.md) — runtimes sit beside each sample; the tree is on build 131
 - [Tool home layout deferred](tool-home-layout-deferred.md) — /GPC/ + /BASIC-SRC/ is next-version; research in docs/blitz/TOOL-HOME-LAYOUT.RESEARCH.md
 - [Build toolchain location](build-toolchain-location.md) — make, 64tass, python are off-PATH in C:\8bitProgramming; see docs/BUILDING.md

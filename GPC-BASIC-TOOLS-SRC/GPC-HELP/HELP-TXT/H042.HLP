@@ -94,10 +94,10 @@
 .
 =EXAMPLE PROGRAM
 .
->196|STRUSING.EXP.BL
->198|USINGT.EXP.BL  the regression test for STRUSING.INC.BL
+>197|STRUSING.EXP.BL
+>199|USINGT.EXP.BL  the regression test for STRUSING.INC.BL
 .
 =SEE ALSO
 .
->68|4.2 STRINGS.INC.BL -- string helpers
->87|4.10 STRUSING.INC.BL -- a number to a template
+>69|4.2 STRINGS.INC.BL -- string helpers
+>88|4.10 STRUSING.INC.BL -- a number to a template

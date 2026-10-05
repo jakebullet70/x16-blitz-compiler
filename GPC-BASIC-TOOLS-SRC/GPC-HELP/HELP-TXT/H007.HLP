@@ -123,15 +123,15 @@
 .
 =SEE ALSO
 .
->162|7. Memory, and what the compiler tells you
->67|4.1 THEME.INC.BL -- named colour roles
->76|4.3 APPSYS.INC.BL -- start politely, leave it as you found it
->115|STASH.INC.BL -- save a text rectangle, and put it back.
->119|STASHFILE.INC.BL -- a saved text rectangle, through a file.
->97|4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM
->98|4.19 STASHVRAMGC.INC.BL -- close the holes in a STASHVRAM store
->77|4.4 LINEINPUT.INC.BL -- a positioned entry field
->79|4.6 MENU.INC.BL -- menus built a row at a time
->92|4.13 BANKMGR.INC.BL -- who owns which RAM bank
->86|4.9 MENUPULL.INC.BL -- a dropdown under a bar item
->88|4.11 GUI.INC.BL -- the box that puts the screen back, and the form in 
+>163|7. Memory, and what the compiler tells you
+>68|4.1 THEME.INC.BL -- named colour roles
+>77|4.3 APPSYS.INC.BL -- start politely, leave it as you found it
+>116|STASH.INC.BL -- save a text rectangle, and put it back.
+>120|STASHFILE.INC.BL -- a saved text rectangle, through a file.
+>98|4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM
+>99|4.19 STASHVRAMGC.INC.BL -- close the holes in a STASHVRAM store
+>78|4.4 LINEINPUT.INC.BL -- a positioned entry field
+>80|4.6 MENU.INC.BL -- menus built a row at a time
+>93|4.13 BANKMGR.INC.BL -- who owns which RAM bank
+>87|4.9 MENUPULL.INC.BL -- a dropdown under a bar item
+>89|4.11 GUI.INC.BL -- the box that puts the screen back, and the form in 

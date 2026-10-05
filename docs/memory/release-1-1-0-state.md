@@ -20,6 +20,9 @@ not start with `A`.
 The build was green but no program was run from the staged tree afterwards. The user's smoke test
 of `release/TMP` is the check that is still owed before the zip is sent.
 
+On 2026-10-05 the user asked for V1.2: `buildnum.txt` is 1.2.0, GPC.BIN prints V1.2.0 and the
+GPC.PRG banner reads `V1.2 - FALL 2026`. No 1.2.0 zip has been built yet.
+
 **Why:** a later session will ask whether a zip went out and which build it held. Two different
 zips under one name would confuse bug reports.
 

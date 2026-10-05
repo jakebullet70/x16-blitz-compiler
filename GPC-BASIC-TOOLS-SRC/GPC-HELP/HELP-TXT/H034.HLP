@@ -116,12 +116,12 @@
 .
 =EXAMPLE PROGRAM
 .
->191|SPLITT.EXP.BL
->194|STRINGS.EXP.BL  the GP.BASIC string set
->195|STRTST.EXP.BL  the parts of STRINGS.INC.BL that STRCTST and
+>192|SPLITT.EXP.BL
+>195|STRINGS.EXP.BL  the GP.BASIC string set
+>196|STRTST.EXP.BL  the parts of STRINGS.INC.BL that STRCTST and
 .
 =SEE ALSO
 .
->41|3.4.5 GP.STRPTR -- address of a string block
->37|3.4.1 GP.INSTR -- position of a substring
->68|4.2 STRINGS.INC.BL -- string helpers
+>42|3.4.5 GP.STRPTR -- address of a string block
+>38|3.4.1 GP.INSTR -- position of a substring
+>69|4.2 STRINGS.INC.BL -- string helpers

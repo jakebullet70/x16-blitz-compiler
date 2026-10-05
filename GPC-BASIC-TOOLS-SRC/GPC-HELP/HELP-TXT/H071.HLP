@@ -70,7 +70,7 @@
 .
 =SEE ALSO
 .
->79|4.6 MENU.INC.BL -- menus built a row at a time
->86|4.9 MENUPULL.INC.BL -- a dropdown under a bar item
->88|4.11 GUI.INC.BL -- the box that puts the screen back, and the form in 
->90|4.12 GUI-DIALOGS.INC.BL -- every dialog as a verb
+>80|4.6 MENU.INC.BL -- menus built a row at a time
+>87|4.9 MENUPULL.INC.BL -- a dropdown under a bar item
+>89|4.11 GUI.INC.BL -- the box that puts the screen back, and the form in 
+>91|4.12 GUI-DIALOGS.INC.BL -- every dialog as a verb

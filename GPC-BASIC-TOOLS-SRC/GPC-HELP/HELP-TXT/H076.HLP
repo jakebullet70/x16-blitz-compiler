@@ -252,7 +252,7 @@
 =SEE ALSO
 .
 >9|2. Using it
->59|3.12 Code in a bank
->53|3.10 Text in a bank
->78|4.5 BMX.INC.BL -- a BMX bitmap into VERA
->115|STASH.INC.BL -- save a text rectangle, and put it back.
+>60|3.12 Code in a bank
+>54|3.10 Text in a bank
+>79|4.5 BMX.INC.BL -- a BMX bitmap into VERA
+>116|STASH.INC.BL -- save a text rectangle, and put it back.

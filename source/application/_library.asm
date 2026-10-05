@@ -5591,7 +5591,7 @@ symSavedBank: 								; the caller's RAM bank, while one of ours is selected
 BuildNumber = 133
 		.section code
 VersionText:
-		.text	'V1.1.0',13,0
+		.text	'V1.2.0',13,0
 		.text	'/GPC/'
 RTImageFileText:
 		.text	'GPC.IMG.133.BIN',0

@@ -67,13 +67,13 @@
 .
 =IN THIS SECTION
 .
->104|4.24.1 MSGBOX -- lines of text over one or two buttons
->105|4.24.2 PICKMENU -- a menu that stays open
->106|4.24.3 CLOSEBOX -- take down the box opened last
+>105|4.24.1 MSGBOX -- lines of text over one or two buttons
+>106|4.24.2 PICKMENU -- a menu that stays open
+>107|4.24.3 CLOSEBOX -- take down the box opened last
 .
 =SEE ALSO
 .
->67|4.1 THEME.INC.BL -- named colour roles
->90|4.12 GUI-DIALOGS.INC.BL -- every dialog as a verb
->97|4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM
->103|4.24 GUI-LITE.INC.BL -- a message box and a menu, in low memory
+>68|4.1 THEME.INC.BL -- named colour roles
+>91|4.12 GUI-DIALOGS.INC.BL -- every dialog as a verb
+>98|4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM
+>104|4.24 GUI-LITE.INC.BL -- a message box and a menu, in low memory

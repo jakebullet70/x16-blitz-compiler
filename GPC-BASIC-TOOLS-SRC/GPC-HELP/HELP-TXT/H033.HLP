@@ -102,6 +102,6 @@
 .
 =SEE ALSO
 .
->88|4.11 GUI.INC.BL -- the box that puts the screen back, and the form in 
->87|4.10 STRUSING.INC.BL -- a number to a template
->67|4.1 THEME.INC.BL -- named colour roles
+>89|4.11 GUI.INC.BL -- the box that puts the screen back, and the form in 
+>88|4.10 STRUSING.INC.BL -- a number to a template
+>68|4.1 THEME.INC.BL -- named colour roles
