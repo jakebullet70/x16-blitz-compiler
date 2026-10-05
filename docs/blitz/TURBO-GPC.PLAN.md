@@ -491,8 +491,11 @@ A typed character and RETURN replace the selection. Backspace and Delete take it
 and every command but find and replace end it. Copy keeps it.
 
 The clipboard is document 3 of the store, in bank 40. It holds 512 lines and 6,400 bytes.
-A copy that does not fit keeps the lines before the one refused and shows
-`Clipboard full, copied in part`. A cut then leaves the document as it was. Copy with no
+A copy that does not fit goes to the file `TURBO.CLP` in the current directory instead, and
+shows `Copied to TURBO.CLP`. A paste then reads that file in after the last line and
+rotates the lines into place with `DOC.SLOT.ROTATE`. A paste that finds the file gone shows
+`TURBO.CLP not found`. A failed write shows `TURBO.CLP not written`, leaves the clipboard
+empty, and a cut then leaves the document as it was. Copy with no
 selection takes the cursor line, and its paste goes in below the cursor line, as MSEDIT
 does. Other text goes in at the cursor. A paste or a deletion that would make a line over
 250 characters is refused. An edit with more undo records than the ring keeps, 32, empties
@@ -775,8 +778,7 @@ letter in the other case there. Every text the editor hands the library goes thr
 
 ### Not built
 
-- The clipboard's spill to disk: a copy too big for bank 40 goes to a file in the editor's
-  home folder. Later, five clipboard slots on disk there.
+- Five clipboard slots on disk.
 - The settings, in `/SETTINGS.KVB`.
 - The relay. See Data flow: the relay.
 

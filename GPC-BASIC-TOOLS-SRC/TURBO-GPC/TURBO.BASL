@@ -349,8 +349,10 @@ TURBO.CLIP.MESSAGE:
     GP.CASE 1 : TURBO.MESSAGE$ = "Copied"
     GP.CASE 2 : TURBO.MESSAGE$ = "Line copied"
     GP.CASE 3 : TURBO.MESSAGE$ = "Clipboard empty"
-    GP.CASE 4 : TURBO.MESSAGE$ = "Clipboard full, copied in part"
+    GP.CASE 4 : TURBO.MESSAGE$ = "TURBO.CLP not written"
     GP.CASE 5 : TURBO.MESSAGE$ = "Line too long"
+    GP.CASE 7 : TURBO.MESSAGE$ = "Copied to TURBO.CLP"
+    GP.CASE 8 : TURBO.MESSAGE$ = "TURBO.CLP not found"
     GP.OTHER  : TURBO.MESSAGE$ = "Document full"
   GP.ENDSEL
   GOSUB TURBO.MESSAGE.SHOW
