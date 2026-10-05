@@ -34,9 +34,9 @@ happened passes: two regions holding the same pattern give the same CRC either w
 
 ## Costs and ceilings
 
-- `memory_copy` counts in **16 bits**, so anything at or above 65,536 must be chunked. A `#DEFINE`
-  of `$8000` is no good as the chunk size — a `#DEFINE` is a signed int16 and it arrives as
-  `-32768`, clamping the count negative. `$4000` is the largest round chunk that stays positive.
+- `memory_copy` counts in **16 bits**, so anything at or above 65,536 must be chunked.
+  `STASHVRAMGC.INC.BL` uses 16,384 (`$4000`). A number `#DEFINE` is unsigned (BASLOAD writes it
+  as decimal text), so `$8000` would arrive as 32768; one call is measured only up to 15,360.
 - `HELP.PAGE.SHIFT` (`GPC-BASIC-TOOLS-SRC/GPC-HELP/GPC.HELP.BASL:835`) already shipped this at 4,480 bytes and
   is the blob-free template to copy: geometry asked of VERA, two ports, the 17-bit split, r0/r1/r2
   poked, one `GP.CALL`. Benchmarked at **1.6 jiffies against STASH's 11.0**.

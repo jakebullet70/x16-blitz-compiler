@@ -3904,6 +3904,13 @@ switching and string garbage collection cannot touch.
 
 ## Build / infrastructure
 
+### Rebuild GPC.GUI — TODO
+
+`GPC.GUI.BASL` writes `NOSTRIP` to `GPC.INPUT` line 5 when its DEAD setting is N (commit 6f65e95).
+The tracked `GPC.GUI.PRG` predates that change, so with DEAD off it still writes a blank line 5,
+and a blank line 5 now removes dead code. Tokenise and compile it, then check that DEAD off keeps
+the dead code.
+
 ### Update README.md before a release — TODO
 
 The repository README is the maintainer-facing document and nothing regenerates it, so it goes stale

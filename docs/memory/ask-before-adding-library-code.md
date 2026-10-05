@@ -10,6 +10,6 @@ metadata:
 
 Ask before adding code to a GPC-BASIC library file (`GPB-MODS-TESTING/GPC-BASIC/*.INC.BL` or root `GPC-BASIC/`). Refactors and fixes of existing code are fine. New routines, new behaviour and new options need a yes first.
 
-**Why:** without the dead-code option (off by default, and no repo build passes --strip) every program that `#INCLUDE`s a module carries every routine in it, called or not ([[basl-dead-code-elimination-measured]]: dead routines inside used modules cost GPBMODS 521 B). A feature only TURBO needs, added to FILEPICK or GUI, taxes every other program forever.
+**Why:** a feature only TURBO needs, added to FILEPICK or GUI, grows a module every other program reads, keeps in step and maintains. On 2026-10-05 dead-code removal became the default, and the user confirmed the same day that the rule still applies.
 
 **How to apply:** when a program needs something a module lacks, first propose putting it in the program itself (or a program-local .INC.BL). Offer the library only when a second program will use it, and say what it costs every includer.

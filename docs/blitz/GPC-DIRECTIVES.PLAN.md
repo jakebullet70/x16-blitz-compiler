@@ -72,8 +72,7 @@ Every compile removes dead code unless `#GPC NOSTRIP` or the control file turns 
 - `GPC.PRG` asks `REMOVE DEAD CODE?` with Y as the default.
 - `TURBO-GPC/build.py` keeps `--strip TURBO.DEAD`.
 - `GPC.GUI` writes `NOSTRIP` when its DEAD setting is N.
-- The `ask-before-adding-library-code` rule loses its reason once every build strips. Revisit it
-  then.
+- The `ask-before-adding-library-code` rule stays, by the user's decision.
 
 Done. `PrescanDirectives` sets `pdNoStrip` from `#GPC NOSTRIP` or from line 5 reading `NOSTRIP`, and
 then clears line 5. `CompileCode` sets `dcEnabled` unless `pdNoStrip` is set. A `#GPC DEADLIST` in

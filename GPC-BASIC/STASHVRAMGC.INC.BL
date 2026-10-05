@@ -31,9 +31,7 @@
 #IFNDEF SVGC.DEFS
 #DEFINE SVGC.DEFS 1
 
-## memory_copy counts in 16 bits, and a block may be bigger than that. A #DEFINE
-## is a SIGNED int16, so $8000 would arrive as -32768 and clamp the count to a
-## negative; $4000 is the largest round chunk that stays positive.
+## memory_copy counts in 16 bits, and a block may be bigger than that.
 #DEFINE SVGC.CHUNK $4000
 
 GOTO SVGC.MODULE.END
