@@ -76,12 +76,13 @@ CompilerRAMBankReg	= $0000
 ;			10	the BLOCK DEPTH at virtual $8000-$9FFF.
 ;			11	DEAD-CODE REMOVAL's bit planes and swallow list (main/deadcode.asm), pass zero only.
 ;			12	...and its edge list.
-;			13	the #SYMFILE's variables, for GP.ASM {VAR} -- the application's, like bank 7.
-;			14	...and their second 8K. Both are application/source/compiler/symfile.asm.
+;			13-14	free.
 ;			15	the embedded BANK CODE, held for the object -- the application's, like bank 7.
 ;			16-23	the LINE NUMBER TABLE and its BLOCK DEPTH below virtual $8000, a pair a
 ;				segment: 16 and 17 at $6000, 18 and 19 at $4000, 20 and 21 at $2000, 22 and
 ;				23 at $0000.
+;			24-27	the #SYMFILE's variables, for GP.ASM {VAR} -- the application's, like bank 7.
+;				application/source/compiler/symfile.asm; the four banks must stay contiguous.
 ;			63	the GP.BANKEDSTR pool, growing DOWN from the top bank a 512K machine has.
 ;
 ;		The line table is six banks and one virtual address space, $0000-$BFFF, 12,288 entries.

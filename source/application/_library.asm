@@ -4857,8 +4857,8 @@ APIDesc:
 
 IO_SYM_FILE = 5 							; 3 is the source, 4 the runtime image, 6 the object
 
-SymCacheBank = 13 							; the first; x16_storage.inc lists every compile-time bank
-SYM_CACHE_BANKS = 2 						; 16K, about 1,300 names of GPBMODS's length
+SymCacheBank = 24 							; the first; x16_storage.inc lists every compile-time bank
+SYM_CACHE_BANKS = 4 						; 32K, about 2,600 names of GPBMODS's length
 
 SYM_UNREAD = 0 								; symCacheState: nothing read yet this compile
 SYM_CACHED = 1 								; every variable is in the banks
