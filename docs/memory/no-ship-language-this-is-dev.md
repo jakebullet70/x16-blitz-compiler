@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: feedback
   originSessionId: 5591d6bc-636d-4001-b0b0-d858156d6ec0
-  modified: 2026-10-02T06:34:04.838Z
+  modified: 2026-10-05T20:28:36.909Z
 ---
 
 **Never say "ship", "shipped" or "release" about this repo.** Corrected on
@@ -34,8 +34,13 @@ and stop.
 **The exception is a play-test loop.** Corrected 2026-10-02, on LANDER64, after a speed option
 was edited in and left unbuilt: *"did you forget, its give and take, after interaction you auto
 build?"* When the user is running a program by hand and sends back a change to it, the edit is
-half the turn and the build is the other half. He cannot test the change without the PRG. Build
+half the turn and the build is the other half. The user cannot test the change without the PRG. Build
 that one sample in the background straight after the edit, then report the result.
+
+**Feature work the user asked for counts too.** Said 2026-10-05, after TURBO's encoding switch was
+written and left waiting for a "shall I build?": *"after these give and take edits just do a build"*.
+When the user asks for a change to a program, build that program as soon as the edits land. Do not
+ask first.
 
 The rule still holds everywhere else: "commit and push" is not a build request, a refactor nobody
 is about to run is not one, and the help text is never regenerated unasked.

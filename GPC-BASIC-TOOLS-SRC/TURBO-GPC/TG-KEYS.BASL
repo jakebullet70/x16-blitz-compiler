@@ -37,6 +37,7 @@
 ##   Ctrl+S or F2, Ctrl+O, Ctrl+N          save, open, new
 ##   F5, F1                                build, help
 ##   F7                                    the next document
+##   Ctrl+F7                               switch the document's encoding
 ##   32 to 126, 160, 193 to 218            typed. 160 is typed as a space.
 ##
 ## A Ctrl+letter arrives as the letter's place in the alphabet. Ctrl+L is 12. Ctrl+S and
@@ -130,6 +131,7 @@ KEYS.SETUP:
 KEYS.DISPATCH:
   KEYS.ACTION% = PEEK(KEYS.ACTION.ADDR + KEYS.CODE%)
   IF KEYS.CODE% < 32 THEN IF (KEYS.MODIFIERS% AND 4) <> 0 THEN KEYS.ACTION% = PEEK(KEYS.CONTROL.ADDR + KEYS.CODE%)
+  IF KEYS.CODE% = 136 THEN IF (KEYS.MODIFIERS% AND 4) <> 0 THEN KEYS.ACTION% = 81
   IF KEYS.ACTION% >= 2 AND KEYS.ACTION% <= 9 THEN GOSUB KEYS.SELECT.MOVE
 
 ## KEYS.RUN -- run action KEYS.ACTION%, numbered as KEYS.SETUP's table numbers it. A menu row

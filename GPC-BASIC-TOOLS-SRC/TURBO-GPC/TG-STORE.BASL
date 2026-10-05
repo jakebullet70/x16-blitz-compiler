@@ -41,6 +41,8 @@
 ##   DOC.FULL%          -1 once the arena has refused a record, or a load reached
 ##                      DOC.LINE.LIMIT%
 ##   DOC.FILE.NAME$     in for DOC.LOADFILE and DOC.SAVEFILE
+##   DOC.FILE.PETSCII%  in for DOC.LOADFILE, DOC.APPENDFILE, DOC.SAVEFILE and DOC.SAVE.LINES:
+##                      -1 when the file is PETSCII, 0 when it is ASCII
 ##   DOC.FIND.TERM$     in for DOC.FIND
 ##   DOC.BLOCK.ADDR     the block buffer: 256 bytes of low RAM the file, find, split and
 ##                      join kernels work in
@@ -51,7 +53,7 @@
 ## DOC.SLOT.CLOSE, DOC.SLOT.ROTATE, DOC.LOADFILE, DOC.APPENDFILE, DOC.SAVEFILE, DOC.SAVE.LINES,
 ## DOC.FIND.
 ##
-## Document text is PETSCII. A file on disk is ASCII.
+## Document text is PETSCII. A file on disk is ASCII, or PETSCII when DOC.FILE.PETSCII% is -1.
 ##
 ## WARNING: the kernels use zero page $2C to $31.
 ##
@@ -71,7 +73,7 @@ DOC.SETUP:
   DIM DOC.BLOCK.BUFFER%(127) : DOC.BLOCK.ADDR = GP.ARRPTR(DOC.BLOCK.BUFFER%())
   DOC.BLOCK.PTR% = DOC.BLOCK.ADDR : DOC.BLOCK.LENGTH% = 0 : DOC.NUMBER% = 0 : DOC.NEXT.NUMBER% = 0
   DIM DOC.KEPT.LINES%(3) : DIM DOC.KEPT.ARENA.BANK%(3) : DIM DOC.KEPT.ARENA.PTR%(3) : DIM DOC.KEPT.FULL%(3)
-  GOSUB DOC.PLACE : DOC.STRING.PTR% = 0 : DOC.KEEP.LINE% = 0 : DOC.FILE.NAME$ = "" : DOC.FIND.TERM$ = "" : DOC.LOAD.STATUS% = 0 
+  GOSUB DOC.PLACE : DOC.STRING.PTR% = 0 : DOC.KEEP.LINE% = 0 : DOC.FILE.NAME$ = "" : DOC.FILE.PETSCII% = 0 : DOC.FIND.TERM$ = "" : DOC.LOAD.STATUS% = 0 
   DOC.LOAD.PENDING.CR% = 0 : DOC.SAVE.ERROR% = 0 : DOC.WALK.LINE% = 0 : DOC.WALK.BANK% = 0 : DOC.FIND.LINE% = 0 : DOC.FIND.COLUMN% = 0 : DOC.FIND.FOUND% = 0 
   DOC.EDIT.COLUMN% = 0 : DOC.EDIT.CHAR% = 0 : DOC.SPLIT.INDENT% = 0 : DOC.SLOT.LINE% = 0 : DOC.MOVE.SEGMENT% = 0 : DOC.MOVE.FIRST% = 0 : DOC.MOVE.SLOTS% = 0 : DOC.MOVE.CARRY% = 0
   DOC.WALK.END% = 0 : DOC.WALK.OFFSET% = 0 : DOC.SLOT.PLACE.LINE% = 0 : DOC.SLOT.PLACE.BANK% = 0 : DOC.SLOT.PLACE.OFFSET% = 0
@@ -389,8 +391,9 @@ DOC.LOAD.APPEND:
 ## DOC.LOAD.BLOCK -- read up to 255 bytes of file 2 and store the lines they complete.
 ##
 ## The line that the block leaves unfinished stays in the edit buffer, with its length
-## in the length byte. DOC.LOAD.PENDING.CR% is 1 when the block ended on a CR. A to Z
-## becomes $C1 to $DA, a to z becomes $41 to $5A, and a control byte becomes a space.
+## in the length byte. DOC.LOAD.PENDING.CR% is 1 when the block ended on a CR. A control
+## byte becomes a space. From an ASCII file, A to Z becomes $C1 to $DA and a to z becomes
+## $41 to $5A. A PETSCII file's bytes are kept.
 ##
 ##   out  DOC.LOAD.STATUS%   0 while there is more to read
 ##
@@ -468,7 +471,9 @@ DOC.LOAD.BLOCK:
   REM BCS LUPPER
   REM LDA #$20
   REM BRA LPUT
-  REM LUPPER: CMP #$41
+  REM LUPPER: BIT {DOC.FILE.PETSCII%}
+  REM BMI LPUT
+  REM CMP #$41
   REM BCC LPUT
   REM CMP #$5B
   REM BCS LLOWER
@@ -612,8 +617,8 @@ DOC.LOAD.BLOCK:
   #REM 0
   RETURN
 
-## DOC.SAVEFILE -- write the document to the file DOC.FILE.NAME$ as ASCII, with CR LF
-## after every line. A file of that name is replaced. A dirty edit buffer is stored first.
+## DOC.SAVEFILE -- write the document to the file DOC.FILE.NAME$, as DOC.SAVE.LINES writes
+## it. A file of that name is replaced. A dirty edit buffer is stored first.
 ##
 ##   out  DOC.SAVE.ERROR%   -1 when a write failed
 DOC.SAVEFILE:
@@ -625,8 +630,9 @@ DOC.SAVEFILE:
   CLOSE 2
   RETURN
 
-## DOC.SAVE.LINES -- write stored lines to file 2. $41 to $5A becomes a to z and $C1 to $DA
-## becomes A to Z.
+## DOC.SAVE.LINES -- write stored lines to file 2. An ASCII file gets CR LF after every line,
+## and $41 to $5A becomes a to z and $C1 to $DA becomes A to Z. A PETSCII file gets the bytes
+## as they are and a CR after every line.
 ##
 ##   in   DOC.WALK.LINE%   the first line to write
 ##        DOC.WALK.END%    the line after the last one to write
@@ -685,6 +691,8 @@ DOC.SAVE.LINES:
   REM TAY
   REM BEQ WENDL
   REM WCHAR: LDA ($2C),Y
+  REM BIT {DOC.FILE.PETSCII%}
+  REM BMI WPUT
   REM CMP #$41
   REM BCC WPUT
   REM CMP #$5B
@@ -703,10 +711,12 @@ DOC.SAVE.LINES:
   REM LDA #$0D
   REM STA ($2E),Y
   REM INY
+  REM BIT {DOC.FILE.PETSCII%}
+  REM BMI WEOL
   REM LDA #$0A
   REM STA ($2E),Y
   REM INY
-  REM TYA
+  REM WEOL: TYA
   REM STA {DOC.BLOCK.LENGTH%}
   REM ; ---- write it. One call can take fewer bytes than it was given.
   REM WSEND: LDA {DOC.BLOCK.LENGTH%}
