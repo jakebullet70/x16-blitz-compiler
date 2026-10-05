@@ -31,7 +31,7 @@
 ##
 ##   LINE.COUNT%        lines in the document
 ##   DOC.NUMBER%        the document the store works on, 0 to 3
-##   DOC.NEXT.NUMBER%   in for DOC.SELECT
+##   DOC.NEXT.NUMBER%   in for DOC.SELECT and DOC.MEASURE
 ##   DOC.LINE.LIMIT%    the document's line limit. DOC.LINE.SPLIT and DOC.SLOT.OPEN do not
 ##                      check it.
 ##   DOC.LINE%          the line a call works on
@@ -45,7 +45,7 @@
 ##   DOC.BLOCK.ADDR     the block buffer: 256 bytes of low RAM the file, find, split and
 ##                      join kernels work in
 ##
-## Routines: DOC.NEW, DOC.SELECT, DOC.SELECT.ONLY, DOC.EDIT.OPEN, DOC.EDIT.CLOSE, DOC.FETCH, DOC.COMMIT,
+## Routines: DOC.NEW, DOC.SELECT, DOC.SELECT.ONLY, DOC.MEASURE, DOC.EDIT.OPEN, DOC.EDIT.CLOSE, DOC.FETCH, DOC.COMMIT,
 ## DOC.EDIT.INSERT, DOC.EDIT.REMOVE, DOC.EDIT.WORD.RIGHT, DOC.EDIT.WORD.LEFT,
 ## DOC.EDIT.TO.BLOCK, DOC.EDIT.APPEND, DOC.LINE.SPLIT, DOC.LINE.REMOVE, DOC.SLOT.OPEN,
 ## DOC.SLOT.CLOSE, DOC.LOADFILE, DOC.SAVEFILE, DOC.FIND.
@@ -57,6 +57,9 @@
 ## Checklist: a kernel that writes $00 is GP.ASM LOW. It pushes $00 on entry and puts it
 ## back on every exit, because a caller in a GP.BANKED region runs from the bank $00 selects.
 ## ============================================================================
+
+## The arena bytes of a bank, $A000 to $BEFF.
+#DEFINE DOC.ARENA.BANK.BYTES 7936
 
 ## DOC.SETUP -- claim the edit buffer and the block buffer. Call it once.
 ##
@@ -118,6 +121,37 @@ DOC.SELECT.ONLY:
   GOSUB DOC.PLACE : LINE.COUNT% = DOC.KEPT.LINES%(DOC.NUMBER%)
   DOC.ARENA.BANK% = DOC.KEPT.ARENA.BANK%(DOC.NUMBER%) : DOC.ARENA.PTR% = DOC.KEPT.ARENA.PTR%(DOC.NUMBER%)
   DOC.FULL% = DOC.KEPT.FULL%(DOC.NUMBER%) : DOC.EDIT.DIRTY% = 0
+  RETURN
+
+## DOC.MEASURE -- measure document DOC.NEXT.NUMBER%, 0 to 2, and leave the store on the
+## document it works on.
+##
+##   out  DOC.MEASURE.LINES%   its lines. 0 for a document never selected
+##        DOC.MEASURE.LIMIT%   its line limit
+##        DOC.MEASURE.USED     the arena bytes its records take, the ones no line holds too
+##        DOC.MEASURE.FREE     the arena bytes left to hand out
+DOC.MEASURE:
+  DOC.KEPT.LINES%(DOC.NUMBER%) = LINE.COUNT%
+  DOC.KEPT.ARENA.BANK%(DOC.NUMBER%) = DOC.ARENA.BANK%
+  DOC.KEPT.ARENA.PTR%(DOC.NUMBER%) = DOC.ARENA.PTR%
+  DOC.MEASURE.WORKING% = DOC.NUMBER%
+  DOC.NUMBER% = DOC.NEXT.NUMBER%
+  GOSUB DOC.PLACE
+  DOC.MEASURE.LINES% = DOC.KEPT.LINES%(DOC.NUMBER%)
+  DOC.MEASURE.LIMIT% = DOC.LINE.LIMIT%
+  DOC.MEASURE.BANK% = DOC.KEPT.ARENA.BANK%(DOC.NUMBER%)
+  DOC.MEASURE.ADDR = DOC.KEPT.ARENA.PTR%(DOC.NUMBER%)
+  IF DOC.MEASURE.ADDR < 0 THEN DOC.MEASURE.ADDR = DOC.MEASURE.ADDR + 65536
+  ## WARNING: the bank counts go into untyped variables before they are multiplied. The
+  ## bytes pass 32,767, and an int16 product would wrap.
+  DOC.MEASURE.USED = 0
+  IF DOC.MEASURE.BANK% <> 0 THEN DOC.MEASURE.USED = DOC.MEASURE.BANK% - DOC.ARENA.FIRST.BANK%
+  DOC.MEASURE.USED = DOC.MEASURE.USED * DOC.ARENA.BANK.BYTES
+  IF DOC.MEASURE.BANK% <> 0 THEN DOC.MEASURE.USED = DOC.MEASURE.USED + DOC.MEASURE.ADDR - DOC.ARENA.START
+  DOC.MEASURE.FREE = DOC.ARENA.LAST.BANK% - DOC.ARENA.FIRST.BANK% + 1
+  DOC.MEASURE.FREE = DOC.MEASURE.FREE * DOC.ARENA.BANK.BYTES - DOC.MEASURE.USED
+  DOC.NUMBER% = DOC.MEASURE.WORKING%
+  GOSUB DOC.PLACE
   RETURN
 
 ## DOC.EDIT.OPEN -- put line DOC.LINE% in the edit buffer. The line the edit buffer holds

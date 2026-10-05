@@ -10,6 +10,10 @@
 ## VIEW.STATUS.ROW% is the status bar. A text row is a six cell gutter, then
 ## VIEW.TEXT.WIDTH% cells of text. The gutter is four digits and two blanks.
 ##
+## Column VIEW.BAR.COLUMN%, the last, is the scroll bar: a track of VIEW.ATTR.TRACK% over the
+## pane's rows and a thumb of VIEW.ATTR.THUMB% for the lines on screen. Set both attributes
+## before the first paint. VIEW.STATUS repaints the bar when the thumb moves.
+##
 ## Interface:
 ##
 ##   VIEW.CURSOR.LINE%   the document line under the cursor
@@ -71,14 +75,16 @@
 ## not LOW.
 ## ============================================================================
 
+## The scroll bar's screen codes: a shaded cell for the track and a solid one for the thumb.
+#DEFINE VIEW.BAR.TRACK.CODE $20
+#DEFINE VIEW.BAR.THUMB.CODE $20
+
 ## VIEW.SETUP -- build the PETSCII to screen code table, set the pane's geometry and its
 ## attributes, load the keyword table and the inks into VIEW.KEY.BANK%, and store the entry
 ## addresses of VIEW.CLASS.SCAN and VIEW.CLASS.WORDS. It sets VIEW.COLOUR.ON% to 0. Call it
 ## once.
 VIEW.SETUP:
-  DIM VIEW.XLAT.TABLE%(127)
-  VIEW.XLAT.ADDR = GP.ARRPTR(VIEW.XLAT.TABLE%())
-  VIEW.XLAT.PTR% = VIEW.XLAT.ADDR
+  DIM VIEW.XLAT.TABLE%(127) : VIEW.XLAT.ADDR = GP.ARRPTR(VIEW.XLAT.TABLE%()) : VIEW.XLAT.PTR% = VIEW.XLAT.ADDR
   FOR VIEW.CODE = 0 TO 255
     VIEW.SCREEN.CODE = VIEW.CODE
     IF VIEW.CODE < 32 THEN VIEW.SCREEN.CODE = VIEW.CODE + 128
@@ -89,9 +95,8 @@ VIEW.SETUP:
     IF VIEW.CODE >= 192 THEN VIEW.SCREEN.CODE = VIEW.CODE - 128
     POKE VIEW.XLAT.ADDR + VIEW.CODE, VIEW.SCREEN.CODE
   NEXT VIEW.CODE
-  POKE VIEW.XLAT.ADDR + 255, 94
-  VIEW.TEXT.TOP% = 1 : VIEW.TEXT.ROWS% = 28
-  VIEW.TEXT.WIDTH% = 74 : VIEW.STATUS.ROW% = 29 : VIEW.ATTR.TEXT% = 97 : VIEW.ATTR.BAND% = 225 : VIEW.ATTR.GUTTER% = 111
+  POKE VIEW.XLAT.ADDR + 255, 94 : VIEW.TEXT.TOP% = 1 : VIEW.TEXT.ROWS% = 28
+  VIEW.TEXT.WIDTH% = 73 : VIEW.STATUS.ROW% = 29 : VIEW.ATTR.TEXT% = 97 : VIEW.ATTR.BAND% = 225 : VIEW.ATTR.GUTTER% = 111
   VIEW.ATTR.CURSOR% = 22 : VIEW.CURSOR.LINE% = 0 : VIEW.CURSOR.COL% = 0 : VIEW.TOP.LINE% = 0
   VIEW.LEFT.COL% = 0 : VIEW.MOVED.FROM% = 0 : VIEW.KEY.CHAR% = 0 : VIEW.TAB.WIDTH% = 4
   VIEW.PAINT.ROW% = 0 : VIEW.PAINT.COUNT% = 0 : VIEW.PAINT.LINE% = 0 : VIEW.SCROLL.TOP% = 0
@@ -101,22 +106,15 @@ VIEW.SETUP:
   VIEW.SCAN.ENTRY% = 0 : VIEW.WORDS.ENTRY% = 0 :  VIEW.CLASS.LENGTH% = 0
   VIEW.CLASS.TEXTBANK% = 0 : VIEW.CLASS.FIRST% = 0 : VIEW.WORD.START% = 0
   VIEW.WORD.END% = 0 : VIEW.WORD.LENGTH% = 0 : VIEW.WORD.DOTTED% = 0
-  VIEW.CHANGE.LINE% = 0
-  VIEW.SELECT.ON% = 0
-  VIEW.SELECT.ANCHOR.LINE% = 0
-  VIEW.SELECT.ANCHOR.COL% = 0
-  VIEW.SELECT.FIRST.LINE% = 0
-  VIEW.SELECT.FIRST.COL% = 0
-  VIEW.SELECT.LAST.LINE% = 0
-  VIEW.SELECT.LAST.COL% = 0
-  VIEW.SELECTION.DELETED% = 0
+  VIEW.CHANGE.LINE% = 0 : VIEW.BAR.COLUMN% = 6 + VIEW.TEXT.WIDTH% : VIEW.BAR.TOP.SEEN% = -1
+  VIEW.BAR.COUNT.SEEN% = -1 : VIEW.BAR.PAINTED.ROW% = -1 : VIEW.BAR.PAINTED.SIZE% = 0 : VIEW.SELECT.ON% = 0
+  VIEW.SELECT.ANCHOR.LINE% = 0 : VIEW.SELECT.ANCHOR.COL% = 0 : VIEW.SELECT.FIRST.LINE% = 0 : VIEW.SELECT.FIRST.COL% = 0
+  VIEW.SELECT.LAST.LINE% = 0 : VIEW.SELECT.LAST.COL% = 0 : VIEW.SELECTION.DELETED% = 0
   ## Dark grey paper, under every ink of the colouring.
-  VIEW.SELECT.PAPER% = 176
-  GOSUB VIEW.KEYS.LOAD
+  VIEW.SELECT.PAPER% = 176 : GOSUB VIEW.KEYS.LOAD
   ## The seven inks at $BDF0, in class order: plain, statement, function, string, number,
   ## comment, and a word that is not a keyword.
-  POKE 48624, 1 : POKE 48625, 7: POKE 48626, 13
-  POKE 48627, 3 : POKE 48628, 8 : POKE 48629, 15 : POKE 48630, 1
+  POKE 48624, 1 : POKE 48625, 7: POKE 48626, 13 : POKE 48627, 3 : POKE 48628, 8 : POKE 48629, 15 : POKE 48630, 1
   GOSUB VIEW.CLASS.SCAN : GOSUB VIEW.CLASS.WORDS
   RETURN
 
@@ -1203,7 +1201,8 @@ VIEW.CLASS.WORDS:
 ## VIEW.SCROLL -- slide the VIEW.SCROLL.ROWS% screen rows from row VIEW.SCROLL.TOP% by one
 ## row. VIEW.SCROLL.DIR% is 0 to move the text up and 1 to move it down.
 ##
-## The row the slide exposes keeps its old cells. The caller paints it.
+## The row the slide exposes keeps its old cells. The caller paints it. The slide moves the
+## scroll bar's column too, so it leaves the bar to be painted again.
 VIEW.SCROLL:
   #REM 1
   GP.ASM
@@ -1266,11 +1265,13 @@ VIEW.SCROLL:
   REM SDONE: STZ $9F25
   GP.ENDASM
   #REM 0
+  VIEW.BAR.PAINTED.ROW% = -1
   RETURN
 
 ## VIEW.STATUS -- write the cursor's line and column on the status bar, both counted from 1.
 ## The line is four characters at column 6. The column is four characters at column 16.
-## Attributes are left as they are.
+## Attributes are left as they are. A change of the top line or the line count goes on to
+## VIEW.BAR.UPDATE.
 VIEW.STATUS:
   #REM 1
   GP.ASM
@@ -1351,6 +1352,28 @@ VIEW.STATUS:
   REM RTS
   GP.ENDASM
   #REM 0
+  IF VIEW.TOP.LINE% <> VIEW.BAR.TOP.SEEN% OR LINE.COUNT% <> VIEW.BAR.COUNT.SEEN% THEN GOSUB VIEW.BAR.UPDATE
+  RETURN
+
+## VIEW.BAR.UPDATE -- place the scroll bar's thumb for VIEW.TOP.LINE% and LINE.COUNT%, and
+## paint the bar when the thumb moved or grew, or a slide moved the bar.
+##
+## The thumb is the pane's share of the document, one row at least. It fills the track
+## while the document fits in the pane.
+VIEW.BAR.UPDATE:
+  VIEW.BAR.TOP.SEEN% = VIEW.TOP.LINE% : VIEW.BAR.COUNT.SEEN% = LINE.COUNT%
+  VIEW.BAR.SIZE% = VIEW.TEXT.ROWS% : VIEW.BAR.ROW% = 0
+  IF LINE.COUNT% <= VIEW.TEXT.ROWS% THEN GOTO VIEW.BAR.PLACED
+  VIEW.BAR.SIZE% = INT(VIEW.TEXT.ROWS% * VIEW.TEXT.ROWS% / LINE.COUNT%)
+  IF VIEW.BAR.SIZE% < 1 THEN VIEW.BAR.SIZE% = 1
+  VIEW.BAR.TRAVEL = VIEW.TEXT.ROWS% - VIEW.BAR.SIZE%
+  VIEW.BAR.ROW% = INT(VIEW.BAR.TRAVEL * VIEW.TOP.LINE% / (LINE.COUNT% - VIEW.TEXT.ROWS%) + 0.5)
+  IF VIEW.BAR.ROW% > VIEW.BAR.TRAVEL THEN VIEW.BAR.ROW% = VIEW.BAR.TRAVEL
+VIEW.BAR.PLACED:
+  IF VIEW.BAR.ROW% = VIEW.BAR.PAINTED.ROW% AND VIEW.BAR.SIZE% = VIEW.BAR.PAINTED.SIZE% THEN RETURN
+  VIEW.BAR.PAINTED.ROW% = VIEW.BAR.ROW% : VIEW.BAR.PAINTED.SIZE% = VIEW.BAR.SIZE%
+  GP.FILL VIEW.BAR.COLUMN%, VIEW.TEXT.TOP%, 1, VIEW.TEXT.ROWS%, VIEW.BAR.TRACK.CODE, VIEW.ATTR.TRACK%
+  GP.FILL VIEW.BAR.COLUMN%, VIEW.TEXT.TOP% + VIEW.BAR.ROW%, 1, VIEW.BAR.SIZE%, VIEW.BAR.THUMB.CODE, VIEW.ATTR.THUMB%
   RETURN
 
 ## VIEW.SELECT.PAINT -- give the selected cells of the rows VIEW.PAINT has just painted the

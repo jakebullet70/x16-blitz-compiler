@@ -21,6 +21,7 @@ junction; re-make it first if a rename breaks it. See [memory-is-git-tracked](me
 - [No ship language, no unasked builds](no-ship-language-this-is-dev.md) — a change sent back during a play-test gets built at once; [run builds in the background](run-builds-in-background.md); [build, report, hand it back](build-report-dont-investigate.md)
 - [Compile shared, not embedded](compile-shared-not-embedded.md) — SHARED is the p-code number; [release samples are the exception](release-samples-shape.md); [shipped readmes fit 78 columns](release-readmes-fit-78-columns.md)
 - [The compiler is GPC](name-the-compiler-gpc.md) — "Blitz" is a heritage nod; [concurrent agents run here](user-runs-concurrent-agents-here.md), re-read before any write
+- [Build times baseline](build-times-baseline.md) — time every build, flag 2x over; build.py prints step times
 - [Compact early, not at the end](compact-early-not-at-the-end.md) — remind the user to /compact at the end of every turn that lands a step
 
 ## Build and toolchain
@@ -72,6 +73,7 @@ junction; re-make it first if a rename breaks it. See [memory-is-git-tracked](me
 - [BUILD ALL: a sixth GPC.INPUT line](gpc-input-sixth-line-chain.md) — agreed route, asm not written
 
 ## The editor sample
+- [TURBO compile slow, FIXED](turbo-compile-slow-open.md) — the {VAR} cache overflowed; now banks 24-27, 32K; TURBO compiles in 45 s
 - [TURBO GPC IDE plan](turbo-gpc-ide-plan.md) — a fresh GP.BASIC editor on MSEDIT's design, source in GPC-BASIC-TOOLS-SRC/TURBO-GPC; the library change is done (bank plus address, `%` in 14 modules); the GUI dialogs are in TURBO.BASL, save to VRAM, and TURBOTEST passes; the menu bar is built (Esc opens File, Exit is a row); the file picker is built and the keys follow Notepad++; setup code lives in the regions to keep workspace; DLGLABELS gives the library's buttons TURBO's case; the library is copied to root and help rebuilt; plan in docs/blitz/TURBO-GPC.PLAN.md
 - [Editor branch state, GUI next](gpc-editor-branch-and-gui-next.md) — the self-check lines to keep green
 - [ED-STORE 255.BASL is test data](editor-test-fixture-files.md) — the editor opens it; do not flag it
@@ -124,7 +126,7 @@ junction; re-make it first if a rename breaks it. See [memory-is-git-tracked](me
 - [Arrays share the workspace](blitz-arrays-share-the-workspace.md) — no array heap; DIM raises OUT OF MEMORY
 - [Array index fast path](gpc-array-index-fastpath.md) — worth ~31%; watch the OOB short-circuit
 - [STRCASE call overhead, measured](strcase-call-overhead-measured.md) — ~2,570 cycles a call
-- [GP.ASM {VAR} symbol lookup, FIXED](gpasm-var-lookup-rescans-symfile.md) — FIXED: read once into banks 13-14, 317 s to 20 s
+- [GP.ASM {VAR} symbol lookup, FIXED](gpasm-var-lookup-rescans-symfile.md) — FIXED: read once into a bank cache, now 24-27
 
 ## X16 platform / toolchain
 - [PRINT and SCREEN drop the input channel](print-and-screen-drop-the-input-channel.md) — re-CHKIN before every MACPTR

@@ -278,6 +278,15 @@ Two decisions to take at the keyboard:
 
 ## Bugs
 
+### A second DIM of the same array raises no error -- OPEN, raised 2026-10-04
+
+X16 BASIC stops a second `DIM` of an array that is already dimensioned with `?REDIM'D ARRAY
+ERROR`. GPC runs it without an error. What the second `DIM` does to the array and to the
+workspace is not measured yet.
+
+To check: what the runtime does on the second `DIM`, whether the compiler can see the same
+name dimensioned twice, and that the fix raises the same error as the ROM.
+
 ### BASLOAD runs out of short variable names at about 950 — OPEN, raised 2026-10-01
 
 BASLOAD gives every variable a one- or two-character name: `A` to `Z`, then each letter with `0`
@@ -1002,6 +1011,11 @@ before writing it. `KV.PUTNUM` and `KV.GETNUM` are stubs until this is done
 - **The report never says how much of the 4,096-byte variable arena is gone.** Not started, and the
   cheapest of these. The figure is already in `pass1VarSpace` when the report prints.
   `### The report never says how much of the variable arena is gone`.
+- **A forward `FN` reference raises `BAD VALUE` -- research only, raised 2026-10-04.** `FNCompile`
+  in `evaluate/term/functions.asm` looks the function up with `FindVariable`. A call above its
+  `DEF FN` is not found yet and raises `BAD VALUE`, which names nothing. X16 BASIC only needs the
+  `DEF FN` to have run before the call, wherever it sits in the text. The research is how to fix
+  it, and whether that is worth doing at all. At the least, the error could name the cause.
 
 **Done 2026-09-13, outside the ranking:** compiler tests in two tiers
 (`docs/blitz/COMPILER-TESTS.PLAN.md`); `GP.ASM` `{VAR}` lookup reads the symbol file once a compile,
@@ -1374,6 +1388,32 @@ name. The scan collects it with the names.
 
 To decide: the exact marker the scan looks for, and a sweep of the library's contract comments into
 the form.
+
+### A plain editor spun off TURBO GPC — OPEN, raised 2026-10-04
+
+A generic text editor released on its own, built from TURBO GPC's modules with no syntax colouring,
+no Build menu and no relay. It lives in its own folder with an embedded runtime. The tag
+`editor-base` marks the tree it starts from.
+
+Name candidates: TURBOPAD, GPEDIT, EDIT16, NOTE16, PAD16. Taken: X16EDIT (Stefan Jakobsson).
+
+One source, two programs. Every `TG-*.BASL` module is shared. The colouring moves out of
+`TG-VIEW.BASL` into its own module, and the plain editor includes a stand-in that draws plain rows.
+`TURBO.BASL` and the plain editor's main file each pick their modules.
+
+Shared work comes first, the split after it:
+
+1. Themes: colour sets, chosen in the editor.
+2. Saved settings: theme, tab width, last file, find history.
+3. Tabs: shown at a set width, inserted as a tab or spaces.
+4. Line endings: CR, LF or CRLF kept as the file had it, chosen on Save As.
+5. Encoding: PETSCII or ASCII on load and save.
+6. Save As, and a prompt for unsaved changes on Quit and Open.
+7. A file named at launch opens.
+8. An About box and a key help screen.
+9. Long lines: the length limit and the sideways scroll.
+
+The plain editor's own work: the release folder, a readme that fits 78 columns.
 
 ### `FILEDIR` reads a directory too slowly — QUEUED, raised 2026-09-20
 
