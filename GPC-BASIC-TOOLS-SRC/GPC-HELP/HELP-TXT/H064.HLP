@@ -154,8 +154,8 @@
 .
 =SEE ALSO
 .
->76|4.5 BMX.INC.BL -- a BMX bitmap into VERA
->90|4.13 BANKMGR.INC.BL -- who owns which RAM bank
->57|3.12 Code in a bank
->51|3.10 Text in a bank
->95|4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM
+>78|4.5 BMX.INC.BL -- a BMX bitmap into VERA
+>92|4.13 BANKMGR.INC.BL -- who owns which RAM bank
+>59|3.12 Code in a bank
+>53|3.10 Text in a bank
+>97|4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM

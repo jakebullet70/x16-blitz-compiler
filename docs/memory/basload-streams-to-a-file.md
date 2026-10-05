@@ -110,7 +110,7 @@ the binary that just overwrote it. It stays at $6000. Tried and reverted, same s
 ## `#GPC` -- the directive channel
 
 `#GPC <anything>` emits the rest of the line into the tokenised program as a `REM`, verbatim, and
-BASLOAD never learns what it means. Shipped `1adaa64`. **Nothing reads these yet.**
+BASLOAD never learns what it means. Shipped `1adaa64`. GPC reads ten words; GP-BASIC.md §2 lists them.
 
     #GPC OBJECT "GPBMODS.PRG"    ->   1 REM#GPC OBJECT "GPBMODS.PRG"
 

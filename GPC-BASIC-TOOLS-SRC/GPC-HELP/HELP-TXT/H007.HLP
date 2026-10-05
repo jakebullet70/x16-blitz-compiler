@@ -2,9 +2,9 @@
 .
 =5. GPC-BASIC/ -- THE LIBRARY
 .
-.Text-mode building blocks, in BASL, #INCLUDEd into your source. Unless the
-.compile removes dead code, including a module costs its whole size whether
-.or not it is called.
+.Text-mode building blocks, in BASL, #INCLUDEd into your source. The compile
+.leaves out the lines of a module that nothing reaches (GP-BASIC.md SEC 7).
+.Under NOSTRIP a module costs its whole size whether or not it is called.
 .
 .  GPB.INC.BL
 .      the GP.* keyword definitions for BASLOAD. Every source using a GP
@@ -123,15 +123,15 @@
 .
 =SEE ALSO
 .
->65|4.1 THEME.INC.BL -- named colour roles
->74|4.3 APPSYS.INC.BL -- start politely, leave it as you found it
->113|STASH.INC.BL -- save a text rectangle, and put it back.
->117|STASHFILE.INC.BL -- a saved text rectangle, through a file.
->95|4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM
->96|4.19 STASHVRAMGC.INC.BL -- close the holes in a STASHVRAM store
->75|4.4 LINEINPUT.INC.BL -- a positioned entry field
->77|4.6 MENU.INC.BL -- menus built a row at a time
->90|4.13 BANKMGR.INC.BL -- who owns which RAM bank
->84|4.9 MENUPULL.INC.BL -- a dropdown under a bar item
->86|4.11 GUI.INC.BL -- the box that puts the screen back, and the form in 
->88|4.12 GUI-DIALOGS.INC.BL -- every dialog as a verb
+>162|7. Memory, and what the compiler tells you
+>67|4.1 THEME.INC.BL -- named colour roles
+>76|4.3 APPSYS.INC.BL -- start politely, leave it as you found it
+>115|STASH.INC.BL -- save a text rectangle, and put it back.
+>119|STASHFILE.INC.BL -- a saved text rectangle, through a file.
+>97|4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM
+>98|4.19 STASHVRAMGC.INC.BL -- close the holes in a STASHVRAM store
+>77|4.4 LINEINPUT.INC.BL -- a positioned entry field
+>79|4.6 MENU.INC.BL -- menus built a row at a time
+>92|4.13 BANKMGR.INC.BL -- who owns which RAM bank
+>86|4.9 MENUPULL.INC.BL -- a dropdown under a bar item
+>88|4.11 GUI.INC.BL -- the box that puts the screen back, and the form in 

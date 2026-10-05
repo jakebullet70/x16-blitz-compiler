@@ -60,7 +60,7 @@
 .
 =SEE ALSO
 .
->109|4.27 GPBMODS -- the harness that drives every module
->98|4.21 CHECK.INC.BL -- a check box, [X] or [ ]
->86|4.11 GUI.INC.BL -- the box that puts the screen back, and the form in 
->94|4.17 COMBO.INC.BL -- a drop-down list that folds into one row
+>111|4.27 GPBMODS -- the harness that drives every module
+>100|4.21 CHECK.INC.BL -- a check box, [X] or [ ]
+>88|4.11 GUI.INC.BL -- the box that puts the screen back, and the form in 
+>96|4.17 COMBO.INC.BL -- a drop-down list that folds into one row

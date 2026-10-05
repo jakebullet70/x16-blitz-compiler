@@ -116,14 +116,29 @@
 .
 =Removing dead code
 .
-.With REMOVE DEAD CODE? answered Y in GPC.PRG, or a file named on line 5 of
-.GPC.INPUT, the compiler leaves out every source line that no path from the
-.first line reaches. It writes the numbers of those lines to the file, one a
-.line. GPC.PRG names it D. and the source name. The numbers are the BASIC
-.line numbers BASLOAD gave, not lines of the .BASL file.
+.The compiler leaves out every source line that no path from the first line
+.reaches. It finds them in one extra pass, PASS 0. Line 5 of GPC.INPUT sets
+.what happens:
 .
-.The option adds one pass, PASS 0. With it off, the passes and the object are
-.unchanged.
+.  empty, or the file stops before it
+.      dead code is removed. No list is written
+.
+.  a file name
+.      dead code is removed. The numbers of the removed lines are written to
+.        that file, one a line
+.
+.  NOSTRIP
+.      dead code is kept. There is no PASS 0
+.
+.GPC.PRG asks REMOVE DEAD CODE?. RETURN alone or Y writes D. and the source
+.name on line 5, so the list goes to that file. N writes NOSTRIP.
+.
+.In the source, #GPC NOSTRIP keeps dead code whatever line 5 says. #GPC
+.DEADLIST "NAME" replaces line 5, so it turns removal on even when line 5
+.reads NOSTRIP. SEC 2 has the #GPC words.
+.
+.The numbers in the list are the BASIC line numbers BASLOAD gave, not lines
+.of the .BASL file.
 .
 .A line is reached through:
 .
@@ -164,12 +179,11 @@
 .    other line.
 .  - A KEEP inside a region, an ENDKEEP outside one, or a region open at the
 .    end of the source stops the compile with BLOCK MISMATCH.
-.  - With the option off, the markers are ordinary REMs.
+.  - Under NOSTRIP, the markers are ordinary REMs.
 .
 .{VAR} on a removed variable. A GP.ASM {VAR} naming a variable that only
-.removed lines create stops the compile with UNKNOWN VARIABLE IN {}. With the
-.option off it compiles. Create the variable in live code or in a keep
-.region.
+.removed lines create stops the compile with UNKNOWN VARIABLE IN {}. Under
+.NOSTRIP it compiles. Create the variable in live code or in a keep region.
 .
 =OUT OF MEMORY
 .
@@ -237,7 +251,8 @@
 .
 =SEE ALSO
 .
->57|3.12 Code in a bank
->51|3.10 Text in a bank
->76|4.5 BMX.INC.BL -- a BMX bitmap into VERA
->113|STASH.INC.BL -- save a text rectangle, and put it back.
+>9|2. Using it
+>59|3.12 Code in a bank
+>53|3.10 Text in a bank
+>78|4.5 BMX.INC.BL -- a BMX bitmap into VERA
+>115|STASH.INC.BL -- save a text rectangle, and put it back.

@@ -23,5 +23,5 @@
 .
 =SEE ALSO
 .
->39|3.4.5 GP.STRPTR -- address of a string block
->40|3.5 Arrays
+>41|3.4.5 GP.STRPTR -- address of a string block
+>42|3.5 Arrays

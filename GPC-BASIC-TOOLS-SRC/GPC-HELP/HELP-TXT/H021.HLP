@@ -26,8 +26,8 @@
 .
 =EXAMPLE PROGRAM
 .
->168|ARRAYS.EXP.BL  the GP.BASIC array set
+>170|ARRAYS.EXP.BL  the GP.BASIC array set
 .
 =SEE ALSO
 .
->82|4.7 SORT.INC.BL -- shell sort a string array
+>84|4.7 SORT.INC.BL -- shell sort a string array

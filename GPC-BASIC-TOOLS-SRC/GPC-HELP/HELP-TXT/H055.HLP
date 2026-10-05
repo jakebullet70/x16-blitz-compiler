@@ -22,8 +22,7 @@
 .MEM.BLOCKFILL, and the two routines share MEM.TARGET and MEM.COUNT.
 .
 .MEM.COUNT is 1 to 65535. It is not checked. A longer block goes a chunk at a
-.time; a chunk size above $4000 cannot be a #DEFINE, which is signed.
-.STASHVRAMGC.INC.BL (SEC 4.19) is the worked example.
+.time. STASHVRAMGC.INC.BL (SEC 4.19) is the worked example.
 .
 .Regions may overlap with the target below the source.
 .
@@ -40,6 +39,6 @@
 .
 =SEE ALSO
 .
->96|4.19 STASHVRAMGC.INC.BL -- close the holes in a STASHVRAM store
->95|4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM
->100|4.23 MEM.INC.BL -- a block copied, a block filled
+>98|4.19 STASHVRAMGC.INC.BL -- close the holes in a STASHVRAM store
+>97|4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM
+>102|4.23 MEM.INC.BL -- a block copied, a block filled

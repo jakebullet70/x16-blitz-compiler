@@ -2,8 +2,8 @@
 .
 =2. THE COMPILER
 .
-.GPC.PRG asks five questions -- input file, output file, debug map, shared
-.runtime, remove dead code -- writes the answers to GPC.INPUT, and
+.GPC.PRG asks five questions: input file, output file, debug map, shared
+.runtime, and REMOVE DEAD CODE?. It writes the answers to GPC.INPUT and
 .chain-loads the engine. Writing that file is all it does.
 .
 .GPC.BIN takes its whole job from GPC.INPUT and asks nothing. One program can
@@ -11,10 +11,33 @@
 .this project's test harness compiles, and how to get a build if the front
 .end itself is broken.
 .
-.GPC.INPUT is up to five text lines: source, object, map file, the word
-.SHARED, and the name of the removed-line list. An empty line, or one the
-.file stops short of, leaves that option off. It is per-user state and is not
-.shipped; the front end rewrites it on every compile.
+.GPC.INPUT is up to five text lines. It is per-user state and is not shipped.
+.The front end rewrites it on every compile.
+.
+.  1
+.      HOLDS: the source
+.
+.  2
+.      HOLDS: the object
+.
+.  3
+.      HOLDS: the debug map. Empty, or past the end of the file: no map
+.
+.  4
+.      HOLDS: the word SHARED. Empty, or past the end of the file: embedded
+.
+.  5
+.      HOLDS: empty, or past the end of the file: dead code is removed and no
+.        list is written. A file name: dead code is removed and the removed
+.        line numbers are written to that file, one a line. The word NOSTRIP:
+.        dead code is kept
+.
+.To REMOVE DEAD CODE?, RETURN alone or Y writes D. and the source name on
+.line 5. N writes NOSTRIP.
+.
+.#GPC lines in the source override lines 2 to 5, and with them the answers
+.typed into GPC.PRG. GP-BASIC.md SEC 2, "#GPC -- directives to the compiler",
+.lists the words.
 .
 .GPC.IMG.nnn.BIN is the runtime streamed into every self-contained object as
 .it is written. The engine cannot compile without it.

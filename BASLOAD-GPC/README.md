@@ -286,8 +286,9 @@ Three things it does that are easy to get wrong:
 - **A hidden `#IFDEF` block emits nothing**, the same test `#DEFINE` already
   makes.
 
-It costs a line number and the bytes of the text. GPC reads `#GPC KEEP` and
-`#GPC ENDKEEP`. A `#GPC` line is never searched for a define name.
+It costs a line number and the bytes of the text. A `#GPC` line is never
+searched for a define name. GPC reads ten words; `GPC-BASIC/GP-BASIC.md` §2,
+"`#GPC` - directives to the compiler", lists them.
 
 ## `#DEFINE` with a string
 

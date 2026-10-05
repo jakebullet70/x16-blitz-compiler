@@ -45,8 +45,8 @@ StartCompiler:
 		stz 	passNumber 					; the first of the two
 		stz 	pass1VarSpace 				; nothing known yet, so pass one emits zeroes into the
 		stz 	pass1VarSpace+1 			; _variable.space operand and pass two emits the answer
-		lda 	dcEnabled 					; and pass zero ahead of them both, when GPC.INPUT
-		sta 	dcPass 						; asks for dead code to be removed
+		lda 	dcEnabled 					; and pass zero ahead of them both, unless NOSTRIP
+		sta 	dcPass 						; keeps the dead code
 		stz 	dcSkip 						; and nothing is left out until pass zero says so
 		jsr 	GPBankScanLines 			; the lines each GP.BANKED region holds, before any
 											; pass decides how long a GOSUB into one is
@@ -140,6 +140,8 @@ MainCompileLoop:
 _MCLLineRead: 								; dead-code hooks went in
 		jsr 	ShowProgress 				; X and Y carry the line address, so this preserves both
 		jsr 	ProcessNewLine 				; set up pointer and line number.
+		lda 	gpcDebugOpen 				; a debug line, for the debugging features to come
+		sta 	gpcDebugLine
 		;
 		jsr 	GetLineNumber 				; get line # (=> A low, Y high)
 		;
@@ -173,6 +175,10 @@ _MCLSameLine:
 		cmp 	#";" 						; a stray ; between statements (e.g. GOSUB 970;) is
 		beq 	_MCLSameLine 				; tolerated by BASIC, so skip it like a colon.
 		jsr 	DCStatement 				; pass zero: what the statement starts with
+		cmp 	#C64_REM 					; anything but a REM ends the head of the program,
+		beq 	_MCLNotCode 				; where the program-wide #GPC words go
+		sta 	gpcCodeSeen
+_MCLNotCode:
 
 		;
 		;		A real statement follows. Checkpoint it for defer-to-runtime: remember the
@@ -298,6 +304,7 @@ SaveCodeAndExit:
 		lda 	blockDepth 					; GP.DO
 		ora 	ifDepth 					; GP.IF
 		ora 	SelectDepth 				; GP.SELECT
+		ora 	gpcDebugOpen 				; #GPC DEBUG_ON
 		beq 	_SCEClosed
 		.error_structure
 _SCEClosed:
@@ -522,6 +529,8 @@ ResetPassState:
 		stz 	clrCheckpoint 				; no CLR compiled yet -> no array is re-DIMmable
 		stz 	clrCheckpoint+1
 		stz 	deferErrors 				; not deferring compile errors until a statement arms it
+		stz 	gpcCodeSeen 				; no statement yet but REMs
+		stz 	gpcDebugOpen 				; no debug region open
 		stz 	deferCount 					; and the report is this pass's, because dead-code removal
 											; can leave a deferred line out of the final program
 		lda 	#$00 						; default return target $FE00 (the END marker) so an
@@ -1002,8 +1011,8 @@ layoutRunBase:								; the page the whole run of them starts at
 ;
 ;		Dead-code removal, in the code section for the same reason.
 ;
-dcEnabled:									; nonzero when GPC.INPUT line 5 names a removed-line
-		.fill 	1 							; list. Set by CompileCode, like gpBankShared
+dcEnabled:									; nonzero unless NOSTRIP is set. Set by CompileCode,
+		.fill 	1 							; like gpBankShared
 dcPass:										; nonzero while pass zero runs: pass one's work, with
 		.fill 	1 							; recording on
 		.send code

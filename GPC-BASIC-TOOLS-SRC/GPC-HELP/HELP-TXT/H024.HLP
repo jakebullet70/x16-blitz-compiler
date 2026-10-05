@@ -61,9 +61,9 @@
 .
 =EXAMPLE PROGRAM
 .
->175|IF.EXP.BL  GP.IF / GP.ELSEIF / GP.ELSE / GP.ENDIF
+>177|IF.EXP.BL  GP.IF / GP.ELSEIF / GP.ELSE / GP.ENDIF
 .
 =SEE ALSO
 .
->31|3.2 Multi-way branch
->30|3.1 Loops
+>33|3.2 Multi-way branch
+>32|3.1 Loops

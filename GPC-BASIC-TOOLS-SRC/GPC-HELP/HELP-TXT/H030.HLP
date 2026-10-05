@@ -39,5 +39,5 @@
 .
 =SEE ALSO
 .
->54|3.11.1 GP.DEFPROC -- declare a verb and its arguments
->55|3.11.2 GP.SUB -- call a verb
+>56|3.11.1 GP.DEFPROC -- declare a verb and its arguments
+>57|3.11.2 GP.SUB -- call a verb

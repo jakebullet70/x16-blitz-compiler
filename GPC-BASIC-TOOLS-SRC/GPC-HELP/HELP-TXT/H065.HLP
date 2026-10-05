@@ -74,5 +74,5 @@
 .
 =SEE ALSO
 .
->117|STASHFILE.INC.BL -- a saved text rectangle, through a file.
->95|4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM
+>119|STASHFILE.INC.BL -- a saved text rectangle, through a file.
+>97|4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM

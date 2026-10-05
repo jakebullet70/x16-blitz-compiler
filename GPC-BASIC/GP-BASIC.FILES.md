@@ -41,17 +41,30 @@ compiles. The engine behind it, `GPC.BIN`, is 100% assembly.
 
 ## 2. The compiler
 
-`GPC.PRG` asks five questions — input file, output file, debug map, shared runtime, remove dead
-code — writes the answers to `GPC.INPUT`, and chain-loads the engine. Writing that file is all it
-does.
+`GPC.PRG` asks five questions: input file, output file, debug map, shared runtime, and
+`REMOVE DEAD CODE?`. It writes the answers to `GPC.INPUT` and chain-loads the engine. Writing that
+file is all it does.
 
 `GPC.BIN` takes its whole job from `GPC.INPUT` and asks nothing. One program can therefore drive
 another: write the control file and `RUN GPC.BIN`. That is how this project's test harness compiles,
 and how to get a build if the front end itself is broken.
 
-`GPC.INPUT` is up to five text lines: source, object, map file, the word `SHARED`, and the name of
-the removed-line list. An empty line, or one the file stops short of, leaves that option off. It is
-per-user state and is not shipped; the front end rewrites it on every compile.
+`GPC.INPUT` is up to five text lines. It is per-user state and is not shipped. The front end
+rewrites it on every compile.
+
+| line | holds |
+|---|---|
+| 1 | the source |
+| 2 | the object |
+| 3 | the debug map. Empty, or past the end of the file: no map |
+| 4 | the word `SHARED`. Empty, or past the end of the file: embedded |
+| 5 | empty, or past the end of the file: dead code is removed and no list is written. A file name: dead code is removed and the removed line numbers are written to that file, one a line. The word `NOSTRIP`: dead code is kept |
+
+To `REMOVE DEAD CODE?`, RETURN alone or `Y` writes `D.` and the source name on line 5. `N` writes
+`NOSTRIP`.
+
+`#GPC` lines in the source override lines 2 to 5, and with them the answers typed into `GPC.PRG`.
+`GP-BASIC.md` §2, "`#GPC` — directives to the compiler", lists the words.
 
 `GPC.IMG.nnn.BIN` is the runtime streamed into every self-contained object as it is written. The
 engine cannot compile without it.
@@ -150,8 +163,9 @@ BASLOAD never learns what any of it means:
 ```
 
 **The `#` is kept and there is no space after the `REM` token.** That is what a reader matches on:
-`$8f` then `#GPC`, which no ordinary comment produces by accident. One table entry buys the compiler
-an unlimited directive namespace, so every future compiler directive is a GPC-side change alone.
+`$8f` then `#GPC`, which no ordinary comment produces by accident.
+
+GPC reads ten words. `GP-BASIC.md` §2, "`#GPC` — directives to the compiler", lists them.
 
 ### Where the old ceiling still binds
 
@@ -169,7 +183,7 @@ reads the debug map the compiler writes when `MAKE A DEBUG MAP?` is answered yes
 the address cannot be resolved.
 
 `GPC.HELP.PRG` is this reference, on the machine. It reads `HELP-TXT/` beside it — `GPC.HELP.IDX`
-and one `.HLP` per topic — and shows 75 topics at 80x30. Arrows, `PgUp` / `PgDn`, `HOME` and `END`
+and one `.HLP` per topic — and shows 76 topics at 80x30. Arrows, `PgUp` / `PgDn`, `HOME` and `END`
 move. `RETURN` opens the highlighted index row. `/` finds and `N` repeats the search. `L` follows a
 topic's cross references, `X` writes its code out as a `.BL` where it has any, `T` cycles the colour
 themes, `?` is the about box. `ESC` goes back a step, and quits from the index.
@@ -178,8 +192,9 @@ themes, `?` is the about box. `ESC` goes back a step, and quits from the index.
 
 ## 5. `GPC-BASIC/` — the library
 
-Text-mode building blocks, in BASL, `#INCLUDE`d into your source. Unless the compile
-removes dead code, including a module costs its whole size whether or not it is called.
+Text-mode building blocks, in BASL, `#INCLUDE`d into your source. The compile leaves out the
+lines of a module that nothing reaches (`GP-BASIC.md` §7). Under `NOSTRIP` a module costs its whole
+size whether or not it is called.
 
 | | |
 |---|---|

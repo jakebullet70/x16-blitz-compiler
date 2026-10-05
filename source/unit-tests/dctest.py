@@ -169,15 +169,15 @@ def compile_one(name, gpc, shared, dead):
     drive = os.path.join(WORK, name if dead else name + "-OFF")
     shutil.rmtree(drive, ignore_errors=True)
     os.makedirs(drive)
-    shutil.copy2(gpc, os.path.join(drive, "GPC.BIN"))
     for f in glob.glob(os.path.join(INPUTS, "*.BIN")):
         shutil.copy2(f, drive)
+    shutil.copy2(gpc, os.path.join(drive, "GPC.BIN"))    # last: the inputs hold an old GPC.BIN
     problem = make_source(name, drive)
     if problem:
         return problem, b"", None
 
     lines = [name + ".SRC.PRG", name + ".PRG", name + ".MAP", "SHARED" if shared else "",
-             ("D." + name) if dead else ""]
+             ("D." + name) if dead else "NOSTRIP"]
     open(os.path.join(drive, "GPC.INPUT"), "w", newline="\n").write("\n".join(lines) + "\n")
 
     env = dict(os.environ)

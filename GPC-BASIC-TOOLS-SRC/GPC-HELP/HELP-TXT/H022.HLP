@@ -24,9 +24,10 @@
 :...
 :GOSUB STASH.RESTORE
 .
-.STASHFILE.INC.BL is the same rectangle through a file. It is a separate
-.module because, unless the compile removes dead code (SEC 7), everything a
-.module holds is compiled into every program that includes it, called or not.
+.STASHFILE.INC.BL is the same rectangle through a file, in a module of its
+.own. A routine nothing calls costs nothing, because the compile removes dead
+.code (SEC 7). Under NOSTRIP everything a module holds is compiled into every
+.program that includes it, called or not.
 .
 .More than one rectangle in a bank. STASH.SLOT is a byte offset into the
 .bank, default 0, and STASH.NEXT comes back as the offset just past what was
@@ -46,8 +47,8 @@
 .
 =SEE ALSO
 .
->160|7. Memory, and what the compiler tells you
->113|STASH.INC.BL -- save a text rectangle, and put it back.
->117|STASHFILE.INC.BL -- a saved text rectangle, through a file.
->95|4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM
->96|4.19 STASHVRAMGC.INC.BL -- close the holes in a STASHVRAM store
+>162|7. Memory, and what the compiler tells you
+>115|STASH.INC.BL -- save a text rectangle, and put it back.
+>119|STASHFILE.INC.BL -- a saved text rectangle, through a file.
+>97|4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM
+>98|4.19 STASHVRAMGC.INC.BL -- close the holes in a STASHVRAM store

@@ -352,8 +352,9 @@ OptionsText: 								; line 3 : the debug map file name, or empty for none
 ModeText: 									; line 4 : compile mode -- first byte 'S' (SHARED) selects
 		.fill 	CFLineSize 					; the resident runtime (GPC.RT.nnn.BIN); empty/anything else
 											; = the default self-contained (embedded) runtime.
-DeadListFile: 								; line 5 : the removed-line list, or empty to keep every
-		.fill 	CFLineSize 					; line. Past the 256-byte block, see ReadControlFile.
+DeadListFile: 								; line 5 : the removed-line list, empty for none, or NOSTRIP
+		.fill 	CFLineSize 					; to keep every line. Past the 256-byte block, see
+											; ReadControlFile.
 cfLine: 									; ReadControlFile scratch: current line, 0..4
 		.fill 	1
 cfJustCR: 									; ReadControlFile scratch: nonzero if the last byte was a CR

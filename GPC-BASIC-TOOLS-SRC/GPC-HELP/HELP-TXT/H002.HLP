@@ -33,6 +33,95 @@
 .
 .Run GPC.PRG on BASLOAD's .PRG, then run the object it writes.
 .
+=#GPC -- directives to the compiler
+.
+:#GPC SHARED
+:#GPC OBJECT "GPBMODS.PRG"
+:#GPC DEADLIST "GPBMODS.DEAD"
+.
+.A #GPC line tells GPC how to build the program. BASLOAD-GPC, the tokeniser
+.the build runs, passes it through as the BASIC line REM#GPC <text>. ROM
+.BASLOAD does not know #GPC. A #GPC line inside a hidden #IFDEF block emits
+.nothing.
+.
+.  #GPC SHARED
+.      DOES: compiles against the resident runtime. Replaces GPC.INPUT line 4
+.
+.  #GPC EMBEDDED
+.      DOES: carries the runtime in the object. Replaces line 4
+.
+.  #GPC OBJECT "NAME"
+.      DOES: names the object. Replaces line 2
+.
+.  #GPC MAP "NAME"
+.      DOES: names the debug map. Replaces line 3
+.
+.  #GPC DEADLIST "NAME"
+.      DOES: names the list of removed lines. Replaces line 5
+.
+.  #GPC NOSTRIP
+.      DOES: keeps dead code, whatever line 5 says
+.
+.  #GPC KEEP, #GPC ENDKEEP
+.      DOES: open and close a keep region (SEC 7)
+.
+.  #GPC DEBUG_ON, #GPC DEBUG_OFF
+.      DOES: open and close a debug region. It changes nothing in the object
+.
+.The first six are program-wide. Each overrides the matching GPC.INPUT line,
+.and with it the answer typed into GPC.PRG. Put them first in the source. One
+.after the first line whose first statement is not a REM stops the compile
+.with DIRECTIVE TOO LATE.
+.
+.#GPC DEADLIST turns dead-code removal on even when line 5 reads NOSTRIP. SEC
+.7 covers dead-code removal.
+.
+.  - The word follows #GPC after any number of spaces, letters in any case.
+.    It ends at a space, a colon or the end of the line.
+.  - A name is in double quotes, 1 to 63 characters, and is folded to upper
+.    case. A missing quote, an empty name or a longer one is SYNTAX ERROR.
+.  - An unknown word stops the compile with UNKNOWN DIRECTIVE.
+.  - KEEP with ENDKEEP, and DEBUG_ON with DEBUG_OFF, go anywhere and pair up.
+.    An open inside an open region, a close without an open, or a region open
+.    at the end of the source is BLOCK MISMATCH. A keep region and a debug
+.    region may overlap. Under NOSTRIP the keep markers are not checked.
+.
+=#DEFINE -- a name for a constant
+.
+:#DEFINE APP.MAXROWS 120
+:#DEFINE APP.TITLE "TURBO GPC"
+:DIM ROW$(APP.MAXROWS)
+:PRINT APP.TITLE
+.
+.BASLOAD replaces every use of the name after its #DEFINE line with the
+.value. The compiler never sees the name. A define is set only in the source.
+.
+.  a number
+.      unsigned 16-bit, 0 to 65,535
+.
+.  text in double quotes
+.      a string define. The text goes in with its quotes, as a literal
+.        written there would. BASLOAD-GPC only
+.
+.  - A digit anywhere in the name, a negative value, or a number above 65,535
+.    stops BASLOAD with INVALID PARAMETER. #IFNDEF rejects a digit in the
+.    name the same way.
+.  - A use before the first #DEFINE is SYMBOL NOT IN SCOPE.
+.  - A name inside a string literal is not replaced, nor one on a #GPC line.
+.  - A name may be defined again, from a number to a string and back.
+.  - String text ends at the second " and holds no quote of its own. No
+.    closing quote is INVALID PARAMETER. {RED} in the text becomes a control
+.    code only under #CONTROLCODES. A line the text makes longer than
+.    #MAXCOLUMN, 250 by default, is LINE TOO LONG.
+.
+.#IFDEF NAME and #IFNDEF NAME keep or drop the lines down to their #ENDIF.
+.They nest. There is no #ELSE. #IFDEF sees a string define.
+.
+.WARNING: a define's name is replaced where it begins a longer name. With
+.#DEFINE FILEPICK.BOXW 44, the variable FILEPICK.BOXW% becomes 44%. It
+.compiles, and raises SYNTAX ERROR when the line runs. Never begin a
+.variable's name with a define's full name.
+.
 =Numbers, and what a variable holds
 .
 .One numeric type on the evaluation stack: a 4-byte mantissa, a 1-byte
@@ -70,4 +159,5 @@
 .
 =SEE ALSO
 .
->154|6. The traps, collected
+>162|7. Memory, and what the compiler tells you
+>156|6. The traps, collected

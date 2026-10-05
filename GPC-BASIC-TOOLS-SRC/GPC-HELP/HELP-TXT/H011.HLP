@@ -32,8 +32,8 @@
 .
 =EXAMPLE PROGRAM
 .
->179|LOOPS.EXP.BL  GP.DO / GP.LOOP / GP.EXITDO
+>181|LOOPS.EXP.BL  GP.DO / GP.LOOP / GP.EXITDO
 .
 =SEE ALSO
 .
->31|3.2 Multi-way branch
+>33|3.2 Multi-way branch

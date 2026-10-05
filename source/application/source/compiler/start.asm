@@ -21,6 +21,7 @@
 CompileCode:
 		jsr 	ReadControlFile 			; GPC.INPUT says what to compile and where to put it
 		bcs 	_CCNoControlFile 			; and without it there is nothing to be done
+		jsr 	PrescanDirectives 			; the source's #GPC words replace GPC.INPUT lines (directives.asm)
 		jsr 	PrintWorking 				; which is all the compiler now says for itself
 		jsr 	IODeleteOutputs 			; and clear the object AND map from a PREVIOUS run, so a
 								; compile that stops on an error leaves nothing behind
@@ -64,9 +65,9 @@ _CCNotShared:
 		lda 	#(PCODE_PAGE + 1 - (ObjectOrigin >> 8)) & $FF
 _CCRunPage:
 		sta 	gpBankRunPage
-		stz 	dcEnabled
-		lda 	DeadListFile 				; GPC.INPUT line 5 -- a name turns on dead-code removal
-		beq 	_CCKeepAll
+		stz 	dcEnabled 					; dead code is removed unless NOSTRIP (directives.asm)
+		lda 	pdNoStrip
+		bne 	_CCKeepAll
 		inc 	dcEnabled
 _CCKeepAll:
 		stz 	symCacheState 				; the first {VAR} reads the symbol file (symfile.asm)

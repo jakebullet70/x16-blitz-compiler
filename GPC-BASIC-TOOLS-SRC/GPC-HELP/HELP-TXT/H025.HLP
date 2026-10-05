@@ -187,9 +187,9 @@
 .
 =EXAMPLE PROGRAM
 .
->169|ASM.EXP.BL  GP.ASM / GP.ENDASM, inline 65C02 assembly
+>171|ASM.EXP.BL  GP.ASM / GP.ENDASM, inline 65C02 assembly
 .
 =SEE ALSO
 .
->57|3.12 Code in a bank
->93|4.16 FILEDIR.INC.BL -- a directory, into a bank or into low RAM
+>59|3.12 Code in a bank
+>95|4.16 FILEDIR.INC.BL -- a directory, into a bank or into low RAM

@@ -26,5 +26,5 @@
 .
 =SEE ALSO
 .
->104|4.24.3 CLOSEBOX -- take down the box opened last
->101|4.24 GUI-LITE.INC.BL -- a message box and a menu, in low memory
+>106|4.24.3 CLOSEBOX -- take down the box opened last
+>103|4.24 GUI-LITE.INC.BL -- a message box and a menu, in low memory

@@ -33,17 +33,17 @@
 .
 =IN THIS SECTION
 .
->35|3.4.1 GP.INSTR -- position of a substring
->36|3.4.2 GP.CONTAINS -- test for a substring
->37|3.4.3 GP.ISEMPTY -- test for a zero-length string
->38|3.4.4 GP.COMP -- compare two strings, ignoring case
->39|3.4.5 GP.STRPTR -- address of a string block
+>37|3.4.1 GP.INSTR -- position of a substring
+>38|3.4.2 GP.CONTAINS -- test for a substring
+>39|3.4.3 GP.ISEMPTY -- test for a zero-length string
+>40|3.4.4 GP.COMP -- compare two strings, ignoring case
+>41|3.4.5 GP.STRPTR -- address of a string block
 .
 =EXAMPLE PROGRAM
 .
->192|STRINGS.EXP.BL  the GP.BASIC string set
+>194|STRINGS.EXP.BL  the GP.BASIC string set
 .
 =SEE ALSO
 .
->83|4.8 STRCASE.INC.BL -- case, in place
->66|4.2 STRINGS.INC.BL -- string helpers
+>85|4.8 STRCASE.INC.BL -- case, in place
+>68|4.2 STRINGS.INC.BL -- string helpers

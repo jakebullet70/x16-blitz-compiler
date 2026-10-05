@@ -81,8 +81,8 @@
 .
 =EXAMPLE PROGRAM
 .
->173|FORM.EXP.BL  three fields you can move between, LINEINPUT style
+>175|FORM.EXP.BL  three fields you can move between, LINEINPUT style
 .
 =SEE ALSO
 .
->75|4.4 LINEINPUT.INC.BL -- a positioned entry field
+>77|4.4 LINEINPUT.INC.BL -- a positioned entry field

@@ -249,6 +249,79 @@ input.
 
 Run `GPC.PRG` on BASLOAD's `.PRG`, then run the object it writes.
 
+#### `#GPC` — directives to the compiler
+
+```basl
+#GPC SHARED
+#GPC OBJECT "GPBMODS.PRG"
+#GPC DEADLIST "GPBMODS.DEAD"
+```
+
+A `#GPC` line tells GPC how to build the program. BASLOAD-GPC, the tokeniser the build runs, passes
+it through as the BASIC line `REM#GPC <text>`. ROM BASLOAD does not know `#GPC`. A `#GPC` line
+inside a hidden `#IFDEF` block emits nothing.
+
+| directive | does |
+|---|---|
+| `#GPC SHARED` | compiles against the resident runtime. Replaces `GPC.INPUT` line 4 |
+| `#GPC EMBEDDED` | carries the runtime in the object. Replaces line 4 |
+| `#GPC OBJECT "NAME"` | names the object. Replaces line 2 |
+| `#GPC MAP "NAME"` | names the debug map. Replaces line 3 |
+| `#GPC DEADLIST "NAME"` | names the list of removed lines. Replaces line 5 |
+| `#GPC NOSTRIP` | keeps dead code, whatever line 5 says |
+| `#GPC KEEP`, `#GPC ENDKEEP` | open and close a keep region (§7) |
+| `#GPC DEBUG_ON`, `#GPC DEBUG_OFF` | open and close a debug region. It changes nothing in the object |
+
+The first six are program-wide. Each overrides the matching `GPC.INPUT` line, and with it the answer
+typed into `GPC.PRG`. Put them first in the source. One after the first line whose first statement
+is not a `REM` stops the compile with `DIRECTIVE TOO LATE`.
+
+`#GPC DEADLIST` turns dead-code removal on even when line 5 reads `NOSTRIP`. §7 covers dead-code
+removal.
+
+- The word follows `#GPC` after any number of spaces, letters in any case. It ends at a space, a
+  colon or the end of the line.
+- A name is in double quotes, 1 to 63 characters, and is folded to upper case. A missing quote, an
+  empty name or a longer one is `SYNTAX ERROR`.
+- An unknown word stops the compile with `UNKNOWN DIRECTIVE`.
+- `KEEP` with `ENDKEEP`, and `DEBUG_ON` with `DEBUG_OFF`, go anywhere and pair up. An open inside an
+  open region, a close without an open, or a region open at the end of the source is
+  `BLOCK MISMATCH`. A keep region and a debug region may overlap. Under `NOSTRIP` the keep markers
+  are not checked.
+
+#### `#DEFINE` — a name for a constant
+
+```basl
+#DEFINE APP.MAXROWS 120
+#DEFINE APP.TITLE "TURBO GPC"
+DIM ROW$(APP.MAXROWS)
+PRINT APP.TITLE
+```
+
+BASLOAD replaces every use of the name after its `#DEFINE` line with the value. The compiler never
+sees the name. A define is set only in the source.
+
+| value | |
+|---|---|
+| a number | unsigned 16-bit, 0 to 65,535 |
+| text in double quotes | a string define. The text goes in with its quotes, as a literal written there would. BASLOAD-GPC only |
+
+- A digit anywhere in the name, a negative value, or a number above 65,535 stops BASLOAD with
+  `INVALID PARAMETER`. `#IFNDEF` rejects a digit in the name the same way.
+- A use before the first `#DEFINE` is `SYMBOL NOT IN SCOPE`.
+- A name inside a string literal is not replaced, nor one on a `#GPC` line.
+- A name may be defined again, from a number to a string and back.
+- String text ends at the second `"` and holds no quote of its own. No closing quote is
+  `INVALID PARAMETER`. `{RED}` in the text becomes a control code only under `#CONTROLCODES`. A line
+  the text makes longer than `#MAXCOLUMN`, 250 by default, is `LINE TOO LONG`.
+
+`#IFDEF NAME` and `#IFNDEF NAME` keep or drop the lines down to their `#ENDIF`. They nest. There is
+no `#ELSE`. `#IFDEF` sees a string define.
+
+**WARNING: a define's name is replaced where it begins a longer name.** With
+`#DEFINE FILEPICK.BOXW 44`, the variable `FILEPICK.BOXW%` becomes `44%`. It compiles, and raises
+`SYNTAX ERROR` when the line runs. Never begin a variable's name with a define's full name.
+
 #### Numbers, and what a variable holds
 
 One numeric type on the evaluation stack: a 4-byte mantissa, a 1-byte exponent and a status byte
@@ -273,7 +346,7 @@ anything wider compiles through the float encoder. Neither wraps.
 
 `AND` and `OR` are 16-bit signed and raise `OUT OF RANGE` above 32,767; see §6.
 
-*See also: [6. The traps, collected](#6-the-traps-collected)*
+*See also: [7. Memory, and what the compiler tells you](#7-memory-and-what-the-compiler-tells-you), [6. The traps, collected](#6-the-traps-collected)*
 
 ## WHAT IS IN GPC
 
@@ -309,17 +382,30 @@ compiles. The engine behind it, `GPC.BIN`, is 100% assembly.
 
 ### 2. The compiler
 
-`GPC.PRG` asks five questions — input file, output file, debug map, shared runtime, remove dead
-code — writes the answers to `GPC.INPUT`, and chain-loads the engine. Writing that file is all it
-does.
+`GPC.PRG` asks five questions: input file, output file, debug map, shared runtime, and
+`REMOVE DEAD CODE?`. It writes the answers to `GPC.INPUT` and chain-loads the engine. Writing that
+file is all it does.
 
 `GPC.BIN` takes its whole job from `GPC.INPUT` and asks nothing. One program can therefore drive
 another: write the control file and `RUN GPC.BIN`. That is how this project's test harness compiles,
 and how to get a build if the front end itself is broken.
 
-`GPC.INPUT` is up to five text lines: source, object, map file, the word `SHARED`, and the name of
-the removed-line list. An empty line, or one the file stops short of, leaves that option off. It is
-per-user state and is not shipped; the front end rewrites it on every compile.
+`GPC.INPUT` is up to five text lines. It is per-user state and is not shipped. The front end
+rewrites it on every compile.
+
+| line | holds |
+|---|---|
+| 1 | the source |
+| 2 | the object |
+| 3 | the debug map. Empty, or past the end of the file: no map |
+| 4 | the word `SHARED`. Empty, or past the end of the file: embedded |
+| 5 | empty, or past the end of the file: dead code is removed and no list is written. A file name: dead code is removed and the removed line numbers are written to that file, one a line. The word `NOSTRIP`: dead code is kept |
+
+To `REMOVE DEAD CODE?`, RETURN alone or `Y` writes `D.` and the source name on line 5. `N` writes
+`NOSTRIP`.
+
+`#GPC` lines in the source override lines 2 to 5, and with them the answers typed into `GPC.PRG`.
+`GP-BASIC.md` §2, "`#GPC` — directives to the compiler", lists the words.
 
 `GPC.IMG.nnn.BIN` is the runtime streamed into every self-contained object as it is written. The
 engine cannot compile without it.
@@ -416,14 +502,17 @@ BASLOAD never learns what any of it means:
 ```
 
 **The `#` is kept and there is no space after the `REM` token.** That is what a reader matches on:
-`$8f` then `#GPC`, which no ordinary comment produces by accident. One table entry buys the compiler
-an unlimited directive namespace, so every future compiler directive is a GPC-side change alone.
+`$8f` then `#GPC`, which no ordinary comment produces by accident.
+
+GPC reads ten words. `GP-BASIC.md` §2, "`#GPC` — directives to the compiler", lists them.
 
 #### Where the old ceiling still binds
 
 **Anything that types `BASLOAD "X"` at the BASIC prompt uses the ROM, and still stops at 38,655
 bytes.** That is the interactive path and the dev harnesses in `source/scratch/`. Only the build drives the
 fork.
+
+*See also: [2. Using it](#2-using-it)*
 
 ### 4. The tools
 
@@ -440,8 +529,9 @@ themes, `?` is the about box. `ESC` goes back a step, and quits from the index.
 
 ### 5. `GPC-BASIC/` — the library
 
-Text-mode building blocks, in BASL, `#INCLUDE`d into your source. Unless the compile
-removes dead code, including a module costs its whole size whether or not it is called.
+Text-mode building blocks, in BASL, `#INCLUDE`d into your source. The compile leaves out the
+lines of a module that nothing reaches (`GP-BASIC.md` §7). Under `NOSTRIP` a module costs its whole
+size whether or not it is called.
 
 | | |
 |---|---|
@@ -479,7 +569,7 @@ removes dead code, including a module costs its whole size whether or not it is 
 
 What each one costs in bytes is in the command reference, under *At a glance*.
 
-*See also: [4.1 `THEME.INC.BL` — named colour roles](#41-themeincbl--named-colour-roles), [4.3 `APPSYS.INC.BL` — start politely, leave it as you found it](#43-appsysincbl--start-politely-leave-it-as-you-found-it), [STASH.INC.BL -- save a text rectangle, and put it back.](#stashincbl----save-a-text-rectangle-and-put-it-back), [STASHFILE.INC.BL -- a saved text rectangle, through a file.](#stashfileincbl----a-saved-text-rectangle-through-a-file), [4.18 `STASHVRAM.INC.BL` — rectangles and blobs, kept in VRAM](#418-stashvramincbl--rectangles-and-blobs-kept-in-vram), [4.19 `STASHVRAMGC.INC.BL` — close the holes in a STASHVRAM store](#419-stashvramgcincbl--close-the-holes-in-a-stashvram-store), [4.4 `LINEINPUT.INC.BL` — a positioned entry field](#44-lineinputincbl--a-positioned-entry-field), [4.6 `MENU.INC.BL` — menus built a row at a time](#46-menuincbl--menus-built-a-row-at-a-time), [4.13 `BANKMGR.INC.BL` — who owns which RAM bank](#413-bankmgrincbl--who-owns-which-ram-bank), [4.9 `MENUPULL.INC.BL` — a dropdown under a bar item](#49-menupullincbl--a-dropdown-under-a-bar-item), 4.11 GUI.INC.BL -- the box that puts the screen back, and the form in, [4.12 `GUI-DIALOGS.INC.BL` — every dialog as a verb](#412-gui-dialogsincbl--every-dialog-as-a-verb)*
+*See also: [7. Memory, and what the compiler tells you](#7-memory-and-what-the-compiler-tells-you), [4.1 `THEME.INC.BL` — named colour roles](#41-themeincbl--named-colour-roles), [4.3 `APPSYS.INC.BL` — start politely, leave it as you found it](#43-appsysincbl--start-politely-leave-it-as-you-found-it), [STASH.INC.BL -- save a text rectangle, and put it back.](#stashincbl----save-a-text-rectangle-and-put-it-back), [STASHFILE.INC.BL -- a saved text rectangle, through a file.](#stashfileincbl----a-saved-text-rectangle-through-a-file), [4.18 `STASHVRAM.INC.BL` — rectangles and blobs, kept in VRAM](#418-stashvramincbl--rectangles-and-blobs-kept-in-vram), [4.19 `STASHVRAMGC.INC.BL` — close the holes in a STASHVRAM store](#419-stashvramgcincbl--close-the-holes-in-a-stashvram-store), [4.4 `LINEINPUT.INC.BL` — a positioned entry field](#44-lineinputincbl--a-positioned-entry-field), [4.6 `MENU.INC.BL` — menus built a row at a time](#46-menuincbl--menus-built-a-row-at-a-time), [4.13 `BANKMGR.INC.BL` — who owns which RAM bank](#413-bankmgrincbl--who-owns-which-ram-bank), [4.9 `MENUPULL.INC.BL` — a dropdown under a bar item](#49-menupullincbl--a-dropdown-under-a-bar-item), 4.11 GUI.INC.BL -- the box that puts the screen back, and the form in*
 
 ### 6. `GPC-BASIC/` — the examples
 
@@ -897,9 +987,9 @@ GOSUB STASH.SAVE
 GOSUB STASH.RESTORE
 ```
 
-`STASHFILE.INC.BL` is the same rectangle through a file. It is a separate module because, unless
-the compile removes dead code (§7), everything a module holds is compiled into every program that
-includes it, called or not.
+`STASHFILE.INC.BL` is the same rectangle through a file, in a module of its own. A routine nothing
+calls costs nothing, because the compile removes dead code (§7). Under `NOSTRIP` everything a module
+holds is compiled into every program that includes it, called or not.
 
 **More than one rectangle in a bank.** `STASH.SLOT` is a byte offset into the bank, default 0, and
 `STASH.NEXT` comes back as the offset just past what was written. Feed one into the other and the
@@ -2960,9 +3050,8 @@ GOSUB SV.COMPACT
 IF SV.MOVED = 0 THEN <it was already tight>
 ```
 
-**Its own file, so a compactor nobody calls costs nothing.** Unless the compile removes dead code
-(§7), it would otherwise be compiled into every program that includes the store. `#INCLUDE` this
-one only if something in the program calls it, and **never call it automatically**.
+**A compactor nobody calls costs nothing.** The compile removes it as dead code (§7). Under
+`NOSTRIP` it is compiled into every program that includes it. `#INCLUDE` this one only if something in the program calls it, and **never call it automatically**.
 
 **It is not a garbage collector.** Liveness is known from the handle table rather than discovered,
 so there is no mark phase and nothing traces anything: the live blocks are read off in page order,
@@ -3179,9 +3268,8 @@ GOSUB MEM.FILL
 The KERNAL's `memory_copy` and `memory_fill`. The verbs are `MEM.BLOCKCOPY` and `MEM.BLOCKFILL`, and
 the two routines share `MEM.TARGET` and `MEM.COUNT`.
 
-`MEM.COUNT` is 1 to 65535. It is not checked. A longer block goes a chunk at a time; a chunk size
-above `$4000` cannot be a `#DEFINE`, which is signed. `STASHVRAMGC.INC.BL` (§4.19) is the worked
-example.
+`MEM.COUNT` is 1 to 65535. It is not checked. A longer block goes a chunk at a time.
+`STASHVRAMGC.INC.BL` (§4.19) is the worked example.
 
 Regions may overlap with the target below the source.
 
@@ -4437,7 +4525,7 @@ Each of these has cost a debugging session at least once.
 | `GP.BOX X,Y,W,H,,7` | optionals cannot be skipped over | `GP.BOX X,Y,W,H,0,7` |
 | `SCREEN` after `BMX.PAINT` | reloads the default palette and throws the image's colours away | set the mode first |
 | `STR.FIELD$` wanted bigger | auto-`DIM`ed at 0..10 on first use, and you cannot `DIM` it after | `DIM` it **before** the first call, set `STR.MAX` |
-| `#DEFINE X 129536` | `#DEFINE` takes an INT16 — `ERROR: INVALID PARAMETER` | an ordinary variable |
+| `#DEFINE X 129536` | a number define is unsigned 16-bit, 0 to 65,535. Above that, or negative: `ERROR: INVALID PARAMETER` | an ordinary variable |
 | `GP.SUB` above its `GP.DEFPROC` | the call carries an address, not a line number — `GP.SUB BEFORE ITS GP.DEFPROC` | declare the routine above every caller |
 | an array element as a `GP.DEFPROC` formal | `GP.DEFPROC FORMAL IS NOT A VARIABLE` | plain scalar formals, and set the array before the call |
 | a `GP.DEFPROC` body calling its own verb | one set of formals, so it writes over the arguments in use — wrong answer, no error | recursion needs its own saved copies, or a different shape |
@@ -4571,12 +4659,22 @@ build number: `?RTB128` for `GPB.RT.128.BIN`.
 
 #### Removing dead code
 
-With `REMOVE DEAD CODE?` answered `Y` in `GPC.PRG`, or a file named on line 5 of `GPC.INPUT`, the
-compiler leaves out every source line that no path from the first line reaches. It writes the numbers
-of those lines to the file, one a line. `GPC.PRG` names it `D.` and the source name. The numbers are
-the BASIC line numbers BASLOAD gave, not lines of the `.BASL` file.
+The compiler leaves out every source line that no path from the first line reaches. It finds them
+in one extra pass, `PASS 0`. Line 5 of `GPC.INPUT` sets what happens:
 
-The option adds one pass, `PASS 0`. With it off, the passes and the object are unchanged.
+| line 5 | |
+|---|---|
+| empty, or the file stops before it | dead code is removed. No list is written |
+| a file name | dead code is removed. The numbers of the removed lines are written to that file, one a line |
+| `NOSTRIP` | dead code is kept. There is no `PASS 0` |
+
+`GPC.PRG` asks `REMOVE DEAD CODE?`. RETURN alone or `Y` writes `D.` and the source name on line 5, so
+the list goes to that file. `N` writes `NOSTRIP`.
+
+In the source, `#GPC NOSTRIP` keeps dead code whatever line 5 says. `#GPC DEADLIST "NAME"` replaces
+line 5, so it turns removal on even when line 5 reads `NOSTRIP`. §2 has the `#GPC` words.
+
+The numbers in the list are the BASIC line numbers BASLOAD gave, not lines of the `.BASL` file.
 
 A line is reached through:
 
@@ -4613,10 +4711,10 @@ REM GP.ENDKEEP
 - The words match in either case. The marker lines are judged like any other line.
 - A `KEEP` inside a region, an `ENDKEEP` outside one, or a region open at the end of the source stops
   the compile with `BLOCK MISMATCH`.
-- With the option off, the markers are ordinary `REM`s.
+- Under `NOSTRIP`, the markers are ordinary `REM`s.
 
 **`{VAR}` on a removed variable.** A `GP.ASM` `{VAR}` naming a variable that only removed lines
-create stops the compile with `UNKNOWN VARIABLE IN {}`. With the option off it compiles. Create the
+create stops the compile with `UNKNOWN VARIABLE IN {}`. Under `NOSTRIP` it compiles. Create the
 variable in live code or in a keep region.
 
 #### `OUT OF MEMORY`
@@ -4674,4 +4772,4 @@ workspace, and inside a region it costs no p-code at all.
 - **A big temporary cannot be built and then freed.** Freeing is not a thing that happens on
   demand: build it in a bank, or in pieces.
 
-*See also: [3.12 Code in a bank](#312-code-in-a-bank), [3.10 Text in a bank](#310-text-in-a-bank), [4.5 `BMX.INC.BL` — a BMX bitmap into VERA](#45-bmxincbl--a-bmx-bitmap-into-vera), [STASH.INC.BL -- save a text rectangle, and put it back.](#stashincbl----save-a-text-rectangle-and-put-it-back)*
+*See also: [2. Using it](#2-using-it), [3.12 Code in a bank](#312-code-in-a-bank), [3.10 Text in a bank](#310-text-in-a-bank), [4.5 `BMX.INC.BL` — a BMX bitmap into VERA](#45-bmxincbl--a-bmx-bitmap-into-vera), [STASH.INC.BL -- save a text rectangle, and put it back.](#stashincbl----save-a-text-rectangle-and-put-it-back)*

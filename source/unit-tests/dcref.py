@@ -13,8 +13,8 @@
 #   other sessions, and one of them rewriting GPC.INPUT between the write and the read has
 #   already built the wrong program twice.
 #
-#   GPC.INPUT is written with FIVE lines, the fifth empty unless --dead names a removed-line
-#   list. A four-line engine stops reading at line four, so the same file serves both.
+#   GPC.INPUT is written with FIVE lines. The fifth names a removed-line list with --dead and
+#   reads NOSTRIP without it.
 #
 import os, shutil, subprocess, sys, time, glob, filecmp
 from concurrent.futures import ThreadPoolExecutor
@@ -71,13 +71,13 @@ def compile_one(entry, gpc, inputs, dead, run="run"):
     drive = os.path.join(WORK, run, tag(entry))
     shutil.rmtree(drive, ignore_errors=True)
     os.makedirs(drive)
-    shutil.copy2(gpc, os.path.join(drive, "GPC.BIN"))
     for f in os.listdir(inputs):
         if f.endswith(".BIN") or f.startswith(name + ".SRC."):
             shutil.copy2(os.path.join(inputs, f), drive)
+    shutil.copy2(gpc, os.path.join(drive, "GPC.BIN"))    # last: the inputs hold an old GPC.BIN
 
     lines = [name + ".SRC.PRG", name + ".PRG", name + ".MAP", "SHARED" if shared else "",
-             ("D." + name) if dead else ""]
+             ("D." + name) if dead else "NOSTRIP"]
     open(os.path.join(drive, "GPC.INPUT"), "w", newline="\n").write("\n".join(lines) + "\n")
 
     env = dict(os.environ)

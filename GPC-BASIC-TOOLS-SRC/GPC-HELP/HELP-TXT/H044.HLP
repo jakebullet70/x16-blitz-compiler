@@ -181,17 +181,17 @@
 .
 =EXAMPLE PROGRAM
 .
->174|GUI.EXP.BL  the four dialogs, over a screen they have to put back
+>176|GUI.EXP.BL  the four dialogs, over a screen they have to put back
 .
 =SEE ALSO
 .
->42|3.7 Screen -- drawing
->77|4.6 MENU.INC.BL -- menus built a row at a time
->95|4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM
->88|4.12 GUI-DIALOGS.INC.BL -- every dialog as a verb
->65|4.1 THEME.INC.BL -- named colour roles
->75|4.4 LINEINPUT.INC.BL -- a positioned entry field
->113|STASH.INC.BL -- save a text rectangle, and put it back.
->86|4.11 GUI.INC.BL -- the box that puts the screen back, and the form in 
->94|4.17 COMBO.INC.BL -- a drop-down list that folds into one row
->98|4.21 CHECK.INC.BL -- a check box, [X] or [ ]
+>44|3.7 Screen -- drawing
+>79|4.6 MENU.INC.BL -- menus built a row at a time
+>97|4.18 STASHVRAM.INC.BL -- rectangles and blobs, kept in VRAM
+>90|4.12 GUI-DIALOGS.INC.BL -- every dialog as a verb
+>67|4.1 THEME.INC.BL -- named colour roles
+>77|4.4 LINEINPUT.INC.BL -- a positioned entry field
+>115|STASH.INC.BL -- save a text rectangle, and put it back.
+>88|4.11 GUI.INC.BL -- the box that puts the screen back, and the form in 
+>96|4.17 COMBO.INC.BL -- a drop-down list that folds into one row
+>100|4.21 CHECK.INC.BL -- a check box, [X] or [ ]

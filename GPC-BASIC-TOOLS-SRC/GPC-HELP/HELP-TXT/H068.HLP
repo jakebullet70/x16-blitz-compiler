@@ -129,14 +129,14 @@
 =SEE ALSO
 .
 >9|2. Using it
->66|4.2 STRINGS.INC.BL -- string helpers
->85|4.10 STRUSING.INC.BL -- a number to a template
->65|4.1 THEME.INC.BL -- named colour roles
->74|4.3 APPSYS.INC.BL -- start politely, leave it as you found it
->75|4.4 LINEINPUT.INC.BL -- a positioned entry field
->91|4.14 KB.INC.BL -- the keyboard buffer, emptied
->77|4.6 MENU.INC.BL -- menus built a row at a time
->84|4.9 MENUPULL.INC.BL -- a dropdown under a bar item
->86|4.11 GUI.INC.BL -- the box that puts the screen back, and the form in 
->88|4.12 GUI-DIALOGS.INC.BL -- every dialog as a verb
->101|4.24 GUI-LITE.INC.BL -- a message box and a menu, in low memory
+>68|4.2 STRINGS.INC.BL -- string helpers
+>87|4.10 STRUSING.INC.BL -- a number to a template
+>67|4.1 THEME.INC.BL -- named colour roles
+>76|4.3 APPSYS.INC.BL -- start politely, leave it as you found it
+>77|4.4 LINEINPUT.INC.BL -- a positioned entry field
+>93|4.14 KB.INC.BL -- the keyboard buffer, emptied
+>79|4.6 MENU.INC.BL -- menus built a row at a time
+>86|4.9 MENUPULL.INC.BL -- a dropdown under a bar item
+>88|4.11 GUI.INC.BL -- the box that puts the screen back, and the form in 
+>90|4.12 GUI-DIALOGS.INC.BL -- every dialog as a verb
+>103|4.24 GUI-LITE.INC.BL -- a message box and a menu, in low memory

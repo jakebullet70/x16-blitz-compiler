@@ -244,13 +244,13 @@
 .
 =EXAMPLE PROGRAM
 .
->183|MENUTO.EXP.BL  MENUTO.VERT and MENUTO.BAR by hand
->181|MENUBUILD.EXP.BL  MENU.INC.BL's builder, read back
+>185|MENUTO.EXP.BL  MENUTO.VERT and MENUTO.BAR by hand
+>183|MENUBUILD.EXP.BL  MENU.INC.BL's builder, read back
 .
 =SEE ALSO
 .
->90|4.13 BANKMGR.INC.BL -- who owns which RAM bank
->51|3.10 Text in a bank
->84|4.9 MENUPULL.INC.BL -- a dropdown under a bar item
->77|4.6 MENU.INC.BL -- menus built a row at a time
->65|4.1 THEME.INC.BL -- named colour roles
+>92|4.13 BANKMGR.INC.BL -- who owns which RAM bank
+>53|3.10 Text in a bank
+>86|4.9 MENUPULL.INC.BL -- a dropdown under a bar item
+>79|4.6 MENU.INC.BL -- menus built a row at a time
+>67|4.1 THEME.INC.BL -- named colour roles

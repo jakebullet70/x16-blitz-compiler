@@ -106,8 +106,10 @@
 .
 .The # is kept and there is no space after the REM token. That is what a
 .reader matches on: $8f then #GPC, which no ordinary comment produces by
-.accident. One table entry buys the compiler an unlimited directive
-.namespace, so every future compiler directive is a GPC-side change alone.
+.accident.
+.
+.GPC reads ten words. GP-BASIC.md SEC 2, "#GPC -- directives to the
+.compiler", lists them.
 .
 =Where the old ceiling still binds
 .
@@ -115,3 +117,6 @@
 .stops at 38,655 bytes. That is the interactive path and the dev harnesses in
 .source/scratch/. Only the build drives the fork.
 .
+=SEE ALSO
+.
+>9|2. Using it

@@ -72,7 +72,7 @@
 .
 =SEE ALSO
 .
->90|4.13 BANKMGR.INC.BL -- who owns which RAM bank
->45|3.9 Inline assembly
->93|4.16 FILEDIR.INC.BL -- a directory, into a bank or into low RAM
->92|4.15 FILEIO.INC.BL -- the drive: status, files, directories
+>92|4.13 BANKMGR.INC.BL -- who owns which RAM bank
+>47|3.9 Inline assembly
+>95|4.16 FILEDIR.INC.BL -- a directory, into a bank or into low RAM
+>94|4.15 FILEIO.INC.BL -- the drive: status, files, directories

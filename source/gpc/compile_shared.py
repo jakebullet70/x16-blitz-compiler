@@ -18,13 +18,13 @@
 #		this boots the bundled emulator and drives the real thing. GPC.PRG (the front end) is
 #		INTERACTIVE, so it is the wrong thing to script -- run the ENGINE, GPC.BIN, which
 #		reads GPC.INPUT straight off the drive. GPC.INPUT is five lines: source, object,
-#		map, SHARED or blank, and the removed-line list or blank. This script writes the
-#		first three, and SHARED on a fourth for a SHARED build, so it never removes dead code.
+#		map, SHARED or blank, and the removed-line list, blank or NOSTRIP. Dead code is removed
+#		unless line 5 reads NOSTRIP.
 #
 #		GPC.INPUT is a tracked working file, so it is snapshotted and restored: a build must not
 #		leave the tree different from how it found it.
 #
-#			compile_shared.py [--drive DIR] [--embedded] <source.prg> <object.prg> [map]
+#			compile_shared.py [--drive DIR] [--embedded] [--strip FILE | --nostrip] <source.prg> <object.prg> [map]
 #
 #		Both programs the build compiles -- GPC.PRG and GPC.ERR -- are SHARED, so they use
 #		the resident runtime rather than carrying a ~12K copy each. GPC.PRG needs the GPB
@@ -107,14 +107,12 @@ def compile_one(source, obj, mapfile="", shared=True, deadlist=""):
 	try:
 		#
 		#		Three lines, and SHARED on a fourth for a SHARED build. The engine reads a line
-		#		the file stops short of as blank, so an EMBEDDED build needs no empty fourth line
-		#		and a build without --strip has no fifth: dead code is only removed when asked
-		#		for. GPC.PRG writes all five, blank where an option is off.
+		#		the file stops short of as blank. A blank fifth line removes dead code and writes
+		#		no list.
 		#
-		#		--strip names the fifth line, which is what turns the option on. The compiler
-		#		WRITES that file -- the numbers of the lines it left out, one a line -- so it is
-		#		an output, not a list to supply. The fourth line has to be there to be stepped
-		#		over, blank for an EMBEDDED build.
+		#		The fifth line is the list file with --strip, or NOSTRIP with --nostrip. The
+		#		compiler WRITES the list, the numbers of the lines it left out, one a line. The
+		#		fourth line has to be there to be stepped over, blank for an EMBEDDED build.
 		#
 		control = "%s\n%s\n%s\n" % (source, obj, mapfile)
 		if shared:
@@ -230,11 +228,13 @@ def main():
 	shared = True
 	deadlist = ""
 	#		--drive DIR compiles where a sample lives rather than in source/drive/.
-	#		--strip FILE removes dead code and writes the lines left out to FILE. Off unless
-	#		asked for, so every build that does not pass it is compiled exactly as before.
-	while args and args[0] in ("--embedded", "--drive", "--strip"):
+	#		--strip FILE writes the lines left out to FILE. --nostrip keeps the dead code.
+	while args and args[0] in ("--embedded", "--drive", "--strip", "--nostrip"):
 		if args[0] == "--embedded":
 			shared = False
+			args = args[1:]
+		elif args[0] == "--nostrip":
+			deadlist = "NOSTRIP"
 			args = args[1:]
 		elif len(args) >= 2:
 			if args[0] == "--strip":
@@ -246,7 +246,7 @@ def main():
 		else:
 			break
 	if len(args) not in (2, 3):
-		die("usage: compile_shared.py [--drive DIR] [--embedded] [--strip DEAD.TXT] <source.prg> <object.prg> [map]")
+		die("usage: compile_shared.py [--drive DIR] [--embedded] [--strip DEAD.TXT | --nostrip] <source.prg> <object.prg> [map]")
 	compile_one(args[0], args[1], args[2] if len(args) == 3 else "", shared, deadlist)
 
 

@@ -107,11 +107,11 @@
 .
 =EXAMPLE PROGRAM
 .
->172|BMXVIEW.EXP.BL  a BMX bitmap viewer, in about thirty lines
->170|BMXPAL.EXP.BL
->171|BMXSPD.EXP.BL
+>174|BMXVIEW.EXP.BL  a BMX bitmap viewer, in about thirty lines
+>172|BMXPAL.EXP.BL
+>173|BMXSPD.EXP.BL
 .
 =SEE ALSO
 .
->57|3.12 Code in a bank
->76|4.5 BMX.INC.BL -- a BMX bitmap into VERA
+>59|3.12 Code in a bank
+>78|4.5 BMX.INC.BL -- a BMX bitmap into VERA

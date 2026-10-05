@@ -50,7 +50,8 @@
 .      DO THIS: DIM it before the first call, set STR.MAX
 .
 .  #DEFINE X 129536
-.      WHAT HAPPENS: #DEFINE takes an INT16 -- ERROR: INVALID PARAMETER
+.      WHAT HAPPENS: a number define is unsigned 16-bit, 0 to 65,535. Above
+.        that, or negative: ERROR: INVALID PARAMETER
 .      DO THIS: an ordinary variable
 .
 .  GP.SUB above its GP.DEFPROC
@@ -74,4 +75,4 @@
 .
 =SEE ALSO
 .
->82|4.7 SORT.INC.BL -- shell sort a string array
+>84|4.7 SORT.INC.BL -- shell sort a string array
