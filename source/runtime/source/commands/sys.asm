@@ -29,6 +29,15 @@ CommandSYS: ;; [!sys]
 		lda 	NSMantissa0,x
 		sta 	zTemp0
 
+		lda 	SelectROMBank 				; a call into $C000-$FFFF runs under BANK's ROM bank
+		pha
+		lda 	zTemp0+1
+		cmp 	#$C0
+		bcc 	_CSRAMTarget
+		lda 	romBank
+		sta 	SelectROMBank
+_CSRAMTarget:
+
 		ldx 	SYS_Reg_X 					; load registers
 		ldy 	SYS_Reg_Y
 		lda 	SYS_Reg_S
@@ -44,6 +53,8 @@ CommandSYS: ;; [!sys]
 		sta 	SYS_Reg_A
 		pla
 		sta 	SYS_Reg_S
+		pla
+		sta 	SelectROMBank
 
 		ply 								; restore YX and drop 2
 		plx

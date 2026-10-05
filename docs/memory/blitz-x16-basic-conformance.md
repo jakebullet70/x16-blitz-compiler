@@ -1,6 +1,6 @@
 ---
 name: blitz-x16-basic-conformance
-description: Blitz-vs-stock-X16-BASIC conformance — the four lexer and semantics defects are fixed, the float PRINTER bug under them too, and SLEEP 0 is a fifth divergence still open
+description: Blitz-vs-stock-X16-BASIC conformance — the four lexer and semantics defects are fixed, the float PRINTER bug under them too, PEEK/SYS now honour BANK's ROM bank (build 133), and SLEEP 0 still diverges
 metadata:
   type: project
 ---
@@ -72,6 +72,15 @@ never claimed the same thing. `FloatAdd`/`FloatSubtract` are exact and deliberat
 To check float internals, bypass BASIC entirely: hand-build the stack slots in a small `.asm`, `jsr` the routine, store the
 6 result bytes to a fixed address, and read them out of the emulator's `-dump R` image. That is the only way to see the bits;
 `PRINT` cannot be trusted as a readout, which is exactly what cost time here.
+
+## BANK's ROM bank, FIXED in runtime build 133 (2026-10-05)
+
+A user reported `PRINT PEEK($FF80)` gives 49 interpreted and 255 compiled. `CommandBank` stored the ROM argument in
+`romBank` and nothing read it, so PEEK read through whatever bank `$01` held (4, BASIC, under a compiled program).
+Now `XPeekMemory` (x16_peekpoke.asm) reads $C000-$FFFF under `romBank` with IRQs off, and `CommandSYS` (sys.asm)
+runs a call into $C000-$FFFF under it and restores `$01` after. `romBank` starts at 0 (KERNAL), as the ROM's does.
+Measured: interpreted and compiled both print `49`, `255` after `BANK 0,4`, and `PEEK(1)` = 4 throughout.
+Test runner: source/scratch/peek133/run.py.
 
 ## Still open
 

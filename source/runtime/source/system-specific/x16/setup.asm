@@ -19,9 +19,9 @@
 ; ************************************************************************************************
 
 XRuntimeSetup:
- 		lda 	#$FF 						; default banks to access.
+ 		lda 	#$FF 						; RAM bank: leave the current one
  		sta 	ramBank
- 		sta 	romBank
+ 		stz 	romBank 					; ROM bank: KERNAL, as X16 BASIC starts
 		rts
 		
 		.send code

@@ -5,7 +5,7 @@ metadata:
   type: project
 ---
 
-**PARKED, to revisit.** The question was whether BASLOAD should drop routines the program never
+**BUILT in GPC (b60c146), off by default: GPC asks REMOVE DEAD CODE?, compile_shared.py takes --strip FILE, GP-BASIC.md "Removing dead code". The numbers below are the original BASLOAD-side study.** The question was whether BASLOAD should drop routines the program never
 calls before it writes the tokenised file. Measured with `source/unit-tests/deadcode.py`, which
 reproduces every number here.
 

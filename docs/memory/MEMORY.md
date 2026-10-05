@@ -16,6 +16,7 @@ junction; re-make it first if a rename breaks it. See [memory-is-git-tracked](me
 - [Compiler must not cap program size](compiler-must-not-cap-program-size.md) — a build-side wall is a bug; [no backward compatibility](no-backward-compatibility-needed.md)
 - [BMXVIEW: two copies, one master](bmxview-two-copies-one-master.md) — BMXVIEWER/BMXVIEW.BASL is the master; sync back, adjusting the #INCLUDE prefix
 - [Library working copy, then root](library-working-copy-then-root.md) — edit in GPB-MODS-TESTING/GPC-BASIC/, drift runs both ways; [test in GPBMODS first](test-in-gpbmods-before-spreading.md); [samples build in place](samples-build-in-place.md)
+- [Ask before adding library code](ask-before-adding-library-code.md) — unused routines ship unless --strip; one program's feature goes in that program
 - [GUI only through verbs](gui-only-through-verbs.md) — no GOSUB GUI.* in a program
 - [Library never hard-codes a bank](library-never-hard-codes-a-bank.md) — the program hands each module its place; banks are shared, no waste
 - [No ship language, no unasked builds](no-ship-language-this-is-dev.md) — a change sent back during a play-test gets built at once; [run builds in the background](run-builds-in-background.md); [build, report, hand it back](build-report-dont-investigate.md)
@@ -115,7 +116,7 @@ junction; re-make it first if a rename breaks it. See [memory-is-git-tracked](me
 - [Empty INPUT gives ""](gpc-input-empty-line.md) — FIXED; ROM keeps the old value, a chosen divergence
 - [GPC JOY high byte diverges](gpc-joy-high-byte-diverges.md) — FIXED in runtime build 129
 - [GPC PSGVOL and FMVOL were inverted](gpc-psgvol-fmvol-inverted.md) — FIXED in runtime build 130
-- [X16 BASIC conformance](blitz-x16-basic-conformance.md) — 4 defects fixed; `SLEEP 0` still diverges
+- [X16 BASIC conformance](blitz-x16-basic-conformance.md) — 4 defects fixed, PEEK/SYS ROM bank fixed in build 133; `SLEEP 0` still diverges
 - [Interpreter LOAD chain is safe](x16-interpreter-load-chain-is-safe.md) — R49 moves VARTAB
 - [No END crashes at exit](program-without-end-crashes.md) — end every test program with END
 - [X16 BASIC coverage](gpc-x16-basic-coverage.md) — the 7 lexer blockers on valid X16 BASIC

@@ -39,9 +39,13 @@ _XPMExit:
 ;
 ; ************************************************************************************************
 
+;		$C000-$FFFF reads the ROM bank BANK chose, 0 (KERNAL) by default, as X16 BASIC does.
+
 XPeekMemory:
 		stx 	zTemp0
 		sty 	zTemp0+1
+		cpy 	#$C0
+		bcs 	_XPMReadROM
 
 		ldy 	SelectRAMBank 				; old RAM bank in Y
 		ldx 	ramBank 					; switch to BANKed RAMBank if not $FF
@@ -51,6 +55,17 @@ XPeekMemory:
 _XPMNoSwitch:
 		lda 	(zTemp0) 					; do the PEEK
 		sty 	SelectRAMBank 				; reselect previous RAM bank.
+		rts
+
+_XPMReadROM:
+		php
+		sei
+		ldy 	SelectROMBank 				; old ROM bank in Y
+		lda 	romBank
+		sta 	SelectROMBank
+		lda 	(zTemp0)
+		sty 	SelectROMBank
+		plp
 		rts
 
 
@@ -68,7 +83,7 @@ CommandBank: ;; [!bank]
 		lda 	NSMantissa0+1 		 		; ROM specified 
 		cmp 	#$FF
 		beq 	_CBNoUpdate
-		sta 	romBank 					; this doesn't set the hardware page.
+		sta 	romBank 					; PEEK and SYS select it for $C000-$FFFF
 _CBNoUpdate:		
 		ldx 	#$FF
 		.exitcmd
