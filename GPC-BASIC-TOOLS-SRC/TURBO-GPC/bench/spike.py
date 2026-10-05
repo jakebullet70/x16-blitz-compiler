@@ -53,7 +53,7 @@ DRIVER = "SPIKERUN.BAS"
 FIXTURE = "FIX2000.TXT"
 CONFIG = "BENCH.CFG"
 RUN_TIMEOUT = 300
-MODULES = ["TG-STORE.BASL", "TG-UNDO.BASL", "TG-VIEW.BASL", "TG-CLIP.BASL", "TG-KEYS.BASL", "TG-LOW.BASL", "TGKEYS.BIN"]
+MODULES = ["TG-STORE.BASL", "TG-FIND.BASL", "TG-UNDO.BASL", "TG-VIEW.BASL", "TG-CLIP.BASL", "TG-KEYS.BASL", "TG-LOW.BASL", "TGKEYS.BIN"]
 LIBRARY = "GPC-BASIC"
 # The name endings of the files this folder keeps. clean() deletes every other file in it.
 KEPT = (".BASL", ".py", ".P8", ".TXT")
@@ -103,12 +103,16 @@ def turbo_test_source():
     """Write TURBOTEST.BASL. It is the editor's source with its key wait and its exit
     handed to TURBOTEST-DRIVER.BASL, and its settings store in this folder.
 
-    Each of the six strings replaced must occur once in TURBO.BASL. The run stops when
-    one does not."""
-    source = open(os.path.join(EDITOR, "TURBO.BASL"), "r", encoding="latin-1", newline="").read()
+    Each of the nine strings replaced must occur once in TURBO.BASL. The run stops when
+    one does not. TURBO.BASL is read with its line endings made LF, so the strings ending
+    in a newline match a CRLF copy too."""
+    source = open(os.path.join(EDITOR, "TURBO.BASL"), "r", encoding="latin-1").read()
     changes = [
         ('#SAVEAS "@:TURBO.SRC.PRG"', '#SAVEAS "@:TURBOTEST.SRC.PRG"'),
         ('#SYMFILE "@:TURBO.SRC.SYM"', '#SYMFILE "@:TURBOTEST.SRC.SYM"'),
+        ('#GPC OBJECT "TURBO.PRG"', '#GPC OBJECT "TURBOTEST.PRG"'),
+        ('#GPC MAP "TURBO.MAP"', '#GPC MAP "TURBOTEST.MAP"'),
+        ('#GPC DEADLIST "TURBO.DEAD"', '#GPC DEADLIST "TURBOTEST.DEAD"'),
         (' IF TURBO.KEY$ = "" THEN GOTO TURBO.KEY.IDLE\n', ' IF TURBO.KEY$ = "" THEN GOTO TEST.FEED\n'),
         ('GOSUB APPSYS.RESTORE\nEND\n', 'TEST.QUIT.SEEN = 1\nGOTO TEST.REPORT\n'),
         ('KVBIN.FNAME$ = "/SETTINGS.KVB"', 'KVBIN.FNAME$ = "%s"' % SETTINGS),

@@ -2,6 +2,9 @@
 
     python build.py        write TGKEYS.BIN, tokenise TURBO.BASL, compile it SHARED
 
+The #GPC lines at the head of TURBO.BASL name TURBO.PRG, TURBO.MAP and TURBO.DEAD and pick SHARED.
+TURBO.DEAD lists the source lines dead-code removal left out, one number a line.
+
 The emulator mounts GPC-BASIC-TOOLS-SRC and changes into this folder. The tools come from
 /GPC/, the tool home that make install fills. TURBO.MAP and TURBO.SRC.SYM stay beside
 TURBO.PRG. The tokenised source and GPC.INPUT are removed.
@@ -65,7 +68,8 @@ def main():
     print("build: {VAR} cache needs %d of %d bytes" % (needed, SYM_CACHE_BYTES))
     if needed > SYM_CACHE_BYTES:
         print("build: WARNING the cache overflows, so this compile will be slow")
-    step("compile_shared.py", NAME + ".SRC.PRG", NAME + ".PRG", NAME + ".MAP")
+    # compile_shared.py checks the object it is given, so NAME.PRG must match #GPC OBJECT.
+    step("compile_shared.py", NAME + ".SRC.PRG", NAME + ".PRG")
     for scratch in (NAME + ".SRC.PRG", "GPC.INPUT"):
         if os.path.exists(os.path.join(HERE, scratch)):
             os.remove(os.path.join(HERE, scratch))
