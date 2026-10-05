@@ -230,6 +230,14 @@ default:
     sec
     rts
 
+:   cmp #$f8                        ;=== GPC begin === a string #DEFINE filled the table
+    bne :+
+    sec
+    lda #RESPONSE_SYMTBL_FULL
+    jsr response_set
+    sec
+    rts                             ;=== GPC end ===
+
     ;=== GPC begin === #GPC emits, so pass 1 has to count it
     ;
     ;   A directive line normally leaves index_dst at zero and eol rewinds the
@@ -679,6 +687,14 @@ default:
     sec
     rts
 
+:   cmp #$f8                        ;=== GPC begin === a string #DEFINE filled the table
+    bne :+
+    sec
+    lda #RESPONSE_SYMTBL_FULL
+    jsr response_set
+    sec
+    rts                             ;=== GPC end ===
+
     ;=== GPC begin === #GPC goes out as a REM, verbatim
     ;
     ;   eol_mark, not eol: eol would let #SOURCELINES append ": REM nnn" INSIDE
@@ -973,9 +989,13 @@ symbol_found:
     jmp instoken
 :   cmp #SYMBOLTYPE_LITERAL_PASS2
     beq symbol_insert_value
-    cmp #SYMBOLTYPE_LITERAL_PASS1
+    cmp #SYMBOLTYPE_STRING_PASS1    ;=== GPC begin ===
+    bcc :+
+    jmp symbol_string
+:   cmp #SYMBOLTYPE_LITERAL_PASS1     ;=== GPC end ===
     bne :+
 
+symbol_not_in_scope:                ;=== GPC ===
     clc
     lda #RESPONSE_SYMBOL_NOT_IN_SCOPE
     jsr response_set
@@ -1290,6 +1310,101 @@ next:
     ; Move to next char in the input buffer
     inc index_src
     jmp loop
+
+;=== GPC begin === a string define. Its text, in quotes, replaces the name in file_buf and the
+;=== line is read on from the opening quote, so {codes} and \X work as in a literal.
+symbol_string:
+    bne :+
+    jmp symbol_not_in_scope
+:   jsr symbol_text_open
+    sta text_len
+
+    ; Find the line's terminating zero
+    ldx index_src
+:   inx
+    lda file_buf,x
+    bne :-
+    stx text_line_end
+
+    ; The new line end: the line less the name, plus the text and two quotes
+    txa
+    sec
+    sbc index_src
+    sta text_tail_count             ; the bytes after the name, the zero included
+    clc
+    adc symbol_start
+    bcs text_too_long
+    sec
+    adc text_len
+    bcs text_too_long
+    cmp file_maxcol
+    beq :+
+    bcs text_too_long
+:   sta text_new_end
+
+    ; Move the rest of the line to sit after the closing quote
+    cmp text_line_end
+    bcc text_move_down
+    ldx text_line_end
+    ldy text_new_end
+:   lda file_buf,x
+    sta file_buf,y
+    dex
+    dey
+    dec text_tail_count
+    bne :-
+    bra text_copy
+
+text_move_down:
+    ldx index_src
+    inx
+    clc
+    lda symbol_start
+    adc text_len
+    adc #2
+    tay
+:   lda file_buf,x
+    sta file_buf,y
+    inx
+    iny
+    dec text_tail_count
+    bne :-
+
+text_copy:
+    ldx symbol_start
+    lda #34
+    sta file_buf,x
+    ldy #0
+:   cpy text_len
+    beq :+
+    iny
+    lda (symbol_pointer),y
+    inx
+    sta file_buf,x
+    bra :-
+:   inx
+    lda #34
+    sta file_buf,x
+
+    lda symbol_start
+    sta index_src
+    stz state
+    jmp loop
+
+text_too_long:
+    clc
+    lda #RESPONSE_LINE_TOO_LONG
+    jsr response_set
+    sec
+    rts
+
+.segment "VARS"
+    text_len: .res 1
+    text_line_end: .res 1
+    text_new_end: .res 1
+    text_tail_count: .res 1
+.CODE
+;=== GPC end ===
 
 jump_table:
     .word default, remark, string, hexnum, binnum, decnum, symbol, data, curly, backslash, charcode, charcode

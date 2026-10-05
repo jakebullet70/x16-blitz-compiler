@@ -213,16 +213,20 @@ tree dirty.
 - `line.inc`: `line_meta` points at a 260-byte staging buffer for the whole
   run; `eol_mark` streams the finished line, and `out_addr` carries the
   address it *would* have had; the six `out_*` routines that own the output
-  file; `gpc_emit`; the BASIC RAM ceiling test and `mem_top` are gone
+  file; `gpc_emit`; the BASIC RAM ceiling test and `mem_top` are gone;
+  `symbol_string` puts a string define's text into the line
 - `loader.inc`: opens the file before pass 2, closes it at exit and deletes it
   if the run failed; the `SAVE` at the end is gone, and with it the
   `VARTAB`/`ARYTAB`/`STREND` stores
-- `option.inc`: one directive, `#GPC` - see below
+- `option.inc`: one directive, `#GPC`, and a quoted value for `#DEFINE` -
+  see below
 - `response.inc`: one word: message 15 was `SYMFILE IO ERR`, so a stock
   BASLOAD reports the wrong error for a `#SAVEAS` with no argument
 - `symbol.inc`: the name check tests variables, where stock tests labels, and
   the first character runs on past `Z` into `[ \ ] ^ _`, so `OUT OF VARIABLE
-  NAMES` comes after `_Z`. GPC reads those names; ROM BASIC cannot
+  NAMES` comes after `_Z`. GPC reads those names; ROM BASIC cannot. Two
+  more symbol types, and `symbol_add_text` / `symbol_text_open` for a string
+  define's text
 
 **Nothing downstream can tell the program was never in RAM.** GPC reads the
 two-byte line link, ORs its halves, tests for zero and never dereferences it
@@ -282,9 +286,35 @@ Three things it does that are easy to get wrong:
 - **A hidden `#IFDEF` block emits nothing**, the same test `#DEFINE` already
   makes.
 
-It costs a line number and the bytes of the text. Nothing reads these yet -
-the channel ships before its first caller, deliberately, because adding it
-later would mean another BASLOAD build.
+It costs a line number and the bytes of the text. GPC reads `#GPC KEEP` and
+`#GPC ENDKEEP`. A `#GPC` line is never searched for a define name.
+
+## `#DEFINE` with a string
+
+A value in quotes makes a string define:
+
+```
+#DEFINE APP.TITLE "TURBO GPC"    PRINT APP.TITLE    ->   PRINT"TURBO GPC"
+```
+
+- **The text goes in, quotes and all,** and the line is read on from the
+  opening quote. So the text is tokenised exactly as a literal written there
+  would be: `{RED}` becomes a control code only under `#CONTROLCODES`.
+- **A name inside a string literal is not replaced**, nor one in a `#GPC`
+  line.
+- **The text has no quote of its own.** It ends at the second `"`. No
+  closing quote is `INVALID PARAMETER`.
+- **A line the text makes longer than the column limit** (`#MAXCOLUMN`, 250
+  by default) is `LINE TOO LONG`.
+- **Redefining is allowed**, between number and string too. A use before the
+  first `#DEFINE` is `SYMBOL NOT IN SCOPE`, as for a number. `#IFDEF` sees a
+  string define.
+
+The text lives in the symbol table's own banks, 2 to 9, as a length byte and
+the bytes, written where the next symbol would go. The define's 16-bit value
+says where: bits 13-15 are the bank less 2, bits 0-12 the offset from `$A000`.
+Each `#DEFINE` stores its text again in pass 2 and on every redefinition, and
+the space is never reused. A table that fills is `SYMBOL TABLE FULL`.
 
 ## Layout
 

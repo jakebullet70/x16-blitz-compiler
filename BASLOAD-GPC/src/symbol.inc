@@ -83,6 +83,10 @@ SYMBOLTYPE_RESERVED_VAR = 3
 SYMBOLTYPE_CONTROL_CHAR = 4
 SYMBOLTYPE_LITERAL_PASS1 = 5
 SYMBOLTYPE_LITERAL_PASS2 = 6
+;=== GPC begin === a string define. Its value says where its text is (symbol_add_text).
+SYMBOLTYPE_STRING_PASS1 = 7
+SYMBOLTYPE_STRING_PASS2 = 8
+;=== GPC end ===
 
 ; Variables
 .ZEROPAGE
@@ -194,6 +198,8 @@ PRINT_TOKEN:
 ;                   4: PETSCII control char
 ;                   5: Defined literal (pass 1)
 ;                   6: Defined literal (pass 2)
+;                   7: Defined string (pass 1)
+;                   8: Defined string (pass 2)
 ;               C   1: Skip duplicate check
 ;Output.......: X/Y Symbol value (low/high byte)
 ;               A   0: OK
@@ -549,6 +555,8 @@ exit:
 ;                   4: PETSCII control char
 ;                   5: Defined literal (pass 1)
 ;                   6: Defined literal (pass 2)
+;                   7: Defined string (pass 1)
+;                   8: Defined string (pass 2)
 ;Error........: C=1 if symbol not found
 .proc symbol_find
     ; Store input params
@@ -684,6 +692,114 @@ not_found:
     sec
     rts
 .endproc
+
+;=== GPC begin ===
+;******************************************************************************
+;Function name: symbol_add_text
+;Purpose......: Stores a string define's text in the symbol table banks, as a
+;               length byte and the text
+;Input........: X   Index in file_buf where the text starts
+;               A   Text length
+;Output.......: token_next_id   Where the text is: bits 13-15 the bank less
+;                               SYMBOL_FIRST_BANK, bits 0-12 the offset from $A000
+;Error........: C=1 if the symbol table is full
+.proc symbol_add_text
+    stx index1
+    sta len
+
+    ; Move to the next bank if the length byte and the text do not fit
+    sec
+    adc symbol_next_addr
+    lda symbol_next_addr+1
+    adc #0
+    cmp #$c0
+    bcc :+
+    inc symbol_next_bank
+    stz symbol_next_addr
+    lda #$a0
+    sta symbol_next_addr+1
+
+:   lda symbol_next_bank
+    cmp #SYMBOL_LAST_BANK+1
+    bcc :+
+    rts
+
+:   sta RAM_SEL
+    lda symbol_next_addr
+    sta symbol_pointer
+    lda symbol_next_addr+1
+    sta symbol_pointer+1
+    lda len
+    sta (symbol_pointer)
+    ldx index1
+    ldy #0
+:   cpy len
+    beq :+
+    lda file_buf,x
+    iny
+    sta (symbol_pointer),y
+    inx
+    bra :-
+
+:   lda symbol_next_addr
+    sta token_next_id
+    lda symbol_next_bank
+    sec
+    sbc #SYMBOL_FIRST_BANK
+    asl
+    asl
+    asl
+    asl
+    asl
+    sta token_next_id+1
+    lda symbol_next_addr+1
+    and #$1f
+    ora token_next_id+1
+    sta token_next_id+1
+
+    sec
+    lda symbol_next_addr
+    adc len
+    sta symbol_next_addr
+    lda symbol_next_addr+1
+    adc #0
+    sta symbol_next_addr+1
+    clc
+    rts
+
+.segment "VARS"
+    index1: .res 1
+    len: .res 1
+.CODE
+.endproc
+
+;******************************************************************************
+;Function name: symbol_text_open
+;Purpose......: Selects a string define's text
+;Input........: X, Y   The define's value, as symbol_add_text made it
+;Output.......: A      Text length
+;               symbol_pointer  The length byte, its bank selected. The text
+;                               starts at offset 1.
+;Error........: None
+.proc symbol_text_open
+    stx symbol_pointer
+    tya
+    and #$1f
+    ora #$a0
+    sta symbol_pointer+1
+    tya
+    lsr
+    lsr
+    lsr
+    lsr
+    lsr
+    clc
+    adc #SYMBOL_FIRST_BANK
+    sta RAM_SEL
+    lda (symbol_pointer)
+    rts
+.endproc
+;=== GPC end ===
 
 SYMBOLTYPE_RESERVED_VARs:
     .byt "DA"

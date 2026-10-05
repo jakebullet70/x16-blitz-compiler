@@ -398,16 +398,20 @@ define:
     beq redefine
     cmp #SYMBOLTYPE_LITERAL_PASS2
     beq redefine
+    cmp #SYMBOLTYPE_STRING_PASS1    ;=== GPC ===
+    beq redefine                    ;=== GPC ===
+    cmp #SYMBOLTYPE_STRING_PASS2    ;=== GPC ===
+    beq redefine                    ;=== GPC ===
     lda #$fc ; Symbol exists, and can't be redefined
     rts
 
 define_new:
-    jsr define_val
+    jsr define_value                ;=== GPC ===
     ldx index1
     ldy index2
     clc
     lda line_pass
-    adc #SYMBOLTYPE_LITERAL_PASS1-1
+    adc define_type                 ;=== GPC ===
     jsr symbol_add
     cmp #0
     beq :+
@@ -416,15 +420,58 @@ define_new:
     rts
 
 redefine:
-    jsr define_val
+    jsr define_value                ;=== GPC ===
     ldx index1
     ldy index2
     clc
     lda line_pass
-    adc #SYMBOLTYPE_LITERAL_PASS1-1
+    adc define_type                 ;=== GPC ===
     jsr symbol_update
     lda option_index
     rts
+
+;=== GPC begin === a value in quotes is a string define, anything else a number.
+;=== define_type is the pass 1 symbol type less one.
+define_value:
+    lda #SYMBOLTYPE_LITERAL_PASS1-1
+    sta define_type
+    ldx index2
+    inx
+:   lda file_buf,x
+    cmp #32 ; blank space
+    beq :+
+    cmp #9 ; tab
+    beq :+
+    cmp #160 ; shift + blank space
+    bne :++
+:   inx
+    bra :--
+:   cmp #34 ; double quote
+    beq :+
+    jmp define_val
+
+:   inx
+    stx define_text_start
+:   lda file_buf,x
+    beq define_val_invalid ; No closing quote
+    cmp #34
+    beq :+
+    inx
+    bra :-
+:   txa
+    sec
+    sbc define_text_start
+    ldx define_text_start
+    jsr symbol_add_text
+    bcs :+
+    lda #SYMBOLTYPE_STRING_PASS1-1
+    sta define_type
+    rts
+:   pla
+    pla
+    lda #$f8 ; Symbol table full
+    rts
+;=== GPC end ===
 
 define_val:
     ldx index2
@@ -467,7 +514,10 @@ ifdef:
 
     jsr symbol_find
     bcs ifdef_notfound
-    sec
+    cmp #SYMBOLTYPE_STRING_PASS1    ;=== GPC === a string define's types sit two
+    bcc :+                          ;=== GPC === above a number define's
+    sbc #2                          ;=== GPC ===
+:   sec
     sbc #SYMBOLTYPE_LITERAL_PASS1-1
     cmp line_pass
     bne ifdef_notfound
@@ -602,6 +652,8 @@ invalid:
 .segment "VARS"
     index1: .res 1
     index2: .res 1
+    define_type: .res 1             ;=== GPC ===
+    define_text_start: .res 1       ;=== GPC ===
     option_index: .res 1
     tmp: .res 1
 .CODE
