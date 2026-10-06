@@ -353,6 +353,7 @@ DOC.COMMIT:
 ## one empty line.
 ##
 ##   out  DOC.LOAD.STATUS%   the last read's ST. Bit 1 is a read error.
+##        DOC.LOAD.SPLIT%    non-zero when a line over 250 characters was broken
 ##        DOC.FULL%          -1 when the arena refused a record, or the document reached
 ##                           DOC.LINE.LIMIT% lines. The load stops after that block.
 ##
@@ -371,6 +372,7 @@ DOC.APPENDFILE:
   DOC.OPEN.NAME$ = DOC.FILE.NAME$ + ",S,R"
   OPEN 2, 8, 2, DOC.OPEN.NAME$
   DOC.LOAD.PENDING.CR% = 0 : DOC.EDIT.DIRTY% = 0 : POKE DOC.EDIT.ADDR, 0
+  DOC.LOAD.SPLIT% = 0
 DOC.LOAD.LOOP:
   GOSUB DOC.LOAD.BLOCK
   IF LINE.COUNT% >= DOC.LINE.LIMIT% THEN DOC.FULL% = -1
@@ -487,6 +489,8 @@ DOC.LOAD.BLOCK:
   REM LPUT: CPX #250
   REM BCC LSTORE
   REM PHA
+  REM LDA #$FF
+  REM STA {DOC.LOAD.SPLIT%}
   REM JSR LCOMIT
   REM PLA
   REM LSTORE: STA ($2E)

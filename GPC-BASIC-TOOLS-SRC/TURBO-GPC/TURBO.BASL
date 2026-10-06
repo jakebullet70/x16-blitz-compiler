@@ -616,12 +616,21 @@ TURBO.OPEN:
 TURBO.LOAD:
   DOC.FILE.NAME$ = TURBO.FILE.NAME$ : DOC.FILE.PETSCII% = TURBO.FILE.PETSCII%
   GOSUB DOC.LOADFILE : GOSUB TURBO.DOCUMENT.SHOW
+  IF DOC.LOAD.SPLIT% <> 0 THEN GOSUB TURBO.OPEN.SPLIT
   IF DOC.FULL% <> 0 THEN GOTO TURBO.OPEN.TOO.BIG
   TURBO.MESSAGE$ = "Loaded"
   IF (DOC.LOAD.STATUS% AND 2) <> 0 THEN TURBO.MESSAGE$ = "New file"
   GOTO TURBO.MESSAGE.SHOW
 TURBO.OPEN.TOO.BIG:
   GP.SUB MSGBOX, GP.FN(TURBO.PETSCII, "File too big, loaded in part")
+  RETURN
+
+## The load broke a long line, so the document no longer matches its file. It is marked
+## changed.
+TURBO.OPEN.SPLIT:
+  TURBO.SAVED.GROUP% = -1
+  GOSUB TURBO.MARK.PAINT
+  GP.SUB MSGBOXEX, "", GP.FN(TURBO.PETSCII, "Lines over 250 characters were split."), GP.FN(TURBO.PETSCII, "A save writes them split."), "", ""
   RETURN
 
 ## TURBO.NEW -- start an empty ASCII document with no name.
