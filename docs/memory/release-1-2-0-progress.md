@@ -1,6 +1,6 @@
 ---
 name: release-1-2-0-progress
-description: "v1.2.0 release, seven steps, all done 2026-10-08: zip built, docs and release notes committed; 1.1.0 was never public, so the notes run from 1.0.0"
+description: "v1.2.0 release, seven steps, all done 2026-10-08: zip built, docs and release notes committed; the last public release was 0.9.114, so the notes run from there"
 metadata:
   node_type: memory
   type: project
@@ -87,6 +87,11 @@ The UXCBASIC design draft ([[uxcbasic-plan]]) waits until the release is out.
   combined: Paul Robson 2023 and Steven De George SR 2026. BASLOAD's BSD licence ships as
   SRC/GPC-BASLOAD/LICENSE. release/gpc-release-1.2.0.zip is built: 359 files, 1,599,637 bytes.
   All seven steps are done.
+- Later on 2026-10-08 the user said 1.0.0 also went only to a tester; V0.9.114 was the last
+  public release. RELEASE-NOTES.md was rewritten to run from 0.9.114, with Upgrading from
+  0.9.114, in 554e130. The public 0.9.114 zip held b67e26d (buildnum 0.9.114 first appears
+  there); the git tag V0.9.114 sits earlier, on 3645da3 (buildnum 0.9.113). Zip rebuilt:
+  359 files, 1,600,318 B.
 
 **Why:** the release work spans many sessions and compacts.
 
