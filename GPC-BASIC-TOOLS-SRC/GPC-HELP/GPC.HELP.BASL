@@ -1845,7 +1845,6 @@ HELP.LINKS:
     ## references, so the key does nothing. Same rule as X in HELP.EXPORT.
     IF HELP.LINKN = 0 THEN RETURN
     HELP.LINKSEL = GP.FN(PICKMENUEX, "SEE ALSO", "Follow", "", "", 1, 0)
-    HELP.REDRAW = 1
     IF HELP.LINKSEL < 1 THEN RETURN
     GOSUB HELP.BACK.PUSH
     HELP.GO = HELP.PICK%(HELP.LINKSEL)
@@ -1878,7 +1877,6 @@ HELP.BACK.POP:
 HELP.EXPORT:
     IF HELP.HASCODE = 0 THEN RETURN
     HELP.OUTNAME$ = GP.FN(INPUTBOXEX, "EXPORT", "Write this topic's code to:", "", "", "EXAMPLE.BL", 24, 0)
-    HELP.REDRAW = 1
     IF GUI.OK% = 0 THEN RETURN
     IF HELP.OUTNAME$ = "" THEN RETURN
 
@@ -1923,7 +1921,6 @@ HELP.EXPORT.WRITE:
 
 HELP.FIND.ASK:
     HELP.ASKED$ = GP.FN(INPUTBOXEX, "FIND", "Find in the index:", "", "", HELP.FIND$, 30, 0)
-    HELP.FULL = 1
     IF GUI.OK% = 0 THEN RETURN
     ## The "" is what makes it a copy. Assigning one string to another can hand
     ## over the same block, and STRCASE rewrites the bytes where they lie.
@@ -1958,13 +1955,11 @@ HELP.FIND.SCAN:
     IF GP.INSTR(HELP.HAY$, HELP.FIND$) = 0 THEN GOTO HELP.FIND.SCAN
     HELP.IX.SEL = HELP.J
     GOSUB HELP.IX.SHOW
-    HELP.FULL = 1
     RETURN
 HELP.FIND.MISS:
     HELP.MSG.ONE$ = "Not found: " + HELP.FIND$
     HELP.MSG.TWO$ = ""
     GOSUB HELP.SAY
-    HELP.FULL = 1
     RETURN
 
 
@@ -1996,12 +1991,10 @@ HELP.ABOUT:
     HELP.PAD.TEXT$ = HELP.ABOUT.WHAT$ : GOSUB HELP.CENTRE : HELP.ABOUT.WHAT$ = HELP.PAD.TEXT$
     HELP.PAD.TEXT$ = HELP.ABOUT.WHO$ : GOSUB HELP.CENTRE : HELP.ABOUT.WHO$ = HELP.PAD.TEXT$
     GP.SUB MSGBOXEX, "ABOUT GPC.HELP", HELP.ABOUT.WHAT$, HELP.ABOUT.WHO$, HELP.ABOUT.MEM$, "&OK"
-    HELP.FULL = 1
     RETURN
 
 HELP.ASKQUIT:
     HELP.DONE = GP.FN(ASKYNEX, "GPC.HELP", "Leave the help viewer?", "", "", 1, 0)
-    HELP.FULL = 1
     RETURN
 
 ## THEME.HI trades an attribute's nibbles, which turns white-on-black text into

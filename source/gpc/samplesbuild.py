@@ -67,13 +67,13 @@ PROGRAMS = [
          shared=False,
          install=("GPC-BASIC-TOOLS-SRC/BMXVIEWER", "BMXVIEW.PRG"), data=["bmx"]),
 
-    #   SHARED, and built in the sample folder: its #INCLUDEs name GPC-BASIC/ and the
-    #   runtime and GPC.BIN are already beside it.  install=None leaves the object on
-    #   that same drive, which is where its own bat mounts it from.
+    #   SHARED, and built in the sample folder, which is the drive its bat mounts. The
+    #   install is in place and brings the runtimes in. GPC.BIN, BASLOAD-GPC and the
+    #   two IMG files beside it are copied from the tool home by hand.
     dict(name="GPC.GUI",
          src=("GPC-BASIC-TOOLS-SRC/GPC-GUI-HELPER", "GPC.GUI.BASL"),
          shared=True,
-         install=None, data=[]),
+         install=("GPC-BASIC-TOOLS-SRC/GPC-GUI-HELPER", "GPC.GUI.PRG"), data=["runtimes"]),
 
     #   EMBEDDED: the forked menus keep their rows in ordinary string arrays, so there is
     #   no GP.BANKEDSTR and no SHARED. It builds in the sample folder, which is the drive,

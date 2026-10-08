@@ -1,11 +1,11 @@
 ---
 name: release-1-2-0-progress
-description: "v1.2.0 release plan (no TURBO editor), seven steps; steps 1-2 committed, step 3 rebuild: all built, commit owed"
+description: "v1.2.0 release plan (no TURBO editor), seven steps; steps 1-2 committed, step 3 committed in 134212b, step 4 committed, step 5 docs next"
 metadata:
   node_type: memory
   type: project
   originSessionId: ec94f0c6-00cf-4484-b8af-f7e45a81977a
-  modified: 2026-10-08T07:30:40.640Z
+  modified: 2026-10-08T16:50:56.646Z
 ---
 
 The 1.2.0 release ships without the TURBO GPC editor. There are seven steps:
@@ -57,15 +57,26 @@ that needs the user's go-ahead for the asm.
   in the background. Failed builds delete their PRG.
 - The rerun of the five (samples-step3e.log, 268 s) built clean: EDIT 31,121 B (OVL 27,405), GPC.ERR
   10,549 SHARED (OVL 28,433), GUI-FIELD-EDIT 18,321 (OVL 24,589), KV-BIN-STORE 22,417 (OVL 24,077),
-  KVBIN-BASIC 3,544. All of step 3 is built; only the commit is left.
-- After a clean rerun: commit step 3, staging by name (synced library copies, source ports,
-  rebuilt PRG/OVL/SRC.PRG, COLORTST, BUILD bumps, STASHVRAM additions). Then step 4.
+  KVBIN-BASIC 3,544. All of step 3 is built.
+- Step 3 committed in 134212b, with the three build 132 runtimes in GPB-MODS-TESTING deleted.
+  Step 4, the user's play-test, is next.
+- Step 4 play-test on 2026-10-08, by the user: GPC.HELP, GPBMODS, GPC.ERR, GUI-FIELD-EDIT,
+  BMXVIEW, COLORTST, GUI-LITE, MANDEL, LANDER64 and KVBIN tested good. GPC.HELP repainted the
+  whole screen after every dialog; fixed by deleting seven HELP.FULL/HELP.REDRAW sets, since
+  GUI.CLOSE restores the covered cells (PRG 10,060 B, OVL 23,053). GPC.GUI and EDIT are not
+  release items; release.sh does not stage them. GPC.GUI was rebuilt with runtime 133 in its
+  folder anyway, and the user chose to keep it. The build 131 runtimes and the 131/132 images are
+  deleted from every sample folder except XBASE; the embedded samples never used them. Step 4
+  committed; step 5, the docs, is next.
 - Step 5 migration note must list: int16 % names, #DEFINE MENU.TEXTBANK before
   MENU.INC.BANKED, DLGRESET/LIST.BANK/FORM.ITEMS gained an address, PICKBANKS became
   PICKSPACE then PICKDIRSPACE, FILEPICK.COUNT became FILEPICK.COUNT%.
 
+On 2026-10-08 the user said the release goes out the morning of 2026-10-09, after their testing.
+The UXCBASIC design draft ([[uxcbasic-plan]]) waits until the release is out.
+
 **Why:** the release work spans many sessions and compacts.
 
-**How to apply:** resume at the step 3 rerun. Remind the user to /compact after each step
+**How to apply:** resume at step 5, the docs. Remind the user to /compact after each step
 ([[compact-early-not-at-the-end]]). Never commit OASIS, and leave the untracked TURBO.DEAD,
 TURBO-GPC/bench and SETTINGS files alone. See [[release-1-1-0-state]].
