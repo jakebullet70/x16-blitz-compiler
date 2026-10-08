@@ -23,7 +23,8 @@
 ## **      IF (GUI.CTRL.FLAGS%(HIDDEN) AND GUI.CF.CHECKED) <> 0 THEN <ticked>
 ## **
 ## **   in   CHECK.X%  CHECK.Y%   the cell the [ goes in
-## **        CHECK.TEXT$        the caption, plain text. "" for a bare box
+## **        CHECK.TEXT$        the caption. "" for a bare box. An "&" marks
+## **                            the next letter, and that letter flips the box
 ## **        CHECK.ON%           non-zero starts it ticked
 ## **
 ## **   out  CHECK.CTRL%         the control's number, 0 if the form was full
@@ -76,6 +77,11 @@ CHECK.ADD:
     IF CHECK.TEXT$ <> "" THEN GUI.CTRL.W%(CHECK.CTRL%) = LEN(CHECK.TEXT$) + 4
     GUI.CTRL.TEXT$(CHECK.CTRL%) = CHECK.TEXT$
     GUI.CTRL.KEY%(CHECK.CTRL%) = 0 : GUI.CTRL.FLAGS%(CHECK.CTRL%) = 0
+    CHECK.AMP% = GP.INSTR(CHECK.TEXT$, "&")
+    GP.IF CHECK.AMP% > 0 THEN
+        GUI.CTRL.W%(CHECK.CTRL%) = GUI.CTRL.W%(CHECK.CTRL%) - 1
+        GUI.CTRL.KEY%(CHECK.CTRL%) = ASC(MID$(CHECK.TEXT$, CHECK.AMP% + 1, 1))
+    GP.ENDIF
     IF CHECK.ON% <> 0 THEN GUI.CTRL.FLAGS%(CHECK.CTRL%) = GUI.CF.CHECKED
     GUI.PAINT.N% = CHECK.CTRL%
     GOSUB CHECK.DRAW
@@ -106,7 +112,19 @@ CHECK.DRAW:
     GP.FILL CHECK.CX%, CHECK.CY%, 1, 1, CHECK.LBRACK, CHECK.ATTR%
     GP.FILL CHECK.CX% + 1, CHECK.CY%, 1, 1, CHECK.MARK%, CHECK.MARKA%
     GP.FILL CHECK.CX% + 2, CHECK.CY%, 1, 1, CHECK.RBRACK, CHECK.ATTR%
-    IF CHECK.SHOW$ <> "" THEN GP.PRINTAT CHECK.CX% + 4, CHECK.CY%, CHECK.SHOW$, CHECK.ATTR%
+    IF CHECK.SHOW$ = "" THEN RETURN
+    CHECK.AMP% = GP.INSTR(CHECK.SHOW$, "&")
+    GP.IF CHECK.AMP% = 0 THEN
+        GP.PRINTAT CHECK.CX% + 4, CHECK.CY%, CHECK.SHOW$, CHECK.ATTR%
+        RETURN
+    GP.ENDIF
+    ## the marked letter takes a button's hot colour
+    GUI.BTN.FOCUSED% = 0
+    IF CHECK.N% = GUI.FOCUS% THEN GUI.BTN.FOCUSED% = -1
+    GOSUB GUI.BTN.COLOURS
+    IF CHECK.AMP% > 1 THEN GP.PRINTAT CHECK.CX% + 4, CHECK.CY%, LEFT$(CHECK.SHOW$, CHECK.AMP% - 1), CHECK.ATTR%
+    GP.PRINTAT CHECK.CX% + 3 + CHECK.AMP%, CHECK.CY%, MID$(CHECK.SHOW$, CHECK.AMP% + 1, 1), GUI.BTN.HI%
+    GP.PRINTAT CHECK.CX% + 4 + CHECK.AMP%, CHECK.CY%, MID$(CHECK.SHOW$, CHECK.AMP% + 2), CHECK.ATTR%
     RETURN
 
 

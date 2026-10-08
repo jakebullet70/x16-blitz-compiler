@@ -5,6 +5,7 @@
 ## **      FILE.DIR.INIT   once, before anything else here
 ## **      FILE.DIR.OPEN   read the whole listing into the buffer
 ## **      FILE.DIR.NEXT   the next entry out of it
+## **      FILE.DIR.REWIND the walk again from the first entry, the drive not asked
 ## **
 ## **  Requires GPB.INC.BL and FILEIO.INC.BL, and #INCLUDEs neither.
 ## **
@@ -169,9 +170,19 @@ FILE.DIR.OPEN:
 ## **  Consumed here rather than flagged, so FILE.DIR.NEXT stays "an entry, or
 ## **  the end" with no special first call.
 ## ***********************************************************************
-FILE.DIR.SKIPDISK:  
+FILE.DIR.SKIPDISK:
     IF FILE.DIR.GOT% = 0 THEN RETURN
     GOSUB FILE.DIR.NEXT : FILE.DIR.MORE% = 0 : RETURN
+
+
+## ***********************************************************************
+## **  FILE.DIR.REWIND -- start the walk again at the first entry. The
+## **  listing FILE.DIR.OPEN read stays in the buffer, so a second walk costs
+## **  the parse and not the drive.
+## ***********************************************************************
+FILE.DIR.REWIND:
+    FILE.DIR.AT% = 4
+    GOTO FILE.DIR.SKIPDISK
 
 
 ## Where the bytes land, in a bank or in low RAM. FILE.DIR.ADDR% holds the
