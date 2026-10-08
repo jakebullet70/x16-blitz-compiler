@@ -8,7 +8,6 @@
 #INCLUDE "GPC-BASIC/GPB.INC.BL"
 #INCLUDE "GPC-BASIC/APPSYS.INC.BL"
 #INCLUDE "GPC-BASIC/STASH.INC.BL"
-
 ## ============================================================================
 ## TURBO -- TURBO GPC, the editor. It holds three documents, A, B and C, and shows one.
 ## F7 shows the next.
