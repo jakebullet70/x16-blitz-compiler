@@ -19,8 +19,8 @@ Forked from Paul Robson's original:
 
 ## What's new
 
-[RELEASE-NOTES.md](RELEASE-NOTES.md) lists every change since 1.0.0 and how
-to move a 1.0.0 program to 1.2.0.
+[RELEASE-NOTES.md](RELEASE-NOTES.md) lists every change since 0.9.114, the last
+public release, and how to move a 0.9.114 program to 1.2.0.
 
 ## What is in the zip
 
@@ -43,7 +43,7 @@ same build.
 | `BASLOAD-GPC.PRG` | the streaming tokeniser, the program you run |
 | `BASLOAD-GPC.BIN` | the streaming tokeniser's engine |
 | `README.md` | this file |
-| `RELEASE-NOTES.md` | what changed since 1.0.0 |
+| `RELEASE-NOTES.md` | what changed since 0.9.114 |
 | `LICENSE` | the MIT licence |
 | `HELP-TXT/` | the index and topic files `GPC.HELP.PRG` reads |
 | `GPC-BASIC/` | the GP.BASIC library and its manual |
