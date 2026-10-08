@@ -12,7 +12,7 @@
 ## **  Usage:
 ## **      LINEINPUT.X = 10 : LINEINPUT.Y = 6
 ## **      LINEINPUT.LEN = 20
-## **      LINEINPUT.ATTR = THEME.CLR(THEME.TEXT)
+## **      LINEINPUT.ATTR = THEME.CLR%(THEME.TEXT)
 ## **      LINEINPUT.TEXT$ = ""
 ## **      GOSUB LINEINPUT.GET
 ## **      IF LINEINPUT.KEY = 27 THEN <cancelled>

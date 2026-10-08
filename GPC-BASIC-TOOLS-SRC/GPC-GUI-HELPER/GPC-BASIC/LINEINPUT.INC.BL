@@ -12,7 +12,7 @@
 ## **  Usage:
 ## **      LINEINPUT.X = 10 : LINEINPUT.Y = 6
 ## **      LINEINPUT.LEN = 20
-## **      LINEINPUT.ATTR = THEME.CLR(THEME.TEXT)
+## **      LINEINPUT.ATTR = THEME.CLR%(THEME.TEXT)
 ## **      LINEINPUT.TEXT$ = ""
 ## **      GOSUB LINEINPUT.GET
 ## **      IF LINEINPUT.KEY = 27 THEN <cancelled>
@@ -37,6 +37,7 @@
 ## **                                     13  RETURN, finished
 ## **                                     27  ESC, cancelled (3 is STOP)
 ## **                                     17  cursor down / 145 up / 9 TAB
+## **                                     24  SHIFT+TAB
 ## **                                         -- left the field, text kept
 ## **
 ## **  So a form is a loop: call the field, look at LINEINPUT.KEY, move the focus. The
@@ -82,6 +83,7 @@
 #DEFINE LINEINPUT.DOWN 17
 #DEFINE LINEINPUT.UP 145
 #DEFINE LINEINPUT.TAB 9
+#DEFINE LINEINPUT.SHTAB 24
 
 ## The keys that move the CARET inside the field, as opposed to leaving it.
 #DEFINE LINEINPUT.LEFT 157
@@ -129,7 +131,7 @@ LINEINPUT.KEYED:
         GP.CASE LINEINPUT.RETURN : LINEINPUT.DONE = -1
         GP.CASE LINEINPUT.ESCAPE, LINEINPUT.STOP
             LINEINPUT.TEXT$ = LINEINPUT.WAS$ : LINEINPUT.POS = LEN(LINEINPUT.TEXT$) : LINEINPUT.DONE = -1
-        GP.CASE LINEINPUT.DOWN, LINEINPUT.UP, LINEINPUT.TAB
+        GP.CASE LINEINPUT.DOWN, LINEINPUT.UP, LINEINPUT.TAB, LINEINPUT.SHTAB
             LINEINPUT.DONE = -1
         GP.CASE LINEINPUT.LEFT   : IF LINEINPUT.POS > 0 THEN LINEINPUT.POS = LINEINPUT.POS - 1
         GP.CASE LINEINPUT.RIGHT  : IF LINEINPUT.POS < LEN(LINEINPUT.TEXT$) THEN LINEINPUT.POS = LINEINPUT.POS + 1

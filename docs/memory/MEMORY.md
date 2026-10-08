@@ -26,6 +26,7 @@ junction; re-make it first if a rename breaks it. See [memory-is-git-tracked](me
 - [Compact early, not at the end](compact-early-not-at-the-end.md) — remind the user to /compact at the end of every turn that lands a step
 
 ## Build and toolchain
+- [Release 1.2.0 progress](release-1-2-0-progress.md) — seven-step plan, no TURBO; step 3: rerun EDIT, GPC.ERR, GUI-FIELD-EDIT, KV-BIN-STORE, KVBIN-BASIC, then commit
 - [Release 1.1.0 state](release-1-1-0-state.md) — 1.1.0 zip (build 131) is with a tester since 2026-10-05, keep it; the tree is 1.2.0, no 1.2.0 zip yet
 - [USER-RUNS demos broken by Build 127](user-runs-demos-broken-by-build-127.md) — runtimes sit beside each sample; the tree is on build 131
 - [Tool home goes stale](tool-home-goes-stale.md) — sample builds run /GPC/GPC.BIN, which no commit refreshes; copy a new compiler there by hand

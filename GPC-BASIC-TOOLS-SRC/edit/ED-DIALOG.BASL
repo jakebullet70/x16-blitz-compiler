@@ -66,9 +66,8 @@ ED.DLG.ASKTEXT2:
 ##        ED.DLG.PICK.COUNT   files offered. 0 with an empty name is the empty drive, not a
 ##                            cancel, and the caller can tell them apart by reading it
 ##
-## PICKBANKS is called on every pick rather than once at startup. It assigns two variables and
-## zeroes two more, which is cheaper than a flag to remember whether startup ran, and it leaves
-## no order to get wrong.
+## PICKSPACE and PICKDIRSPACE run on every pick rather than once at startup. PICKSPACE zeroes
+## the directory bank, so PICKDIRSPACE comes second.
 ##
 ## The strings are arguments, not GP.BSTR reads: this module runs from the ED.DLGCODE region
 ## and the text is in ED.TEXTBANK, so the low-memory caller reads them and passes them in, the
@@ -78,9 +77,10 @@ ED.DLG.ASKTEXT2:
 ## is FILEDIR's read loop, not the host filesystem, and it is a known open item.
 ED.DLG.PICKFILE:
     GP.DEFPROC PICKDOC, ED.DLG.PICK.TITLE$, ED.DLG.PICK.EXT$, ED.DLG.PICK.NONE$ RETURNS ED.DLG.PICK.NAME$
-    GP.SUB PICKBANKS, ED.PICKLIST, ED.PICKDIR
+    GP.SUB PICKSPACE, ED.PICKLIST, $A000, 8192
+    GP.SUB PICKDIRSPACE, ED.PICKDIR, $A000, 8192
     ED.DLG.PICK.NAME$ = GP.FN(PICKFILE, ED.DLG.PICK.TITLE$, ED.DLG.PICK.EXT$)
-    ED.DLG.PICK.COUNT = FILEPICK.COUNT
+    ED.DLG.PICK.COUNT = FILEPICK.COUNT%
     IF ED.DLG.PICK.COUNT = 0 THEN GP.SUB MSGBOXEX, ED.DLG.PICK.TITLE$, ED.DLG.PICK.NONE$, "", "", "&OK"
     RETURN
 

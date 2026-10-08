@@ -7,9 +7,8 @@
 ## **
 ## ***********************************************************************
 ## A group must be declared before GP.BSTR names it, so this comes first.
-#IFNDEF MENU.TEXTBANK
-#DEFINE MENU.TEXTBANK 62
-#ENDIF
+## The program #DEFINEs MENU.TEXTBANK, the bank the two groups go in, before
+## this file. Nothing else may use that bank.
 
 GOTO MENU.BANKED.END
 

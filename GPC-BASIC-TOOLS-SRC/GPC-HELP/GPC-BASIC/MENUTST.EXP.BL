@@ -11,6 +11,8 @@
 ## THE LIBRARY IN LOW MEMORY. To run a module below from a RAM bank instead,
 ## put its #INCLUDE inside a GP.BANKED region -- BANKED-OR-NOT.md has the rules.
 #INCLUDE "BANKMGR.INC.BL"
+#INCLUDE "THEME.INC.BL"
+#DEFINE MENU.TEXTBANK 62
 #INCLUDE "MENU.INC.BANKED.BL"
 #INCLUDE "MENU.INC.BL"
 #SAVEAS "@:MENUTST.PRG"
@@ -24,22 +26,22 @@ CLS
 COLOR 1,0
 GOSUB BANKMGR.INIT
 
-MENU.ATTR = NORMAL
-MENU.HIATTR = BRIGHT
+MENU.ATTR% = NORMAL
+MENU.HIATTR% = BRIGHT
 GOSUB TEST.GAME
 
 ## ---- 1. two downs and RETURN, and the highlight is GONE afterwards
-MENU.FLAGS = 0
+MENU.FLAGS% = 0
 KEY.CODE = 17 : GOSUB KEY.SEND
 KEY.CODE = 17 : GOSUB KEY.SEND
 KEY.CODE = 13 : GOSUB KEY.SEND
 GOSUB TEST.RUN
-TEST.A = TEST.GOT : TEST.AK = MENU.EXITKEY
+TEST.A = TEST.GOT : TEST.AK = MENU.EXITKEY%
 
 ## ---- 2. hotkey, upper case. It CHOOSES, it does not merely move
 KEY.CODE = 79 : GOSUB KEY.SEND
 GOSUB TEST.RUN
-TEST.B = TEST.GOT : TEST.BK = MENU.EXITKEY
+TEST.B = TEST.GOT : TEST.BK = MENU.EXITKEY%
 
 ## ---- 3. hotkey, lower case -- matched without case
 KEY.CODE = 113 : GOSUB KEY.SEND
@@ -49,7 +51,7 @@ TEST.C = TEST.GOT
 ## ---- 4. ESC cancels
 KEY.CODE = 27 : GOSUB KEY.SEND
 GOSUB TEST.RUN
-TEST.D = TEST.GOT : TEST.DK = MENU.EXITKEY
+TEST.D = TEST.GOT : TEST.DK = MENU.EXITKEY%
 
 ## ---- 5. wrap off the top, 1 -> 4
 KEY.CODE = 145 : GOSUB KEY.SEND
@@ -65,7 +67,7 @@ GOSUB TEST.RUN
 TEST.F = TEST.GOT
 
 ## ---- 7. NOWRAP holds at the top
-MENU.FLAGS = MENU.NOWRAP
+MENU.FLAGS% = MENU.NOWRAP
 KEY.CODE = 145 : GOSUB KEY.SEND
 KEY.CODE = 13 : GOSUB KEY.SEND
 GOSUB TEST.RUN
@@ -79,7 +81,7 @@ GOSUB TEST.RUN
 TEST.H = TEST.GOT
 
 ## ---- 9. MUSTSEL swallows ESC, so the RETURN after it is what lands
-MENU.FLAGS = MENU.MUSTSEL
+MENU.FLAGS% = MENU.MUSTSEL
 GP.SUB MENU.SELECTED, 2
 KEY.CODE = 27 : GOSUB KEY.SEND
 KEY.CODE = 13 : GOSUB KEY.SEND
@@ -87,14 +89,14 @@ GOSUB TEST.RUN
 TEST.I = TEST.GOT
 
 ## ---- 10. KEEPMARK leaves the chosen row highlighted on the way out
-MENU.FLAGS = MENU.KEEPMARK
+MENU.FLAGS% = MENU.KEEPMARK
 GP.SUB MENU.SELECTED, 3
 KEY.CODE = 13 : GOSUB KEY.SEND
 GOSUB TEST.RUN
 TEST.J = TEST.GOT
 
 ## ---- 11. no hotkeys at all: Q must be ignored, not crash
-MENU.FLAGS = 0
+MENU.FLAGS% = 0
 GP.SUB MENU.BEGIN, MENU.POPUP
 GP.SUB MENU.ITEM, " NEW GAME"
 GP.SUB MENU.ITEM, " LOAD"
@@ -114,23 +116,23 @@ TEST.L = TEST.GOT
 ## ---- 13. the GAMEPAD flag with no pad plugged in must not eat the
 ## ---- keyboard, and must not hang in the poll
 GOSUB TEST.GAME
-MENU.FLAGS = MENU.GAMEPAD
+MENU.FLAGS% = MENU.GAMEPAD
 KEY.CODE = 17 : GOSUB KEY.SEND
 KEY.CODE = 13 : GOSUB KEY.SEND
 GOSUB TEST.RUN
 TEST.M = TEST.GOT
 
-## ---- 14. the default highlight: MENU.HIATTR = 0 inverts MENU.ATTR
-MENU.FLAGS = MENU.KEEPMARK
-MENU.HIATTR = 0
+## ---- 14. the default highlight: MENU.HIATTR% = 0 inverts MENU.ATTR%
+MENU.FLAGS% = MENU.KEEPMARK
+MENU.HIATTR% = 0
 KEY.CODE = 13 : GOSUB KEY.SEND
 GOSUB TEST.RUN
 TEST.N = TEST.GOT
-MENU.HIATTR = BRIGHT
+MENU.HIATTR% = BRIGHT
 
 ## ---- 15..20. dead rows. A separator and a disabled row sit between 1 and 4,
 ## ---- and the cursor steps over both, either way.
-MENU.FLAGS = 0
+MENU.FLAGS% = 0
 GP.SUB MENU.BEGIN, MENU.POPUP
 GP.SUB MENU.ITEM, " &NEW GAME"
 GP.SUB MENU.ITEM, "-"
@@ -162,14 +164,14 @@ GOSUB TEST.RUN
 TEST.R = TEST.GOT
 
 ## KEYEXIT hands back a key the menu has no use for, with the row it was on
-MENU.FLAGS = MENU.KEYEXIT
+MENU.FLAGS% = MENU.KEYEXIT
 GP.SUB MENU.SELECTED, 4
 KEY.CODE = 29 : GOSUB KEY.SEND
 GOSUB TEST.RUN
-TEST.S = TEST.GOT : TEST.SK = MENU.EXITKEY
+TEST.S = TEST.GOT : TEST.SK = MENU.EXITKEY%
 
 ## no live row at all: the cursor must not walk for ever, and ESC still works
-MENU.FLAGS = 0
+MENU.FLAGS% = 0
 GP.SUB MENU.BEGIN, MENU.POPUP
 GP.SUB MENU.ITEMX, " &ONLY", "", MENU.OFF
 GP.SUB MENU.ITEM, "-"

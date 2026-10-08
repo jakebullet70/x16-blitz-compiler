@@ -1,42 +1,77 @@
 ## ***********************************************************************
 ## **
-## **  FILEPICK.INC.BL -- a popup file picker whose list lives in a bank.
+## **  FILEPICK.INC.BL -- a popup file picker that walks directories. Its
+## **  list lives in a bank.
 ## **
-## **      GP.SUB PICKBANKS, listbank, dirbank     once, before the first pick
-## **      F$ = GP.FN(PICKFILE, title$, ext$)       "" is a cancel, or no match
+## **      GP.SUB PICKSPACE, bank, addr, size       once, before the first pick
+## **      GP.SUB PICKDIRSPACE, bank, addr, size    optional, the same way
+## **      GP.SUB PICKLABELS, on$, off$, ask$       optional, the footer's text
+## **      F$ = GP.FN(PICKFILE, title$, ext$)       "" is a cancel
 ## **      GP.SUB PICKSCAN, ext$                    the read without the box
 ## **
 ## **  Requires, and #INCLUDEs none of them:
 ## **      GPB.INC.BL          GP.INSTR, GP.ISEMPTY
 ## **      STASH.INC.BL        STASH.SELECT
-## **      GUI.INC.BL          the list control and GUI.LIST.FETCH
-## **      GUI-DIALOGS.INC.BL  GUI.DEFAULTS and the listbox
-## **      FILEIO.INC.BL       FILE.DEVICE
+## **      GUI.INC.BL          GUI.OPEN, GUI.CLOSE and GUI.LIST.FETCH
+## **      GUI-DIALOGS.INC.BL  GUI.DEFAULTS
+## **      FILEIO.INC.BL       FILE.DEVICE%, FILE.CHDIR, FILE.UP, FILE.DELETE
 ## **      FILEDIR.INC.BL      the directory read and its parser
 ## **
-## **   in   listbank   the bank the list is built in. Claimed from BANKMGR,
-## **                   never a code bank
-## **        dirbank    the bank the raw listing is read into. 0 packs both
-## **                   into listbank: the listing in its top half, the list
-## **                   in its bottom half, and half the files
+## **   in   PICKSPACE     where the list is built: a bank, the first byte,
+## **                      and the size. 8,192 bytes hold 255 entries
+## **        PICKDIRSPACE  where the raw listing is read, the same way. Bank
+## **                      0, the default, packs both into the list's space:
+## **                      the listing in its top half, the list in its
+## **                      bottom half, and half the entries
+## **        PICKLABELS    the footer with the folders shown, with them
+## **                      hidden, and the delete question. & marks a hot
+## **                      letter and * in ask$ is the file's name. "" keeps
+## **                      "&DEL  &FOLDERS:ON   ESC", "&DEL  &FOLDERS:OFF  ESC"
+## **                      and "DELETE *? Y/N"
+## **        title$     the text of the title bar
 ## **        ext$       suffixes without the dot, comma separated: "BASL,BL".
-## **                   Empty takes every file. Case sensitive
+## **                   Empty takes every file. Case sensitive. A directory
+## **                   is listed whatever its name
 ## **
-## **   out  FILEPICK.COUNT   files in the list
-## **        FILEPICK.FULL    -1 when more matched than the list holds
+## **   out  FILEPICK.COUNT%   entries in the list, ".." among them
+## **        FILEPICK.FULL%    -1 when more were listed than the list holds
 ## **
-## **  THE LIST IS A GP.BSTR IMAGE, string 0 the first file, and it stays in
-## **  listbank after the pick. LIST.BANK listbank, 0, FILEPICK.COUNT - 1 shows
-## **  it again without going near the drive.
+## **  The box is 44 columns wide on a screen of 80 or more, and 2 narrower
+## **  than a narrower screen. It leaves 3 rows of the screen above it and 3
+## **  below. Its top edge is a title bar and its bottom edge a footer bar.
 ## **
-## **      $A000   the file count, 16 bits
-## **      $A002   an offset a file to its record's length byte, room for MAX
-## **      then    records [cap][len][row], the row as it is drawn:
-## **              a space, the name padded to 16, blocks in 6, a space, type
+## **  The list is "..", then the directories, then the files that match
+## **  ext$, in the drive's order. A name that starts with a dot is left out.
+## **
+## **      Up, Down, PgUp, PgDn    move, and stop at the ends
+## **      Home, End               the first entry, the last
+## **      RETURN                  a file is the answer. A directory, ".."
+## **                              among them, is changed into
+## **      D                       delete the file, after a Y. A directory
+## **                              is not deleted
+## **      F                       show or hide the directories
+## **      Esc, Stop               "", back in the directory the pick
+## **                              started in
+## **
+## **  The picked file is in the current directory when PICKFILE returns. A
+## **  directory above the starting one is not returned from by Esc. The
+## **  folders setting lasts from one pick to the next.
+## **
+## **  THE LIST IS A GP.BSTR IMAGE, string 0 the first entry, and it stays in
+## **  its space after the pick. LIST.BANK bank, addr, 0, FILEPICK.COUNT% - 1
+## **  shows it again without going near the drive.
+## **
+## **      addr      the entry count, 16 bits
+## **      addr + 2  an offset from addr an entry to its record's length
+## **                byte, room for MAX
+## **      then    records [cap][len][row], the row as it is drawn: / for a
+## **              directory or a space for a file, the name padded to 16,
+## **              blocks in 6, a space, type
 ## **
 ## **  A row's last FILEPICK.TAIL characters are blocks and type, so the name
-## **  is what lies between the leading space and them, trailing spaces off.
-## **  A name longer than 16 pushes the blocks right rather than being cut.
+## **  is what lies between the first character and them, trailing spaces
+## **  off. A name longer than 16 pushes the blocks right rather than being
+## **  cut. A directory's blocks are blank.
 ## **
 ## **  TO RUN IT FROM A RAM BANK, put the #INCLUDE between GP.BANKED and
 ## **  GP.ENDBANKED. The POKEs into the list bank go through STASH.SELECT.
@@ -45,27 +80,35 @@
 #IFNDEF FILEPICK.DEFS
 #DEFINE FILEPICK.DEFS 1
 
-## Files the list holds: two banks, and one bank shared with the listing.
-#DEFINE FILEPICK.MAXTWO 255
-#DEFINE FILEPICK.MAXONE 127
-
-## Packed, the listing is read in at this offset and the list stops short of it.
-#DEFINE FILEPICK.SPLIT $1000
-#DEFINE FILEPICK.BANKROOM $2000
+## The most entries a list holds, and the bytes an entry is allowed for MAX.
+#DEFINE FILEPICK.MAXFILES 255
+#DEFINE FILEPICK.FILEBYTES 32
 
 #DEFINE FILEPICK.NAMEW 16
 #DEFINE FILEPICK.TAIL 10
+
+## The box's width on a screen of 80 columns or more, and the screen rows it leaves free.
+#DEFINE FILEPICK.BOXW 44
+#DEFINE FILEPICK.BOXMARGIN 6
 
 GOTO FILEPICK.MODULE.END
 
 
 ## ***********************************************************************
-## **  PICKBANKS -- where the list and the listing go.
+## **  PICKSPACE -- where the list goes. PICKDIRSPACE -- where the listing
+## **  goes. PICKSPACE puts the listing back in the list's space.
 ## ***********************************************************************
-FILEPICK.BANKS:
-    GP.DEFPROC PICKBANKS, FILEPICK.LISTBANK, FILEPICK.DIRBANK
-    IF FILEPICK.DIRBANK = FILEPICK.LISTBANK THEN FILEPICK.DIRBANK = 0
-    FILEPICK.COUNT = 0 : FILEPICK.FULL = 0
+FILEPICK.SPACE:
+    GP.DEFPROC PICKSPACE, FILEPICK.LISTBANK%, FILEPICK.LISTADDR, FILEPICK.LISTSIZE%
+    FILEPICK.DIRBANK% = 0 : FILEPICK.COUNT% = 0 : FILEPICK.FULL% = 0
+    RETURN
+
+FILEPICK.DIRSPACE:
+    GP.DEFPROC PICKDIRSPACE, FILEPICK.DIRBANK%, FILEPICK.DIRADDR, FILEPICK.DIRSIZE%
+    RETURN
+
+FILEPICK.LABELS:
+    GP.DEFPROC PICKLABELS, FILEPICK.SHOWON$, FILEPICK.SHOWOFF$, FILEPICK.ASK$
     RETURN
 
 
@@ -73,96 +116,356 @@ FILEPICK.BANKS:
 ## **  PICKSCAN -- the read on its own, no box.
 ## **
 ## **  For a caller that wants the list before anyone sees it: sort it, filter
-## **  it, then show it with LIST.BANK. FILEPICK.COUNT answers how many.
+## **  it, then show it with LIST.BANK. FILEPICK.COUNT% answers how many.
 ## ***********************************************************************
 FILEPICK.SCANONLY:
-    GP.DEFPROC PICKSCAN, FILEPICK.ONLY$
-    FILEPICK.EXT$ = FILEPICK.ONLY$
+    GP.DEFPROC PICKSCAN, FILEPICK.ONLY$ : FILEPICK.EXT$ = FILEPICK.ONLY$
     GOSUB FILEPICK.SCAN
     RETURN
 
 
 ## ***********************************************************************
-## **  PICKFILE -- read, filter, show, answer.
-## **
-## **  NOTHING MATCHING IS NOT A DIALOG. There is nothing to offer, so the
-## **  answer is empty and FILEPICK.COUNT 0 tells the caller why.
+## **  PICKFILE -- read, show, walk, answer.
 ## ***********************************************************************
 FILEPICK.PICK:
     GP.DEFPROC PICKFILE, FILEPICK.TITLE$, FILEPICK.EXT$ RETURNS FILEPICK.NAME$
-    FILEPICK.NAME$ = "" : GOSUB FILEPICK.SCAN
-    IF FILEPICK.COUNT = 0 THEN RETURN
+    FILEPICK.NAME$ = ""
+    IF FILEPICK.LISTBANK% = 0 THEN RETURN
+    IF GP.ISEMPTY(FILEPICK.SHOWON$) THEN FILEPICK.SHOWON$ = "&DEL  &FOLDERS:ON   ESC"
+    IF GP.ISEMPTY(FILEPICK.SHOWOFF$) THEN FILEPICK.SHOWOFF$ = "&DEL  &FOLDERS:OFF  ESC"
+    IF GP.ISEMPTY(FILEPICK.ASK$) THEN FILEPICK.ASK$ = "DELETE *? Y/N"
+    FILEPICK.DEPTH% = 0
+    GOSUB FILEPICK.SCAN
+    GOSUB FILEPICK.BOX
 
-    GOSUB GUI.DEFAULTS : GUI.TITLE$ = FILEPICK.TITLE$
-    GUI.LIST.BANK = FILEPICK.LISTBANK : GUI.LIST.FIRST = 0
-    DLG.COUNT = FILEPICK.COUNT : DLG.ROWS = 0 : DLG.MULTI = 0
-    GOSUB DLG.INTERNAL.LIST : IF GUI.LISTBOX.SEL < 1 THEN RETURN
+FILEPICK.KEYS:
+    GOSUB FILEPICK.SHOW : GOSUB FILEPICK.GETKEY
+    IF FILEPICK.KEY% = 13 THEN GOTO FILEPICK.ENTER
+    IF FILEPICK.KEY% = 27 THEN GOTO FILEPICK.CANCEL
+    IF FILEPICK.KEY% = 3 THEN GOTO FILEPICK.CANCEL
+    IF FILEPICK.KEY% = 68 THEN GOSUB FILEPICK.DELETE
+    IF FILEPICK.KEY% = 70 THEN GOSUB FILEPICK.FOLDERS
+    IF FILEPICK.KEY% = 145 THEN FILEPICK.CUR% = FILEPICK.CUR% - 1
+    IF FILEPICK.KEY% = 17 THEN FILEPICK.CUR% = FILEPICK.CUR% + 1
+    IF FILEPICK.KEY% = 130 THEN FILEPICK.CUR% = FILEPICK.CUR% - FILEPICK.ROWS%
+    IF FILEPICK.KEY% = 2 THEN FILEPICK.CUR% = FILEPICK.CUR% + FILEPICK.ROWS%
+    IF FILEPICK.KEY% = 19 THEN FILEPICK.CUR% = 0
+    IF FILEPICK.KEY% = 4 THEN FILEPICK.CUR% = FILEPICK.COUNT% - 1
+    IF FILEPICK.CUR% >= FILEPICK.COUNT% THEN FILEPICK.CUR% = FILEPICK.COUNT% - 1
+    IF FILEPICK.CUR% < 0 THEN FILEPICK.CUR% = 0
+    GOTO FILEPICK.KEYS
 
-    GUI.LIST.AT = GUI.LISTBOX.SEL : GOSUB GUI.LIST.FETCH
-    FILEPICK.NAME$ = MID$(GUI.LIST.TEXT$, 2, LEN(GUI.LIST.TEXT$) - 1 - FILEPICK.TAIL)
+## ---- RETURN: a file is the answer, and a directory is changed into.
+FILEPICK.ENTER:
+    GOSUB FILEPICK.ROW.NAME : IF FILEPICK.ISDIR% = 0 THEN GOTO FILEPICK.CHOSE
+    GOSUB FILEPICK.CHANGEDIR : GOSUB FILEPICK.SCAN
+    FILEPICK.CUR% = 0 : FILEPICK.TOP% = 0 : FILEPICK.REPAINT% = -1
+    GOTO FILEPICK.KEYS
+
+## ---- Esc: climb back to the directory the pick started in.
+FILEPICK.CANCEL:
+    IF FILEPICK.DEPTH% = 0 THEN GOTO FILEPICK.CLOSE
+    GOSUB FILE.UP : FILEPICK.DEPTH% = FILEPICK.DEPTH% - 1
+    GOTO FILEPICK.CANCEL
+
+FILEPICK.CHOSE:
+    FILEPICK.NAME$ = FILEPICK.CHOSEN$
+
+FILEPICK.CLOSE:
+    GOSUB GUI.CLOSE : GOSUB GUI.FORM.DRAIN
+    RETURN
+
+
+## ---- A directory by name goes one deeper, and ".." one higher.
+FILEPICK.CHANGEDIR:
+    IF FILEPICK.CHOSEN$ = ".." THEN GOTO FILEPICK.CHANGEUP
+    FILE.NAME$ = FILEPICK.CHOSEN$
+    GOSUB FILE.CHDIR
+    IF FILE.ERR% < FILE.OKMAX THEN FILEPICK.DEPTH% = FILEPICK.DEPTH% + 1
+    RETURN
+FILEPICK.CHANGEUP:
+    GOSUB FILE.UP
+    IF FILEPICK.DEPTH% > 0 THEN FILEPICK.DEPTH% = FILEPICK.DEPTH% - 1
+    RETURN
+
+## ---- D: the file under the cursor, deleted after a Y on the footer.
+FILEPICK.DELETE:
+    GOSUB FILEPICK.ROW.NAME
+    IF FILEPICK.ISDIR% <> 0 THEN RETURN
+    GOSUB FILEPICK.ASKDELETE
+    IF FILEPICK.YES% <> 0 THEN GOSUB FILEPICK.REMOVE
+    GOTO FILEPICK.FOOTER
+
+## FILE.NAME$ is assigned here, and FILEPICK.SCAN's FILE.DIR.INIT makes the parser's string
+## again.
+FILEPICK.REMOVE:
+    FILE.NAME$ = FILEPICK.CHOSEN$
+    GOSUB FILE.DELETE
+    GOSUB FILEPICK.SCAN
+    IF FILEPICK.CUR% >= FILEPICK.COUNT% THEN FILEPICK.CUR% = FILEPICK.COUNT% - 1
+    FILEPICK.TOP% = 0
+    FILEPICK.REPAINT% = -1
+    RETURN
+
+## ---- The question on the footer. Y is a yes. N, Esc and Stop are a no.
+FILEPICK.ASKDELETE:
+    GP.FILL GUI.LEFT% + 1, FILEPICK.BOTTOM%, GUI.WIDTH% - 2, 1, GUI.SPACE, FILEPICK.BAR%
+    FILEPICK.FOOT$ = FILEPICK.ASK$
+    FILEPICK.STAR% = GP.INSTR(FILEPICK.ASK$, "*")
+    IF FILEPICK.STAR% > 0 THEN FILEPICK.FOOT$ = LEFT$(FILEPICK.ASK$, FILEPICK.STAR% - 1) + FILEPICK.CHOSEN$ + MID$(FILEPICK.ASK$, FILEPICK.STAR% + 1)
+    GP.PRINTAT GUI.LEFT% + 2, FILEPICK.BOTTOM%, LEFT$(FILEPICK.FOOT$, GUI.WIDTH% - 4), FILEPICK.BAR%
+FILEPICK.ASKDELETE.KEY:
+    GOSUB FILEPICK.GETKEY
+    FILEPICK.YES% = 0
+    GP.SELECT FILEPICK.KEY%
+        GP.CASE 89
+            FILEPICK.YES% = -1
+            RETURN
+        GP.CASE 78, GUI.ESCAPE, GUI.STOP
+            RETURN
+    GP.ENDSEL
+    GOTO FILEPICK.ASKDELETE.KEY
+
+## ---- F: the directories shown or hidden. The listing is walked again, not read again.
+FILEPICK.FOLDERS:
+    FILEPICK.HIDEDIRS% = NOT FILEPICK.HIDEDIRS%
+    GOSUB FILEPICK.WALK
+    FILEPICK.CUR% = 0
+    FILEPICK.TOP% = 0
+    FILEPICK.REPAINT% = -1
+    GOTO FILEPICK.FOOTER
+
+## ---- The next key into FILEPICK.KEY%. A letter of either case is the capital, 65 to 90.
+FILEPICK.GETKEY:
+    GET FILEPICK.PRESSED$
+    IF GP.ISEMPTY(FILEPICK.PRESSED$) THEN GOTO FILEPICK.GETKEY
+    FILEPICK.KEY% = ASC(FILEPICK.PRESSED$)
+    IF FILEPICK.KEY% > 192 AND FILEPICK.KEY% < 219 THEN FILEPICK.KEY% = FILEPICK.KEY% - 128
+    IF FILEPICK.KEY% > 96 AND FILEPICK.KEY% < 123 THEN FILEPICK.KEY% = FILEPICK.KEY% - 32
+    RETURN
+
+## ---- The entry under the cursor: FILEPICK.CHOSEN$ its name, FILEPICK.ISDIR% -1 for a
+## ---- directory.
+FILEPICK.ROW.NAME:
+    GUI.LIST.AT% = FILEPICK.CUR% + 1
+    GOSUB GUI.LIST.FETCH
+    FILEPICK.ISDIR% = 0
+    IF LEFT$(GUI.LIST.TEXT$, 1) = "/" THEN FILEPICK.ISDIR% = -1
+    FILEPICK.CHOSEN$ = MID$(GUI.LIST.TEXT$, 2, LEN(GUI.LIST.TEXT$) - 1 - FILEPICK.TAIL)
     GP.DO
-        IF RIGHT$(FILEPICK.NAME$, 1) <> " " THEN GP.EXITDO
-        FILEPICK.NAME$ = LEFT$(FILEPICK.NAME$, LEN(FILEPICK.NAME$) - 1)
+        IF RIGHT$(FILEPICK.CHOSEN$, 1) <> " " THEN GP.EXITDO
+        FILEPICK.CHOSEN$ = LEFT$(FILEPICK.CHOSEN$, LEN(FILEPICK.CHOSEN$) - 1)
     GP.LOOP
     RETURN
 
 
 ## ***********************************************************************
-## **  FILEPICK.SCAN -- the drive into the listing, the matches into the list.
+## **  FILEPICK.BOX -- the box, its title bar and its footer, with the screen
+## **  under it saved as every dialog's is.
+## ***********************************************************************
+FILEPICK.BOX:
+    GOSUB GUI.DEFAULTS
+    GOSUB GUI.SCREEN
+    FILEPICK.BOX.WIDTH% = FILEPICK.BOXW
+    IF GUI.SCREEN.COLS% < 80 THEN FILEPICK.BOX.WIDTH% = GUI.SCREEN.COLS% - 2
+    FILEPICK.ROWS% = GUI.SCREEN.ROWS% - FILEPICK.BOXMARGIN - 4
+    GUI.BODY.WIDTH% = FILEPICK.BOX.WIDTH% - 2 - 2 * GUI.PADX
+    GUI.BODY.ROWS% = FILEPICK.ROWS%
+    GOSUB GUI.OPEN
+    GUI.LIST.BANK% = FILEPICK.LISTBANK%
+    GUI.LIST.BASE = FILEPICK.LISTADDR
+    GUI.LIST.FIRST% = 0
+    FILEPICK.FIRSTROW% = GUI.TOP% + 2
+    FILEPICK.BOTTOM% = GUI.TOP% + GUI.HEIGHT% - 1
+    FILEPICK.LIT% = THEME.CLR%(THEME.HILITE)
+    FILEPICK.BAR% = THEME.CLR%(THEME.BAR)
+    FILEPICK.HOTATTR% = (FILEPICK.BAR% AND 240) + (THEME.CLR%(THEME.BORDER) AND 15)
+    IF GUI.HOTFG% <> 0 THEN FILEPICK.HOTATTR% = (FILEPICK.BAR% AND 240) + GUI.HOTFG%
+    GP.FILL GUI.LEFT% + 1, GUI.TOP%, GUI.WIDTH% - 2, 1, GUI.SPACE, FILEPICK.BAR%
+    FILEPICK.FOOT$ = " " + FILEPICK.TITLE$ + " "
+    GP.PRINTAT GUI.LEFT% + INT((GUI.WIDTH% - LEN(FILEPICK.FOOT$)) / 2), GUI.TOP%, FILEPICK.FOOT$, FILEPICK.BAR%
+    GOSUB FILEPICK.FOOTER
+    FILEPICK.CUR% = 0
+    FILEPICK.TOP% = 0
+    FILEPICK.REPAINT% = -1
+    GOSUB GUI.FORM.DRAIN
+    RETURN
+
+## ---- The footer bar, centred. A letter after & is in FILEPICK.HOTATTR%.
+FILEPICK.FOOTER:
+    GP.FILL GUI.LEFT% + 1, FILEPICK.BOTTOM%, GUI.WIDTH% - 2, 1, GUI.SPACE, FILEPICK.BAR%
+    FILEPICK.FOOT$ = FILEPICK.SHOWON$
+    IF FILEPICK.HIDEDIRS% <> 0 THEN FILEPICK.FOOT$ = FILEPICK.SHOWOFF$
+    FILEPICK.FOOT.WIDTH% = 0
+    FOR FILEPICK.FOOT.AT = 1 TO LEN(FILEPICK.FOOT$)
+        IF MID$(FILEPICK.FOOT$, FILEPICK.FOOT.AT, 1) <> "&" THEN FILEPICK.FOOT.WIDTH% = FILEPICK.FOOT.WIDTH% + 1
+    NEXT FILEPICK.FOOT.AT
+    FILEPICK.FOOT.X% = GUI.LEFT% + INT((GUI.WIDTH% - FILEPICK.FOOT.WIDTH%) / 2)
+    FILEPICK.FOOT.ATTR% = FILEPICK.BAR%
+    FOR FILEPICK.FOOT.AT = 1 TO LEN(FILEPICK.FOOT$)
+        FILEPICK.FOOT.CH$ = MID$(FILEPICK.FOOT$, FILEPICK.FOOT.AT, 1)
+        IF FILEPICK.FOOT.CH$ = "&" THEN FILEPICK.FOOT.ATTR% = FILEPICK.HOTATTR%
+        IF FILEPICK.FOOT.CH$ <> "&" THEN GOSUB FILEPICK.FOOT.PUT
+    NEXT FILEPICK.FOOT.AT
+    RETURN
+FILEPICK.FOOT.PUT:
+    GP.PRINTAT FILEPICK.FOOT.X%, FILEPICK.BOTTOM%, FILEPICK.FOOT.CH$, FILEPICK.FOOT.ATTR%
+    FILEPICK.FOOT.X% = FILEPICK.FOOT.X% + 1
+    FILEPICK.FOOT.ATTR% = FILEPICK.BAR%
+    RETURN
+
+
+## ***********************************************************************
+## **  FILEPICK.SHOW -- keep the cursor in the window and paint what moved:
+## **  every row after a scroll or a new list, else the row the cursor left
+## **  and the row it is on. ^ and V at the right edge say more lies above
+## **  or below.
+## ***********************************************************************
+FILEPICK.SHOW:
+    IF FILEPICK.CUR% < FILEPICK.TOP% THEN FILEPICK.TOP% = FILEPICK.CUR%
+    IF FILEPICK.CUR% >= FILEPICK.TOP% + FILEPICK.ROWS% THEN FILEPICK.TOP% = FILEPICK.CUR% - FILEPICK.ROWS% + 1
+    IF FILEPICK.TOP% <> FILEPICK.SHOWNTOP% THEN FILEPICK.REPAINT% = -1
+    IF FILEPICK.REPAINT% <> 0 THEN GOTO FILEPICK.SHOW.ALL
+    FILEPICK.PAINT.AT% = FILEPICK.SHOWNCUR%
+    GOSUB FILEPICK.ROW.PAINT
+    FILEPICK.PAINT.AT% = FILEPICK.CUR%
+    GOSUB FILEPICK.ROW.PAINT
+    GOTO FILEPICK.SHOWN
+FILEPICK.SHOW.ALL:
+    FOR FILEPICK.PAINT.ROW = 0 TO FILEPICK.ROWS% - 1
+        FILEPICK.PAINT.AT% = FILEPICK.TOP% + FILEPICK.PAINT.ROW
+        GOSUB FILEPICK.ROW.PAINT
+    NEXT FILEPICK.PAINT.ROW
+FILEPICK.SHOWN:
+    IF FILEPICK.TOP% > 0 THEN GOSUB FILEPICK.HINT.UP
+    IF FILEPICK.TOP% + FILEPICK.ROWS% < FILEPICK.COUNT% THEN GOSUB FILEPICK.HINT.DOWN
+    FILEPICK.SHOWNTOP% = FILEPICK.TOP%
+    FILEPICK.SHOWNCUR% = FILEPICK.CUR%
+    FILEPICK.REPAINT% = 0
+    RETURN
+
+## ---- Entry FILEPICK.PAINT.AT% on its row, lit when the cursor is on it. A row past the
+## ---- end of the list is blank.
+FILEPICK.ROW.PAINT:
+    GOSUB FILEPICK.ROW.PLACE
+    GP.FILL GUI.LEFT% + 1, FILEPICK.ROW.Y%, GUI.WIDTH% - 2, 1, GUI.SPACE, FILEPICK.ROW.ATTR%
+    IF FILEPICK.PAINT.AT% >= FILEPICK.COUNT% THEN RETURN
+    GUI.LIST.AT% = FILEPICK.PAINT.AT% + 1
+    GOSUB GUI.LIST.FETCH
+    GP.PRINTAT GUI.LEFT% + 2, FILEPICK.ROW.Y%, LEFT$(GUI.LIST.TEXT$, GUI.WIDTH% - 4), FILEPICK.ROW.ATTR%
+    RETURN
+
+FILEPICK.ROW.PLACE:
+    FILEPICK.ROW.Y% = FILEPICK.FIRSTROW% + FILEPICK.PAINT.AT% - FILEPICK.TOP%
+    FILEPICK.ROW.ATTR% = GUI.PANEL%
+    IF FILEPICK.PAINT.AT% = FILEPICK.CUR% THEN FILEPICK.ROW.ATTR% = FILEPICK.LIT%
+    RETURN
+
+FILEPICK.HINT.UP:
+    FILEPICK.PAINT.AT% = FILEPICK.TOP%
+    FILEPICK.HINT$ = CHR$(94)
+    GOTO FILEPICK.HINT.PUT
+FILEPICK.HINT.DOWN:
+    FILEPICK.PAINT.AT% = FILEPICK.TOP% + FILEPICK.ROWS% - 1
+    FILEPICK.HINT$ = "V"
+FILEPICK.HINT.PUT:
+    GOSUB FILEPICK.ROW.PLACE
+    GP.PRINTAT GUI.LEFT% + GUI.WIDTH% - 2, FILEPICK.ROW.Y%, FILEPICK.HINT$, FILEPICK.ROW.ATTR%
+    RETURN
+
+
+## ***********************************************************************
+## **  FILEPICK.SCAN -- the drive into the listing, the listing into the list.
 ## **
-## **  The drive is asked for FILES ONLY and no pattern: a DOS pattern cannot
+## **  The drive is asked for everything and no pattern: a DOS pattern cannot
 ## **  say "BASL or BL", so the suffix test is FILEPICK.MATCH.
 ## **
 ## **  FILE.DIR.INIT RUNS ON EVERY SCAN. It points the parser at FILE.NAME$,
 ## **  which FILEIO shares: one FILEIO call between two picks can move it.
 ## ***********************************************************************
 FILEPICK.SCAN:
-    FILEPICK.COUNT = 0 : FILEPICK.FULL = 0
-    IF FILEPICK.LISTBANK = 0 THEN RETURN
+    FILEPICK.COUNT% = 0 : FILEPICK.FULL% = 0
+    IF FILEPICK.LISTBANK% = 0 THEN RETURN
     GOSUB FILE.DIR.INIT
-    GP.IF FILEPICK.DIRBANK = 0 THEN
-        FILE.DIR.BANK = FILEPICK.LISTBANK : FILE.DIR.BANKAT = FILEPICK.SPLIT
-        FILEPICK.MAX% = FILEPICK.MAXONE : FILEPICK.LIMIT% = FILEPICK.SPLIT
+    GP.IF FILEPICK.DIRBANK% = 0 THEN
+        FILEPICK.LIMIT% = INT(FILEPICK.LISTSIZE% / 2)
+        FILE.DIR.BANK% = FILEPICK.LISTBANK%
+        FILE.DIR.PTR = FILEPICK.LISTADDR + FILEPICK.LIMIT%
+        FILE.DIR.CAP% = FILEPICK.LISTSIZE% - FILEPICK.LIMIT%
     GP.ELSE
-        FILE.DIR.BANK = FILEPICK.DIRBANK
-        FILEPICK.MAX% = FILEPICK.MAXTWO : FILEPICK.LIMIT% = FILEPICK.BANKROOM
+        FILEPICK.LIMIT% = FILEPICK.LISTSIZE%
+        FILE.DIR.BANK% = FILEPICK.DIRBANK%
+        FILE.DIR.PTR = FILEPICK.DIRADDR
+        FILE.DIR.CAP% = FILEPICK.DIRSIZE%
     GP.ENDIF
-    FILE.DIR.PATTERN$ = "" : FILE.DIR.ONLY = FILE.DIR.FILES
+    FILEPICK.MAX% = INT((FILEPICK.LIMIT% - 2) / FILEPICK.FILEBYTES)
+    IF FILEPICK.MAX% > FILEPICK.MAXFILES THEN FILEPICK.MAX% = FILEPICK.MAXFILES
+    FILE.DIR.PATTERN$ = "" : FILE.DIR.ONLY% = FILE.DIR.ALL
     GOSUB FILE.DIR.OPEN
 
+## FILEPICK.WALK -- the listing already in its buffer into the list: "..", the directories
+## unless FILEPICK.HIDEDIRS% is set, then the files.
+FILEPICK.WALK:
+    FILEPICK.COUNT% = 0
+    FILEPICK.FULL% = 0
     FILEPICK.NEXT% = 2 + 2 * FILEPICK.MAX%
-    GP.DO
-        GOSUB FILE.DIR.NEXT
-        IF FILE.DIR.MORE = 0 THEN GP.EXITDO
-        FILEPICK.TRY$ = FILE.NAME$
-        GOSUB FILEPICK.MATCH
-        IF FILEPICK.HIT% <> 0 THEN GOSUB FILEPICK.KEEP
-        IF FILEPICK.FULL <> 0 THEN GP.EXITDO
-    GP.LOOP
+    FILEPICK.TRY$ = ".."
+    FILEPICK.TRYDIR% = -1
+    GOSUB FILEPICK.KEEP
+    FILEPICK.PASSDIRS% = -1
+    IF FILEPICK.HIDEDIRS% = 0 THEN GOSUB FILEPICK.PASS
+    FILEPICK.PASSDIRS% = 0
+    GOSUB FILEPICK.PASS
+    STASH.PEEKBANK = FILEPICK.LISTBANK% : GOSUB STASH.SELECT
+    POKE FILEPICK.LISTADDR, FILEPICK.COUNT%
+    POKE FILEPICK.LISTADDR + 1, 0
+    RETURN
 
-    STASH.PEEKBANK = FILEPICK.LISTBANK : GOSUB STASH.SELECT
-    POKE $A000, FILEPICK.COUNT : POKE $A001, 0
+## ---- One walk of the listing. It keeps the directories when FILEPICK.PASSDIRS% is set,
+## ---- else the files that match.
+FILEPICK.PASS:
+    GOSUB FILE.DIR.REWIND
+    GP.DO
+        IF FILEPICK.FULL% <> 0 THEN GP.EXITDO
+        GOSUB FILE.DIR.NEXT
+        IF FILE.DIR.MORE% = 0 THEN GP.EXITDO
+        GOSUB FILEPICK.CONSIDER
+    GP.LOOP
+    RETURN
+
+FILEPICK.CONSIDER:
+    FILEPICK.TRY$ = FILE.NAME$
+    IF LEFT$(FILEPICK.TRY$, 1) = "." THEN RETURN
+    FILEPICK.TRYDIR% = 0
+    IF FILE.TYPE$ = "DIR" THEN FILEPICK.TRYDIR% = -1
+    IF FILEPICK.TRYDIR% <> FILEPICK.PASSDIRS% THEN RETURN
+    FILEPICK.HIT% = -1
+    IF FILEPICK.TRYDIR% = 0 THEN GOSUB FILEPICK.MATCH
+    IF FILEPICK.HIT% <> 0 THEN GOSUB FILEPICK.KEEP
     RETURN
 
 
-## ---- One file onto the end of the list: its offset, then its record.
+## ---- One entry onto the end of the list: its offset, then its record.
 FILEPICK.KEEP:
-    GP.IF FILEPICK.COUNT >= FILEPICK.MAX% THEN
-        FILEPICK.FULL = -1 : RETURN
+    GP.IF FILEPICK.COUNT% >= FILEPICK.MAX% THEN
+        FILEPICK.FULL% = -1 : RETURN
     GP.ENDIF
     FILEPICK.ROW$ = " " + FILEPICK.TRY$
+    IF FILEPICK.TRYDIR% <> 0 THEN FILEPICK.ROW$ = "/" + FILEPICK.TRY$
     IF LEN(FILEPICK.TRY$) < FILEPICK.NAMEW THEN FILEPICK.ROW$ = FILEPICK.ROW$ + RPT$(32, FILEPICK.NAMEW - LEN(FILEPICK.TRY$))
-    FILEPICK.ROW$ = FILEPICK.ROW$ + RIGHT$("      " + STR$(FILE.BLOCKS), 6) + " " + FILE.TYPE$
+    FILEPICK.BLOCKS$ = RIGHT$("      " + STR$(FILE.BLOCKS), 6) + " " + FILE.TYPE$
+    IF FILEPICK.TRYDIR% <> 0 THEN FILEPICK.BLOCKS$ = "       DIR"
+    FILEPICK.ROW$ = FILEPICK.ROW$ + FILEPICK.BLOCKS$
     FILEPICK.LEN% = LEN(FILEPICK.ROW$)
     GP.IF FILEPICK.NEXT% + 2 + FILEPICK.LEN% > FILEPICK.LIMIT% THEN
-        FILEPICK.FULL = -1 : RETURN
+        FILEPICK.FULL% = -1 : RETURN
     GP.ENDIF
 
-    STASH.PEEKBANK = FILEPICK.LISTBANK : GOSUB STASH.SELECT
-    FILEPICK.SLOT = $A002 + 2 * FILEPICK.COUNT
+    STASH.PEEKBANK = FILEPICK.LISTBANK% : GOSUB STASH.SELECT
+    FILEPICK.SLOT = FILEPICK.LISTADDR + 2 + 2 * FILEPICK.COUNT%
     POKE FILEPICK.SLOT, (FILEPICK.NEXT% + 1) AND 255
     POKE FILEPICK.SLOT + 1, INT((FILEPICK.NEXT% + 1) / 256)
-    FILEPICK.AT = $A000 + FILEPICK.NEXT%
+    FILEPICK.AT = FILEPICK.LISTADDR + FILEPICK.NEXT%
     POKE FILEPICK.AT, FILEPICK.LEN% : POKE FILEPICK.AT + 1, FILEPICK.LEN%
     FILEPICK.PTR = GP.STRPTR(FILEPICK.ROW$)
     FOR FILEPICK.C = 1 TO FILEPICK.LEN%
@@ -170,7 +473,7 @@ FILEPICK.KEEP:
     NEXT FILEPICK.C
 
     FILEPICK.NEXT% = FILEPICK.NEXT% + 2 + FILEPICK.LEN%
-    FILEPICK.COUNT = FILEPICK.COUNT + 1
+    FILEPICK.COUNT% = FILEPICK.COUNT% + 1
     RETURN
 
 

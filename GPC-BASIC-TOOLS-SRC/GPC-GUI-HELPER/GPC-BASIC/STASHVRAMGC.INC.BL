@@ -22,7 +22,7 @@
 ## **
 ## **   out  SV.MOVED   how many blocks actually moved, 0 if it was already
 ## **                   tight -- which is what LIFO release leaves behind
-## **        SV.OK      -1 done
+## **        SV.OK%      -1 done
 ## **
 ## **  The slide is downward, so a block's destination is always below its
 ## **  source. That the overlap is safe at the hardware is measured, not
@@ -41,17 +41,17 @@ GOTO SVGC.MODULE.END
 ## ***********************************************************************
 
 SV.COMPACT:  
-    SV.OK = 0 : SV.MOVED = 0 : SV.ERROR$ = ""
-    IF SV.READY = 0 THEN SV.ERROR$ = "SV.INIT HAS NOT RUN" : RETURN
+    SV.OK% = 0 : SV.MOVED = 0 : SV.ERROR$ = ""
+    IF SV.READY% = 0 THEN SV.ERROR$ = "SV.INIT HAS NOT RUN" : RETURN
 
-    SV.TO = SV.BASEPG
+    SV.TO = SV.BASEPG%
 
 ## ---- Take the lowest live block at or above the mark, place it, and move the
 ## ---- mark past it. A selection pass rather than a sort: the table is a few
 ## ---- dozen entries and this needs no second array to hold an order in.
 SV.GC.NEXT:  
     SV.PICK = 0 : SV.BEST = 0
-    FOR SV.J = 1 TO SV.MAX
+    FOR SV.J = 1 TO SV.MAX%
         IF SV.PAGE%(SV.J) >= SV.TO THEN GOSUB SV.GC.OFFER
     NEXT SV.J
     IF SV.PICK = 0 THEN GOTO SV.GC.DONE
@@ -61,7 +61,7 @@ SV.GC.NEXT:
     GOTO SV.GC.NEXT
 
 SV.GC.DONE:  
-    SV.NEXT = SV.TO : SV.OK = -1 : RETURN
+    SV.NEXT% = SV.TO : SV.OK% = -1 : RETURN
 
 ## ---- A free slot holds page 0, which is never >= SV.TO because SV.INIT
 ## ---- refuses a base under one page. So this sees live blocks only.

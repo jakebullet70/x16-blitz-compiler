@@ -33,10 +33,11 @@
 ## rest of the fixed banks.
 #DEFINE ED.TEXTBANK 12
 
-## The file picker: a region for its three modules, and the two banks PICKBANKS is given.
+## The file picker: a region for its three modules, and the two banks PICKSPACE and PICKDIRSPACE
+## are given.
 ##
 ## FILEPICK builds its list in one bank and reads the raw directory into the other. Two banks
-## hold 255 files; handing PICKBANKS a 0 for the second packs both into one and holds 127.
+## hold 255 files; one bank alone packs both and holds 127.
 ## The editor pays the second bank, because a source folder passes 127 files easily.
 ##
 ## These three come out of the document arena, which starts above them at DOC.FIRST.BANK% --
@@ -96,29 +97,6 @@ GP.ENDBANKED
 ED.LIBEND:
 
 
-## ---- the drive, and the picker over it, in a region of its own ----
-## FILEIO is the drive commands, FILEDIR reads a directory into a bank, and FILEPICK is the
-## popup built on both. None of the three executes BANK and each says in its own header that
-## it may be #INCLUDEd into a region, so all three go in one.
-##
-## FILEDIR's two GP.ASM blocks are GP.ASM LOW, which is what lets the module run from a bank:
-## they write $00, and a blob that writes $00 has to stay in low memory. FILEIO's block does
-## not, so it rides along.
-##
-## The #SYMFILE at the top of this file is required by FILEIO and FILEDIR both, for the {VAR}
-## references in those blobs. It is already there for STRCASE.
-##
-## This region is ABOVE the two GUI ones although FILEPICK draws with them: ED-DIALOG.BASL, at
-## the bottom of the second, calls PICKBANKS and PICKFILE, and a GP.SUB compiled before the
-## GP.DEFPROC it names stops the compile with GP.SUB BEFORE ITS GP.DEFPROC. FILEPICK's own
-## calls into GUI-DIALOGS are plain GOSUBs, which carry no such order.
-GOTO ED.FILEEND
-GP.BANKED ED.FILECODE
-#INCLUDE "GPC-BASIC/FILEIO.INC.BL"
-#INCLUDE "GPC-BASIC/FILEDIR.INC.BL"
-#INCLUDE "GPC-BASIC/FILEPICK.INC.BL"
-GP.ENDBANKED
-ED.FILEEND:
 
 
 
@@ -140,6 +118,27 @@ GOTO ED.GUIEND
 GP.BANKED ED.GUICODE
 #INCLUDE "GPC-BASIC/LINEINPUT.INC.BL"
 #INCLUDE "GPC-BASIC/GUI.INC.BL"
+GP.ENDBANKED
+## ---- the drive, and the picker over it, in a region of its own ----
+## FILEIO is the drive commands, FILEDIR reads a directory into a bank, and FILEPICK is the
+## popup built on both. None of the three executes BANK and each says in its own header that
+## it may be #INCLUDEd into a region, so all three go in one.
+##
+## FILEDIR's two GP.ASM blocks are GP.ASM LOW, which is what lets the module run from a bank:
+## they write $00, and a blob that writes $00 has to stay in low memory. FILEIO's block does
+## not, so it rides along.
+##
+## The #SYMFILE at the top of this file is required by FILEIO and FILEDIR both, for the {VAR}
+## references in those blobs. It is already there for STRCASE.
+##
+## This region sits between the two GUI ones. FILEPICK uses GUI.INC.BL's #DEFINEs, so it
+## comes after GUI. ED-DIALOG.BASL, in the region below, calls PICKSPACE and PICKFILE, and a
+## GP.SUB compiled before the GP.DEFPROC it names stops the compile with GP.SUB BEFORE ITS
+## GP.DEFPROC.
+GP.BANKED ED.FILECODE
+#INCLUDE "GPC-BASIC/FILEIO.INC.BL"
+#INCLUDE "GPC-BASIC/FILEDIR.INC.BL"
+#INCLUDE "GPC-BASIC/FILEPICK.INC.BL"
 GP.ENDBANKED
 GP.BANKED ED.DLGCODE
 #INCLUDE "GPC-BASIC/COMBO.INC.BL"
@@ -285,7 +284,7 @@ ED.INIT:
   GOSUB ED.APPSYS.STARTUP : GOSUB BANKMGR.INIT
   GOSUB DOC.INIT  : GOSUB ED.CLAIM.FIXED.BANKS
   GOSUB UNDO.INIT : GOSUB CLIP.INIT : GOSUB ED.SEL.INIT : GOSUB THEME.SELECT
-  SV.MAX = 1 : REM the dropdown's stash, claimed on first use; the dialogs use a RAM bank
+  SV.MAX% = 1 : REM the dropdown's stash, claimed on first use; the dialogs use a RAM bank
   GOSUB ED.MENUS.SETUP
   GOSUB ED.CLAIM.ARENA.BANKS
   
@@ -304,11 +303,11 @@ ED.INIT:
   ED.TEXT.BOTTOM% = SCREEN.ROWS% - 2
   ED.HDRAW.ROW% = 0 - 1
   ED.TEXT.ROWS%   = SCREEN.ROWS% - 2
-  ED.ATTR.TEXT%   = THEME.CLR(THEME.TEXT)
-  ED.ATTR.CARET%  = THEME.CLR(THEME.HILITE)
-  ED.ATTR.SEL%    = THEME.CLR(THEME.BAR) : REM the selection band, distinct from the caret
+  ED.ATTR.TEXT%   = THEME.CLR%(THEME.TEXT)
+  ED.ATTR.CARET%  = THEME.CLR%(THEME.HILITE)
+  ED.ATTR.SEL%    = THEME.CLR%(THEME.BAR) : REM the selection band, distinct from the caret
   ED.CARET.LEN%   = 1 : REM cells the caret covers; a find sets it to the length of the match
-  ED.ASM.GATTR% = THEME.CLR(THEME.DIMMED) : REM the gutter, read by ED.ROW.STREAM
+  ED.ASM.GATTR% = THEME.CLR%(THEME.DIMMED) : REM the gutter, read by ED.ROW.STREAM
   ED.MAP.TOP% = 0
   POKE 40761, 0 : POKE 40762, 0 : REM L1 never scrolls again -- see ED.LAYERS
   ED.MAP.CFG% = PEEK(40756) : ED.MAP.HB% = INT(ED.MAP.CFG% / 64) : ED.MAP.H% = 32
@@ -333,7 +332,7 @@ REM region is only code to the compiler -- to BANKMGR it is a bank like the rest
 REM
 REM MENU.TEXTBANK is not here: MENU claims it itself, on the first MENU.BEGIN.
 REM
-REM ED.BANK.FAILED prints BANKMGR.SET.BANK, which is the verb's own argument, so the
+REM ED.BANK.FAILED prints BANKMGR.SET.BANK%, which is the verb's own argument, so the
 REM message still names the bank that would not claim.
 ED.CLAIM.FIXED.BANKS:
   ## -- if any of these fail we got bigger problems
@@ -368,9 +367,9 @@ ED.CLAIM.ARENA.BANKS:
   RETURN
 
 
-REM ---- a claim failed: two owners name one bank. BANKMGR.SET.BANK is the bank.
+REM ---- a claim failed: two owners name one bank. BANKMGR.SET.BANK% is the bank.
 ED.BANK.FAILED:
-  PRINT "BANK"; BANKMGR.SET.BANK; "FAILED"
+  PRINT "BANK"; BANKMGR.SET.BANK%; "FAILED"
   GOSUB ED.APPSYS.STOPON : REM this one runs after ED.APPSYS.STARTUP took the STOP key away
   END
 
@@ -423,8 +422,8 @@ REM blue until ED.RENDER.ALL paints them. Filled, they come up in the theme's co
 REM then fill with text.
 ED.CLEAR.OVERLAY:
   GP.FILL 0, 1, SCREEN.COLS%, ED.TEXT.ROWS%, 32, 0
-  GP.FILL 0, 0, SCREEN.COLS%, 1, 32, THEME.CLR(THEME.BAR)
-  GP.FILL 0, SCREEN.ROWS% - 1, SCREEN.COLS%, 1, 32, THEME.CLR(THEME.BAR)
+  GP.FILL 0, 0, SCREEN.COLS%, 1, 32, THEME.CLR%(THEME.BAR)
+  GP.FILL 0, SCREEN.ROWS% - 1, SCREEN.COLS%, 1, 32, THEME.CLR%(THEME.BAR)
   RETURN
 
 ED.OPEN.DONE:
@@ -840,7 +839,7 @@ ED.CMD.OPEN:
   ED.CONFIRM.TITLE$ = "Open" : GOSUB ED.CONFIRM.SAVE
   IF ED.PROCEED% = 0 THEN GOSUB ED.REFRESH.FULL : RETURN
   ED.INPUT$ = GP.FN(INPUTBOXEX, "Open", GP.BSTR(BS.DLG, BSTR.DLG.FILE.NAME), "", "", "", ED.DLG.WIDTHDEFAULT, 0)
-  IF GUI.OK = 0 THEN GOSUB ED.REFRESH.FULL : RETURN
+  IF GUI.OK% = 0 THEN GOSUB ED.REFRESH.FULL : RETURN
   DOC.FILE.NAME$ = ED.INPUT$
   GOSUB ED.OPEN.FILE
   RETURN
@@ -883,7 +882,7 @@ ED.CMD.SAVE:
 ED.CMD.SAVEAS:
   ED.SAVEAS.START$ = DOC.FILE.NAME$ : IF DOC.FILE.NAME$ = GP.BSTR(BS.DLG, BSTR.DLG.UNTITLED) THEN ED.SAVEAS.START$ = ""
   ED.INPUT$ = GP.FN(INPUTBOXEX, GP.BSTR(BS.DLG, BSTR.DLG.SAVE.AS), GP.BSTR(BS.DLG, BSTR.DLG.FILE.NAME), "", "", ED.SAVEAS.START$, ED.DLG.WIDTHDEFAULT, 0)
-  IF GUI.OK = 0 THEN GOSUB ED.REFRESH.FULL : RETURN
+  IF GUI.OK% = 0 THEN GOSUB ED.REFRESH.FULL : RETURN
   DOC.FILE.NAME$ = ED.INPUT$ : ED.MB.FORCE% = 1
   GOSUB ED.SAVE.FILE : GOSUB ED.REFRESH.FULL
   ED.MSG$ = GP.BSTR(BS.MSG, BSTR.MSG.SAVED) + DOC.FILE.NAME$ : GOSUB ED.INFO.MSG
@@ -924,30 +923,30 @@ ED.CMD.ABOUT:
 
   REM The panel's own colour is the background of every line, so only the foreground is
   REM chosen here. A line that took its own background would read as a patch on the box.
-  ED.AB.L% = GUI.INNER.LEFT : ED.AB.Y% = GUI.INNER.TOP
-  ED.AB.TATTR% = (GUI.PANEL AND 240) + (THEME.CLR(THEME.TITLE) AND 15)
-  ED.AB.HATTR% = (GUI.PANEL AND 240) + (THEME.CLR(THEME.DIMMED) AND 15)
+  ED.AB.L% = GUI.INNER.LEFT% : ED.AB.Y% = GUI.INNER.TOP%
+  ED.AB.TATTR% = (GUI.PANEL% AND 240) + (THEME.CLR%(THEME.TITLE) AND 15)
+  ED.AB.HATTR% = (GUI.PANEL% AND 240) + (THEME.CLR%(THEME.DIMMED) AND 15)
 
   GP.PRINTAT ED.AB.L%, ED.AB.Y%, GP.BSTR(BS.ABOUT, BSTR.ABOUT.PRODUCT), ED.AB.TATTR%
-  GP.PRINTAT ED.AB.L%, ED.AB.Y% + 1, GP.BSTR(BS.ABOUT, BSTR.ABOUT.MACHINE), GUI.PANEL
+  GP.PRINTAT ED.AB.L%, ED.AB.Y% + 1, GP.BSTR(BS.ABOUT, BSTR.ABOUT.MACHINE), GUI.PANEL%
 
   ED.AB.S$ = GP.BSTR(BS.ABOUT, BSTR.ABOUT.HEAP) + MID$(STR$(FRE(0)), 2) + GP.BSTR(BS.ABOUT, BSTR.ABOUT.FREE.TAIL)
-  GP.PRINTAT ED.AB.L%, ED.AB.Y% + 3, ED.AB.S$, GUI.PANEL
+  GP.PRINTAT ED.AB.L%, ED.AB.Y% + 3, ED.AB.S$, GUI.PANEL%
   ED.AB.S$ = GP.BSTR(BS.ABOUT, BSTR.ABOUT.DOCUMENT) + MID$(STR$(INT(ED.AB.USED / 1024)), 2)
   ED.AB.S$ = ED.AB.S$ + GP.BSTR(BS.ABOUT, BSTR.ABOUT.K.USED)
   ED.AB.S$ = ED.AB.S$ + MID$(STR$(INT((ED.AB.TOT - ED.AB.USED) / 1024)), 2)
   ED.AB.S$ = ED.AB.S$ + GP.BSTR(BS.ABOUT, BSTR.ABOUT.K.FREE) + MID$(STR$(ED.AB.PCT%), 2) + "%)"
-  GP.PRINTAT ED.AB.L%, ED.AB.Y% + 4, ED.AB.S$, GUI.PANEL
+  GP.PRINTAT ED.AB.L%, ED.AB.Y% + 4, ED.AB.S$, GUI.PANEL%
   ED.AB.S$ = GP.BSTR(BS.ABOUT, BSTR.ABOUT.LINES) + MID$(STR$(LINE.COUNT%), 2)
   IF DOC.FULL% <> 0 THEN ED.AB.S$ = ED.AB.S$ + GP.BSTR(BS.ABOUT, BSTR.ABOUT.DOC.FULL)
-  GP.PRINTAT ED.AB.L%, ED.AB.Y% + 5, ED.AB.S$, GUI.PANEL
+  GP.PRINTAT ED.AB.L%, ED.AB.Y% + 5, ED.AB.S$, GUI.PANEL%
 
   ED.AB.S$ = GP.BSTR(BS.ABOUT, BSTR.ABOUT.ARENA) + MID$(STR$(DOC.FIRST.BANK%), 2) + "-" + MID$(STR$(DOC.LAST.BANK%), 2) + " (" + MID$(STR$(ED.AB.BANKS%), 2) + GP.BSTR(BS.ABOUT, BSTR.ABOUT.BANK.SIZE)
-  GP.PRINTAT ED.AB.L%, ED.AB.Y% + 6, ED.AB.S$, GUI.PANEL
+  GP.PRINTAT ED.AB.L%, ED.AB.Y% + 6, ED.AB.S$, GUI.PANEL%
   ED.AB.S$ = GP.BSTR(BS.ABOUT, BSTR.ABOUT.TABLE) + MID$(STR$(DOC.TABLE.BASE.BANK%), 2) + "-"
   ED.AB.S$ = ED.AB.S$ + MID$(STR$(DOC.TABLE.BASE.BANK% + DOC.TABLE.BANKS% - 1), 2)
-  ED.AB.S$ = ED.AB.S$ + GP.BSTR(BS.ABOUT, BSTR.ABOUT.MACHINE.HAS) + MID$(STR$(BANKMGR.BANKS), 2)
-  GP.PRINTAT ED.AB.L%, ED.AB.Y% + 7, ED.AB.S$, GUI.PANEL
+  ED.AB.S$ = ED.AB.S$ + GP.BSTR(BS.ABOUT, BSTR.ABOUT.MACHINE.HAS) + MID$(STR$(BANKMGR.BANKS%), 2)
+  GP.PRINTAT ED.AB.L%, ED.AB.Y% + 7, ED.AB.S$, GUI.PANEL%
 
   REM ---- the two banks that fill up as you work, rather than as the document grows.
   REM
@@ -968,7 +967,7 @@ ED.CMD.ABOUT:
     ED.AB.S$ = ED.AB.S$ + MID$(STR$(CLIP.PTR - CLIP.WIN.START), 2) + "/"
     ED.AB.S$ = ED.AB.S$ + MID$(STR$(CLIP.WIN.END - CLIP.WIN.START), 2) + GP.BSTR(BS.ABOUT, BSTR.ABOUT.BYTES)
   GP.ENDIF
-  GP.PRINTAT ED.AB.L%, ED.AB.Y% + 8, ED.AB.S$, GUI.PANEL
+  GP.PRINTAT ED.AB.L%, ED.AB.Y% + 8, ED.AB.S$, GUI.PANEL%
 
   ED.AB.S$ = GP.BSTR(BS.ABOUT, BSTR.ABOUT.UNDO.REDO)
   GP.IF UNDO.ON% = 0 THEN
@@ -977,12 +976,12 @@ ED.CMD.ABOUT:
     ED.AB.S$ = ED.AB.S$ + MID$(STR$(UNDO.U.COUNT%), 2) + " / " + MID$(STR$(UNDO.D.COUNT%), 2)
     ED.AB.S$ = ED.AB.S$ + " of " + MID$(STR$(UNDO.MAX.GROUP%), 2) + GP.BSTR(BS.ABOUT, BSTR.ABOUT.DEEP)
   GP.ENDIF
-  GP.PRINTAT ED.AB.L%, ED.AB.Y% + 9, ED.AB.S$, GUI.PANEL
+  GP.PRINTAT ED.AB.L%, ED.AB.Y% + 9, ED.AB.S$, GUI.PANEL%
 
   REM Centred on the panel rather than set at a fixed column, so it stays centred if the
   REM width is ever changed.
   ED.AB.S$ = GP.BSTR(BS.ABOUT, BSTR.ABOUT.PRESS.KEY)
-  GP.PRINTAT ED.AB.L% + INT((GUI.INNER.WIDTH - LEN(ED.AB.S$)) / 2), ED.AB.Y% + 11, ED.AB.S$, ED.AB.HATTR%
+  GP.PRINTAT ED.AB.L% + INT((GUI.INNER.WIDTH% - LEN(ED.AB.S$)) / 2), ED.AB.Y% + 11, ED.AB.S$, ED.AB.HATTR%
 
   GOSUB ED.DLG.WAITKEY
   GP.SUB PANELCLOSE
@@ -1009,7 +1008,7 @@ REM is -- which is the test for whether the save actually happened.
 
 ED.CMD.FIND:
   ED.INPUT$ = GP.FN(INPUTBOXEX, "Find", GP.BSTR(BS.DLG, BSTR.DLG.FIND.TEXT), "", "", ED.FIND$, ED.DLG.WIDTHDEFAULT, 0)
-  IF GUI.OK = 0 THEN GOSUB ED.REFRESH.FULL : RETURN
+  IF GUI.OK% = 0 THEN GOSUB ED.REFRESH.FULL : RETURN
   ED.FIND$ = ED.INPUT$ : GOSUB ED.FIND.NEXT
   RETURN
 
@@ -1027,7 +1026,7 @@ ED.CMD.FINDPREV:
 
 ED.CMD.GOTO:
   ED.INPUT$ = GP.FN(INPUTBOXEX, GP.BSTR(BS.DLG, BSTR.DLG.GO.TO.LINE), GP.BSTR(BS.DLG, BSTR.DLG.LINE.NUMBER), "", "", "", ED.DLG.WIDTHDEFAULT, 0)
-  IF GUI.OK = 0 THEN GOSUB ED.REFRESH.FULL : RETURN
+  IF GUI.OK% = 0 THEN GOSUB ED.REFRESH.FULL : RETURN
   ED.GOTO.N = VAL(ED.INPUT$)
   IF ED.GOTO.N < 1 THEN ED.GOTO.N = 1
   IF ED.GOTO.N > LINE.COUNT% THEN ED.GOTO.N = LINE.COUNT%
@@ -1245,13 +1244,13 @@ REM back, so the editor never sits showing a stale "Saved" or "Not found". The f
 REM struck ends the hold early and is handled as usual, so a message never costs a keypress.
 ED.INFO.MSG:
   ED.PS.ROW% = SCREEN.ROWS% - 1 : ED.PS.COL% = 0 : ED.PS.WIDTH% = SCREEN.COLS%
-  ED.PS$ = " " + ED.MSG$ : ED.PS.ATTR% = THEME.CLR(THEME.BAR) : GOSUB ED.PUT.FIELD
+  ED.PS$ = " " + ED.MSG$ : ED.PS.ATTR% = THEME.CLR%(THEME.BAR) : GOSUB ED.PUT.FIELD
   GOSUB ED.MSG.HOLD
   RETURN
 
 ED.ERR.MSG:
   ED.PS.ROW% = SCREEN.ROWS% - 1 : ED.PS.COL% = 0 : ED.PS.WIDTH% = SCREEN.COLS%
-  ED.PS$ = " " + ED.MSG$ : ED.PS.ATTR% = THEME.CLR(THEME.WARN) : GOSUB ED.PUT.FIELD
+  ED.PS$ = " " + ED.MSG$ : ED.PS.ATTR% = THEME.CLR%(THEME.WARN) : GOSUB ED.PUT.FIELD
   GOSUB ED.MSG.HOLD
   RETURN
 
@@ -1267,7 +1266,7 @@ REM Nothing clears it. Every caller ends at ED.REFRESH.FULL or ED.RENDER.STATUS,
 REM the status line again over the top.
 ED.BUSY.MSG:
   ED.PS.ROW% = SCREEN.ROWS% - 1 : ED.PS.COL% = 0 : ED.PS.WIDTH% = SCREEN.COLS%
-  ED.PS$ = " " + ED.MSG$ : ED.PS.ATTR% = THEME.CLR(THEME.BAR) : GOSUB ED.PUT.FIELD
+  ED.PS$ = " " + ED.MSG$ : ED.PS.ATTR% = THEME.CLR%(THEME.BAR) : GOSUB ED.PUT.FIELD
   RETURN
 
 REM ---- hold the message on screen, then put the status line back ----
@@ -1622,11 +1621,11 @@ ED.RENDER.MENUBAR:
 ED.MB.DRAW:
   ED.MB.FORCE% = 0 : ED.MB.D% = ED.DOC.DIRTY%
   ED.PS.ROW% = 0 : ED.PS.COL% = 0 : ED.PS.WIDTH% = SCREEN.COLS%
-  ED.PS$ = "" : ED.PS.ATTR% = THEME.CLR(THEME.BAR) : GOSUB ED.PUT.FIELD
+  ED.PS$ = "" : ED.PS.ATTR% = THEME.CLR%(THEME.BAR) : GOSUB ED.PUT.FIELD
   GOSUB ED.MENUS.DRAW.BAR
   ED.NAME$ = DOC.FILE.NAME$ : IF ED.DOC.DIRTY% = 1 THEN ED.NAME$ = ED.NAME$ + " *"
   ED.NCOL% = SCREEN.COLS% - LEN(ED.NAME$) - 1
-  IF ED.NCOL% > 1 THEN ED.PS.ROW% = 0 : ED.PS.COL% = ED.NCOL% - 1 : ED.PS.WIDTH% = LEN(ED.NAME$) : ED.PS$ = ED.NAME$ : ED.PS.ATTR% = (THEME.CLR(THEME.BAR) AND 240) + (THEME.CLR(THEME.TITLE) AND 15) : GOSUB ED.PUT.FIELD
+  IF ED.NCOL% > 1 THEN ED.PS.ROW% = 0 : ED.PS.COL% = ED.NCOL% - 1 : ED.PS.WIDTH% = LEN(ED.NAME$) : ED.PS$ = ED.NAME$ : ED.PS.ATTR% = (THEME.CLR%(THEME.BAR) AND 240) + (THEME.CLR%(THEME.TITLE) AND 15) : GOSUB ED.PUT.FIELD
   RETURN
 
 
@@ -1647,7 +1646,7 @@ ED.RENDER.STATUS:
   ED.BAR$ = ED.MARK$ + "L" + MID$(STR$(ED.CUR.ROW% + 1), 2) + " C" + MID$(STR$(ED.CUR.COL% + 1), 2) + "  " + ED.MODE$
   ED.BAR$ = ED.BAR$ + "  " + ED.CSET$ + "  " + ED.EOLN$ + GP.BSTR(BS.BAR, BSTR.BAR.LINES) + MID$(STR$(LINE.COUNT%), 2)
   ED.PS.ROW% = SCREEN.ROWS% - 1 : ED.PS.COL% = 0 : ED.PS.WIDTH% = SCREEN.COLS%
-  ED.PS$ = ED.BAR$ : ED.PS.ATTR% = THEME.CLR(THEME.BAR) : GOSUB ED.PUT.FIELD
+  ED.PS$ = ED.BAR$ : ED.PS.ATTR% = THEME.CLR%(THEME.BAR) : GOSUB ED.PUT.FIELD
   RETURN
 
 REM ---- write ED.PS$ into the VERA text map at 0-based (ED.PS.ROW%, ED.PS.COL%), attribute

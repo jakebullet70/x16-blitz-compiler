@@ -57,9 +57,12 @@ APPSYS.STARTUP:
 
 
 ## APPSYS.RESTORE -- the screen as it was, for whatever runs next.
+##
+## COLOR goes first. Setting the mode clears the screen in the colour already
+## selected, so a COLOR after it leaves the program's page colour on screen.
 APPSYS.RESTORE:  
-    GP.CALL APPSYS.SCRMODE, APPSYS.MODE, 0, 0, 0 : GP.CALL APPSYS.SETCHR, APPSYS.CHARSET AND 63, 0, 0, 0
-    POKE APPSYS.CHRREG, APPSYS.CHARSET : COLOR APPSYS.COLOUR AND 15, INT(APPSYS.COLOUR / 16)
+    COLOR APPSYS.COLOUR AND 15, INT(APPSYS.COLOUR / 16) : GP.CALL APPSYS.SCRMODE, APPSYS.MODE, 0, 0, 0
+    GP.CALL APPSYS.SETCHR, APPSYS.CHARSET AND 63, 0, 0, 0 : POKE APPSYS.CHRREG, APPSYS.CHARSET
     RETURN
 
 

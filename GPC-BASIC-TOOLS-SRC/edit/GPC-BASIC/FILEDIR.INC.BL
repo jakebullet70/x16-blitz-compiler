@@ -5,30 +5,29 @@
 ## **      FILE.DIR.INIT   once, before anything else here
 ## **      FILE.DIR.OPEN   read the whole listing into the buffer
 ## **      FILE.DIR.NEXT   the next entry out of it
+## **      FILE.DIR.REWIND the walk again from the first entry, the drive not asked
 ## **
 ## **  Requires GPB.INC.BL and FILEIO.INC.BL, and #INCLUDEs neither.
 ## **
 ## **      #SYMFILE "@:MYPROG.SYM"   <- required, before the #INCLUDEs.
 ## **
-## **   in   FILE.DIR.BANK     the bank to read into, or 0 for low RAM
-## **        FILE.DIR.BANKAT   where in the bank the listing starts. 0 is
-## **                          $A000, and INIT and every OPEN leave it 0
-## **        FILE.DIR.PTR      the low RAM buffer, when BANK is 0
-## **        FILE.DIR.CAP      how many bytes that buffer holds
+## **   in   FILE.DIR.BANK%     the bank the buffer is in, or 0 for low RAM
+## **        FILE.DIR.PTR      the buffer's first byte
+## **        FILE.DIR.CAP%      how many bytes the buffer holds
 ## **        FILE.DIR.PATTERN$  a name pattern, or empty for all
-## **        FILE.DIR.ONLY     FILE.DIR.ALL, FILE.DIR.FILES, FILE.DIR.DIRS
-## **        FILE.DEVICE       the drive, from FILEIO. 0 means 8
+## **        FILE.DIR.ONLY%     FILE.DIR.ALL, FILE.DIR.FILES, FILE.DIR.DIRS
+## **        FILE.DEVICE%       the drive, from FILEIO. 0 means 8
 ## **
-## **   out  FILE.DIR.GOT      bytes read. 0 is an empty or failed listing
-## **        FILE.DIR.FULL     the buffer filled before the listing ended
-## **        FILE.DIR.SLOW     1 if the device had no MACPTR and the read
+## **   out  FILE.DIR.GOT%      bytes read. 0 is an empty or failed listing
+## **        FILE.DIR.FULL%     the buffer filled before the listing ended
+## **        FILE.DIR.SLOW%     1 if the device had no MACPTR and the read
 ## **                          fell back to CHRIN a byte at a time
-## **        FILE.DIR.MORE     -1 while NEXT produced an entry, 0 at the end
+## **        FILE.DIR.MORE%     -1 while NEXT produced an entry, 0 at the end
 ## **        FILE.NAME$        the entry
 ## **        FILE.BLOCKS       its size in blocks
 ## **        FILE.TYPE$        PRG, SEQ or DIR
 ## **
-## **  internal  FILE.DIR.AT FILE.DIR.ASK$ FILE.DIR.ADDR% FILE.DIR.ROOM%
+## **  internal  FILE.DIR.AT% FILE.DIR.ASK$ FILE.DIR.ADDR% FILE.DIR.ROOM%
 ## **            FILE.DIR.OFF% FILE.DIR.BYTES% FILE.DIR.CNT% FILE.DIR.BLK%
 ## **            FILE.DIR.OK% FILE.DIR.SLOW% FILE.DIR.LFN% FILE.DIR.NAMEA%
 ## **            FILE.DIR.WAS% FILE.DIR.BNK%
@@ -36,25 +35,24 @@
 ## **
 ## **  Two destinations, one code path: the reader takes an address and a size.
 ## **
-## **      a bank    FILE.DIR.BANK = BANKMGR.BANK
-## **                8,192 bytes at $A000, about 250 entries
+## **      a bank    FILE.DIR.BANK% = MYBANK%
+## **                FILE.DIR.PTR = MYADDR
+## **                FILE.DIR.CAP% = 8192
+## **                8,192 bytes holds about 250 entries
 ## **
-## **      low RAM   FILE.DIR.BANK = 0
+## **      low RAM   FILE.DIR.BANK% = 0
 ## **                DIM FD.BUF%(1022)
 ## **                FILE.DIR.PTR = GP.ARRPTR(FD.BUF%())
-## **                FILE.DIR.CAP = 1023 * 2
+## **                FILE.DIR.CAP% = 1023 * 2
 ## **
-## **  WARNING: a % array is TWO bytes an element, not six. The recipe here said
-## **  six until 07/09/26 and sized a 682-byte buffer as 2,046 -- a caller
-## **  following it handed the assembly three times the room it had, and the
-## **  reader would have run 1,364 bytes off the end of the array and into
-## **  whatever the workspace put after it. An untyped array is the six.
+## **  WARNING: a % array is TWO bytes an element, not six. A buffer sized as
+## **  six runs the reader off the end of the array, into whatever the
+## **  workspace put after it. An untyped array is the six.
 ## **
-## **  FILE.DIR.BANKBASE and FILE.DIR.BANKROOM are the hardware window, not an
-## **  allocation: every bank appears at $A000 and every bank is 8,192 bytes.
-## **  The bank NUMBER is the resource. Take it from BANKMGR.GET.FREE.BANK and
-## **  put it in FILE.DIR.BANK. This module claims no bank and executes no BANK
-## **  statement.
+## **  WARNING: IN A BANK, PTR + CAP STAYS AT OR BELOW $C000. Past $BFFF, MACPTR
+## **  wraps into the next bank. A piece from BANKMGR.SPACE keeps to this.
+## **
+## **  This module claims no bank and executes no BANK statement.
 ## **
 ## **  THE WINDOW IS SWITCHED IN ASSEMBLY, NOT IN BASIC, and that is what lets this
 ## **  module live in a GP.BANKED region. The two blobs take the data bank at entry
@@ -62,17 +60,17 @@
 ## **  foreign bank selected. A BANK statement in banked p-code is refused by the
 ## **  compiler, and one either side of a GOSUB would leave the return fetching its
 ## **  next byte from the data bank. FILE.DIR.BNK% carries the bank to the assembly
-## **  because {VAR} on the untyped FILE.DIR.BANK would read a float's mantissa.
+## **  because {VAR} on the untyped FILE.DIR.BANK% would read a float's mantissa.
 ## **
 ## **  The drive does the filtering. Do not write a pattern matcher.
 ## **
 ## **      FILE.DIR.PATTERN$ = "GAME*"
-## **      FILE.DIR.ONLY = FILE.DIR.FILES
+## **      FILE.DIR.ONLY% = FILE.DIR.FILES
 ## **
 ## **  A listing arrives as a fake BASIC program: two bytes of load address, then
 ## **  per entry a two byte link, a two byte line number that is the block count,
 ## **  the text, and a NUL. The blocks-free line at the end carries no quoted
-## **  name, so running out of quotes is the end. FILE.DIR.AT starts at 4.
+## **  name, so running out of quotes is the end. FILE.DIR.AT% starts at 4.
 ## **
 ## ** ---- traps ----
 ## **
@@ -94,7 +92,7 @@
 ## **
 ## **  MACPTR is asked for at most 255 bytes a call, so its returned count fits
 ## **  one byte. It can return fewer than asked for. Carry set means the device
-## **  has no MACPTR and the read falls back to CHRIN, setting FILE.DIR.SLOW;
+## **  has no MACPTR and the read falls back to CHRIN, setting FILE.DIR.SLOW%;
 ## **  that path is untested, no device here refuses MACPTR.
 ## **
 ## **  MACPTR wraps banks by itself and leaves the new one selected. This module
@@ -119,11 +117,6 @@
 ## copy; the assembler cannot read this. Change both.
 #DEFINE FILE.DIR.NAMEMAX 32
 
-## The bank window. The reader stops at BANKROOM so MACPTR is never asked for a
-## chunk that would carry it past $BFFF into the automatic wrap.
-#DEFINE FILE.DIR.BANKROOM $2000
-#DEFINE FILE.DIR.BANKBASE $A000
-
 GOTO FILEDIR.MODULE.END
 
 ## ***********************************************************************
@@ -142,8 +135,8 @@ FILE.DIR.INIT:
     FILE.NAME$ = RPT$(32, FILE.DIR.NAMEMAX) : FILE.TYPE$ = RPT$(32, 3)
     FILE.DIR.NAMEA% = GP.STRPTR(FILE.NAME$) : FILE.DIR.TYPEA% = GP.STRPTR(FILE.TYPE$)
     FILE.DIR.ADDR% = 0 : FILE.DIR.ROOM% = 0 : FILE.DIR.LFN% = FILE.CHAN : FILE.DIR.BYTES% = 0 : FILE.DIR.CNT% = 0 : FILE.DIR.OFF% = 0
-    FILE.DIR.WAS% = 0 : FILE.DIR.BNK% = 0 : FILE.DIR.SLOW = 0 : FILE.DIR.BANKAT = 0
-    FILE.DIR.BLK% = 0 : FILE.DIR.OK% = 0 : FILE.DIR.SLOW% = 0 : FILE.DIR.AT = 0 : FILE.DIR.GOT = 0 : FILE.DIR.MORE = 0 : FILE.DIR.FULL = 0  
+    FILE.DIR.WAS% = 0 : FILE.DIR.BNK% = 0
+    FILE.DIR.BLK% = 0 : FILE.DIR.OK% = 0 : FILE.DIR.SLOW% = 0 : FILE.DIR.AT% = 0 : FILE.DIR.GOT% = 0 : FILE.DIR.MORE% = 0 : FILE.DIR.FULL% = 0  
     RETURN
 
 
@@ -155,15 +148,15 @@ FILE.DIR.INIT:
 ## **  the matching.
 ## **
 ## **  THE COMMAND CHANNEL IS OPENED FIRST AND READ AFTERWARDS, the same order
-## **  FILE.EXISTS uses, so FILE.ERR means something when the listing is empty.
+## **  FILE.EXISTS uses, so FILE.ERR% means something when the listing is empty.
 ## ***********************************************************************
 FILE.DIR.OPEN:  
-    FILE.DIR.GOT = 0 : FILE.DIR.FULL = 0 : FILE.DIR.MORE = 0 : IF FILE.DEVICE = 0 THEN FILE.DEVICE = 8
-    FILE.DIR.BNK% = FILE.DIR.BANK : GOSUB FILE.DIR.WHERE : GOSUB FILE.DIR.ASKFOR : OPEN 15, FILE.DEVICE, 15
-    OPEN FILE.CHAN, FILE.DEVICE, 0, FILE.DIR.ASK$
-    INPUT#15, FILE.ERR, FILE.MSG$, FILE.TRK, FILE.SEC
-    IF FILE.ERR < FILE.OKMAX THEN GOSUB FILE.DIR.SUCK
-    CLOSE FILE.CHAN : CLOSE 15 : FILE.DIR.AT = 4 : FILE.DIR.BANKAT = 0 : GOSUB FILE.DIR.SKIPDISK
+    FILE.DIR.GOT% = 0 : FILE.DIR.FULL% = 0 : FILE.DIR.MORE% = 0 : IF FILE.DEVICE% = 0 THEN FILE.DEVICE% = 8
+    FILE.DIR.BNK% = FILE.DIR.BANK% : GOSUB FILE.DIR.WHERE : GOSUB FILE.DIR.ASKFOR : OPEN 15, FILE.DEVICE%, 15
+    OPEN FILE.CHAN, FILE.DEVICE%, 0, FILE.DIR.ASK$
+    INPUT#15, FILE.ERR%, FILE.MSG$, FILE.TRK%, FILE.SEC%
+    IF FILE.ERR% < FILE.OKMAX THEN GOSUB FILE.DIR.SUCK
+    CLOSE FILE.CHAN : CLOSE 15 : FILE.DIR.AT% = 4 : GOSUB FILE.DIR.SKIPDISK
     RETURN
 
 
@@ -177,43 +170,48 @@ FILE.DIR.OPEN:
 ## **  Consumed here rather than flagged, so FILE.DIR.NEXT stays "an entry, or
 ## **  the end" with no special first call.
 ## ***********************************************************************
-FILE.DIR.SKIPDISK:  
-    IF FILE.DIR.GOT = 0 THEN RETURN
-    GOSUB FILE.DIR.NEXT : FILE.DIR.MORE = 0 : RETURN
+FILE.DIR.SKIPDISK:
+    IF FILE.DIR.GOT% = 0 THEN RETURN
+    GOSUB FILE.DIR.NEXT : FILE.DIR.MORE% = 0 : RETURN
 
 
-## Where the bytes land. A bank is $A000 plus FILE.DIR.BANKAT, to its end; low RAM is
-## whatever the caller handed over.
-FILE.DIR.WHERE:  
-IF FILE.DIR.BANK = 0 THEN GOTO FILE.DIR.LOWRAM
-    FILE.DIR.ADDR% = FILE.DIR.BANKBASE + FILE.DIR.BANKAT : FILE.DIR.ROOM% = FILE.DIR.BANKROOM - FILE.DIR.BANKAT
-    RETURN
+## ***********************************************************************
+## **  FILE.DIR.REWIND -- start the walk again at the first entry. The
+## **  listing FILE.DIR.OPEN read stays in the buffer, so a second walk costs
+## **  the parse and not the drive.
+## ***********************************************************************
+FILE.DIR.REWIND:
+    FILE.DIR.AT% = 4
+    GOTO FILE.DIR.SKIPDISK
 
 
+## Where the bytes land, in a bank or in low RAM. FILE.DIR.ADDR% holds the
+## address's two bytes for the assembly; past 32,767 it reads negative in BASIC.
+##
 ## A CAP WITH NO PTR WOULD WRITE OVER ZERO PAGE. Forgetting both is already
 ## safe, because no room ends the read at once; forgetting only the address is
 ## not, so no address means no room either.
-FILE.DIR.LOWRAM:  
-    FILE.DIR.ADDR% = FILE.DIR.PTR : FILE.DIR.ROOM% = FILE.DIR.CAP : IF FILE.DIR.PTR = 0 THEN FILE.DIR.ROOM% = 0
+FILE.DIR.WHERE:  
+    FILE.DIR.ADDR% = FILE.DIR.PTR : FILE.DIR.ROOM% = FILE.DIR.CAP% : IF FILE.DIR.PTR = 0 THEN FILE.DIR.ROOM% = 0
     RETURN
 
 
 ## "$", "$:PATTERN", "$:*=P", "$:PATTERN=D" -- the pattern and the filter are
 ## independent, and a filter with no pattern still needs the * to hang it on.
 FILE.DIR.ASKFOR:
-    FILE.DIR.ASK$ = "$" : IF FILE.DIR.ONLY = FILE.DIR.ALL AND GP.ISEMPTY(FILE.DIR.PATTERN$) THEN RETURN
+    FILE.DIR.ASK$ = "$" : IF FILE.DIR.ONLY% = FILE.DIR.ALL AND GP.ISEMPTY(FILE.DIR.PATTERN$) THEN RETURN
     FILE.DIR.ASK$ = "$:" + FILE.DIR.PATTERN$
     IF GP.ISEMPTY(FILE.DIR.PATTERN$) THEN FILE.DIR.ASK$ = "$:*"
-    IF FILE.DIR.ONLY = FILE.DIR.FILES THEN FILE.DIR.ASK$ = FILE.DIR.ASK$ + "=P"
-    IF FILE.DIR.ONLY = FILE.DIR.DIRS THEN FILE.DIR.ASK$ = FILE.DIR.ASK$ + "=D"
+    IF FILE.DIR.ONLY% = FILE.DIR.FILES THEN FILE.DIR.ASK$ = FILE.DIR.ASK$ + "=P"
+    IF FILE.DIR.ONLY% = FILE.DIR.DIRS THEN FILE.DIR.ASK$ = FILE.DIR.ASK$ + "=D"
     RETURN
 
 
 ## No bank statement here. FILE.DIR.FILL's blob takes the data bank and gives the
 ## caller's back, so this routine and its caller stay on whatever bank they had.
 FILE.DIR.SUCK:  
-    GOSUB FILE.DIR.FILL : FILE.DIR.GOT = FILE.DIR.BYTES% : FILE.DIR.SLOW = FILE.DIR.SLOW%
-    IF FILE.DIR.BYTES% >= FILE.DIR.ROOM% THEN FILE.DIR.FULL = -1
+    GOSUB FILE.DIR.FILL : FILE.DIR.GOT% = FILE.DIR.BYTES%
+    IF FILE.DIR.BYTES% >= FILE.DIR.ROOM% THEN FILE.DIR.FULL% = -1
     RETURN
 
 
@@ -331,7 +329,7 @@ FILE.DIR.FILL:  FILE.DIR.BYTES% = 0 : FILE.DIR.SLOW% = 0
 ## ***********************************************************************
 ## **  FILE.DIR.NEXT -- one entry out of the buffer.
 ## **
-## **  FILE.DIR.MORE is 0 when the walk ran out, which happens naturally: the
+## **  FILE.DIR.MORE% is 0 when the walk ran out, which happens naturally: the
 ## **  blocks-free line at the end carries no quoted name, so the scan for one
 ## **  reaches the end of the buffer and gives up.
 ## ***********************************************************************
@@ -342,10 +340,10 @@ FILE.DIR.FILL:  FILE.DIR.BYTES% = 0 : FILE.DIR.SLOW% = 0
 ## holds the offset; the assembly adds it to the base.
 
 FILE.DIR.NEXT:  
-    FILE.DIR.MORE = 0 : IF FILE.DIR.GOT = 0 THEN RETURN
-    FILE.DIR.OFF% = FILE.DIR.AT : FILE.DIR.BNK% = FILE.DIR.BANK : GOSUB FILE.DIR.STEP
+    FILE.DIR.MORE% = 0 : IF FILE.DIR.GOT% = 0 THEN RETURN
+    FILE.DIR.OFF% = FILE.DIR.AT% : FILE.DIR.BNK% = FILE.DIR.BANK% : GOSUB FILE.DIR.STEP
     IF FILE.DIR.OK% = 0 THEN RETURN
-    FILE.DIR.AT = FILE.DIR.OFF% : FILE.BLOCKS = FILE.DIR.BLK% : FILE.DIR.MORE = -1
+    FILE.DIR.AT% = FILE.DIR.OFF% : FILE.BLOCKS = FILE.DIR.BLK% : FILE.DIR.MORE% = -1
     RETURN
 
 

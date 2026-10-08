@@ -3,7 +3,7 @@
 ## **  FILEIO.INC.BL -- the drive: status, files, directories.
 ## **
 ## **      FILE.STATUS     read the command channel
-## **      DOS.CMD         send one command, FILE.ERR back. A VERB, not a
+## **      DOS.CMD         send one command, FILE.ERR% back. A VERB, not a
 ## **                      GOSUB. FILE.CMD is the same body by label:
 ## **                          GP.SUB DOS.CMD, "S:OLD.DAT"
 ## **                          E = GP.FN(DOS.CMD, "S:OLD.DAT")
@@ -38,27 +38,27 @@
 ## **
 ## **   in   FILE.NAME$     the file acted on
 ## **        FILE.NEW$      the second name, RENAME and COPY
-## **        FILE.DEVICE       the drive. 0 means 8
-## **        FILE.ISO       non-zero folds names to PETSCII on the way out
-## **        FILE.ROWS      rows to write, SAVEARRAY
-## **        FILE.MAX.ROWS  rows that fit, LOADARRAY. 0 means 10
+## **        FILE.DEVICE%       the drive. 0 means 8
+## **        FILE.ISO%       non-zero folds names to PETSCII on the way out
+## **        FILE.ROWS%      rows to write, SAVEARRAY
+## **        FILE.MAX.ROWS%  rows that fit, LOADARRAY. 0 means 10
 ## **        FILE.LINE$()   the rows. The caller owns the DIM
 ## **        FILE.CMDSTR$   the command, FILE.CMD and DOS.CMD
 ## **
-## **   out  FILE.ERR       error number. Under 20 is success
+## **   out  FILE.ERR%       error number. Under 20 is success
 ## **        FILE.MSG$      the drive's text
-## **        FILE.TRK       FILE.SEC   the two trailing fields
-## **        FILE.OK        FILE.EXISTS, and FILE.SIZE
-## **        FILE.BLOCKS    FILE.SIZE. 0 when FILE.OK is 0
-## **        FILE.ROWS      rows read, LOADARRAY
+## **        FILE.TRK%       FILE.SEC%   the two trailing fields
+## **        FILE.OK%        FILE.EXISTS, and FILE.SIZE
+## **        FILE.BLOCKS    FILE.SIZE. 0 when FILE.OK% is 0
+## **        FILE.ROWS%      rows read, LOADARRAY
 ## **        FILE.PATH$     FILE.CURDIR
 ## **
-## **  internal  FILE.OUT$ FILE.RAW$ FILE.ROW$ FILE.ST FILE.KEEP
-## **            FILE.I FILE.PETP% FILE.CH$ FILE.BYTE FILE.LINENO FILE.QUOTED
+## **  internal  FILE.OUT$ FILE.RAW$ FILE.ROW$ FILE.ST% FILE.KEEP%
+## **            FILE.I FILE.PETP% FILE.CH$ FILE.BYTE% FILE.LINENO FILE.QUOTED%
 ## **
-## **  FILE.ERR is DS and FILE.MSG$ is DS$. The X16 has neither.
+## **  FILE.ERR% is DS and FILE.MSG$ is DS$. The X16 has neither.
 ## **
-## **  FILE.ROWS is an input to SAVEARRAY and an output from LOADARRAY.
+## **  FILE.ROWS% is an input to SAVEARRAY and an output from LOADARRAY.
 ## **  FILE.LINE$() is the caller's DIM, like GUI.LIST.ITEM$. Left alone the
 ## **  implicit DIM gives 0..10.
 ## **
@@ -67,7 +67,7 @@
 ## **  so a later FILE.SEEK needs no reopen -- see the P and T note below.
 ## **
 ## **  Error under 20 is success. 0 is OK. 1 is "files scratched" and carries
-## **  the count in FILE.TRK. 62 is FILE NOT FOUND, 63 FILE EXISTS, 26 WRITE
+## **  the count in FILE.TRK%. 62 is FILE NOT FOUND, 63 FILE EXISTS, 26 WRITE
 ## **  PROTECT.
 ## **
 ## ** ---- WARNING: ST IS NOT A DISK STATUS ----
@@ -144,17 +144,17 @@ FILE.STATUS:
 ## FILE.CMD sends FILE.CMDSTR$ and reads the answer.
 ##
 ##   in    FILE.CMDSTR$  the command, and the verb's one argument
-##   out   FILE.ERR      the error, and what GP.FN gives back
-##         FILE.MSG$     FILE.TRK   FILE.SEC
+##   out   FILE.ERR%      the error, and what GP.FN gives back
+##         FILE.MSG$     FILE.TRK%   FILE.SEC%
 ##
 ##      FILE.CMDSTR$ = "S:OLD.DAT" : GOSUB FILE.CMD
 ##      GP.SUB DOS.CMD, "S:OLD.DAT"
 ##      E = GP.FN(DOS.CMD, "S:OLD.DAT")
 FILE.CMD:  
-    GP.DEFPROC DOS.CMD, FILE.CMDSTR$ RETURNS FILE.ERR
-    IF FILE.DEVICE = 0 THEN FILE.DEVICE = 8
-    OPEN 15, FILE.DEVICE, 15, FILE.CMDSTR$
-    INPUT#15, FILE.ERR, FILE.MSG$, FILE.TRK, FILE.SEC
+    GP.DEFPROC DOS.CMD, FILE.CMDSTR$ RETURNS FILE.ERR%
+    IF FILE.DEVICE% = 0 THEN FILE.DEVICE% = 8
+    OPEN 15, FILE.DEVICE%, 15, FILE.CMDSTR$
+    INPUT#15, FILE.ERR%, FILE.MSG$, FILE.TRK%, FILE.SEC%
     CLOSE 15 : FILE.CMDSTR$ = ""
     RETURN
 
@@ -162,19 +162,19 @@ FILE.CMD:
 ## being read is the drive's answer to that open.
 ##
 ##   in    FILE.NAME$    the file, and the verb's one argument
-##   out   FILE.OK       -1 found, 0 not, and what GP.FN gives back
-##         FILE.ERR      FILE.MSG$   FILE.TRK   FILE.SEC
+##   out   FILE.OK%       -1 found, 0 not, and what GP.FN gives back
+##         FILE.ERR%      FILE.MSG$   FILE.TRK%   FILE.SEC%
 ##
 ##      FILE.NAME$ = "SCORES.DAT" : GOSUB FILE.EXISTS
 ##      IF GP.FN(FEXISTS, "SCORES.DAT") THEN GOSUB LOADIT
 FILE.EXISTS:  
-    GP.DEFPROC FEXISTS, FILE.NAME$ RETURNS FILE.OK
-    FILE.OK = 0 : IF FILE.DEVICE = 0 THEN FILE.DEVICE = 8
-    GOSUB FILE.PETNAME : OPEN 15, FILE.DEVICE, 15
-    OPEN FILE.CHAN, FILE.DEVICE, FILE.CHAN, FILE.OUT$ + ",S,R"
-    INPUT#15, FILE.ERR, FILE.MSG$, FILE.TRK, FILE.SEC
+    GP.DEFPROC FEXISTS, FILE.NAME$ RETURNS FILE.OK%
+    FILE.OK% = 0 : IF FILE.DEVICE% = 0 THEN FILE.DEVICE% = 8
+    GOSUB FILE.PETNAME : OPEN 15, FILE.DEVICE%, 15
+    OPEN FILE.CHAN, FILE.DEVICE%, FILE.CHAN, FILE.OUT$ + ",S,R"
+    INPUT#15, FILE.ERR%, FILE.MSG$, FILE.TRK%, FILE.SEC%
     CLOSE FILE.CHAN : CLOSE 15
-    IF FILE.ERR < FILE.OKMAX THEN FILE.OK = -1
+    IF FILE.ERR% < FILE.OKMAX THEN FILE.OK% = -1
     RETURN
 
 
@@ -186,10 +186,10 @@ FILE.EXISTS:
 ## **
 ## **   in   FILE.NAME$   the file, and the verb's one argument
 ## **   out  FILE.BLOCKS  its size, 0 if not found, and what GP.FN returns
-## **        FILE.OK      -1 found, 0 not
+## **        FILE.OK%      -1 found, 0 not
 ## **
 ## **  BOTH FORMS, ONE BODY. GP.SUB is the statement and GP.FN the expression,
-## **  and either way FILE.OK comes back beside the count -- which is the only
+## **  and either way FILE.OK% comes back beside the count -- which is the only
 ## **  thing that tells a real 0-block file from one that is not there.
 ## **
 ## **  THE LABEL IS FILE.SIZE.BODY, NOT FILE.SIZE. A verb is a NAME, so a
@@ -216,11 +216,11 @@ FILE.EXISTS:
 ## ** Function style, FileSize
 GP.DEFPROC FILE.SIZE, FILE.NAME$ RETURNS FILE.BLOCKS
 FILE.SIZE.BODY:  
-    FILE.BLOCKS = 0 : FILE.OK = 0 : IF FILE.DEVICE = 0 THEN FILE.DEVICE = 8
-    GOSUB FILE.PETNAME : OPEN 15, FILE.DEVICE, 15
-    OPEN FILE.CHAN, FILE.DEVICE, 0, "$:" + FILE.OUT$
-    INPUT#15, FILE.ERR, FILE.MSG$, FILE.TRK, FILE.SEC
-    IF FILE.ERR < FILE.OKMAX THEN GOSUB FILE.SIZEWALK
+    FILE.BLOCKS = 0 : FILE.OK% = 0 : IF FILE.DEVICE% = 0 THEN FILE.DEVICE% = 8
+    GOSUB FILE.PETNAME : OPEN 15, FILE.DEVICE%, 15
+    OPEN FILE.CHAN, FILE.DEVICE%, 0, "$:" + FILE.OUT$
+    INPUT#15, FILE.ERR%, FILE.MSG$, FILE.TRK%, FILE.SEC%
+    IF FILE.ERR% < FILE.OKMAX THEN GOSUB FILE.SIZEWALK
     CLOSE FILE.CHAN : CLOSE 15
     RETURN
 
@@ -232,23 +232,23 @@ FILE.SIZE.BODY:
 ## same shape for a different field.
 FILE.SIZEWALK:  
     GOSUB FILE.SIZEBYTE : GOSUB FILE.SIZEBYTE : GOSUB FILE.SIZELINE : GOSUB FILE.SIZELINE
-    IF FILE.QUOTED = 0 THEN RETURN
-    FILE.OK = -1 : FILE.BLOCKS = FILE.LINENO
+    IF FILE.QUOTED% = 0 THEN RETURN
+    FILE.OK% = -1 : FILE.BLOCKS = FILE.LINENO
     RETURN
 
 
 ## One line. THE QUOTE IS WHAT MAKES IT AN ENTRY: a name is quoted and the
 ## BLOCKS FREE line that ends a listing is not, so a listing with no match
-## falls out here with FILE.QUOTED still 0 rather than reporting the trailer's
+## falls out here with FILE.QUOTED% still 0 rather than reporting the trailer's
 ## own number as a size.
 FILE.SIZELINE:  
-    FILE.QUOTED = 0 : GOSUB FILE.SIZEBYTE : GOSUB FILE.SIZEBYTE
-    GOSUB FILE.SIZEBYTE : FILE.LINENO = FILE.BYTE : GOSUB FILE.SIZEBYTE : FILE.LINENO = FILE.LINENO + FILE.BYTE * 256
+    FILE.QUOTED% = 0 : GOSUB FILE.SIZEBYTE : GOSUB FILE.SIZEBYTE
+    GOSUB FILE.SIZEBYTE : FILE.LINENO = FILE.BYTE% : GOSUB FILE.SIZEBYTE : FILE.LINENO = FILE.LINENO + FILE.BYTE% * 256
     GP.DO
         GOSUB FILE.SIZEBYTE
-        IF FILE.BYTE = 0 THEN GP.EXITDO
-        IF (FILE.ST AND 66) <> 0 THEN GP.EXITDO
-        IF FILE.BYTE = 34 THEN FILE.QUOTED = -1
+        IF FILE.BYTE% = 0 THEN GP.EXITDO
+        IF (FILE.ST% AND 66) <> 0 THEN GP.EXITDO
+        IF FILE.BYTE% = 34 THEN FILE.QUOTED% = -1
     GP.LOOP
     RETURN
 
@@ -257,7 +257,7 @@ FILE.SIZELINE:
 ## every line here, so ASC on it unguarded would stop the program on the one
 ## value the walk is looking for.
 FILE.SIZEBYTE:  
-    GET# FILE.CHAN, FILE.CH$ : FILE.ST = ST : FILE.BYTE = 0 : IF FILE.CH$ <> "" THEN FILE.BYTE = ASC(FILE.CH$)
+    GET# FILE.CHAN, FILE.CH$ : FILE.ST% = ST : FILE.BYTE% = 0 : IF FILE.CH$ <> "" THEN FILE.BYTE% = ASC(FILE.CH$)
     RETURN
 
 
@@ -307,18 +307,18 @@ FILE.UP:
 ## padded to a fixed width and truncates a long path.
 ##
 ##   out   FILE.PATH$    the path, and what GP.FN gives back. / at worst
-##         FILE.ERR      FILE.MSG$   FILE.TRK   FILE.SEC
+##         FILE.ERR%      FILE.MSG$   FILE.TRK%   FILE.SEC%
 ##
 ##      GOSUB FILE.CURDIR
 ##      GP.SUB CURDIR
 ##      P$ = GP.FN(CURDIR)
 FILE.CURDIR:  
     GP.DEFPROC CURDIR RETURNS FILE.PATH$
-    FILE.PATH$ = "" : IF FILE.DEVICE = 0 THEN FILE.DEVICE = 8
-    OPEN 15, FILE.DEVICE, 15
-    OPEN FILE.CHAN, FILE.DEVICE, 0, "$=C"
-    INPUT#15, FILE.ERR, FILE.MSG$, FILE.TRK, FILE.SEC
-    IF FILE.ERR < FILE.OKMAX THEN GOSUB FILE.PATHWALK
+    FILE.PATH$ = "" : IF FILE.DEVICE% = 0 THEN FILE.DEVICE% = 8
+    OPEN 15, FILE.DEVICE%, 15
+    OPEN FILE.CHAN, FILE.DEVICE%, 0, "$=C"
+    INPUT#15, FILE.ERR%, FILE.MSG$, FILE.TRK%, FILE.SEC%
+    IF FILE.ERR% < FILE.OKMAX THEN GOSUB FILE.PATHWALK
     CLOSE FILE.CHAN : CLOSE 15 : IF FILE.PATH$ = "" THEN FILE.PATH$ = "/"
     RETURN
 
@@ -342,27 +342,27 @@ FILE.PATHWALK:
 ## **  A string array to a file and back
 ## ***********************************************************************
 FILE.SAVEARRAY:  
-    IF FILE.DEVICE = 0 THEN FILE.DEVICE = 8
-    GOSUB FILE.PETNAME : OPEN 15, FILE.DEVICE, 15
-    OPEN FILE.CHAN, FILE.DEVICE, FILE.CHAN, "@:" + FILE.OUT$ + ",S,W"
-    IF FILE.ROWS > 0 THEN GOSUB FILE.WRITEROWS
-    CLOSE FILE.CHAN : INPUT#15, FILE.ERR, FILE.MSG$, FILE.TRK, FILE.SEC : CLOSE 15
+    IF FILE.DEVICE% = 0 THEN FILE.DEVICE% = 8
+    GOSUB FILE.PETNAME : OPEN 15, FILE.DEVICE%, 15
+    OPEN FILE.CHAN, FILE.DEVICE%, FILE.CHAN, "@:" + FILE.OUT$ + ",S,W"
+    IF FILE.ROWS% > 0 THEN GOSUB FILE.WRITEROWS
+    CLOSE FILE.CHAN : INPUT#15, FILE.ERR%, FILE.MSG$, FILE.TRK%, FILE.SEC% : CLOSE 15
     RETURN
 
 FILE.WRITEROWS:
-    FOR FILE.I = 1 TO FILE.ROWS
+    FOR FILE.I = 1 TO FILE.ROWS%
         PRINT# FILE.CHAN, FILE.LINE$(FILE.I)
     NEXT FILE.I
     RETURN
 
-## FILE.ROWS = FILE.MAX.ROWS on return means the file may hold more.
+## FILE.ROWS% = FILE.MAX.ROWS% on return means the file may hold more.
 FILE.LOADARRAY:  
-    FILE.ROWS = 0 : IF FILE.DEVICE = 0 THEN FILE.DEVICE = 8
-    IF FILE.MAX.ROWS = 0 THEN FILE.MAX.ROWS = 10
-    GOSUB FILE.PETNAME : OPEN 15, FILE.DEVICE, 15
-    OPEN FILE.CHAN, FILE.DEVICE, FILE.CHAN, FILE.OUT$ + ",S,R"
-    INPUT#15, FILE.ERR, FILE.MSG$, FILE.TRK, FILE.SEC
-    IF FILE.ERR < FILE.OKMAX THEN GOSUB FILE.READROWS
+    FILE.ROWS% = 0 : IF FILE.DEVICE% = 0 THEN FILE.DEVICE% = 8
+    IF FILE.MAX.ROWS% = 0 THEN FILE.MAX.ROWS% = 10
+    GOSUB FILE.PETNAME : OPEN 15, FILE.DEVICE%, 15
+    OPEN FILE.CHAN, FILE.DEVICE%, FILE.CHAN, FILE.OUT$ + ",S,R"
+    INPUT#15, FILE.ERR%, FILE.MSG$, FILE.TRK%, FILE.SEC%
+    IF FILE.ERR% < FILE.OKMAX THEN GOSUB FILE.READROWS
     CLOSE FILE.CHAN : CLOSE 15
     RETURN
 
@@ -379,10 +379,10 @@ FILE.LOADARRAY:
 FILE.READROWS:
     GP.DO
         LINPUT# FILE.CHAN, FILE.ROW$
-        FILE.ST = ST : GOSUB FILE.ROWREAL
-        IF FILE.KEEP = -1 THEN GOSUB FILE.KEEPROW
-        IF (FILE.ST AND 66) <> 0 THEN GP.EXITDO
-        IF FILE.ROWS >= FILE.MAX.ROWS THEN GP.EXITDO
+        FILE.ST% = ST : GOSUB FILE.ROWREAL
+        IF FILE.KEEP% = -1 THEN GOSUB FILE.KEEPROW
+        IF (FILE.ST% AND 66) <> 0 THEN GP.EXITDO
+        IF FILE.ROWS% >= FILE.MAX.ROWS% THEN GP.EXITDO
     GP.LOOP
     RETURN
 
@@ -390,18 +390,18 @@ FILE.READROWS:
 ## The length tests are separate statements: AND does not stop evaluating once
 ## it knows the answer, so ASC would still reach the empty string.
 FILE.ROWREAL:  
-    FILE.KEEP = -1 : IF (FILE.ST AND 66) = 0 THEN RETURN
+    FILE.KEEP% = -1 : IF (FILE.ST% AND 66) = 0 THEN RETURN
     IF LEN(FILE.ROW$) = 0 THEN GOTO FILE.ROWDROP
     IF LEN(FILE.ROW$) > 1 THEN RETURN
     IF ASC(FILE.ROW$) = 0 THEN GOTO FILE.ROWDROP
     RETURN
 
 FILE.ROWDROP:  
-    FILE.KEEP = 0 : RETURN
+    FILE.KEEP% = 0 : RETURN
 
 FILE.KEEPROW:
-    IF FILE.ROWS >= FILE.MAX.ROWS THEN RETURN
-    FILE.ROWS = FILE.ROWS + 1 : FILE.LINE$(FILE.ROWS) = FILE.ROW$
+    IF FILE.ROWS% >= FILE.MAX.ROWS% THEN RETURN
+    FILE.ROWS% = FILE.ROWS% + 1 : FILE.LINE$(FILE.ROWS%) = FILE.ROW$
     RETURN
 
 ## ***********************************************************************
@@ -412,7 +412,7 @@ FILE.KEEPROW:
 
 
 
-## FILE.ISO non-zero folds ASCII to PETSCII. Names only, never the rows
+## FILE.ISO% non-zero folds ASCII to PETSCII. Names only, never the rows
 ## SAVEARRAY writes. The copy is made in BASIC and folded in place.
 ##
 
@@ -421,7 +421,7 @@ FILE.PETNAME:
 FILE.PETNEW:   
     FILE.RAW$ = FILE.NEW$
 FILE.TOPET:    
-    FILE.OUT$ = FILE.RAW$ : IF FILE.ISO = 0 THEN RETURN
+    FILE.OUT$ = FILE.RAW$ : IF FILE.ISO% = 0 THEN RETURN
     IF LEN(FILE.OUT$) = 0 THEN RETURN
     FILE.PETP% = GP.STRPTR(FILE.OUT$)
     #REM 1

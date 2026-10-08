@@ -1,28 +1,33 @@
 ## ***********************************************************************
 ## **
-## **  CHECK.INC.BL -- a check box: [X] ticked, [ ] not, and a caption.
+## **  CHECK.INC.BL -- a check box, [X] ticked, [ ] not, and a caption;
+## **  and a radio group, (*) on the one chosen row of several.
 ## **
 ## **      CHECK.ADD    record and draw a check box as a GUI.FORM control
 ## **      CHECK.DRAW   one box, in the colours its focus asks for
 ## **      CHECK.KEY    its keys, translated into a GUI.FORM verdict
+## **      RADIO.ADD    record a radio group as a GUI.FORM control
+## **      RADIO.DRAW   every row of a group
+## **      RADIO.KEY    its keys, translated into a GUI.FORM verdict
 ## **
-## **  Only CHECK.ADD is called by an application. GUI.FORM reaches the other
-## **  two by name, the way it reaches COMBO.DRAW and COMBO.KEY.
+## **  A program calls the two ADDs, or the FORM verbs that call them. GUI.FORM
+## **  reaches the rest by name, the way it reaches COMBO.DRAW and COMBO.KEY.
 ## **
 ## **  Usage, after GUI.OPEN and GUI.FORM.BEGIN, before GUI.FORM.RUN:
-## **      CHECK.X = GUI.INNER.LEFT : CHECK.Y = GUI.INNER.TOP
+## **      CHECK.X% = GUI.INNER.LEFT% : CHECK.Y% = GUI.INNER.TOP%
 ## **      CHECK.TEXT$ = "SHOW HIDDEN FILES"
-## **      CHECK.ON = -1
+## **      CHECK.ON% = -1
 ## **      GOSUB CHECK.ADD
-## **      HIDDEN = CHECK.CTRL
+## **      HIDDEN = CHECK.CTRL%
 ## **      ... run the form ...
 ## **      IF (GUI.CTRL.FLAGS%(HIDDEN) AND GUI.CF.CHECKED) <> 0 THEN <ticked>
 ## **
-## **   in   CHECK.X  CHECK.Y   the cell the [ goes in
-## **        CHECK.TEXT$        the caption, plain text. "" for a bare box
-## **        CHECK.ON           non-zero starts it ticked
+## **   in   CHECK.X%  CHECK.Y%   the cell the [ goes in
+## **        CHECK.TEXT$        the caption. "" for a bare box. An "&" marks
+## **                            the next letter, and that letter flips the box
+## **        CHECK.ON%           non-zero starts it ticked
 ## **
-## **   out  CHECK.CTRL         the control's number, 0 if the form was full
+## **   out  CHECK.CTRL%         the control's number, 0 if the form was full
 ## **
 ## **  THE STATE IS A FLAG ON THE CONTROL, GUI.CF.CHECKED, and not a variable
 ## **  of this module's. That is what lets one form carry several boxes where
@@ -33,8 +38,9 @@
 ## **  RETURN presses the default button and ESC cancels. Every other key is
 ## **  offered to the buttons' marked letters.
 ## **
-## **  IT IS REQUIRED BY GUI.INC.BL, which names CHECK.DRAW and CHECK.KEY, and
-## **  it goes in after that file for the reason COMBO.INC.BL does.
+## **  IT IS REQUIRED BY GUI.INC.BL, which names CHECK.DRAW, CHECK.KEY,
+## **  RADIO.DRAW and RADIO.KEY, and it goes in after that file for the
+## **  reason COMBO.INC.BL does.
 ## **
 ## ***********************************************************************
 #IFNDEF CHECK.DEFS
@@ -44,6 +50,11 @@
 #DEFINE CHECK.LBRACK 91
 #DEFINE CHECK.RBRACK 93
 #DEFINE CHECK.TICK 88
+
+## The radio row's cells: ( * )
+#DEFINE RADIO.LPAREN 40
+#DEFINE RADIO.RPAREN 41
+#DEFINE RADIO.DOT 42
 
 ## X in both cases and shifted, and DEL.
 #DEFINE CHECK.K.TICK 88
@@ -58,16 +69,21 @@ GOTO CHECK.MODULE.END
 ## ***********************************************************************
 
 CHECK.ADD:
-    CHECK.CTRL = 0 : IF GUI.CTRL.N >= GUI.FORM.MAX THEN RETURN
-    GUI.CTRL.N = GUI.CTRL.N + 1 : CHECK.CTRL = GUI.CTRL.N
-    GUI.CTRL.TYPE%(CHECK.CTRL) = GUI.CT.CHECK
-    GUI.CTRL.X%(CHECK.CTRL) = CHECK.X : GUI.CTRL.Y%(CHECK.CTRL) = CHECK.Y
-    GUI.CTRL.W%(CHECK.CTRL) = 3
-    IF CHECK.TEXT$ <> "" THEN GUI.CTRL.W%(CHECK.CTRL) = LEN(CHECK.TEXT$) + 4
-    GUI.CTRL.TEXT$(CHECK.CTRL) = CHECK.TEXT$
-    GUI.CTRL.KEY%(CHECK.CTRL) = 0 : GUI.CTRL.FLAGS%(CHECK.CTRL) = 0
-    IF CHECK.ON <> 0 THEN GUI.CTRL.FLAGS%(CHECK.CTRL) = GUI.CF.CHECKED
-    GUI.PAINT.N = CHECK.CTRL
+    CHECK.CTRL% = 0 : IF GUI.CTRL.N% >= GUI.FORM.MAX THEN RETURN
+    GUI.CTRL.N% = GUI.CTRL.N% + 1 : CHECK.CTRL% = GUI.CTRL.N%
+    GUI.CTRL.TYPE%(CHECK.CTRL%) = GUI.CT.CHECK
+    GUI.CTRL.X%(CHECK.CTRL%) = CHECK.X% : GUI.CTRL.Y%(CHECK.CTRL%) = CHECK.Y%
+    GUI.CTRL.W%(CHECK.CTRL%) = 3
+    IF CHECK.TEXT$ <> "" THEN GUI.CTRL.W%(CHECK.CTRL%) = LEN(CHECK.TEXT$) + 4
+    GUI.CTRL.TEXT$(CHECK.CTRL%) = CHECK.TEXT$
+    GUI.CTRL.KEY%(CHECK.CTRL%) = 0 : GUI.CTRL.FLAGS%(CHECK.CTRL%) = 0
+    CHECK.AMP% = GP.INSTR(CHECK.TEXT$, "&")
+    GP.IF CHECK.AMP% > 0 THEN
+        GUI.CTRL.W%(CHECK.CTRL%) = GUI.CTRL.W%(CHECK.CTRL%) - 1
+        GUI.CTRL.KEY%(CHECK.CTRL%) = ASC(MID$(CHECK.TEXT$, CHECK.AMP% + 1, 1))
+    GP.ENDIF
+    IF CHECK.ON% <> 0 THEN GUI.CTRL.FLAGS%(CHECK.CTRL%) = GUI.CF.CHECKED
+    GUI.PAINT.N% = CHECK.CTRL%
     GOSUB CHECK.DRAW
     RETURN
 
@@ -75,7 +91,7 @@ CHECK.ADD:
 ## ***********************************************************************
 ## **  CHECK.DRAW -- brackets, the tick, and the caption.
 ## **
-## **   in   GUI.PAINT.N   which control
+## **   in   GUI.PAINT.N%   which control
 ## **
 ## **  Focused, the whole run is THEME.HILITE. Unfocused, the caption is the
 ## **  panel's colour and the tick alone is the frame's, the rule the combo's
@@ -83,20 +99,32 @@ CHECK.ADD:
 ## ***********************************************************************
 
 CHECK.DRAW:
-    CHECK.N = GUI.PAINT.N : CHECK.ATTR% = GUI.PANEL : CHECK.MARKA% = GUI.BORDER
-    GP.IF CHECK.N = GUI.FOCUS THEN
-        CHECK.ATTR% = THEME.CLR(THEME.HILITE)
+    CHECK.N% = GUI.PAINT.N% : CHECK.ATTR% = GUI.PANEL% : CHECK.MARKA% = GUI.BORDER%
+    GP.IF CHECK.N% = GUI.FOCUS% THEN
+        CHECK.ATTR% = THEME.CLR%(THEME.HILITE)
         CHECK.MARKA% = CHECK.ATTR%
     GP.ENDIF
     CHECK.MARK% = GUI.SPACE
-    IF (GUI.CTRL.FLAGS%(CHECK.N) AND GUI.CF.CHECKED) <> 0 THEN CHECK.MARK% = CHECK.TICK
-    CHECK.CX% = GUI.CTRL.X%(CHECK.N) : CHECK.CY% = GUI.CTRL.Y%(CHECK.N)
-    CHECK.SHOW$ = GUI.CTRL.TEXT$(CHECK.N)
-    GP.FILL CHECK.CX%, CHECK.CY%, GUI.CTRL.W%(CHECK.N), 1, GUI.SPACE, CHECK.ATTR%
+    IF (GUI.CTRL.FLAGS%(CHECK.N%) AND GUI.CF.CHECKED) <> 0 THEN CHECK.MARK% = CHECK.TICK
+    CHECK.CX% = GUI.CTRL.X%(CHECK.N%) : CHECK.CY% = GUI.CTRL.Y%(CHECK.N%)
+    CHECK.SHOW$ = GUI.CTRL.TEXT$(CHECK.N%)
+    GP.FILL CHECK.CX%, CHECK.CY%, GUI.CTRL.W%(CHECK.N%), 1, GUI.SPACE, CHECK.ATTR%
     GP.FILL CHECK.CX%, CHECK.CY%, 1, 1, CHECK.LBRACK, CHECK.ATTR%
     GP.FILL CHECK.CX% + 1, CHECK.CY%, 1, 1, CHECK.MARK%, CHECK.MARKA%
     GP.FILL CHECK.CX% + 2, CHECK.CY%, 1, 1, CHECK.RBRACK, CHECK.ATTR%
-    IF CHECK.SHOW$ <> "" THEN GP.PRINTAT CHECK.CX% + 4, CHECK.CY%, CHECK.SHOW$, CHECK.ATTR%
+    IF CHECK.SHOW$ = "" THEN RETURN
+    CHECK.AMP% = GP.INSTR(CHECK.SHOW$, "&")
+    GP.IF CHECK.AMP% = 0 THEN
+        GP.PRINTAT CHECK.CX% + 4, CHECK.CY%, CHECK.SHOW$, CHECK.ATTR%
+        RETURN
+    GP.ENDIF
+    ## the marked letter takes a button's hot colour
+    GUI.BTN.FOCUSED% = 0
+    IF CHECK.N% = GUI.FOCUS% THEN GUI.BTN.FOCUSED% = -1
+    GOSUB GUI.BTN.COLOURS
+    IF CHECK.AMP% > 1 THEN GP.PRINTAT CHECK.CX% + 4, CHECK.CY%, LEFT$(CHECK.SHOW$, CHECK.AMP% - 1), CHECK.ATTR%
+    GP.PRINTAT CHECK.CX% + 3 + CHECK.AMP%, CHECK.CY%, MID$(CHECK.SHOW$, CHECK.AMP% + 1, 1), GUI.BTN.HI%
+    GP.PRINTAT CHECK.CX% + 4 + CHECK.AMP%, CHECK.CY%, MID$(CHECK.SHOW$, CHECK.AMP% + 2), CHECK.ATTR%
     RETURN
 
 
@@ -104,14 +132,14 @@ CHECK.DRAW:
 ## **  CHECK.KEY -- the box's keys, translated to a verdict.
 ## **
 ## **  A TICK IS NOT A VERDICT. The flag changes and the box repaints inside
-## **  this routine, and the form hears GUI.NAV.STAY.
+## **  this routine, and the form hears GUI.NAV.STAY and GUI.FORM.CHANGED%.
 ## ***********************************************************************
 
 CHECK.KEY:
-    GOSUB CHECK.GETKEY : GUI.FORM.NAV = GUI.NAV.STAY : CHECK.N = GUI.FOCUS
-    CHECK.WAS% = GUI.CTRL.FLAGS%(CHECK.N) AND GUI.CF.CHECKED
+    GOSUB CHECK.GETKEY : GUI.FORM.NAV% = GUI.NAV.STAY : CHECK.N% = GUI.FOCUS%
+    CHECK.WAS% = GUI.CTRL.FLAGS%(CHECK.N%) AND GUI.CF.CHECKED
     CHECK.NOW% = CHECK.WAS%
-    GP.SELECT GUI.FORM.KEY
+    GP.SELECT GUI.FORM.KEY%
         GP.CASE GUI.SPACE
             CHECK.NOW% = GUI.CF.CHECKED - CHECK.WAS%
         GP.CASE CHECK.K.TICK, CHECK.K.TICKLC, CHECK.K.TICKSH
@@ -119,18 +147,19 @@ CHECK.KEY:
         GP.CASE CHECK.K.DELETE
             CHECK.NOW% = 0
         GP.CASE GUI.K.TAB, GUI.K.RIGHT, GUI.K.DOWN
-            GUI.FORM.NAV = GUI.NAV.NEXT
+            GUI.FORM.NAV% = GUI.NAV.NEXT
         GP.CASE GUI.K.SHTAB, GUI.K.LEFT, GUI.K.UP
-            GUI.FORM.NAV = GUI.NAV.PREV
+            GUI.FORM.NAV% = GUI.NAV.PREV
         GP.CASE GUI.RETURN
-            GUI.FORM.NAV = GUI.NAV.DEFAULT
+            GUI.FORM.NAV% = GUI.NAV.DEFAULT
         GP.CASE GUI.ESCAPE, GUI.STOP
-            GUI.FORM.NAV = GUI.NAV.CANCEL
+            GUI.FORM.NAV% = GUI.NAV.CANCEL
         GP.OTHER : GOSUB GUI.FORM.ACCEL
     GP.ENDSEL
     IF CHECK.NOW% = CHECK.WAS% THEN RETURN
-    GUI.CTRL.FLAGS%(CHECK.N) = GUI.CTRL.FLAGS%(CHECK.N) - CHECK.WAS% + CHECK.NOW%
-    GUI.PAINT.N = CHECK.N
+    GUI.CTRL.FLAGS%(CHECK.N%) = GUI.CTRL.FLAGS%(CHECK.N%) - CHECK.WAS% + CHECK.NOW%
+    GUI.FORM.CHANGED% = CHECK.N%
+    GUI.PAINT.N% = CHECK.N%
     GOSUB CHECK.DRAW
     RETURN
 
@@ -143,7 +172,122 @@ CHECK.KEY:
 CHECK.GETKEY:
     GET GUI.PRESSED$
     IF GP.ISEMPTY(GUI.PRESSED$) THEN GOTO CHECK.GETKEY
-    GUI.FORM.KEY = ASC(GUI.PRESSED$)
+    GUI.FORM.KEY% = ASC(GUI.PRESSED$)
+    RETURN
+
+
+## ***********************************************************************
+## **  RADIO.ADD -- record a radio group. GUI.ITEM.SEAL draws it.
+## **
+## **   in   CHECK.X%  CHECK.Y%   the cell the ( of the first row goes in
+## **        RADIO.SEL%          the row chosen, 1 up
+## **
+## **   out  CHECK.CTRL%         the control's number, 0 if the form was full
+## **
+## **  The group shares the box's in and out names, and its scratch.
+## **  The rows are the form's item store: GUI.ITEM.CLAIM after RADIO.ADD,
+## **  then a GUI.ITEM.ADD a row. Each row grows the group by one, and its
+## **  width to the widest row. The choice is GUI.CTRL.SEL%(CHECK.CTRL%).
+## ***********************************************************************
+
+RADIO.ADD:
+    CHECK.CTRL% = 0
+    IF GUI.CTRL.N% >= GUI.FORM.MAX THEN RETURN
+    GUI.CTRL.N% = GUI.CTRL.N% + 1
+    CHECK.CTRL% = GUI.CTRL.N%
+    GUI.CTRL.TYPE%(CHECK.CTRL%) = GUI.CT.RADIO
+    GUI.CTRL.X%(CHECK.CTRL%) = CHECK.X%
+    GUI.CTRL.Y%(CHECK.CTRL%) = CHECK.Y%
+    GUI.CTRL.W%(CHECK.CTRL%) = 4
+    GUI.CTRL.TEXT$(CHECK.CTRL%) = ""
+    GUI.CTRL.KEY%(CHECK.CTRL%) = 0
+    GUI.CTRL.FLAGS%(CHECK.CTRL%) = 0
+    GUI.CTRL.SEL%(CHECK.CTRL%) = RADIO.SEL%
+    GUI.CTRL.ROWS%(CHECK.CTRL%) = 0
+    RETURN
+
+
+## ***********************************************************************
+## **  RADIO.DRAW -- every row of control GUI.PAINT.N%.
+## **
+## **  Focused, the chosen row is THEME.HILITE across the group's width.
+## **  Unfocused, every row is the panel's colour and the dot alone is the
+## **  frame's, the rule the check box's tick follows.
+## ***********************************************************************
+
+RADIO.DRAW:
+    CHECK.N% = GUI.PAINT.N%
+    GUI.ITEM.CTRL% = CHECK.N%
+    FOR RADIO.ROW = 1 TO GUI.CTRL.COUNT%(CHECK.N%)
+        GOSUB RADIO.DRAW.ROW
+    NEXT RADIO.ROW
+    RETURN
+
+## ---- row RADIO.ROW of control CHECK.N%; GUI.ITEM.CTRL% is CHECK.N%
+RADIO.DRAW.ROW:
+    CHECK.CX% = GUI.CTRL.X%(CHECK.N%)
+    CHECK.CY% = GUI.CTRL.Y%(CHECK.N%) + RADIO.ROW - 1
+    CHECK.ATTR% = GUI.PANEL%
+    CHECK.MARKA% = GUI.BORDER%
+    CHECK.MARK% = GUI.SPACE
+    GP.IF RADIO.ROW = GUI.CTRL.SEL%(CHECK.N%) THEN
+        CHECK.MARK% = RADIO.DOT
+        IF CHECK.N% = GUI.FOCUS% THEN CHECK.ATTR% = THEME.CLR%(THEME.HILITE)
+        IF CHECK.N% = GUI.FOCUS% THEN CHECK.MARKA% = CHECK.ATTR%
+    GP.ENDIF
+    GP.FILL CHECK.CX%, CHECK.CY%, GUI.CTRL.W%(CHECK.N%), 1, GUI.SPACE, CHECK.ATTR%
+    GP.FILL CHECK.CX%, CHECK.CY%, 1, 1, RADIO.LPAREN, CHECK.ATTR%
+    GP.FILL CHECK.CX% + 1, CHECK.CY%, 1, 1, CHECK.MARK%, CHECK.MARKA%
+    GP.FILL CHECK.CX% + 2, CHECK.CY%, 1, 1, RADIO.RPAREN, CHECK.ATTR%
+    GUI.ITEM.AT% = RADIO.ROW
+    GOSUB GUI.ITEM.FETCH
+    IF GUI.LIST.TEXT$ <> "" THEN GP.PRINTAT CHECK.CX% + 4, CHECK.CY%, GUI.LIST.TEXT$, CHECK.ATTR%
+    RETURN
+
+
+## ***********************************************************************
+## **  RADIO.KEY -- the group's keys, translated to a verdict.
+## **
+## **  UP and DOWN move the choice, and past either end leave the group.
+## **  TAB, SHIFT+TAB, LEFT and RIGHT move the focus, RETURN presses the
+## **  default button and ESC cancels. Every other key is offered to the
+## **  buttons' marked letters. A move repaints its two rows, and the form
+## **  hears GUI.NAV.STAY and GUI.FORM.CHANGED%.
+## ***********************************************************************
+
+RADIO.KEY:
+    GOSUB CHECK.GETKEY
+    GUI.FORM.NAV% = GUI.NAV.STAY
+    CHECK.N% = GUI.FOCUS%
+    CHECK.WAS% = GUI.CTRL.SEL%(CHECK.N%)
+    CHECK.NOW% = CHECK.WAS%
+    GP.SELECT GUI.FORM.KEY%
+        GP.CASE GUI.K.UP
+            CHECK.NOW% = CHECK.WAS% - 1
+        GP.CASE GUI.K.DOWN
+            CHECK.NOW% = CHECK.WAS% + 1
+        GP.CASE GUI.K.TAB, GUI.K.RIGHT
+            GUI.FORM.NAV% = GUI.NAV.NEXT
+        GP.CASE GUI.K.SHTAB, GUI.K.LEFT
+            GUI.FORM.NAV% = GUI.NAV.PREV
+        GP.CASE GUI.RETURN
+            GUI.FORM.NAV% = GUI.NAV.DEFAULT
+        GP.CASE GUI.ESCAPE, GUI.STOP
+            GUI.FORM.NAV% = GUI.NAV.CANCEL
+        GP.OTHER
+            GOSUB GUI.FORM.ACCEL
+    GP.ENDSEL
+    IF CHECK.NOW% < 1 THEN GUI.FORM.NAV% = GUI.NAV.PREV
+    IF CHECK.NOW% > GUI.CTRL.COUNT%(CHECK.N%) THEN GUI.FORM.NAV% = GUI.NAV.NEXT
+    IF GUI.FORM.NAV% <> GUI.NAV.STAY THEN RETURN
+    IF CHECK.NOW% = CHECK.WAS% THEN RETURN
+    GUI.CTRL.SEL%(CHECK.N%) = CHECK.NOW%
+    GUI.FORM.CHANGED% = CHECK.N%
+    GUI.ITEM.CTRL% = CHECK.N%
+    RADIO.ROW = CHECK.WAS%
+    GOSUB RADIO.DRAW.ROW
+    RADIO.ROW = CHECK.NOW%
+    GOSUB RADIO.DRAW.ROW
     RETURN
 
 CHECK.MODULE.END:

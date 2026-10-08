@@ -24,8 +24,8 @@
 ## **
 ## **  Usage:
 ## **      THEME.ID% = 1 : GOSUB THEME.SELECT
-## **      GP.BOX 4,2,30,8, 2, THEME.CLR(THEME.BORDER)
-## **      GP.PRINTAT 6,3, "TITLE", THEME.CLR(THEME.TITLE)
+## **      GP.BOX 4,2,30,8, 2, THEME.CLR%(THEME.BORDER)
+## **      GP.PRINTAT 6,3, "TITLE", THEME.CLR%(THEME.TITLE)
 ## **
 ## **  The values are packed attributes, background * 16 + foreground, as the GP
 ## **  drawing commands take them. For COLOR, which wants the halves separately,
@@ -105,9 +105,9 @@ GOTO THEME.SKIP
 THEME.SELECT:
     THEME.STAMP% = THEME.STAMP% + 1
     THEME.FIRST% = 0
-    IF THEME.READY% = 0 THEN DIM THEME.CLR(THEME.SLOTS - 1) : THEME.READY% = -1 : THEME.FIRST% = -1
+    IF THEME.READY% = 0 THEN DIM THEME.CLR%(THEME.SLOTS - 1) : THEME.READY% = -1 : THEME.FIRST% = -1
     IF THEME.ID% = 4 AND THEME.FIRST% = 0 THEN RETURN
-    THEME.CLR(THEME.SHADOW) = 0
+    THEME.CLR%(THEME.SHADOW) = 0
     IF THEME.ID% = 1 THEN GOTO THEME.SELECT.DARK
     IF THEME.ID% = 2 THEN GOTO THEME.SELECT.LIGHT
     IF THEME.ID% = 3 THEN GOTO THEME.SELECT.GRAY
@@ -115,29 +115,29 @@ THEME.SELECT:
 ## page 6,6   text 6,1   title 6,3   border 6,14   hilite 1,6
 ## dimmed 6,12   warn 6,13   focus 7,6   bar 12,1
 THEME.SELECT.X16:
-    THEME.CLR(THEME.PAGE)   = 102
-    THEME.CLR(THEME.TEXT)   = 97
-    THEME.CLR(THEME.TITLE)  = 99
-    THEME.CLR(THEME.BORDER) = 110
-    THEME.CLR(THEME.HILITE) = 22
-    THEME.CLR(THEME.DIMMED) = 108
-    THEME.CLR(THEME.WARN)   = 109
-    THEME.CLR(THEME.FOCUS)  = 118
-    THEME.CLR(THEME.BAR)    = 193
+    THEME.CLR%(THEME.PAGE)   = 102
+    THEME.CLR%(THEME.TEXT)   = 97
+    THEME.CLR%(THEME.TITLE)  = 99
+    THEME.CLR%(THEME.BORDER) = 110
+    THEME.CLR%(THEME.HILITE) = 22
+    THEME.CLR%(THEME.DIMMED) = 108
+    THEME.CLR%(THEME.WARN)   = 109
+    THEME.CLR%(THEME.FOCUS)  = 118
+    THEME.CLR%(THEME.BAR)    = 193
     RETURN
 
 ## page 0,0   text 0,15   title 0,1   border 0,11   hilite 15,0
 ## dimmed 0,12   warn 0,8   focus 7,0   bar 6,1
 THEME.SELECT.DARK:
-    THEME.CLR(THEME.PAGE)   = 0
-    THEME.CLR(THEME.TEXT)   = 15
-    THEME.CLR(THEME.TITLE)  = 1
-    THEME.CLR(THEME.BORDER) = 11
-    THEME.CLR(THEME.HILITE) = 240
-    THEME.CLR(THEME.DIMMED) = 12
-    THEME.CLR(THEME.WARN)   = 8
-    THEME.CLR(THEME.FOCUS)  = 112
-    THEME.CLR(THEME.BAR)    = 97
+    THEME.CLR%(THEME.PAGE)   = 0
+    THEME.CLR%(THEME.TEXT)   = 15
+    THEME.CLR%(THEME.TITLE)  = 1
+    THEME.CLR%(THEME.BORDER) = 11
+    THEME.CLR%(THEME.HILITE) = 240
+    THEME.CLR%(THEME.DIMMED) = 12
+    THEME.CLR%(THEME.WARN)   = 8
+    THEME.CLR%(THEME.FOCUS)  = 112
+    THEME.CLR%(THEME.BAR)    = 97
     RETURN
 
 ## A white page. DIMMED is mid grey rather than dark grey so that reversing it
@@ -146,15 +146,15 @@ THEME.SELECT.DARK:
 ## page 1,1   text 1,0   title 1,6   border 1,11   hilite 0,1
 ## dimmed 1,12   warn 1,2   focus 7,0   bar 15,0
 THEME.SELECT.LIGHT:
-    THEME.CLR(THEME.PAGE)   = 17
-    THEME.CLR(THEME.TEXT)   = 16
-    THEME.CLR(THEME.TITLE)  = 22
-    THEME.CLR(THEME.BORDER) = 27
-    THEME.CLR(THEME.HILITE) = 1
-    THEME.CLR(THEME.DIMMED) = 28
-    THEME.CLR(THEME.WARN)   = 18
-    THEME.CLR(THEME.FOCUS)  = 112
-    THEME.CLR(THEME.BAR)    = 240
+    THEME.CLR%(THEME.PAGE)   = 17
+    THEME.CLR%(THEME.TEXT)   = 16
+    THEME.CLR%(THEME.TITLE)  = 22
+    THEME.CLR%(THEME.BORDER) = 27
+    THEME.CLR%(THEME.HILITE) = 1
+    THEME.CLR%(THEME.DIMMED) = 28
+    THEME.CLR%(THEME.WARN)   = 18
+    THEME.CLR%(THEME.FOCUS)  = 112
+    THEME.CLR%(THEME.BAR)    = 240
     RETURN
 
 ## From the XFMGR file manager's theme module. DIMMED and WARN are not in it.
@@ -166,15 +166,15 @@ THEME.SELECT.LIGHT:
 ## page 11,11   text 11,1   title 11,7   border 11,14   hilite 14,1
 ## dimmed 11,12   warn 11,10   focus 7,11   bar 12,1
 THEME.SELECT.GRAY:
-    THEME.CLR(THEME.PAGE)   = 187
-    THEME.CLR(THEME.TEXT)   = 177
-    THEME.CLR(THEME.TITLE)  = 183
-    THEME.CLR(THEME.BORDER) = 190
-    THEME.CLR(THEME.HILITE) = 225
-    THEME.CLR(THEME.DIMMED) = 188
-    THEME.CLR(THEME.WARN)   = 186
-    THEME.CLR(THEME.FOCUS)  = 123
-    THEME.CLR(THEME.BAR)    = 193
+    THEME.CLR%(THEME.PAGE)   = 187
+    THEME.CLR%(THEME.TEXT)   = 177
+    THEME.CLR%(THEME.TITLE)  = 183
+    THEME.CLR%(THEME.BORDER) = 190
+    THEME.CLR%(THEME.HILITE) = 225
+    THEME.CLR%(THEME.DIMMED) = 188
+    THEME.CLR%(THEME.WARN)   = 186
+    THEME.CLR%(THEME.FOCUS)  = 123
+    THEME.CLR%(THEME.BAR)    = 193
     RETURN
 
 ## THEME.NEXT -- the following theme, selected. It GOTOs THEME.SELECT rather than
@@ -188,12 +188,12 @@ THEME.NEXT:
 ## because that jump lands past the line in THEME.SELECT which would have written it.
 THEME.RESET:
     THEME.STAMP% = THEME.STAMP% + 1
-    IF THEME.ID% = 4 THEN THEME.CLR(THEME.SHADOW) = 0 : GOTO THEME.SELECT.X16
+    IF THEME.ID% = 4 THEN THEME.CLR%(THEME.SHADOW) = 0 : GOTO THEME.SELECT.X16
     GOTO THEME.SELECT
 
 ## THEME.SET -- make THEME.ATTR% the colour PRINT uses.
 ##
-##   in   THEME.ATTR%   a packed attribute, e.g. THEME.CLR(THEME.TEXT)
+##   in   THEME.ATTR%   a packed attribute, e.g. THEME.CLR%(THEME.TEXT)
 ##
 ## WARNING: AND 15 is safe only because a packed attribute is 0..255. AND is 16-bit
 ## signed and raises OUT OF RANGE above 32767.
