@@ -92,6 +92,9 @@ The UXCBASIC design draft ([[uxcbasic-plan]]) waits until the release is out.
   0.9.114, in 554e130. The public 0.9.114 zip held b67e26d (buildnum 0.9.114 first appears
   there); the git tag V0.9.114 sits earlier, on 3645da3 (buildnum 0.9.113). Zip rebuilt:
   359 files, 1,600,318 B.
+- The zip holds one top-level folder, GPC/; release.sh adds the prefix at zip time and
+  release/TMP stays unprefixed. README says to copy GPC and DOS"CD:GPC". Zip: 359 files,
+  1,603,243 B.
 
 **Why:** the release work spans many sessions and compacts.
 

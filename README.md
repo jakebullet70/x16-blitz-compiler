@@ -19,10 +19,13 @@ Forked from Paul Robson's original:
 
 ## What's new
 
-[RELEASE-NOTES.md](RELEASE-NOTES.md) lists every change since 0.9.114, the last
-public release, and how to move a 0.9.114 program to 1.2.0.
+[RELEASE-NOTES.md](RELEASE-NOTES.md) lists every change since 0.9.114, the
+last public release, and how to move a 0.9.114 program to 1.2.0.
 
 ## What is in the zip
+
+The zip holds one folder, `GPC`, and every file below is inside it. Copy
+`GPC` to the SD card or the emulator's host folder.
 
 `133` is the runtime build number. Every file that carries it comes from the
 same build.
@@ -96,9 +99,10 @@ A source that uses a `GP.` keyword tokenises to a `.PRG` the ROM can neither
 
 ### Run `GPC.PRG`
 
-Run it from the folder the zip unpacked to. Every file it needs is there.
+Run it from the `GPC` folder. Every file it needs is there.
 
 ```text
+DOS"CD:GPC"
 LOAD "GPC.PRG",8
 RUN
 

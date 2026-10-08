@@ -628,6 +628,8 @@ if do_zip:
     if not os.path.isdir(TMP):
         raise SystemExit("release: release/TMP does not exist -- run ./release.sh stage first")
 
+    # Every path goes under one top-level folder, so unzipping gives GPC/ and nothing loose.
+    ZIP_FOLDER = "GPC"
     out   = os.path.join(root, "release", "gpc-release-%s.zip" % version)
     names = []
     skipped = []
@@ -640,7 +642,7 @@ if do_zip:
                 if rel.startswith(NOT_SHIPPED):
                     skipped.append(rel)
                     continue
-                z.write(full, rel)
+                z.write(full, ZIP_FOLDER + "/" + rel)
                 names.append(rel)
 
     # A placeholder in a shipped zip is not fatal -- staging deliberately allows one so the
