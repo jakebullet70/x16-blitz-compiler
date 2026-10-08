@@ -428,7 +428,7 @@ colouring is on.
 
 | row | holds |
 |---|---|
-| 0 | the menu bar: File, Edit, Search, Window and Help from column 0, the name `TURBO GPC` at column 66, and A, B and C at columns 76 to 78 |
+| 0 | the menu bar: File, Edit, Search, Window, Options and Help from column 0, the name `TURBO GPC` at column 66, and A, B and C at columns 76 to 78 |
 | 1 to 28 | the pane |
 | 29 | the status bar |
 
@@ -440,7 +440,21 @@ colouring is on.
 | 24 | the file name |
 | 46 | a message. The next key clears it. |
 
-The menu bar and the status bar take the X16 theme's bar colour, `THEME.BAR`, 193.
+The menu bar and the status bar take the theme's bar colour, `THEME.BAR`. Options, Settings picks the
+theme, the tab width, the encoding of a new file and syntax colour on or off. `TG-PREFS.BASL` keeps
+them in the settings store under `TG.THEME`, `TG.TAB.WIDTH`, `TG.NEW.PETSCII` and `TG.COLOUR`.
+
+The boxes and the dropdowns take the menu bar's colours: `TURBO.POPUP.PICK` sets the theme's
+`TEXT`, `TITLE` and `BORDER` to `BAR`, and `DIMMED` and `WARN` to the bar's background.
+`TURBO.PANE.PICK` gives the text pane its colours for each theme, from the theme's own
+`TEXT`, so it runs first.
+
+Theme 4 is Custom. `TG-THEME.BASL` holds it as 23 colours: the ten `THEME.CLR%` roles, the
+pane's text, cursor line, line numbers and cursor, the selection's background, the hot
+letters and the seven syntax foregrounds. The store keeps it under `TG.CUSTOM`. Edit custom
+in the Settings box opens the theme builder: a box at the right lists the colours, the
+arrows and Tab change them, and the editor behind repaints at every change. The first edit
+starts from the colours on screen. Return keeps the theme, Esc drops the changes.
 `APPSYS` remembers the screen mode, the charset and the text colour at the start and
 puts them back at the exit.
 
@@ -569,10 +583,10 @@ Dropdowns are framed with the dialogs' six screen codes, listed in step 3 of The
 in the editor. The glyph table is the `%` array `TURBO.FRAME.GLYPHS%`, and
 `MENU.DROPSTYLE` holds its address. An array does not move and a string can.
 
-Hot letters are yellow, colour 7, `TURBO.HOT.COLOUR`. `TURBO.GUI.SETUP` runs
-`MENU.THEME` after `THEME.SELECT`, then sets `MENU.BARHOT%` and `MENU.HOTATTR%`.
-`GP.SUB DLGHOTKEY, colour` gives the dialogs' buttons and the picker's footer the same
-colour. Colour 0, the default, keeps the theme's `BORDER` foreground.
+Hot letters are `TURBO.HOT.COLOUR%`: light green, colour 13, and red, colour 2, under
+the Light theme. `TURBO.HOT.APPLY` gives it out after each `MENU.THEME`, with `MENU.BARHOT%` and
+`MENU.HOTATTR%`. `GP.SUB DLGHOTKEY, colour` gives the dialogs' buttons and the picker's
+footer the same colour. Colour 0, the default, keeps the theme's `BORDER` foreground.
 
 ### Three documents
 
@@ -584,8 +598,8 @@ A switch stores a dirty edit buffer, keeps the state of the document it leaves, 
 paints the one it shows. A document shown for the first time is one empty line with no
 name.
 
-On the menu bar the letter of the document on screen takes the theme's text colour,
-97. The letter of another document with an edit since its last load or save is yellow
+On the menu bar the letter of the document on screen takes the text pane's colour,
+97 under X16. The letter of another document with an edit since its last load or save is yellow
 on the bar colour, 199.
 
 RETURN does nothing in a document at its line limit or over it. A load checks the limit
@@ -607,8 +621,8 @@ the limit or past it. A full arena stops it the same way. Either shows
 | 14 | pieces from `BANKMGR.SPACE`: the file picker's list, 6,144 bytes, and the TURBOTEST key script, 1,024 bytes, in TURBOTEST only. The clipboard is not placed. |
 | 15 | keyword table, inks and the classify buffers |
 | 16 to 37 | arena of A |
-| 38 | the code of `TG-FIND` and `CHECK`: find, replace, the histories, the About box and the status bar's fields |
-| 39 | the code of `TG-CLIP` and `KVBIN` |
+| 38 | the code of `TG-FIND`, `TG-PREFS` and `CHECK`: find, replace, the histories, the Settings box, the About box and the status bar's fields |
+| 39 | the code of `TG-CLIP`, `KVBIN` and `TG-THEME` |
 | 40 | the clipboard, document 3 of the store: its line table to $A5FF, its arena from $A600 |
 | 41 | the code of `LINEINPUT` and the TG modules other than `TG-CLIP` |
 | 42 to 52 | arena of B |
