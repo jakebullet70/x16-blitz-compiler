@@ -948,13 +948,48 @@ symbol_check1:
     ldx symbol_start
     ldy index_src
     jsr symbol_find
-    bcc symbol_found
+    bcs symbol_check2
+    cmp #SYMBOLTYPE_VARIABLE        ;=== GPC === a variable's key may hold this char, but
+    clc                             ;=== GPC === insvar copies the sigil, so check2 takes it.
+    bne symbol_found                ;=== GPC === C clear is symbol_found's "found"
 
 symbol_check2:
     dec index_src
+    ;=== GPC begin === the key runs on over a $ or % and a (, so each kind of variable is its
+    ;=== own symbol and takes a name from its own pool (symbol.inc, SYMBOL_POOL_*). A label,
+    ;=== token or define found by the bare name still wins.
+    ;=== WARNING: N%(1) and N% (1) are different keys. A space before the ( makes the
+    ;=== array a scalar's name.
+    ldy index_src
+    lda file_buf+1,y
+    cmp #'$'
+    beq :+
+    cmp #'%'
+    bne :++
+:   iny
+    lda file_buf+1,y
+:   cmp #'('
+    bne :+
+    iny
+:   sty symbol_key_end
     ldx symbol_start
     ldy index_src
+    lda symbol_key_end
+    cmp index_src
+    bne symbol_typed
     jsr symbol_find
+    bra symbol_found
+
+symbol_typed:
+    jsr symbol_find
+    bcs :+
+    cmp #SYMBOLTYPE_VARIABLE
+    clc
+    bne symbol_found
+:   ldx symbol_start
+    ldy symbol_key_end
+    jsr symbol_find
+    ;=== GPC end ===
 
 symbol_found:
     pha
@@ -1053,7 +1088,7 @@ symbol_insert_value:
 newvar:
     ; The symbol hasn't been decleared. Let's declear it as a new variable
     ldx symbol_start
-    ldy index_src
+    ldy symbol_key_end              ;=== GPC === the key, sigil and ( included
     lda #1 ; variable
     jsr symbol_add
     cmp #0
@@ -1097,7 +1132,7 @@ newvar_ok:
     phx
     phy
     ldx symbol_start
-    ldy index_src
+    ldy symbol_key_end              ;=== GPC === the SYM file names N% and N%( apart
     jsr symfile_write_variable
     ply
     plx
@@ -1413,6 +1448,7 @@ jump_table:
     state: .res 1
     index_src: .res 1
     symbol_start: .res 1
+    symbol_key_end: .res 1          ;=== GPC === where a variable's key ends: after its sigil and (
     dp_count: .res 1
     e_count: .res 1
     index_dst: .res 1

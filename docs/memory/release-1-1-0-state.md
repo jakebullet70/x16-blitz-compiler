@@ -1,6 +1,6 @@
 ---
 name: release-1-1-0-state
-description: gpc-release-1.1.0.zip was rebuilt 2026-10-02 19:52 on runtime build 131 for two or three outside readers; no zip had gone out before it
+description: gpc-release-1.1.0.zip (2026-10-02, runtime build 131) is with a tester and in use as of 2026-10-05; the tree is now 1.2.0
 metadata:
   node_type: memory
   type: project
@@ -17,8 +17,8 @@ The audience is two or three people. The root `README.md` gained a `## Known iss
 them, above the release cut, with two entries: `SLEEP 0` returns at once, and a `GP.ASM` label may
 not start with `A`.
 
-The build was green but no program was run from the staged tree afterwards. The user's smoke test
-of `release/TMP` is the check that is still owed before the zip is sent.
+On 2026-10-05 the user said the 1.1.0 staged files are out to a tester and in use. Keep
+`release/gpc-release-1.1.0.zip` as it is: a bug report from the tester refers to that build.
 
 On 2026-10-05 the user asked for V1.2: `buildnum.txt` is 1.2.0, GPC.BIN prints V1.2.0 and the
 GPC.PRG banner reads `V1.2 - FALL 2026`. No 1.2.0 zip has been built yet.

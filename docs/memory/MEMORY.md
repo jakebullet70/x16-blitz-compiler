@@ -26,7 +26,7 @@ junction; re-make it first if a rename breaks it. See [memory-is-git-tracked](me
 - [Compact early, not at the end](compact-early-not-at-the-end.md) — remind the user to /compact at the end of every turn that lands a step
 
 ## Build and toolchain
-- [Release 1.1.0 state](release-1-1-0-state.md) — 1.1.0 zip rebuilt 2026-10-02 on build 131, not sent; the version is 1.2.0 since 2026-10-05, no 1.2.0 zip yet
+- [Release 1.1.0 state](release-1-1-0-state.md) — 1.1.0 zip (build 131) is with a tester since 2026-10-05, keep it; the tree is 1.2.0, no 1.2.0 zip yet
 - [USER-RUNS demos broken by Build 127](user-runs-demos-broken-by-build-127.md) — runtimes sit beside each sample; the tree is on build 131
 - [Tool home goes stale](tool-home-goes-stale.md) — sample builds run /GPC/GPC.BIN, which no commit refreshes; copy a new compiler there by hand
 - [Tool home layout deferred](tool-home-layout-deferred.md) — /GPC/ + /BASIC-SRC/ is next-version; research in docs/blitz/TOOL-HOME-LAYOUT.RESEARCH.md
@@ -76,7 +76,7 @@ junction; re-make it first if a rename breaks it. See [memory-is-git-tracked](me
 
 ## The editor sample
 - [TURBO compile slow, FIXED](turbo-compile-slow-open.md) — the {VAR} cache overflowed; now banks 24-27, 32K; TURBO compiles in 45 s
-- [TURBO GPC IDE plan](turbo-gpc-ide-plan.md) — a fresh GP.BASIC editor on MSEDIT's design, source in GPC-BASIC-TOOLS-SRC/TURBO-GPC; the library change is done (bank plus address, `%` in 14 modules); the GUI dialogs are in TURBO.BASL, save to VRAM, and TURBOTEST passes; the menu bar is built (Esc opens File, Exit is a row); the file picker is built and the keys follow Notepad++; setup code lives in the regions to keep workspace; DLGLABELS gives the library's buttons TURBO's case; the library is copied to root and help rebuilt; plan in docs/blitz/TURBO-GPC.PLAN.md
+- [TURBO GPC IDE plan](turbo-gpc-ide-plan.md) — a fresh GP.BASIC editor on MSEDIT's design, source in GPC-BASIC-TOOLS-SRC/TURBO-GPC; the editor core is built: three documents, menu bar, file picker, Notepad++ keys, clipboard, find and replace with histories (TG-FIND.BASL), ISO glyphs, About box, scroll bar; TURBO.BASL names its outputs with #GPC lines, TURBO.PRG 7,658 B SHARED; the relay is next and waits on the user's file-name decisions; the picker and history library changes are not in root yet; plan in docs/blitz/TURBO-GPC.PLAN.md
 - [Editor branch state, GUI next](gpc-editor-branch-and-gui-next.md) — the self-check lines to keep green
 - [ED-STORE 255.BASL is test data](editor-test-fixture-files.md) — the editor opens it; do not flag it
 - [The editor's slow RETURN](editor-return-is-the-line-table.md) — FIXED, the 2048-entry boundary is the trap; [the LINPUT# loader](gpc-editor-loader-linput-and-blob.md), ST=66 on a missing file
@@ -103,7 +103,7 @@ junction; re-make it first if a rename breaks it. See [memory-is-git-tracked](me
 - [BASIC RAM was the tokenise ceiling](basload-basic-ram-is-the-tokenise-ceiling.md) — REMOVED for build_basl.py only
 - [BASLOAD streams to a file](basload-streams-to-a-file.md) — SHIPPED; a failed run now deletes its own output
 - [BASLOAD runs from RAM unmodified](basload-runs-from-ram-unmodified.md) — the ROM source builds as a plain PRG
-- [BASLOAD name space, widened](basload-name-space-widened.md) — about 950 two-character names until 2026-10-03, now about 1,135; BASLOAD errors cleanly past `_Z`
+- [BASLOAD name space, widened](basload-name-space-widened.md) — about 950 two-character names until 2026-10-03, about 1,135 a pool since 2026-10-06, one pool per sigil and ( ; the SYM file names carry the sigil
 - [BASLOAD #DEFINE rejects digits and negatives](basload-define-rejects-digits.md) — INVALID PARAMETER, silent 6-byte PRG; unsigned only
 - [Labels and variables collide](basload-label-and-variable-collide.md) — DUPLICATE SYMBOL; the $ does not separate them
 - [A define eats a longer name](basload-define-eats-a-longer-name.md) — `#DEFINE X.W` turns `X.W%` into `44%`; SYNTAX ERROR at run time

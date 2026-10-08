@@ -219,6 +219,9 @@ def compile_one(source, obj, mapfile="", shared=True, deadlist=""):
 		die("%s wrote no map for %s -- see source/drive/GPCCOMP.LOG" % (ENGINE, source))
 	print("  compiled %s -> %s (%d bytes, %s)"
 		  % (source, obj, os.path.getsize(objpath), "SHARED" if shared else "EMBEDDED"))
+	for line in echo.decode("latin-1").replace("\r", "\n").split("\n"):
+		if line.strip().startswith("DEAD CODE:"):
+			print("  " + line.strip())
 	os.remove(os.path.join(TESTING, "GPCCOMP.LOG"))
 
 

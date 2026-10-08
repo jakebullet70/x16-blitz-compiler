@@ -287,36 +287,23 @@ workspace is not measured yet.
 To check: what the runtime does on the second `DIM`, whether the compiler can see the same
 name dimensioned twice, and that the fix raises the same error as the ROM.
 
-### BASLOAD runs out of short variable names at about 950 — OPEN, raised 2026-10-01
+### BASLOAD variable names: one pool per kind — FIXED 2026-10-06
 
-BASLOAD gives every variable a one- or two-character name: `A` to `Z`, then each letter with `0`
-to `9` and `A` to `Z`, less the reserved pairs. That is about 950 names. GPC reads two
-significant characters, as CBM BASIC does, and GP.ASM `{VAR}` relies on crunched names of one or
-two characters, so longer names are not the way out.
+BASLOAD gives every variable a one- or two-character name. The first character is `A` to `Z` or
+one of `[ \ ] ^ _`, and the second is `0` to `9` or `A` to `Z`, less the reserved pairs. That is
+about 1,135 names a pool.
 
-One pool serves every type. A symbol is keyed by its name without the suffix, so `GUI.MSG` and
-`GUI.MSG$` are one symbol with one short name. A float name and a string name are never the same
-short name, although CBM BASIC keeps `A`, `A%` and `A$` apart.
+BASLOAD-GPC keys a variable by its name plus the sigil and `(` it was written with. Each of the
+six kinds, `N`, `N%`, `N$`, `N(`, `N%(` and `N$(`, draws from its own pool. GPC keeps the six apart
+by type bits. `TI$` and `DA$` are reserved keys. Trap: `N% (1)` with a space is a scalar's key.
 
-Running out is silent. The check in `BASLOAD-GPC/upstream/symbol.inc`, under "Check variable name
-availability" in `symbol_add`, branches `bne` on `type = SYMBOLTYPE_LABEL`, so it runs for labels
-and not for variables. The next variables get `[`, `[0`, `[1` and on. GPC then stops with
-`SYNTAX ERROR` on the first line that uses one, which is a line with nothing wrong in it.
+The SYM file records `PR$(`, not `PR`. GP.ASM `{VAR}` appends the sigil before its lookup
+(`gpasmcode.asm`).
 
-GPBMODS hit it on 2026-10-01 at 986 names, 36 over, when the FORM controls for GUI-FIELD-EDIT
-went in. The error named a `GP.BANKEDSTR` line. The library reuses scratch names and the GPBMODS
-form test names its controls with `#DEFINE`s to stay under. To count a build's names:
+Past the end of a pool, BASLOAD stops with OUT OF VARIABLE NAMES. The fix is in
+`BASLOAD-GPC/src/symbol.inc`. `build/stock` stays pristine upstream.
 
-    tr '\r' '\n' < GPBMODS.SRC.SYM | awk '/^VARIABLES/{f=1} f' | grep -c "="
-
-and any `=[` in the same listing is a name past the end.
-
-The fix is asm in BASLOAD-GPC, not agreed yet:
-
-1. Make the check run for variables, and stop with an error that names the symbol.
-2. A pool per type. Key the symbol by its name and suffix, and draw float, `%` and `$` names from
-   three counters, about 2,850 names. GP.ASM's `#SYMFILE` reader then sees names with the suffix
-   and needs checking. A label and a variable that differ only by the `$` stop colliding too.
+A program that uses a name starting `[ \ ] ^ _` does not run in ROM BASIC.
 
 ### `SLEEP 0` returns at once, where stock X16 BASIC waits a frame
 
@@ -1241,9 +1228,8 @@ the way the variable was written.
   derived from `GPC.INPUT`'s source line and that is an application symbol — the same reason
   `ScanGPUsage` lives there. The two buffers are the compiler's, which the application can see
   because it links the compiler library; the other direction is what breaks the standalone build.
-- **The sigil is not in the symbol file** — `PR$` is filed as `PR`, because BASLOAD crunches the
-  identifier and the `$` or `%` rides along separately. So one entry serves `N`, `N$` and `N%`, and
-  the compiler re-attaches the type itself.
+- **The symbol file carries the sigil** — `PR$` is filed as `PR$`, and an array as `PR$(`. The
+  `{VAR}` lookup appends the sigil of the name it was given before it searches.
 - **The LABELS section is skipped.** Its lines have the same shape but its values are BASIC line
   numbers, so a label could otherwise answer for a variable of the same name.
 - **A missing symbol file is detected by the banner, not by the open.** CMDR-DOS opens a file that

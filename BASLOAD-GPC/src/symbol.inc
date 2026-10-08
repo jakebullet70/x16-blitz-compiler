@@ -88,12 +88,26 @@ SYMBOLTYPE_STRING_PASS1 = 7
 SYMBOLTYPE_STRING_PASS2 = 8
 ;=== GPC end ===
 
+;=== GPC begin === a variable's key is its name with the sigil and ( it was written with, so
+;=== N, N%, N$, N(, N%( and N$( are six symbols. GPC keeps the six apart by the type bits it
+;=== packs into the name, so each kind takes its names from its own pool, and the same short
+;=== name serves all six. These are byte offsets into symbol_next_pool.
+SYMBOL_POOL_INT         = 2         ; added to the plain offset for a % name
+SYMBOL_POOL_STRING      = 4         ; added for a $ name
+SYMBOL_POOL_ARRAY       = 6         ; added for a name written with (
+SYMBOL_POOL_BYTES       = 12
+;=== GPC end ===
+
 ; Variables
 .ZEROPAGE
     symbol_pointer: .res 2
 
 .segment "VARS"
     symbol_next_var: .res 2
+    ;=== GPC begin === the next free name in each of the six pools, two bytes a pool, in the
+    ;=== order of SYMBOL_POOL_*. symbol_next_var is a working copy of one of them.
+    symbol_next_pool: .res 12
+    ;=== GPC end ===
     symbol_last_var: .res 2
     symbol_next_bank: .res 1
     symbol_next_addr: .res 2
@@ -134,6 +148,17 @@ SYMBOLTYPE_STRING_PASS2 = 8
     sta symbol_next_var
     lda #0
     sta symbol_next_var+1
+
+    ;=== GPC begin === every pool starts at "A"
+    ldx #0
+:   lda #'A'
+    sta symbol_next_pool,x
+    stz symbol_next_pool+1,x
+    inx
+    inx
+    cpx #SYMBOL_POOL_BYTES
+    bne :-
+    ;=== GPC end ===
 
     ; Set last variable name to NULL
     stz symbol_last_var
@@ -178,6 +203,28 @@ SYMBOLTYPE_STRING_PASS2 = 8
     ldy #1
     lda #SYMBOLTYPE_RESERVED_VAR
     jsr symbol_add
+
+    ;=== GPC begin === TI$ and DA$ are keys of their own now, and keep their names
+    lda #'T'
+    sta file_buf
+    lda #'I'
+    sta file_buf+1
+    lda #'$'
+    sta file_buf+2
+    ldx #0
+    ldy #2
+    lda #SYMBOLTYPE_RESERVED_VAR
+    jsr symbol_add
+
+    lda #'D'
+    sta file_buf
+    lda #'A'
+    sta file_buf+1
+    ldx #0
+    ldy #2
+    lda #SYMBOLTYPE_RESERVED_VAR
+    jsr symbol_add
+    ;=== GPC end ===
 
     rts
 
@@ -257,9 +304,36 @@ PRINT_TOKEN:
     ;=== 27-31 of its five bits. OUT OF VARIABLE NAMES comes after _Z.
     ;=== WARNING: ROM BASIC cannot parse a name past ZZ, so a program that uses one runs only
     ;=== compiled.
+    ;=== The key's last characters pick the pool: ( for an array, then % or $.
 :   lda type
     cmp #SYMBOLTYPE_VARIABLE
     bne :+
+    ldy #0
+    ldx index2
+    lda file_buf,x
+    cmp #'('
+    bne pool_sigil
+    ldy #SYMBOL_POOL_ARRAY
+    dex
+    lda file_buf,x
+pool_sigil:
+    cmp #'%'
+    bne pool_string
+    iny
+    iny
+pool_string:
+    cmp #'$'
+    bne pool_load
+    iny
+    iny
+    iny
+    iny
+pool_load:
+    sty pool
+    lda symbol_next_pool,y
+    sta symbol_next_var
+    lda symbol_next_pool+1,y
+    sta symbol_next_var+1
     lda symbol_next_var
     cmp #'_'+1
     bcc :+
@@ -465,7 +539,17 @@ chk_var_loop:
     cpx #SYMBOLTYPE_RESERVED_VARs_end-SYMBOLTYPE_RESERVED_VARs
     bne chk_var_loop
 
-:   ; Pull symbol low value from stack
+:   ;=== GPC begin === put the pool's next name back
+    ldy pool
+    lda symbol_next_var
+    sta symbol_next_pool,y
+    lda symbol_next_var+1
+    sta symbol_next_pool+1,y
+    lda symbol_last_var+1
+    tay
+    ;=== GPC end ===
+
+    ; Pull symbol low value from stack
     plx
     bra exit
 
@@ -538,6 +622,7 @@ exit:
     type: .res 1
     hash: .res 1
     len: .res 1
+    pool: .res 1                    ;=== GPC === offset of the variable's pool
 .CODE
 .endproc
 

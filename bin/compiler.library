@@ -9029,8 +9029,9 @@ _APBNameDone:
 		sta 	AsmSymName,y 				; the lookup wants it terminated
 		;
 		;		$ and % are the type, ( makes it an array -- the same three the compiler packs
-		;		into the name itself, and the symbol file records none of them: BASLOAD crunches
-		;		the IDENTIFIER and the sigil rides along separately, so PR$ is filed as PR.
+		;		into the name itself. BASLOAD gives each kind its own pool of names, so the
+		;		symbol file records the name with its sigil and (, and they go on the end of
+		;		AsmSymName too: PR$( is filed as PR$(.
 		;
 		jsr 	LookNext
 		cmp 	#'$'
@@ -9044,6 +9045,10 @@ _APBNotString:
 _APBHaveType:
 		sta 	AsmSymType
 		jsr 	GetNext 					; consume the sigil
+		sta 	AsmSymName,y 				; Y is still the name's length
+		iny
+		lda 	#0
+		sta 	AsmSymName,y
 _APBCheckArray:
 		jsr 	LookNext
 		cmp 	#'('
@@ -9052,6 +9057,10 @@ _APBCheckArray:
 		ora 	#NSSArray
 		sta 	AsmSymType
 		jsr 	GetNext 					; consume the (
+		sta 	AsmSymName,y
+		iny
+		lda 	#0
+		sta 	AsmSymName,y
 		lda 	#')'
 		jsr 	AsmExpect 					; and require the ) -- {N()} names the array itself
 _APBLookup:
@@ -9178,7 +9187,8 @@ AsmName:
 ;		naming an application symbol is what breaks the standalone build.
 ;
 AsmSymName:
-		.fill 	ASM_SYM_MAX+1 			; the name as written, folded to upper case, terminated
+		.fill 	ASM_SYM_MAX+3 			; the name as written, folded to upper case, then its
+										; sigil and ( and a terminator
 AsmSymCrunched:
 		.fill 	4 						; one or two characters and a terminator
 AsmSymType:

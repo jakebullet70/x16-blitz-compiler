@@ -68,7 +68,7 @@ SKIP_FILES = {"GPC-HELP.md", "GPC-HELP.WIN.md", "GPC-HELP-TESTING.md"}
 SIZE = {("", False): 6, ("%", False): 2, ("$", False): 2,
         ("", True): 6, ("%", True): 2, ("$", True): 2}
 
-SYMROW = re.compile(r"^\s*(\d{6})\s+([A-Za-z][A-Za-z0-9._]*)\s+=\w+;")
+SYMROW = re.compile(r"^\s*(\d{6})\s+([A-Za-z][A-Za-z0-9._]*)[%$]?\(?\s+=\w+;")
 DEFINE = re.compile(r"^\s*#DEFINE\s+([A-Za-z][A-Za-z0-9._]*)\s+(.*?)\s*(?:##.*)?$", re.I)
 STRING = re.compile(r'"[^"\n]*(?:"|$)')
 ASSIGN = re.compile(r"^(?:LET\s+)?([A-Z][A-Z0-9._]*)(?![A-Z0-9._%$(])\s*=\s*(.*)$")

@@ -214,7 +214,10 @@ tree dirty.
   run; `eol_mark` streams the finished line, and `out_addr` carries the
   address it *would* have had; the six `out_*` routines that own the output
   file; `gpc_emit`; the BASIC RAM ceiling test and `mem_top` are gone;
-  `symbol_string` puts a string define's text into the line
+  `symbol_string` puts a string define's text into the line; a variable's key
+  is its name with the sigil and `(` it was written with, and the symbol file
+  records that key. `N% (1)`, with a space, is the scalar's key, not the
+  array's
 - `loader.inc`: opens the file before pass 2, closes it at exit and deletes it
   if the run failed; the `SAVE` at the end is gone, and with it the
   `VARTAB`/`ARYTAB`/`STREND` stores
@@ -224,7 +227,9 @@ tree dirty.
   BASLOAD reports the wrong error for a `#SAVEAS` with no argument
 - `symbol.inc`: the name check tests variables, where stock tests labels, and
   the first character runs on past `Z` into `[ \ ] ^ _`, so `OUT OF VARIABLE
-  NAMES` comes after `_Z`. GPC reads those names; ROM BASIC cannot. Two
+  NAMES` comes after `_Z`. GPC reads those names; ROM BASIC cannot. Each of
+  the six kinds of variable (`N`, `N%`, `N$`, `N(`, `N%(`, `N$(`) takes its
+  names from its own pool, so the same short name can serve all six. Two
   more symbol types, and `symbol_add_text` / `symbol_text_open` for a string
   define's text
 

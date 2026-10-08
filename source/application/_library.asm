@@ -5025,9 +5025,9 @@ APIDesc:
 ;
 ;		Two things about it matter. The LABELS section has the same line shape but its values
 ;		are BASIC line numbers, so the scan must not start until VARIABLES has gone past or a
-;		label could answer for a variable of the same name. And THE SIGIL IS NOT RECORDED --
-;		PR$ is filed as PR -- because BASLOAD crunches the identifier and the $ or % rides
-;		along separately, which is exactly what lets one entry serve N, N$ and N%.
+;		label could answer for a variable of the same name. And THE NAME CARRIES ITS SIGIL AND
+;		( -- PR, PR$ and PR$( are three entries -- because BASLOAD-GPC gives each kind of
+;		variable its own pool, so they may crunch to the same short name or to different ones.
 ;
 ;		The name column is padded, but nothing here assumes its width: the name ends at the
 ;		first space and the value runs from the "=" to the ";".

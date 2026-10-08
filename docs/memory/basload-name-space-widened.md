@@ -5,7 +5,7 @@ metadata:
   node_type: memory
   type: project
   originSessionId: f2ef33fe-6565-4754-b1b1-05111d41cf23
-  modified: 2026-10-03T05:12:37.117Z
+  modified: 2026-10-06T08:53:48.845Z
 ---
 
 BASLOAD crunches every variable, GP.DEFPROC verb and GP.BANKEDSTR group name to one or two
@@ -27,6 +27,16 @@ A program using these names does not run in ROM BASIC.
 
 **Why:** GPBMODS sat at the limit, and TURBO's measuring build had 885 names before its menu
 and picker landed.
+
+**TURBO hit the new cap on 2026-10-06.** The Custom theme work stopped BASLOAD with OUT OF
+VARIABLE NAMES; trimmed, TURBO uses 1,132 of 1,135. Every new TURBO variable now needs one
+freed. `#DEFINE` constants and labels cost no name.
+
+**One pool per kind, 2026-10-06 (option A, user's go-ahead).** BASLOAD-GPC keys a variable by its
+name plus the sigil and `(` it was written with, and each of the six kinds (N, N%, N$, N(, N%(, N$()
+takes names from its own pool of about 1,135. GPC already keeps the six apart by type bits. The SYM
+file now records `PR$(` not `PR`, and GP.ASM `{VAR}` appends the sigil before its lookup
+(gpasmcode.asm). TI$ and DA$ are reserved keys. Trap: `N% (1)` with a space is a scalar's key.
 
 **How to apply:** when a GPC build fails with a SYNTAX ERROR on an innocent line, count the
 distinct crunched names in the SYM before blaming the source. A refused expression is
