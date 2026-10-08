@@ -29,7 +29,7 @@
 .GP.PRINTAT GP.CALL GP.A GP.X GP.Y GP.C GP.FN GP.BANKEDSTR GP.ENDBANKEDSTR
 .GP.BSTR GP.BSTRSET GP.BANKED GP.ENDBANKED
 .
-.Their handlers are one block, GPBase $3000 to ObjectBase $3600: 1,536 bytes,
+.Their handlers are one block, GPBase $3100 to ObjectBase $3700: 1,536 bytes,
 .page aligned, all or nothing. ScanGPUsage walks the finished p-code and
 .drops the block from the object when nothing in it is reached.
 .
@@ -120,7 +120,7 @@
 =SEE ALSO
 .
 >9|2. Using it
->163|7. Memory, and what the compiler tells you
+>166|7. Memory, and what the compiler tells you
 >66|4. Module reference -- the BASL library
 >123|5. Variables
 >60|3.12 Code in a bank

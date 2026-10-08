@@ -17,20 +17,25 @@ library of modules built on them.
 Forked from Paul Robson's original:
 <https://github.com/paulscottrobson/blitz-compiler>
 
+## What's new
+
+[RELEASE-NOTES.md](RELEASE-NOTES.md) lists every change since 1.0.0 and how
+to move a 1.0.0 program to 1.2.0.
+
 ## What is in the zip
 
-`128` is the runtime build number. Every file that carries it comes from the
+`133` is the runtime build number. Every file that carries it comes from the
 same build.
 
 | | |
 | --- | --- |
 | `GPC.PRG` | the compiler front end, the program you run |
 | `GPC.BIN` | the compiler engine, which `GPC.PRG` loads |
-| `GPC.IMG.131.BIN` | the runtime a self-contained program carries |
-| `GP1.IMG.131.BIN` | the bank 1 code a self-contained program carries |
-| `GPB.RT.131.BIN` | the shared runtime with the GP handlers |
-| `GPC.RT.131.BIN` | the shared runtime without the GP handlers |
-| `GP1.RT.131.BIN` | the bank 1 code both shared runtimes load |
+| `GPC.IMG.133.BIN` | the runtime a self-contained program carries |
+| `GP1.IMG.133.BIN` | the bank 1 code a self-contained program carries |
+| `GPB.RT.133.BIN` | the shared runtime with the GP handlers |
+| `GPC.RT.133.BIN` | the shared runtime without the GP handlers |
+| `GP1.RT.133.BIN` | the bank 1 code both shared runtimes load |
 | `GPC.ERR.PRG` | turns a runtime error address into a source line |
 | `GPC.ERR.OVL` | the banked code of `GPC.ERR.PRG` |
 | `GPC.HELP.PRG` | the GPC reference, on the X16 |
@@ -38,6 +43,7 @@ same build.
 | `BASLOAD-GPC.PRG` | the streaming tokeniser, the program you run |
 | `BASLOAD-GPC.BIN` | the streaming tokeniser's engine |
 | `README.md` | this file |
+| `RELEASE-NOTES.md` | what changed since 1.0.0 |
 | `LICENSE` | the MIT licence |
 | `HELP-TXT/` | the index and topic files `GPC.HELP.PRG` reads |
 | `GPC-BASIC/` | the GP.BASIC library and its manual |
@@ -141,7 +147,7 @@ folder, or `/GPC/GPC.BIN` when the current folder has none. A shared compile
 first prints `** SHARED RUNTIME SELECTED, REMEMBER TO INCLUDE IT **`.
 
 `GPC.PRG` is itself a shared program that uses the GP handlers. It needs
-`GPB.RT.131.BIN` and `GP1.RT.131.BIN` (see [where the runtime files
+`GPB.RT.133.BIN` and `GP1.RT.133.BIN` (see [where the runtime files
 go](#where-the-runtime-files-go)).
 
 ### What the compiler prints
@@ -244,7 +250,7 @@ Then `LOAD "GPC.BIN",8` and `RUN`.
   and the object's `.OVL`.
 - A source it cannot read stops with `SOURCE NOT FOUND OR EMPTY`. One that
   does not load at `$0801` stops with `NOT A BASIC PRG FILE`.
-- A self-contained compile reads `GPC.IMG.131.BIN` and `GP1.IMG.131.BIN` from
+- A self-contained compile reads `GPC.IMG.133.BIN` and `GP1.IMG.133.BIN` from
   the current folder, or from `/GPC/`. Without them it prints
   `NO RUNTIME IMAGE` and writes nothing. A shared compile does not read them.
 
@@ -253,9 +259,9 @@ Then `LOAD "GPC.BIN",8` and `RUN`.
 ### Self-contained
 
 This is the default. The object carries the runtime ahead of its p-code:
-10,239 bytes when the report says `CORE`, 11,775 bytes when it says `GPBASIC`.
+10,495 bytes when the report says `CORE`, 12,031 bytes when it says `GPBASIC`.
 The report prints this figure as `RUNTIME`. After the p-code, from the next
-page boundary, come 2,432 bytes of bank code, which the program copies to RAM
+page boundary, come 2,448 bytes of bank code, which the program copies to RAM
 bank 1 as it starts.
 
 A self-contained program needs no other file, except its `.OVL` when it has a
@@ -272,29 +278,29 @@ from a compatible build. Otherwise it loads one:
 
 | File | Loads at | Loaded for |
 | --- | --- | --- |
-| `GPB.RT.131.BIN` | `$6F00` | a `GPBASIC` program |
-| `GPC.RT.131.BIN` | `$7700` (`RTBASE`) | a `CORE` program |
-| `GP1.RT.131.BIN` | `$A000` in RAM bank 1 | every shared program |
+| `GPB.RT.133.BIN` | `$6F00` | a `GPBASIC` program |
+| `GPC.RT.133.BIN` | `$7700` (`RTBASE`) | a `CORE` program |
+| `GP1.RT.133.BIN` | `$A000` in RAM bank 1 | every shared program |
 
-`GPB.RT.131.BIN` holds the GP handlers and the core. `GPC.RT.131.BIN` holds
-the core only. `GP1.RT.131.BIN` holds the bank 1 code.
+`GPB.RT.133.BIN` holds the GP handlers and the core. `GPC.RT.133.BIN` holds
+the core only. `GP1.RT.133.BIN` holds the bank 1 code.
 
 The compiler chooses between the first two at compile time, and an edit to the
 program can change the choice. Keep all three files available.
 
 A shared program's workspace ends where the runtime starts: `$6F00` for
 `GPBASIC`, `$7700` for `CORE`. A `CORE` program uses the memory the GP
-handlers occupied, so the next `GPBASIC` program loads `GPB.RT.131.BIN` again.
+handlers occupied, so the next `GPBASIC` program loads `GPB.RT.133.BIN` again.
 
 #### Where the runtime files go
 
 The bootstrap looks in three places, in order: the current folder, `/GPC/`,
-then the root of the drive. It loads `GP1.RT.131.BIN` from the place the
+then the root of the drive. It loads `GP1.RT.133.BIN` from the place the
 runtime came from.
 
 A file that is not found prints `?RT`, the third letter of its name and the
-build number, then returns to BASIC: `?RTB131` for `GPB.RT.131.BIN`, `?RTC131`
-for `GPC.RT.131.BIN`, `?RT1131` for `GP1.RT.131.BIN`.
+build number, then returns to BASIC: `?RTB133` for `GPB.RT.133.BIN`, `?RTC133`
+for `GPC.RT.133.BIN`, `?RT1133` for `GP1.RT.133.BIN`.
 
 A shared object carries the file name of the runtime it was compiled against,
 so a runtime from another build is not found. Recompile every shared program
@@ -343,7 +349,7 @@ section 3.12 covers regions.
 
 ### Other limits
 
-- 4,096 BASIC lines. `PROGRAM TOO BIG @` and a line number means a compiler
+- 12,286 code lines. `PROGRAM TOO BIG @` and a line number means a compiler
   table filled at that line.
 - 4,096 bytes of scalar variables: 6 bytes for each numeric variable without a
   suffix, 2 for each `%` or `$` variable. More stops the compile with
@@ -355,8 +361,8 @@ section 3.12 covers regions.
 answers with the BASIC line, the source file the line came from, and the
 nearest label above it.
 
-It is a shared program that uses the GP handlers, so it needs `GPB.RT.131.BIN`
-and `GP1.RT.131.BIN`. It needs `GPC.ERR.OVL` beside it. It runs on an 80x30
+It is a shared program that uses the GP handlers, so it needs `GPB.RT.133.BIN`
+and `GP1.RT.133.BIN`. It needs `GPC.ERR.OVL` beside it. It runs on an 80x30
 screen.
 
 | Menu | Items |
@@ -409,8 +415,8 @@ from `/GPC/HELP-TXT/` when there is none beside it. The folder name `HELP-TXT`
 is fixed. When the index does not load it prints
 `GPC.HELP: HELP-TXT/GPC.HELP.IDX WOULD NOT LOAD.` and ends.
 
-It is a shared program that uses the GP handlers, so it needs `GPB.RT.131.BIN`
-and `GP1.RT.131.BIN`. It needs `GPC.HELP.OVL` beside it.
+It is a shared program that uses the GP handlers, so it needs `GPB.RT.133.BIN`
+and `GP1.RT.133.BIN`. It needs `GPC.HELP.OVL` beside it.
 
 On the index:
 
@@ -491,10 +497,22 @@ TOKENISING HELLO.BASL ...
   `JSR ADDUP` and `LDA ARRAY` all fail. The error names the line that uses
   the label, not the line that defines it. A bare `A` operand, as in `ASL A`,
   is unaffected. Start the label with any other letter.
+- A second `DIM` of an array that is already dimensioned raises no error.
+  X16 BASIC stops with `?REDIM'D ARRAY ERROR`. What the second `DIM` does to
+  the array is not defined. Dimension each array once.
+- A `GP.ASM` `{VAR}` with a sigil or an array needs a `.SYM` from
+  BASLOAD-GPC. ROM BASLOAD's symbol file records names without the sigil,
+  so `{N%}`, `{N$}`, `{N()}` and `{N%()}` stop the compile with
+  `UNKNOWN VARIABLE IN {}`. A plain `{N}` resolves under either tokeniser.
+  Tokenise with BASLOAD-GPC.
 
 ## License
 
-MIT. See [`LICENSE`](LICENSE). (c) 2023 paulscottrobson and contributors.
+MIT. See [`LICENSE`](LICENSE). (c) 2023 paulscottrobson, (c) 2026 Steven De
+George SR.
+
+BASLOAD-GPC is built on Stefan Jakobsson's BASLOAD, under the BSD 2-Clause
+licence in `SRC/GPC-BASLOAD/LICENSE`.
 
 <!-- release: the rest is for the source tree -->
 

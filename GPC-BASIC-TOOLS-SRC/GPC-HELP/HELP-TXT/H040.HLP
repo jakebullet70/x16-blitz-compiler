@@ -68,9 +68,9 @@
 .
 =EXAMPLE PROGRAM
 .
->195|STRINGS.EXP.BL  the GP.BASIC string set
->194|STRCTST.EXP.BL  STRCASE.INC.BL, eight cases
->196|STRTST.EXP.BL  the parts of STRINGS.INC.BL that STRCTST and
+>198|STRINGS.EXP.BL  the GP.BASIC string set
+>197|STRCTST.EXP.BL  STRCASE.INC.BL, eight cases
+>199|STRTST.EXP.BL  the parts of STRINGS.INC.BL that STRCTST and
 .
 =SEE ALSO
 .

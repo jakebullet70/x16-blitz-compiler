@@ -5,7 +5,7 @@ The GP.BASIC and BASL reference that `GPC.HELP.PRG` shows on the X16, in one fil
 **Generated. Do not edit.** `MKHELP.PY` builds it and the `.HLP` files together from `GPC-BASIC/` -- the manual, the name register and the module banner headers. Fix anything wrong at the source and rebuild:
 
 ```
-python GPC-BASIC-TOOLS-SRC/GPC-HELP/MKHELP.PY
+python MKHELP.PY
 ```
 
 ## Contents
@@ -132,7 +132,7 @@ The 40 keywords split by whether they need a runtime handler.
     GP.BANKEDSTR GP.ENDBANKEDSTR GP.BSTR GP.BSTRSET
     GP.BANKED GP.ENDBANKED
 
-Their handlers are one block, `GPBase $3000` to `ObjectBase $3600`: 1,536 bytes, page aligned, all
+Their handlers are one block, `GPBase $3100` to `ObjectBase $3700`: 1,536 bytes, page aligned, all
 or nothing. `ScanGPUsage` walks the finished p-code and drops the block from the object when
 nothing in it is reached.
 
@@ -313,6 +313,8 @@ again after a later `#REM 0`. Both tokenisers produce byte-identical programs fr
   with `INVALID PARAMETER`.
 - Every library module (`.INC.BL`) follows the second rule. Programs built by ROM BASLOAD include
   them.
+- A program whose `GP.ASM` blocks use `{VAR}` with a sigil or an array, such as `{N%}` or `{N()}`,
+  builds only with BASLOAD-GPC. ROM BASLOAD's `.SYM` records names without the sigil.
 
 WARNING: `#REM 0` after the directives also drops the REM lines that carry a `GP.ASM` body. A
 program with `GP.ASM` blocks sets `#REM 1` again before each block (§3.9).
@@ -4871,8 +4873,8 @@ Each of these has cost a debugging session at least once.
 
 #### 8. Known bugs
 
-Three, all live on 12th September 2026 and all reproducible. Each says what happens, what causes
-it, and what to do instead. A bug leaves this list when it is fixed, not when it is understood.
+Five, all reproducible. Each says what happens, what causes it where that is known, and what to do
+instead. A bug leaves this list when it is fixed, not when it is understood.
 
 ##### A string never gives memory back
 
@@ -4916,6 +4918,35 @@ the next read starts at a line boundary.
 **Do this** — a record cannot be one string. Make it N strings of 255, or keep it in a bank and
 copy out the part that is needed.
 
+##### A second DIM of an array raises no error
+
+A `DIM` of an array that is already dimensioned raises no error. X16 BASIC stops with
+`?REDIM'D ARRAY ERROR`. What the second `DIM` does to the array is not defined. The cause is not
+yet known.
+
+**Do this** — dimension each array once.
+
+##### A GP.ASM label starting with A will not assemble
+
+Inside a `GP.ASM` block, an operand that names a label starting with the letter `A` stops the
+compile with `PASS 1 SYNTAX ERROR`. `BNE ACLP`, `JSR ADDUP` and `LDA ARRAY` all fail. The error
+names the line that uses the label, not the line that defines it. A bare `A` operand, as in
+`ASL A`, is unaffected.
+
+The operand parser takes a leading `A` as the accumulator.
+
+**Do this** — start the label with any other letter.
+
+##### {VAR} with a sigil or an array needs BASLOAD-GPC
+
+Under ROM BASLOAD, `{N%}`, `{N$}`, `{N()}` and `{N%()}` in a `GP.ASM` block stop the compile with
+`UNKNOWN VARIABLE IN {}`. A plain `{N}` resolves under either tokeniser.
+
+ROM BASLOAD's `.SYM` file records names without the sigil, so GPC cannot find a name that has
+one.
+
+**Do this** — tokenise with BASLOAD-GPC.
+
 ---
 
 # MEMORY AND LIMITS
@@ -4929,25 +4960,26 @@ copy out the part that is needed.
 One item a line. `GPBMODS`, built shared:
 
 ```
-OK LOW CODE 11520, SHARED GPBASIC
-LOW FREE 12288, FRAME STACK 2048
-LINES 3795
-BANK   7 CODE  4864 USED  3328 FREE
-BANK   9 CODE   768 USED  7424 FREE
-BANK   4 CODE  7680 USED   512 FREE
+OK LOW CODE 11264, SHARED GPBASIC
+LOW FREE 12544, FRAME STACK 2048
+LINES 3690
+DEAD CODE:  202 LINES REMOVED, 1305 BYTES SAVED
+BANK   7 CODE  3840 USED  4352 FREE
+BANK   9 CODE   512 USED  7680 FREE
+BANK   4 CODE  7936 USED   256 FREE
 BANK  10 CODE   768 USED  7424 FREE
 BANK   8 CODE  1792 USED  6400 FREE
 BANK  11 CODE  3072 USED  5120 FREE
-BANK   5 TEXT  7424 USED   768 FREE
-BANK   6 TEXT  4352 USED  3840 FREE
-TOTAL BANKS 8, 30720 USED
+BANK   5 TEXT  7680 USED   512 FREE
+BANK   6 TEXT  4608 USED  3584 FREE
+TOTAL BANKS 8, 30208 USED
 ```
 
 An embedded build prints a `RUNTIME` line second. `GPCTEST-E`:
 
 ```
-OK LOW CODE 969, EMBEDDED GPBASIC
-RUNTIME 11775
+OK LOW CODE 723, EMBEDDED GPBASIC
+RUNTIME 12031
 LOW FREE 23808, FRAME STACK 2048
 ```
 
@@ -4972,7 +5004,7 @@ Two budgets come off `LOW FREE`:
   `PROGRAM TOO BIG`.
 
 A program can be comfortable on one and out of room on the other. `LOW FREE 4096` is 4K to run in
-and nowhere left to grow; `GPBMODS` at `LOW FREE 12288` has both.
+and nowhere left to grow; `GPBMODS` at `LOW FREE 12544` has both.
 
 ##### What ships with the program
 

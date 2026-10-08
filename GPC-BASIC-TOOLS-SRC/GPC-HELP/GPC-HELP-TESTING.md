@@ -1,11 +1,11 @@
 # GPC-HELP-TESTING
 
-The GP.BASIC and BASL reference, in one file you can read on a PC. The module entries are the banner headers of `../GPB-MODS-TESTING/GPC-BASIC`, so this file documents THAT copy of the library -- not the one the shipped `.HLP` files were built from.
+The GP.BASIC and BASL reference, in one file you can read on a PC. The module entries are the banner headers of `GPC-BASIC-TOOLS-SRC/GPB-MODS-TESTING/GPC-BASIC`, so this file documents THAT copy of the library -- not the one the shipped `.HLP` files were built from.
 
 **Generated. Do not edit.** `MKHELP.PY` builds it from the manual, the name register and the module banner headers. Fix anything wrong at the source and rebuild:
 
 ```
-python MKHELP.PY --mods ../GPB-MODS-TESTING/GPC-BASIC --md-only --md-name GPC-HELP-TESTING.md
+python GPC-BASIC-TOOLS-SRC/GPC-HELP/MKHELP.PY --mods GPC-BASIC-TOOLS-SRC/GPB-MODS-TESTING/GPC-BASIC --md-only --md-name GPC-HELP-TESTING.md
 ```
 
 ## Contents
@@ -135,7 +135,7 @@ The 40 keywords split by whether they need a runtime handler.
     GP.BANKEDSTR GP.ENDBANKEDSTR GP.BSTR GP.BSTRSET
     GP.BANKED GP.ENDBANKED
 
-Their handlers are one block, `GPBase $3000` to `ObjectBase $3600`: 1,536 bytes, page aligned, all
+Their handlers are one block, `GPBase $3100` to `ObjectBase $3700`: 1,536 bytes, page aligned, all
 or nothing. `ScanGPUsage` walks the finished p-code and drops the block from the object when
 nothing in it is reached.
 
@@ -263,8 +263,8 @@ Run `GPC.PRG` on BASLOAD's `.PRG`, then run the object it writes.
 ```
 
 A `#GPC` line tells GPC how to build the program. BASLOAD-GPC, the tokeniser the build runs, passes
-it through as the BASIC line `REM#GPC <text>`. ROM BASLOAD does not know `#GPC`. A `#GPC` line
-inside a hidden `#IFDEF` block emits nothing.
+it through as the BASIC line `REM#GPC <text>`. A `#GPC` line inside a hidden
+`#IFDEF` block emits nothing.
 
 | directive | does |
 |---|---|
@@ -293,6 +293,34 @@ removal.
   open region, a close without an open, or a region open at the end of the source is
   `BLOCK MISMATCH`. A keep region and a debug region may overlap. Under `NOSTRIP` the keep markers
   are not checked.
+
+###### Under ROM BASLOAD
+
+```basl
+#REM 1
+REM #GPC SHARED
+REM #GPC OBJECT "MANDEL.PRG"
+#REM 0
+```
+
+ROM BASLOAD stops with an error at an unknown `#` option, so the short `#GPC` spelling builds only
+with BASLOAD-GPC. GPC also reads `REM #GPC` as a directive: any number of spaces after the `REM`
+token, letters in any case. ROM BASLOAD drops REM lines unless `#REM 1` is set, and drops them
+again after a later `#REM 0`. Both tokenisers produce byte-identical programs from the form above.
+
+- A program past a ROM BASLOAD limit, 38,655 bytes tokenised or about 950 variable names, builds
+  only with BASLOAD-GPC. It may use the short `#GPC` spelling and a string `#DEFINE`. GPBMODS,
+  EDIT, GPC.ERR, GPC.GUI, GPC.HELP, KV-BIN-STORE, GUI-FIELD-EDIT and TURBO are such programs.
+- A program inside both limits stays buildable with ROM BASLOAD. It uses the `REM #GPC` spelling
+  between `#REM 1` and `#REM 0`, and number defines only. ROM BASLOAD rejects a string `#DEFINE`
+  with `INVALID PARAMETER`.
+- Every library module (`.INC.BL`) follows the second rule. Programs built by ROM BASLOAD include
+  them.
+- A program whose `GP.ASM` blocks use `{VAR}` with a sigil or an array, such as `{N%}` or `{N()}`,
+  builds only with BASLOAD-GPC. ROM BASLOAD's `.SYM` records names without the sigil.
+
+WARNING: `#REM 0` after the directives also drops the REM lines that carry a `GP.ASM` body. A
+program with `GP.ASM` blocks sets `#REM 1` again before each block (§3.9).
 
 ##### `#DEFINE` — a name for a constant
 
@@ -354,7 +382,7 @@ anything wider compiles through the float encoder. Neither wraps.
 ---
 
 
-*See also: 7. Memory, and what the compiler tells you, 6. The traps, collected*
+*See also: 7. Memory, and what the compiler tells you, 3.9 Inline assembly, 6. The traps, collected*
 
 ---
 
@@ -549,7 +577,7 @@ reads the debug map the compiler writes when `MAKE A DEBUG MAP?` is answered yes
 the address cannot be resolved.
 
 `GPC.HELP.PRG` is this reference, on the machine. It reads `HELP-TXT/` beside it — `GPC.HELP.IDX`
-and one `.HLP` per topic — and shows 75 topics at 80x30. Arrows, `PgUp` / `PgDn`, `HOME` and `END`
+and one `.HLP` per topic — and shows 76 topics at 80x30. Arrows, `PgUp` / `PgDn`, `HOME` and `END`
 move. `RETURN` opens the highlighted index row. `/` finds and `N` repeats the search. `L` follows a
 topic's cross references, `X` writes its code out as a `.BL` where it has any, `T` cycles the colour
 themes, `?` is the about box. `ESC` goes back a step, and quits from the index.
@@ -5048,8 +5076,8 @@ Each of these has cost a debugging session at least once.
 
 #### 8. Known bugs
 
-Three, all live on 12th September 2026 and all reproducible. Each says what happens, what causes
-it, and what to do instead. A bug leaves this list when it is fixed, not when it is understood.
+Five, all reproducible. Each says what happens, what causes it where that is known, and what to do
+instead. A bug leaves this list when it is fixed, not when it is understood.
 
 ##### A string never gives memory back
 
@@ -5093,6 +5121,35 @@ the next read starts at a line boundary.
 **Do this** — a record cannot be one string. Make it N strings of 255, or keep it in a bank and
 copy out the part that is needed.
 
+##### A second DIM of an array raises no error
+
+A `DIM` of an array that is already dimensioned raises no error. X16 BASIC stops with
+`?REDIM'D ARRAY ERROR`. What the second `DIM` does to the array is not defined. The cause is not
+yet known.
+
+**Do this** — dimension each array once.
+
+##### A GP.ASM label starting with A will not assemble
+
+Inside a `GP.ASM` block, an operand that names a label starting with the letter `A` stops the
+compile with `PASS 1 SYNTAX ERROR`. `BNE ACLP`, `JSR ADDUP` and `LDA ARRAY` all fail. The error
+names the line that uses the label, not the line that defines it. A bare `A` operand, as in
+`ASL A`, is unaffected.
+
+The operand parser takes a leading `A` as the accumulator.
+
+**Do this** — start the label with any other letter.
+
+##### {VAR} with a sigil or an array needs BASLOAD-GPC
+
+Under ROM BASLOAD, `{N%}`, `{N$}`, `{N()}` and `{N%()}` in a `GP.ASM` block stop the compile with
+`UNKNOWN VARIABLE IN {}`. A plain `{N}` resolves under either tokeniser.
+
+ROM BASLOAD's `.SYM` file records names without the sigil, so GPC cannot find a name that has
+one.
+
+**Do this** — tokenise with BASLOAD-GPC.
+
 ---
 
 # MEMORY AND LIMITS
@@ -5106,25 +5163,26 @@ copy out the part that is needed.
 One item a line. `GPBMODS`, built shared:
 
 ```
-OK LOW CODE 11520, SHARED GPBASIC
-LOW FREE 12288, FRAME STACK 2048
-LINES 3795
-BANK   7 CODE  4864 USED  3328 FREE
-BANK   9 CODE   768 USED  7424 FREE
-BANK   4 CODE  7680 USED   512 FREE
+OK LOW CODE 11264, SHARED GPBASIC
+LOW FREE 12544, FRAME STACK 2048
+LINES 3690
+DEAD CODE:  202 LINES REMOVED, 1305 BYTES SAVED
+BANK   7 CODE  3840 USED  4352 FREE
+BANK   9 CODE   512 USED  7680 FREE
+BANK   4 CODE  7936 USED   256 FREE
 BANK  10 CODE   768 USED  7424 FREE
 BANK   8 CODE  1792 USED  6400 FREE
 BANK  11 CODE  3072 USED  5120 FREE
-BANK   5 TEXT  7424 USED   768 FREE
-BANK   6 TEXT  4352 USED  3840 FREE
-TOTAL BANKS 8, 30720 USED
+BANK   5 TEXT  7680 USED   512 FREE
+BANK   6 TEXT  4608 USED  3584 FREE
+TOTAL BANKS 8, 30208 USED
 ```
 
 An embedded build prints a `RUNTIME` line second. `GPCTEST-E`:
 
 ```
-OK LOW CODE 969, EMBEDDED GPBASIC
-RUNTIME 11775
+OK LOW CODE 723, EMBEDDED GPBASIC
+RUNTIME 12031
 LOW FREE 23808, FRAME STACK 2048
 ```
 
@@ -5149,7 +5207,7 @@ Two budgets come off `LOW FREE`:
   `PROGRAM TOO BIG`.
 
 A program can be comfortable on one and out of room on the other. `LOW FREE 4096` is 4K to run in
-and nowhere left to grow; `GPBMODS` at `LOW FREE 12288` has both.
+and nowhere left to grow; `GPBMODS` at `LOW FREE 12544` has both.
 
 ##### What ships with the program
 

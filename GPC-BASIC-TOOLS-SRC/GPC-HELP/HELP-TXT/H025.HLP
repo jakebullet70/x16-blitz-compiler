@@ -187,7 +187,7 @@
 .
 =EXAMPLE PROGRAM
 .
->172|ASM.EXP.BL  GP.ASM / GP.ENDASM, inline 65C02 assembly
+>175|ASM.EXP.BL  GP.ASM / GP.ENDASM, inline 65C02 assembly
 .
 =SEE ALSO
 .

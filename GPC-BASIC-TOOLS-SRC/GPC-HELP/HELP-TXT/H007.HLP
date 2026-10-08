@@ -123,7 +123,7 @@
 .
 =SEE ALSO
 .
->163|7. Memory, and what the compiler tells you
+>166|7. Memory, and what the compiler tells you
 >68|4.1 THEME.INC.BL -- named colour roles
 >77|4.3 APPSYS.INC.BL -- start politely, leave it as you found it
 >116|STASH.INC.BL -- save a text rectangle, and put it back.

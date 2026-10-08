@@ -1,6 +1,6 @@
 ---
 name: release-1-2-0-progress
-description: "v1.2.0 release plan (no TURBO editor), seven steps; steps 1-2 committed, step 3 committed in 134212b, step 4 committed, step 5 docs next"
+description: "v1.2.0 release, seven steps, all done 2026-10-08: zip built, docs and release notes committed; 1.1.0 was never public, so the notes run from 1.0.0"
 metadata:
   node_type: memory
   type: project
@@ -75,8 +75,21 @@ that needs the user's go-ahead for the asm.
 On 2026-10-08 the user said the release goes out the morning of 2026-10-09, after their testing.
 The UXCBASIC design draft ([[uxcbasic-plan]]) waits until the release is out.
 
+- Step 5 on 2026-10-08, uncommitted: README.md gained What's new in 1.2.0, Upgrading from 1.1.0
+  and two Known issues (second DIM, {VAR} sigil under ROM BASLOAD); GP-BASIC.md section 8 has five
+  bugs. Build 131 names and sizes became 133 everywhere shipped: embedded runtime 10,495 CORE /
+  12,031 GPBASIC, bank code 2,448, GPBase $3100. Every shipped readme passes 78 columns and ASCII.
+  MKHELP, the TESTING render and MKHELPWIN were rerun: 76 topics, index 202 of 210 rows.
+
+- Steps 5 to 7 on 2026-10-08. The user said 1.1.0 was never public, so RELEASE-NOTES.md (root,
+  shipped in the zip) covers every change since 1.0.0, with an Upgrading from 1.0.0 section.
+  README.md's What's new and Upgrading from 1.1.0 sections became a pointer to it. LICENSE is
+  combined: Paul Robson 2023 and Steven De George SR 2026. BASLOAD's BSD licence ships as
+  SRC/GPC-BASLOAD/LICENSE. release/gpc-release-1.2.0.zip is built: 359 files, 1,599,637 bytes.
+  All seven steps are done.
+
 **Why:** the release work spans many sessions and compacts.
 
-**How to apply:** resume at step 5, the docs. Remind the user to /compact after each step
+**How to apply:** the release is done; a 1.2.x fix restages with `release.sh stage` then `zip`. Remind the user to /compact after each step
 ([[compact-early-not-at-the-end]]). Never commit OASIS, and leave the untracked TURBO.DEAD,
 TURBO-GPC/bench and SETTINGS files alone. See [[release-1-1-0-state]].

@@ -97,6 +97,5 @@ point of the sample. A `GP.BANKED` or `GP.BANKEDSTR` block anywhere in the sourc
 | `GUI-LITE.BASL` | the program |
 | `GPC-BASIC/` | copies of `GPB`, `APPSYS`, `THEME`, `GUI-LITE` and `DOS` from the root library, the modules it includes |
 | `GPC.BIN`, `GPC.PRG`, `BASLOAD-GPC.PRG`, `BASLOAD-GPC.BIN` | the compiler and tokeniser, for building on the machine |
-| `GPC.IMG.131.BIN`, `GP1.IMG.131.BIN`, `*.RT.131.BIN` | the runtime images the compiler embeds |
 
 Build outputs: `GUI-LITE.SRC.PRG`, `GUI-LITE.SRC.SYM`, `GUI-LITE.PRG` and `GUI-LITE.MAP`.

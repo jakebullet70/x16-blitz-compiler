@@ -107,9 +107,9 @@
 .
 =EXAMPLE PROGRAM
 .
->175|BMXVIEW.EXP.BL  a BMX bitmap viewer, in about thirty lines
->173|BMXPAL.EXP.BL
->174|BMXSPD.EXP.BL
+>178|BMXVIEW.EXP.BL  a BMX bitmap viewer, in about thirty lines
+>176|BMXPAL.EXP.BL
+>177|BMXSPD.EXP.BL
 .
 =SEE ALSO
 .

@@ -20,8 +20,8 @@ junction; re-make it first if a rename breaks it. See [memory-is-git-tracked](me
 - [Build times baseline](build-times-baseline.md) — time every build, flag 2x over; build.py prints step times; [Compact early, not at the end](compact-early-not-at-the-end.md) — remind the user to /compact at the end of every turn that lands a step
 
 ## Build and toolchain
-- [Release 1.2.0 progress](release-1-2-0-progress.md) — seven-step plan, no TURBO; step 3 committed in 134212b, step 4 committed, step 5 docs next
-- [Release 1.1.0 state](release-1-1-0-state.md) — 1.1.0 zip (build 131) is with a tester since 2026-10-05, keep it; the tree is 1.2.0, no 1.2.0 zip yet; [USER-RUNS demos broken by Build 127](user-runs-demos-broken-by-build-127.md) — runtimes sit beside each sample; the tree is on build 131
+- [Release 1.2.0 progress](release-1-2-0-progress.md) — done 2026-10-08, zip built; 1.1.0 was never public, so RELEASE-NOTES.md runs from 1.0.0
+- [Release 1.1.0 state](release-1-1-0-state.md) — 1.1.0 zip (build 131) is with a tester since 2026-10-05, keep it; 1.2.0 zip built 2026-10-08; [USER-RUNS demos broken by Build 127](user-runs-demos-broken-by-build-127.md) — runtimes sit beside each sample; the tree is on build 131
 - [Tool home goes stale](tool-home-goes-stale.md) — sample builds run /GPC/GPC.BIN, which no commit refreshes; copy a new compiler there by hand; [Tool home layout deferred](tool-home-layout-deferred.md) — /GPC/ + /BASIC-SRC/ is next-version; research in docs/blitz/TOOL-HOME-LAYOUT.RESEARCH.md
 - [Build toolchain location](build-toolchain-location.md) — make, 64tass, python are off-PATH in C:\8bitProgramming; see docs/BUILDING.md; [Git Bash sed strips CRLF](git-bash-sed-strips-crlf.md) — `sed -i` writes LF; count CRLF with Python bytes
 - [App make skips compiler.library](app-make-does-not-rebuild-compiler-library.md) — use `make libs`; [it does not install the runtime](make-libs-does-not-install-the-runtime.md); [the baseline is the application copy](baseline-compiler-is-the-application-copy.md)
@@ -48,7 +48,7 @@ junction; re-make it first if a rename breaks it. See [memory-is-git-tracked](me
 - [Run-side workspace, read from the PRG](run-side-workspace-read-from-the-prg.md) — two bootstrap page numbers give the budget; [2 B cushion below GPBase](gpc-core-page-cushion-below-gpbase.md)
 - [Compiler-emitted bank switch](compiler-emitted-bank-switch.md) — .bgosub emitted, shims deleted; [banks work in progress](banks-work-in-progress.md), HANDLER-BANK at step 28, uncommitted
 - [Opcode numbers follow handler order](opcode-numbers-follow-handler-order.md) — moving a `;;` handler renumbers p-code
-- [Library sizes owed to help](library-sizes-belong-in-help.md) — runtime 10,239 B CORE / 11,775 GP.BASIC embedded; GPC-BASIC costs only what you #INCLUDE; [Runtime footprint](blitz-x16-runtime-footprint.md) — build 128 sizes and how to shrink it
+- [Library sizes owed to help](library-sizes-belong-in-help.md) — runtime 10,495 B CORE / 12,031 GP.BASIC embedded; GPC-BASIC costs only what you #INCLUDE; [Runtime footprint](blitz-x16-runtime-footprint.md) — build 133 sizes and how to shrink it
 - [String heap scavenger](string-heap-scavenger.md) — SHIPPED; [string blocks never shrink](gpc-string-blocks-never-shrink.md), never build a big temporary
 - [BINPUT# caps at 255 bytes](binput-caps-at-255-bytes.md) — it is a CHRIN loop; [LOAD chain clears memory](load-chain-clears-memory.md) — the variable carry is gone; no CLR needed
 - [Two-pass compiler](two-pass-compiler.md) — DONE; [compile is write-only](compile-is-write-only.md) is the premise

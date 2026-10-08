@@ -2,9 +2,9 @@
 .
 =8. KNOWN BUGS
 .
-.Three, all live on 12th September 2026 and all reproducible. Each says what
-.happens, what causes it, and what to do instead. A bug leaves this list when
-.it is fixed, not when it is understood.
+.Five, all reproducible. Each says what happens, what causes it where that is
+.known, and what to do instead. A bug leaves this list when it is fixed, not
+.when it is understood.
 .
 =A string never gives memory back
 .
@@ -54,3 +54,33 @@
 .
 .Do this -- a record cannot be one string. Make it N strings of 255, or keep
 .it in a bank and copy out the part that is needed.
+.
+=A second DIM of an array raises no error
+.
+.A DIM of an array that is already dimensioned raises no error. X16 BASIC
+.stops with ?REDIM'D ARRAY ERROR. What the second DIM does to the array is
+.not defined. The cause is not yet known.
+.
+.Do this -- dimension each array once.
+.
+=A GP.ASM label starting with A will not assemble
+.
+.Inside a GP.ASM block, an operand that names a label starting with the
+.letter A stops the compile with PASS 1 SYNTAX ERROR. BNE ACLP, JSR ADDUP and
+.LDA ARRAY all fail. The error names the line that uses the label, not the
+.line that defines it. A bare A operand, as in ASL A, is unaffected.
+.
+.The operand parser takes a leading A as the accumulator.
+.
+.Do this -- start the label with any other letter.
+.
+={VAR} with a sigil or an array needs BASLOAD-GPC
+.
+.Under ROM BASLOAD, {N%}, {N$}, {N()} and {N%()} in a GP.ASM block stop the
+.compile with UNKNOWN VARIABLE IN {}. A plain {N} resolves under either
+.tokeniser.
+.
+.ROM BASLOAD's .SYM file records names without the sigil, so GPC cannot find
+.a name that has one.
+.
+.Do this -- tokenise with BASLOAD-GPC.

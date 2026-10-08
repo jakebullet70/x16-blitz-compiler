@@ -109,7 +109,7 @@ from genrtimage import imageName, bankImageName     # noqa: E402
 #     GPB/GPC/GP1.RT.nnn.BIN               both shared runtimes and their bank code
 #     GPC.ERR.PRG  GPC.HELP.PRG            the two companion programs
 #     BASLOAD-GPC.PRG BASLOAD-GPC.BIN      the streaming tokeniser
-#     README.md LICENSE MANIFEST.TXT
+#     README.md RELEASE-NOTES.md LICENSE MANIFEST.TXT
 #     HELP-TXT/       the help viewer's index and topics
 #     GPC-BASIC/      the GP.BASIC library, whole, with its manual
 #     SRC/            source. Nothing under it is needed to run GPC.
@@ -186,6 +186,7 @@ ROOTFILES = [
     ("BASLOAD-GPC/build/BASLOAD-GPC.BIN",       "BASLOAD-GPC.BIN"),
     ("README.md",                           "README.md"),
     ("LICENSE",                             "LICENSE"),
+    ("RELEASE-NOTES.md",                    "RELEASE-NOTES.md"),
 ]
 
 # A shipped readme serves the repo and the release. Everything from this line on is for the
@@ -230,8 +231,8 @@ GPCHELP_SRC = [
     ("GPC-BASIC-TOOLS-SRC/GPC-HELP/readme.md",     "SRC/GPC-HELP/README.md"),
 ]
 
-# The tokeniser: the runnable pair, the ROM image for anyone flashing it in, and its two
-# documents. Its assembly source goes in as ONE zip rather than a loose tree -- it is
+# The tokeniser: the runnable pair, the ROM image for anyone flashing it in, its two
+# documents, and the upstream BSD licence that must travel with the binary. Its assembly source goes in as ONE zip rather than a loose tree -- it is
 # reference material, and four .inc files at this level would read like something the
 # release needs.
 BASLOAD_FILES = [
@@ -240,6 +241,7 @@ BASLOAD_FILES = [
     ("BASLOAD-GPC/build/basload-rom.bin",   "SRC/GPC-BASLOAD/basload-rom.bin"),
     ("BASLOAD-GPC/README.md",               "SRC/GPC-BASLOAD/README.md"),
     ("BASLOAD-GPC/RESEARCH.md",             "SRC/GPC-BASLOAD/RESEARCH.md"),
+    ("BASLOAD-GPC/upstream/LICENSE",        "SRC/GPC-BASLOAD/LICENSE"),
 ]
 BASLOAD_SRC_DIR = "BASLOAD-GPC/src"
 BASLOAD_SRC_ZIP = "SRC/GPC-BASLOAD/BASLOAD-SRC.ZIP"

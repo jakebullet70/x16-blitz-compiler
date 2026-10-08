@@ -1,4 +1,4 @@
-# BASLOAD — the tokenise ceiling, and what it would take to move it
+# BASLOAD - the tokenise ceiling, and what it would take to move it
 
 Researched 6th September 2026. `README.md` is how to build what came out of
 this.
@@ -7,7 +7,7 @@ this.
 
 Adding `FILEIO.INC.BL` and `FILEDIR.INC.BL` to
 `GPC-BASIC-TOOLS-SRC/GPB-MODS-TESTING/GPBMODS.BASL` produced a clean tokenise,
-then a compile that stopped with `UNKNOWN LINE NUMBER @ 2494` — a line number
+then a compile that stopped with `UNKNOWN LINE NUMBER @ 2494` - a line number
 GPC was sent to and could not find.
 
 The tokenised PRG was truncated. Its text stopped mid-way through
@@ -25,7 +25,7 @@ READY.
 
 It prints `SAVING` *first*, writes the short file, and only then reports.
 `build_basl.py` polled for the file, checked it loaded at $0801, deleted the
-echo log unread, and printed `OK`. Fixed in `4577b50` — it now reads the log
+echo log unread, and printed `OK`. Fixed in `4577b50` - it now reads the log
 and fails on `ERROR:`.
 
 ## 2. The numbers
@@ -41,7 +41,7 @@ and fails on `ERROR:`.
 783 bytes is about 45 lines. `FILEIO` + `FILEDIR` were measured off
 `FILEDIRT.BASL`, which tokenises to 9,449 with a ~2,250-byte driver.
 
-**~17.5 tokenised bytes per non-comment source line**, from two real builds —
+**~17.5 tokenised bytes per non-comment source line**, from two real builds -
 GPBMODS 16.9, FILEDIRT 18.2. Good enough to size a change, not to bet a build
 on.
 
@@ -57,7 +57,7 @@ compiler's size wall; a program can be compiled that cannot be tokenised.
 
 **It is already two-pass.** `line_pass = 1` walks every line building the
 symbol table, then the source is re-opened and pass 2 emits. Forward labels
-are resolved before a byte is written — which is the property that makes
+are resolved before a byte is written - which is the property that makes
 everything below possible.
 
 **Pass 2 emits one line at a time, strictly forward.** `line_meta` points at
@@ -70,12 +70,12 @@ after it, and moves both pointers on.
 **The only back-patch is into the current line's own header, four bytes
 behind.** Nothing reaches back into a line already finished.
 
-There is a single read-back — `lda (line_code),y` at `line.inc:1119` — and it
+There is a single read-back - `lda (line_code),y` at `line.inc:1119` - and it
 peeks at the byte just written in the same line, to drop a colon before a
 `REM`. Also inside the current line. **This was the one thing that could have
 invalidated the analysis, and it does not.**
 
-So a staging buffer of one line — 4 header bytes plus up to 255 body bytes —
+So a staging buffer of one line - 4 header bytes plus up to 255 body bytes -
 is sufficient, and none of the 17 `sta (line_code),y` sites has to change.
 
 ### The edit
@@ -85,13 +85,13 @@ is sufficient, and none of the 17 `sta (line_code),y` sites has to change.
 - `eol_mark`, ~40 lines: link from `out_addr`, fill the header, flush
   `4 + index_dst` bytes, advance
 - the `mem_top` check, ~5 lines: an `out_addr` overflow test instead
-- `file.inc`, ~60 lines: an output channel — OPEN/CHKOUT/CHROUT/CLOSE, and the
+- `file.inc`, ~60 lines: an output channel - OPEN/CHKOUT/CHROUT/CLOSE, and the
   two load-address bytes
 - `loader.inc`, ~20 lines: skip the `VARTAB`/`ARYTAB`/`STREND` store and
   `KERNAL_SAVE`; bracket pass 2
 
 **~150 lines of 65C02 across three files, no restructuring.** The switch
-already exists — `loader.inc` tests `saveas_len`. Streaming is arguably what
+already exists - `loader.inc` tests `saveas_len`. Streaming is arguably what
 `#SAVEAS` should always have meant: build a *file* when a file is asked for,
 build in RAM only when you want to `LIST` and `RUN`.
 
@@ -101,32 +101,32 @@ on the emit path and the pass structure rather than all 24 KB of `line.inc`.
 ### One flat file buys 1.6x. Many buy the lot.
 
 BASIC line links are 16-bit absolute addresses, so streaming to **one** file
-moves the wall from `MEMTOP` to the address space — about 63 KB from $0801.
+moves the wall from `MEMTOP` to the address space - about 63 KB from $0801.
 Enough for the job in hand (GPBMODS 37,872
-+ 7,200 + 8,000 ≈ 53,000, with ~10 KB spare) but a bigger room, not an
++ 7,200 + 8,000 ~ 53,000, with ~10 KB spare) but a bigger room, not an
   unbounded one.
 
 **A file per `#INCLUDE` removes the cap.** Each part restarts at $0801, so no
 part is ever large. Pass 2 already knows which source file it is in. Line
 numbers stay globally ascending and are 16-bit, so 65,535 lines is not the
-next wall — GPBMODS uses about 3,000.
+next wall - GPBMODS uses about 3,000.
 
 Two things it must not become:
 
 - **Pass 1 stays whole-program, in one run.** The symbol table is global. It
   resolves a `GOSUB` in the driver to a label in `GUI.INC.BL`, and it
-  allocates the short BASIC names — `GM.TELL$` becomes `J2$`. Separate runs
+  allocates the short BASIC names - `GM.TELL$` becomes `J2$`. Separate runs
   collide on both. Splitting the *output* is cheap; splitting the *analysis*
   is a different and much larger job.
 - **GPC needs a "next part" hook.**
   `source/application/source/file-io/read.asm` opens the source with `CHKIN`
-  on logical file 3 and streams it — it never loads it, so source size is not
+  on logical file 3 and streams it - it never loads it, so source size is not
   a constraint on the compiler at all. **Open: whether GPC uses the BASIC line
   *links* to find line boundaries.** Across a part break those point nowhere.
   If it scans for the null terminator instead, this is nearly free. Not yet
   checked.
 
-## 4. Running it out of RAM — done, and it needed no source changes
+## 4. Running it out of RAM - done, and it needed no source changes
 
 The objection to patching BASLOAD was distribution: it is a ROM bank, so a
 patched one means a custom `rom.bin` and a flash on real hardware.
@@ -140,7 +140,7 @@ What made it easy:
 
 - **The bridge works from RAM unchanged.** `bridge.inc` copies 42 bytes into
   golden RAM that switch ROM bank, `jsr`, and switch back, plus two more that
-  read BASIC's token table out of ROM bank 4 — needed wherever BASLOAD runs.
+  read BASIC's token table out of ROM bank 4 - needed wherever BASLOAD runs.
   This was the mechanism expected to be ROM-only. It is not.
 - **It already tidies up after itself.** `main_backup_ram` /
   `main_restore_ram` save and restore golden RAM ($0400-$07FF) and ZP $22-$7F,
@@ -184,7 +184,7 @@ toolchain, no third versioned artefact and no upstream to track.
 For doing it eventually: GPC can now compile more than BASLOAD can tokenise,
 which by the standing rule that a build-side wall is a bug makes this a bug
 rather than a limit. The change is small, the delivery problem turned out not
-to exist, and a `#SAVEAS`-streams mode is generally useful — so the right
+to exist, and a `#SAVEAS`-streams mode is generally useful - so the right
 shape is a pull request to `basload-rom`, not a fork carried forever.
 
 **Next step if it is taken up:** check how GPC finds line boundaries. That is

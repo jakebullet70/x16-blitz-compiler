@@ -871,7 +871,7 @@
 .
 =EXAMPLE PROGRAM
 .
->176|FORM.EXP.BL  three fields you can move between, LINEINPUT style
+>179|FORM.EXP.BL  three fields you can move between, LINEINPUT style
 .
 =SEE ALSO
 .

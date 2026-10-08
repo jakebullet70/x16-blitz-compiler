@@ -48,8 +48,8 @@
 .
 =EXAMPLE PROGRAM
 .
->171|ARRAYS.EXP.BL  the GP.BASIC array set
->191|SORT.EXP.BL  the regression test for SORT.INC.BL
+>174|ARRAYS.EXP.BL  the GP.BASIC array set
+>194|SORT.EXP.BL  the regression test for SORT.INC.BL
 .
 =SEE ALSO
 .

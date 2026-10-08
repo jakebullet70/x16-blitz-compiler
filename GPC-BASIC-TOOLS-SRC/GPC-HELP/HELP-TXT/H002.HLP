@@ -108,6 +108,9 @@
 .    only. ROM BASLOAD rejects a string #DEFINE with INVALID PARAMETER.
 .  - Every library module (.INC.BL) follows the second rule. Programs built
 .    by ROM BASLOAD include them.
+.  - A program whose GP.ASM blocks use {VAR} with a sigil or an array, such
+.    as {N%} or {N()}, builds only with BASLOAD-GPC. ROM BASLOAD's .SYM
+.    records names without the sigil.
 .
 .WARNING: #REM 0 after the directives also drops the REM lines that carry a
 .GP.ASM body. A program with GP.ASM blocks sets #REM 1 again before each
@@ -186,6 +189,6 @@
 .
 =SEE ALSO
 .
->163|7. Memory, and what the compiler tells you
+>166|7. Memory, and what the compiler tells you
 >48|3.9 Inline assembly
 >157|6. The traps, collected

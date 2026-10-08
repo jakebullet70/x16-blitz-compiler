@@ -1,14 +1,14 @@
 ---
 name: blitz-x16-runtime-footprint
-description: Build 128 runtime is 10,239 B (CORE) or 11,775 B (GP.BASIC) plus 2,432 B of bank 1 code in an embedded program, none in a shared one; the component split below is from an older 10,956 B build. ~2x the C64 Blitz runtime (est. ~5.8K) because we bundle our own 32-bit float+transcendentals. The size counterpart to the speed yardstick.
+description: Build 133 runtime is 10,495 B (CORE) or 12,031 B (GP.BASIC) plus 2,448 B of bank 1 code in an embedded program, none in a shared one; the component split below is from an older 10,956 B build. ~2x the C64 Blitz runtime (est. ~5.8K) because we bundle our own 32-bit float+transcendentals. The size counterpart to the speed yardstick.
 metadata:
   type: project
   originSessionId: e067067c-f194-41ca-978d-951f2d4c1c2e
 ---
 
-**Build 128, 2026-09-30:** an embedded object carries `$0801` to `GPBase $3000`, 10,239 bytes,
-when no `GP.` keyword is used, and `$0801` to `ObjectBase $3600`, 11,775 bytes, when one is. The
-2,432 bytes of bank 1 code (`GP1`) ride with it. A shared object carries no runtime and loads
+**Build 133, 2026-10-08:** an embedded object carries `$0801` to `GPBase $3100`, 10,495 bytes,
+when no `GP.` keyword is used, and `$0801` to `ObjectBase $3700`, 12,031 bytes, when one is. The
+2,448 bytes of bank 1 code (`GP1`) ride with it. A shared object carries no runtime and loads
 `GPC.RT` or `GPB.RT` plus `GP1.RT` at run time. The component table and the `$3300` addresses below
 are from an earlier 10,956 byte build; re-measure before quoting them.
 
